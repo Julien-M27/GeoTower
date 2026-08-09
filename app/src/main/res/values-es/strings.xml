@@ -26,7 +26,7 @@
     <string name="settings_hub_preferences_desc">Operador, idioma, unidades, enlaces, compartir</string>
     <string name="settings_hub_pages_desc">Inicio, mapa, brújula, fichas, herramientas</string>
     <string name="settings_hub_system_desc">Permisos, servidor, diagnóstico</string>
-    <string name="settings_hub_database_desc">Descargas, generación local, procesamiento local</string>
+    <string name="settings_hub_database_desc">Descargas, generación local, origen de los datos</string>
     <string name="settings_api_server_desc">Servidor principal o espejo de reserva</string>
     <string name="settings_database_online_title">Base de datos de operadores en línea</string>
     <string name="settings_search_placeholder">Buscar un ajuste</string>
@@ -142,9 +142,9 @@
     <string name="onboarding_database_success_desc">La base de datos sin conexión se ha instalado correctamente. La aplicación está lista para funcionar a plena velocidad.</string>
     <string name="onboarding_theme_desc">Elige el estilo que más te convenga.</string>
     <string name="onboarding_offline_desc">Descarga toda la base para usar la lista sin red. Aviso: archivo grande.</string>
-    <string name="onboarding_offline_desc_local_build">Tu nivel de procesamiento local genera la base en este dispositivo: no hay nada que descargar aquí.</string>
+    <string name="onboarding_offline_desc_local_build">Tu elección de origen de los datos genera la base en este dispositivo: no hay nada que descargar aquí.</string>
     <string name="onboarding_database_enb_cut_by_level">La base eNB / gNB no se ofrece: la autonomía máxima la corta, ya que no se puede generar en el dispositivo.</string>
-    <string name="settings_database_hidden_by_local_build">Las descargas móvil y radio se ocultan aquí: tu nivel de procesamiento local genera esas bases en el dispositivo.</string>
+    <string name="settings_database_hidden_by_local_build">Las descargas móvil y radio se ocultan aquí: tu elección de origen de los datos genera esas bases en el dispositivo.</string>
     <string name="settings_database_hidden_by_max_autonomy">Autonomía máxima: la base eNB / gNB se retira de aquí (no se puede generar en el dispositivo), junto con las descargas que sustituya la generación local. Una base todavía instalada conserva su tarjeta, para poder eliminarla.</string>
     <string name="onboarding_display_mode_title">¿Cómo quieres usar GeoTower?</string>
     <string name="onboarding_display_mode_desc">Dos formas de recorrer la aplicación. Puedes cambiarla cuando quieras desde los ajustes.</string>
@@ -261,6 +261,7 @@
     <string name="notification_signalquest_upload_progress">Enviando (%1$d/%2$d)...</string>
     <string name="notification_signalquest_upload_to_operator">Enviando a %1$s</string>
     <string name="notification_signalquest_upload_progress_address">%1$s · %2$d/%3$d</string>
+    <string name="notification_signalquest_upload_result_operator">%1$s · %2$s</string>
     <string name="notification_signalquest_upload_retry">Error de red, se reintentará más tarde.</string>
     <string name="operator_count">↓ Número de operadores: %1$d</string>
     <string name="upload_history_no_photo_recorded">Ninguna foto registrada</string>
@@ -1446,6 +1447,14 @@
     <string name="appstrings_version_quarterly_label">Datos\ntrimestrales</string>
     <string name="appstrings_version_time_at">a las</string>
     <string name="appstrings_version_weekly_label">Datos\nsemanales</string>
+    <string name="appstrings_about_versions_refresh">Actualizar las versiones</string>
+    <string name="appstrings_version_live_db_title">Base de datos online</string>
+    <string name="appstrings_version_live_db_desc">No hay ninguna base instalada en el dispositivo: el mapa, la búsqueda y las fichas leen directamente el servidor GeoTower. Estos son los datos que sirve.</string>
+    <string name="appstrings_version_live_db_label">Versión de la base\nonline</string>
+    <string name="appstrings_version_live_db_stations_label">Estaciones\npublicadas</string>
+    <string name="appstrings_version_live_db_published_label">Puesta en línea</string>
+    <string name="appstrings_version_live_db_server_label">Servidor</string>
+    <string name="appstrings_version_live_db_unavailable">El servidor no ha facilitado el detalle de los datos online.</string>
     <string name="version_week_number_with_date">Semana %1$d\n%2$s</string>
     <string name="photo_exif_label_camera_model">Dispositivo</string>
     <string name="photo_exif_label_distance_to_site">Distancia al sitio</string>
@@ -2400,9 +2409,20 @@
     <string name="outage_download_running">Descargando…</string>
     <string name="outage_download_error">Error de descarga: %1$s</string>
     <string name="outage_download_failed">Servidor inaccesible</string>
-    <string name="outage_download_local_source_note">Las incidencias se preparan actualmente en el dispositivo (Procesamiento local): no se usa el archivo del servidor.</string>
+    <string name="outage_download_local_source_note">Las incidencias se preparan actualmente en el dispositivo (Origen de los datos): no se usa el archivo del servidor.</string>
     <string name="outage_download_unavailable">Las incidencias no están disponibles por el momento.</string>
     <string name="outage_download_delete_desc">¿Seguro que quieres eliminar la copia de incidencias guardada en el dispositivo?</string>
+    <string name="outage_rebuild_desc">¿Ves una incidencia que el informe del servidor aún no tiene? Pídele que vuelva a descargar los archivos de los operadores.</string>
+    <string name="outage_rebuild_button">Solicitar un informe nuevo</string>
+    <string name="outage_rebuild_quota">Límite del servidor: %1$d por hora — disponibles: %2$d</string>
+    <string name="outage_rebuild_requesting">Solicitud enviada…</string>
+    <string name="outage_rebuild_running">El servidor está rehaciendo el informe…</string>
+    <string name="outage_rebuild_downloading">Descargando el informe nuevo…</string>
+    <string name="outage_rebuild_done">Informe rehecho y descargado.</string>
+    <string name="outage_rebuild_refused_global">La cuota de esta hora se ha agotado. Vuelve a intentarlo en %1$d min.</string>
+    <string name="outage_rebuild_refused_client">Ya has solicitado un informe en esta hora. Vuelve a intentarlo en %1$d min.</string>
+    <string name="outage_rebuild_failed">Error al regenerar: %1$s</string>
+    <string name="outage_rebuild_failed_generic">Error al regenerar.</string>
     <!-- Actualización de incidencias: notificación en directo + pasos -->
     <string name="outage_gen_notif_title">Actualizando incidencias</string>
     <string name="outage_gen_channel_name">Actualización de incidencias</string>
@@ -2415,11 +2435,11 @@
     <string name="appstrings_release_section_outages">Cortes de red</string>
     <string name="appstrings_release_v1965_outage_local_source">Elige el origen de los cortes: el servidor de GeoTower o una obtención directamente en tu dispositivo a partir de los archivos oficiales de los operadores</string>
     <string name="appstrings_release_v1965_outage_generation">Nueva pantalla «Origen de los cortes»: frecuencia de actualización, actualización en segundo plano (opcional), botón «Actualizar ahora», fecha y número de cortes obtenidos, con notificación de progreso</string>
-    <!-- Procesamiento local de datos (modo de autonomía del servidor) -->
-    <string name="local_mode_settings_title">Procesamiento local de datos</string>
-    <string name="local_mode_settings_desc">Incidencias y base de datos: servidor o dispositivo</string>
+    <!-- Origen de los datos (servidor o procesamiento en el dispositivo) -->
+    <string name="local_mode_settings_title">Origen de los datos</string>
+    <string name="local_mode_settings_desc">Servidor GeoTower o tu dispositivo</string>
     <string name="local_mode_intro">Elige cuántos datos se procesan en tu dispositivo en lugar de ser proporcionados por el servidor GeoTower. La configuración sigue controlándose de forma remota en todos los niveles.</string>
-    <string name="local_mode_remote_disabled">El procesamiento local está desactivado de forma remota.</string>
+    <string name="local_mode_remote_disabled">La preparación de los datos en el dispositivo está desactivada de forma remota.</string>
     <string name="local_mode_level_off_title">Servidor (predeterminado)</string>
     <string name="local_mode_level_off_desc">Todo se descarga y es proporcionado por el servidor GeoTower.</string>
     <string name="local_mode_level_db_title">Base de datos en local</string>
@@ -2437,7 +2457,7 @@
     <string name="local_mode_db_ineligible_measured">Hacen falta %1$s de memoria de la app y %2$s libres. Aquí: %3$s y %4$s libres.</string>
     <string name="local_mode_max_partial_on_this_device">En este dispositivo, la autonomía máxima es parcial: fotos, comprobación de actualizaciones, API en vivo y base eNB / gNB sí se cortan, pero las bases principales (móvil, radio) siguen viniendo del servidor GeoTower; de lo contrario la aplicación no tendría ningún dato.</string>
     <string name="enb_database_local_mode_unavailable">Autonomía máxima: esta base no se puede generar en el dispositivo, así que no se descarga ni se actualiza mientras ese nivel esté activo.</string>
-    <string name="local_mode_download_disabled">Procesamiento local activo: descarga del servidor desactivada.</string>
+    <string name="local_mode_download_disabled">Datos preparados en el dispositivo: descarga del servidor desactivada.</string>
 
     <!-- Aides au défilement (barre latérale + boutons haut/bas) -->
     <string name="appstrings_page_scrollbar_option">Barra de desplazamiento lateral</string>
@@ -2635,4 +2655,10 @@
     <string name="appstrings_release_v2018_photo_rotate">Un botón gira la foto un cuarto de vuelta antes de enviarla; la vista previa muestra exactamente lo que se enviará</string>
     <string name="appstrings_release_v2018_nearby_radius">La búsqueda de sitios cercanos en la base en línea amplía su radio por etapas, en lugar de detenerse en un límite que dejaba sin resultados fuera de Francia</string>
     <string name="appstrings_release_v2018_about_scrolling">La página «Acerca de» tiene su propio ajuste de desplazamiento: todas las partes seguidas, o una cada vez desde el menú lateral en pantallas grandes</string>
+
+    <!-- Notas de la versión 2.0.19 -->
+    <string name="appstrings_release_v2019_outage_rebuild">Un botón pide al servidor que rehaga su registro de averías cuando falta alguna, dentro de la cuota por hora que anuncia</string>
+    <string name="appstrings_release_v2019_live_db_about">Cuando no hay ninguna base instalada, «Acerca de» detalla los datos servidos en directo por el servidor: versión, estaciones publicadas y fecha de publicación</string>
+    <string name="appstrings_release_v2019_about_refresh">Un botón actualiza las versiones mostradas en «Acerca de»</string>
+    <string name="appstrings_release_v2019_local_mode_renamed">«Procesamiento local» pasa a llamarse «Origen de los datos»: servidor GeoTower o tu dispositivo, dicho más claro</string>
 </resources>

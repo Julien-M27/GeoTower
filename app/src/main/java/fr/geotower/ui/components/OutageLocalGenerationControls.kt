@@ -52,7 +52,7 @@ import java.util.Locale
  *
  * Partagé par les DEUX endroits qui pilotent cette source, pour qu'ils ne divergent jamais :
  *  - [fr.geotower.ui.screens.settings.OutageLocalControls], qui y ajoute les réglages d'exécution
- *    (fréquence, arrière-plan) dans l'écran Traitement local ;
+ *    (fréquence, arrière-plan) dans l'écran « Provenance des données » ;
  *  - [OutageDownloadCard], qui prend ce contenu quand les pannes sont préparées sur l'appareil : la
  *    carte de la section « Base de données » devient alors une carte de génération plutôt que de
  *    proposer un téléchargement serveur qui ne servirait à rien.

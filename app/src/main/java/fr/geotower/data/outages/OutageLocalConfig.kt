@@ -8,7 +8,7 @@ import fr.geotower.data.models.SiteHsEntity
  * Réglages de la récupération LOCALE des pannes (vs source serveur). Persistés dans les prefs
  * partagées "settings" (même store que `last_hs_update`).
  *
- * Le CHOIX de la source ne vit plus ici : il est porté par le niveau de « Traitement local »
+ * Le CHOIX de la source ne vit plus ici : il est porté par le niveau de « Provenance des données »
  * ([fr.geotower.utils.AppConfig.outagesLocal], crans « pannes en local »), seule vérité de l'app. Cette classe ne
  * garde que les réglages d'exécution (fréquence, arrière-plan) et le résumé de la dernière
  * récupération. L'ancienne clé `outages_source` est migrée au démarrage puis supprimée

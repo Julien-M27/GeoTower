@@ -29,6 +29,15 @@ class LocalizedDateLabelsInstantTest {
     }
 
     @Test
+    fun readsThePythonMicrosecondSpelling() {
+        // metadata.generated_at de geotower_live_fr.db (build_live_fr_db.py) : datetime.isoformat()
+        // écrit six chiffres de fraction, que SimpleDateFormat lirait comme des millisecondes.
+        val expected = utcMillis(2026, 8, 2, 18, 0, 2) + 123
+        assertEquals(expected, LocalizedDateLabels.isoInstantMillis("2026-08-02T18:00:02.123456+00:00"))
+        assertEquals(expected, LocalizedDateLabels.isoInstantMillis("2026-08-02T18:00:02.123456Z"))
+    }
+
+    @Test
     fun honoursTheDeclaredOffset() {
         assertEquals(
             utcMillis(2026, 8, 2, 16, 0, 2),

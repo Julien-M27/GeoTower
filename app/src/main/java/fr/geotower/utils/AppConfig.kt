@@ -471,6 +471,46 @@ object AppConfig {
     }
 
     /**
+     * Aligne le cran sur ce qui vient de se produire : une base **générée sur l'appareil** est
+     * exactement l'état que « Serveur » nie. Appelé après chaque installation réussie d'une base
+     * construite localement (cf. `LocalDbBuildPipeline`).
+     *
+     * Ce n'est pas une décision prise à la place de l'utilisateur : la génération est toujours une
+     * action explicite de sa part. C'est surtout la seule façon de tenir la promesse — c'est
+     * [dbForcedLocal] qui empêche le téléchargement d'écraser la base construite, et il ne regarde
+     * que le cran. Rester à « Serveur » revenait à laisser la prochaine mise à jour automatique
+     * défaire le travail que l'appareil venait de fournir.
+     *
+     * Sans effet si le cran génère déjà la base. Sans effet non plus si l'appareil n'est pas
+     * éligible : un build « forcé » sous les budgets mesurés ne doit pas sélectionner un cran que
+     * l'écran affiche grisé et que [dbForcedLocal] ignorerait de toute façon — ce cas-là reste
+     * signalé par la ligne « votre base a été générée ici » du panneau des crans.
+     */
+    fun alignLocalModeLevelAfterLocalBuild(context: Context) {
+        if (!LocalBuildCapability.evaluate(context).eligible) return
+        // Relu dans les préférences plutôt que dans l'état mémoire : le cran est écrit par les
+        // écrans, cette méthode est appelée depuis un worker.
+        val current = context.applicationContext
+            .getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
+            .getInt(PREF_LOCAL_MODE_LEVEL, LOCAL_MODE_SERVER)
+        val target = levelAfterLocalDbBuild(current)
+        if (target != current) setLocalModeLevel(context, target)
+    }
+
+    /**
+     * Cran équivalent une fois la base générée ici, **à réglage des pannes constant** :
+     * [LOCAL_MODE_SERVER] → [LOCAL_MODE_DB], [LOCAL_MODE_OUTAGES] → [LOCAL_MODE_BOTH]. Les crans qui
+     * génèrent déjà la base ne bougent pas. Les deux axes étant indépendants, générer sa base ne
+     * doit jamais rapatrier les pannes sur l'appareil au passage. Décision pure, testable sans
+     * Android.
+     */
+    fun levelAfterLocalDbBuild(level: Int): Int = when {
+        levelBuildsDbLocally(level) -> level
+        levelFetchesOutagesLocally(level) -> LOCAL_MODE_BOTH
+        else -> LOCAL_MODE_DB
+    }
+
+    /**
      * Migration ponctuelle : l'échelle est passée de 4 à 5 crans. L'ancien 1 (« sites en panne en
      * local ») valait ce qui est aujourd'hui [LOCAL_MODE_OUTAGES] ; tout ce qui était ≥ 1 glisse
      * donc d'un cran, la place libérée en 1 revenant à la base seule. Sans ce décalage, un ancien

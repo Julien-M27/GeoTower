@@ -4,7 +4,9 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import fr.geotower.data.api.AnfrService
+import fr.geotower.data.api.LiveDatabaseStatus
 import fr.geotower.data.api.LiveSitesClient
+import fr.geotower.data.api.SitesHsRebuildDto
 import androidx.sqlite.db.SimpleSQLiteQuery
 import fr.geotower.data.db.AppDatabase
 import fr.geotower.data.db.DepartmentOperatorTechRow
@@ -39,7 +41,12 @@ import fr.geotower.data.outages.OutageLocalConfig
 import fr.geotower.data.outages.CachedServerOutages
 import fr.geotower.data.outages.OutageProgressCallback
 import fr.geotower.data.outages.OutageServerInfo
+import fr.geotower.data.outages.HTTP_TOO_MANY_REQUESTS
 import fr.geotower.data.outages.ServerOutageCache
+import fr.geotower.data.outages.ServerOutageRebuildStatus
+import fr.geotower.data.outages.parseServerDetail
+import fr.geotower.data.outages.parseSitesHsRebuildBody
+import fr.geotower.data.outages.toRebuildStatus
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.DepartmentCodes
@@ -61,6 +68,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
+import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -442,23 +450,15 @@ class AnfrRepository(
         }
     }
 
+    /**
+     * Le repli sur l'API live tient à deux choses : l'endpoint est autorisé, et aucune base valide
+     * n'est installée. Ce second point est la définition partagée de [LiveDatabaseStatus.isInUse] —
+     * la page « À propos » s'en sert pour annoncer les données servies par la base en ligne, et ne
+     * doit jamais s'en écarter.
+     */
     private fun shouldUseLiveApiFallback(featureId: String): Boolean {
-        if (
-            AppConfig.blockCommunityAndUpdates() ||
-            !RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.LIVE_API_FR) ||
-            !RemoteFeatureFlags.isFeatureEnabled(featureId)
-        ) {
-            return false
-        }
-
-        val currentState = AppConfig.localDatabaseState.value
-        if (currentState != null) {
-            return currentState != GeoTowerDatabaseValidator.LocalDatabaseState.VALID
-        }
-
-        return GeoTowerDatabaseValidator
-            .getInstalledDatabaseFileStatus(context)
-            .state != GeoTowerDatabaseValidator.LocalDatabaseState.VALID
+        if (!RemoteFeatureFlags.isFeatureEnabled(featureId)) return false
+        return LiveDatabaseStatus.isInUse(context)
     }
 
     private fun liveNearbyRadiusKm(): Double {
@@ -1817,6 +1817,34 @@ class AnfrRepository(
         }
         return sites
     }
+
+    /**
+     * Demande au SERVEUR de refabriquer le fichier national des pannes (bouton « Demander une
+     * régénération » des réglages), quand son relevé est plus vieux que la panne constatée.
+     *
+     * Le serveur n'en accepte que deux par heure : ce plafond est une réponse normale (429), pas
+     * une panne, donc il revient dans le statut avec le délai avant le prochain créneau. Seules les
+     * vraies erreurs (réseau, fonction coupée, générateur absent) lèvent une exception, pour que la
+     * carte des réglages puisse les afficher comme telles.
+     */
+    suspend fun requestServerSitesHsRebuild(): ServerOutageRebuildStatus {
+        val response = api.requestSitesHsRebuild()
+        val code = response.code()
+        if (code == HTTP_TOO_MANY_REQUESTS) {
+            val refused = parseSitesHsRebuildBody(response.errorBody()?.string())
+            return (refused ?: SitesHsRebuildDto()).toRebuildStatus(code)
+        }
+        if (!response.isSuccessful) {
+            // 503 (fonctionnalité coupée), 500 (générateur introuvable)… : le serveur explique
+            // pourquoi dans `detail`, et ce message vaut mieux qu'un code HTTP nu.
+            throw IOException(parseServerDetail(response.errorBody()?.string()) ?: "HTTP $code")
+        }
+        return (response.body() ?: SitesHsRebuildDto()).toRebuildStatus(code)
+    }
+
+    /** Où en est la génération demandée au serveur, et ce qu'il reste de quota. Sans effet de bord. */
+    suspend fun getServerSitesHsRebuildStatus(): ServerOutageRebuildStatus =
+        api.getSitesHsRebuildStatus().toRebuildStatus(200)
 
     /** Supprime la copie du fichier serveur et tout ce que l'app en retenait. */
     fun clearServerSitesHs() {

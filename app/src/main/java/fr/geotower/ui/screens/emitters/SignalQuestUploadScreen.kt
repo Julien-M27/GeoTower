@@ -15,6 +15,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
@@ -26,16 +29,22 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import android.net.Uri // 🚨 NOUVEAU
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.DeleteSweep
@@ -65,11 +74,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 // The crucial imports that fix the delegation error:
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
@@ -86,14 +97,18 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
@@ -104,8 +119,10 @@ import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.ui.components.oneUiActionButtonShape
 import fr.geotower.data.upload.SignalQuestUploadQueue
 import fr.geotower.data.upload.SignalQuestUploadSource
+import fr.geotower.data.upload.SignalQuestUploadTarget
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.MapUtils
+import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.isNetworkAvailable
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
@@ -116,6 +133,7 @@ import org.osmdroid.mapsforge.MapsForgeTileSource
 import org.mapsforge.map.rendertheme.InternalRenderTheme
 import org.osmdroid.tileprovider.MapTileProviderBasic
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import androidx.compose.ui.res.pluralStringResource
@@ -128,7 +146,8 @@ fun SignalQuestUploadScreen(
     imageUris: List<String>,
     siteId: String,
     operatorName: String,
-    operatorNames: List<String> = listOf(operatorName),
+    // Vide = un seul operateur, celui de la route, avec les azimuts de la route.
+    operatorTargets: List<SignalQuestUploadTarget> = emptyList(),
     lat: Double,
     lon: Double,
     azimuts: String,
@@ -158,19 +177,26 @@ fun SignalQuestUploadScreen(
     val currentUris = remember { mutableStateListOf<String>().apply { addAll(imageUris) } }
     // Quarts de tour horaires demandes par photo. Absent = photo laissee telle quelle.
     val photoRotations = remember { mutableStateMapOf<String, Int>() }
-    val targetOperatorNames = remember(operatorName, operatorNames) {
-        operatorNames
-            .ifEmpty { listOf(operatorName) }
-            .map { Uri.decode(it).trim() }
-            .filter { it.isNotBlank() }
-            .distinct()
+    // Chaque cible garde ses propres azimuts : la confirmation doit montrer la station de TOUS les
+    // operateurs coches, pas seulement celle du premier.
+    val targetOperators = remember(operatorName, azimuts, operatorTargets) {
+        operatorTargets
+            .ifEmpty { listOf(SignalQuestUploadTarget(operatorName, azimuts)) }
+            .map { target -> target.copy(operator = Uri.decode(target.operator).trim()) }
+            .filter { it.operator.isNotBlank() }
+            .distinctBy { it.operator }
     }
+    val targetOperatorNames = remember(targetOperators) { targetOperators.map { it.operator } }
     val primaryTargetOperator = targetOperatorNames.firstOrNull() ?: operatorName
-    val targetOperatorLabel = targetOperatorNames.joinToString(", ").ifBlank { operatorName }
+    val targetOperatorLabel = targetOperatorNames
+        .joinToString(", ") { operatorDisplayLabel(it) }
+        .ifBlank { operatorName }
     var description by remember { mutableStateOf("") }
     var stripExifBeforeUpload by rememberSaveable { mutableStateOf(false) }
     var showConfirmDialog by remember { mutableStateOf(false) }
     var showImageSourceDialog by remember { mutableStateOf(false) }
+    // Photo ouverte en plein ecran, par son rang dans le carrousel. Null = visionneuse fermee.
+    var fullScreenPhotoIndex by remember { mutableStateOf<Int?>(null) }
 
     fun addSelectedUris(uris: List<Uri>) {
         if (uris.isNotEmpty()) {
@@ -611,7 +637,18 @@ fun SignalQuestUploadScreen(
                                         }
                                 ) {
                                     Card(
-                                        modifier = Modifier.fillMaxSize(),
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            // Un appui simple ouvre la photo en plein ecran ; l'appui long
+                                            // reste pris par le glisser-deposer de reordonnancement, y compris
+                                            // quand on releve le doigt sans avoir bouge la vignette.
+                                            .clickable(
+                                                onClickLabel = stringResource(R.string.appstrings_full_screen_photo_desc)
+                                            ) {
+                                                if (draggedPhotoUri == null) {
+                                                    safeClick { fullScreenPhotoIndex = currentUris.indexOf(uri) }
+                                                }
+                                            },
                                         shape = photoShape,
                                         colors = CardDefaults.cardColors(containerColor = surfaceColor)
                                     ) {
@@ -867,6 +904,19 @@ fun SignalQuestUploadScreen(
             Text(stringResource(R.string.appstrings_upload_sq_limit), fontSize = sizing.text(12.sp), color = textColor.copy(alpha = 0.5f))
         }
 
+        // --- 4bis. VISIONNEUSE PLEIN ECRAN ---
+        val openedPhotoIndex = fullScreenPhotoIndex
+        if (openedPhotoIndex != null && currentUris.isNotEmpty()) {
+            SignalQuestPhotoViewer(
+                uris = currentUris,
+                rotations = photoRotations,
+                initialIndex = openedPhotoIndex,
+                onDismiss = { fullScreenPhotoIndex = null }
+            )
+        } else if (openedPhotoIndex != null) {
+            LaunchedEffect(Unit) { fullScreenPhotoIndex = null }
+        }
+
         if (showImageSourceDialog) {
             AlertDialog(
                 onDismissRequest = {
@@ -948,6 +998,48 @@ fun SignalQuestUploadScreen(
                     ) {
                         Text(text = pluralStringResource(R.plurals.upload_confirm_message, currentUris.size, currentUris.size))
 
+                        // La question porte sur TOUTES les cibles : un envoi part vers chacune, donc
+                        // chacune est nommee ici (et tracee sur la carte juste en dessous).
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(sizing.spacing(6.dp))
+                        ) {
+                            Text(
+                                text = stringResource(
+                                    if (targetOperatorNames.size > 1) {
+                                        R.string.appstrings_upload_sq_target_operators
+                                    } else {
+                                        R.string.appstrings_upload_sq_target_operator
+                                    }
+                                ),
+                                fontSize = sizing.text(13.sp),
+                                color = textColor.copy(alpha = 0.7f),
+                                modifier = Modifier.align(Alignment.CenterHorizontally)
+                            )
+                            targetOperatorNames.forEach { name ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    operatorDisplayColor(name)?.let { argb ->
+                                        Box(
+                                            modifier = Modifier
+                                                .size(sizing.component(10.dp))
+                                                .clip(CircleShape)
+                                                .background(Color(argb))
+                                        )
+                                        Spacer(Modifier.width(sizing.spacing(8.dp)))
+                                    }
+                                    Text(
+                                        text = operatorDisplayLabel(name),
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = textColor
+                                    )
+                                }
+                            }
+                        }
+
                         // NOUVEAU : LA MINI-CARTE DANS LE POP-UP
                         Box(
                             modifier = Modifier
@@ -961,18 +1053,22 @@ fun SignalQuestUploadScreen(
                             val isColorTooLight = androidx.core.graphics.ColorUtils.calculateLuminance(rawPrimaryColor) > 0.85
                             val safePrimaryColor = if (isColorTooLight) android.graphics.Color.parseColor("#2196F3") else rawPrimaryColor
 
-                            val mappedAntennas = remember(siteId, primaryTargetOperator, lat, lon, azimuts) {
-                                listOf(LocalisationEntity(
-                                    idAnfr = siteId,
-                                    operateur = primaryTargetOperator,
-                                    latitude = lat,
-                                    longitude = lon,
-                                    azimuts = azimuts,
-                                    codeInsee = null,
-                                    azimutsFh = null,
-                                    techMask = 0,
-                                    bandMask = 0
-                                ))
+                            // Une entree par operateur cible : le marqueur trace alors les azimuts de
+                            // chaque station, chacun a la couleur de son operateur.
+                            val mappedAntennas = remember(siteId, targetOperators, lat, lon) {
+                                targetOperators.map { target ->
+                                    LocalisationEntity(
+                                        idAnfr = siteId,
+                                        operateur = target.operator,
+                                        latitude = lat,
+                                        longitude = lon,
+                                        azimuts = target.azimuts,
+                                        codeInsee = null,
+                                        azimutsFh = null,
+                                        techMask = 0,
+                                        bandMask = 0
+                                    )
+                                }
                             }
 
                             AndroidView(
@@ -1110,6 +1206,19 @@ fun SignalQuestUploadScreen(
     }
 }
 
+// Les cibles portent le nom attendu par SignalQuest (« ORANGE », « SFR »...) : on affiche le libelle
+// et la couleur de l'operateur, comme partout ailleurs dans l'app.
+private fun operatorSpecFor(operatorName: String) =
+    OperatorColors.keyFor(operatorName)?.let { OperatorColors.specForKey(it) }
+
+private fun operatorDisplayLabel(operatorName: String): String {
+    return operatorSpecFor(operatorName)?.label ?: operatorName
+}
+
+private fun operatorDisplayColor(operatorName: String): Long? {
+    return operatorSpecFor(operatorName)?.colorArgb
+}
+
 // La photo est cadree dans la carte APRES rotation : sur un quart de tour, on la compose dans une
 // boite aux dimensions inversees, sinon le recadrage laisserait des bandes vides sur les cotes.
 @Composable
@@ -1135,6 +1244,219 @@ private fun RotatedPhotoPreview(
                 )
                 .graphicsLayer { rotationZ = rotationDegrees.toFloat() },
             contentScale = ContentScale.Crop
+        )
+    }
+}
+
+private const val SQ_VIEWER_MIN_SCALE = 1f
+private const val SQ_VIEWER_MAX_SCALE = 5f
+private const val SQ_VIEWER_ZOOM_THRESHOLD = 1.05f
+private const val SQ_VIEWER_DOUBLE_TAP_SCALE = 2.5f
+
+// Visionneuse plein ecran des photos en attente d'envoi : on y voit le fichier local tel qu'il partira,
+// quart de tour manuel compris, avec pincement et double appui pour zoomer.
+@Composable
+private fun SignalQuestPhotoViewer(
+    uris: List<String>,
+    rotations: Map<String, Int>,
+    initialIndex: Int,
+    onDismiss: () -> Unit
+) {
+    if (uris.isEmpty()) return
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    val scope = rememberCoroutineScope()
+    val startIndex = initialIndex.coerceIn(0, uris.lastIndex)
+    val pagerState = rememberPagerState(initialPage = startIndex, pageCount = { uris.size })
+
+    var scale by remember { mutableFloatStateOf(SQ_VIEWER_MIN_SCALE) }
+    var offset by remember { mutableStateOf(Offset.Zero) }
+    var viewerSize by remember { mutableStateOf(IntSize.Zero) }
+
+    // Le zoom repart de zero des qu'on change de photo.
+    LaunchedEffect(pagerState.currentPage) {
+        scale = SQ_VIEWER_MIN_SCALE
+        offset = Offset.Zero
+    }
+
+    // Le deplacement reste borne a l'ecran : agrandie, la photo ne peut pas sortir du cadre.
+    fun clampedOffset(rawOffset: Offset, atScale: Float): Offset {
+        if (atScale <= SQ_VIEWER_ZOOM_THRESHOLD || viewerSize == IntSize.Zero) return Offset.Zero
+        val maxX = (viewerSize.width * (atScale - 1f)) / 2f
+        val maxY = (viewerSize.height * (atScale - 1f)) / 2f
+        return Offset(rawOffset.x.coerceIn(-maxX, maxX), rawOffset.y.coerceIn(-maxY, maxY))
+    }
+
+    val overlayButtonBg = Color.Black.copy(alpha = 0.45f)
+    val overlayContent = Color.White
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.97f))
+        ) {
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize(),
+                userScrollEnabled = scale <= SQ_VIEWER_ZOOM_THRESHOLD
+            ) { page ->
+                // Le pincement agrandit autour des doigts, pas autour du centre de l'ecran.
+                val transformState = rememberTransformableState { centroid, zoomChange, panChange, _ ->
+                    if (pagerState.currentPage != page) return@rememberTransformableState
+                    val previousScale = scale
+                    val rawScale = (previousScale * zoomChange).coerceIn(SQ_VIEWER_MIN_SCALE, SQ_VIEWER_MAX_SCALE)
+                    val nextScale = if (rawScale < SQ_VIEWER_ZOOM_THRESHOLD) SQ_VIEWER_MIN_SCALE else rawScale
+                    if (nextScale <= SQ_VIEWER_ZOOM_THRESHOLD) {
+                        scale = SQ_VIEWER_MIN_SCALE
+                        offset = Offset.Zero
+                    } else {
+                        val scaleRatio = nextScale / previousScale.coerceAtLeast(SQ_VIEWER_MIN_SCALE)
+                        val center = Offset(viewerSize.width / 2f, viewerSize.height / 2f)
+                        val centroidFromCenter = if (centroid == Offset.Unspecified) Offset.Zero else centroid - center
+                        scale = nextScale
+                        offset = clampedOffset(
+                            offset * scaleRatio + centroidFromCenter * (1f - scaleRatio) + panChange,
+                            nextScale
+                        )
+                    }
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .onSizeChanged { viewerSize = it }
+                        .pointerInput(page) {
+                            detectTapGestures(
+                                onDoubleTap = { tapOffset ->
+                                    if (scale > SQ_VIEWER_ZOOM_THRESHOLD) {
+                                        scale = SQ_VIEWER_MIN_SCALE
+                                        offset = Offset.Zero
+                                    } else {
+                                        val center = Offset(viewerSize.width / 2f, viewerSize.height / 2f)
+                                        val tapFromCenter = tapOffset - center
+                                        scale = SQ_VIEWER_DOUBLE_TAP_SCALE
+                                        offset = clampedOffset(
+                                            tapFromCenter * (1f - SQ_VIEWER_DOUBLE_TAP_SCALE),
+                                            SQ_VIEWER_DOUBLE_TAP_SCALE
+                                        )
+                                    }
+                                }
+                            )
+                        }
+                        .transformable(
+                            state = transformState,
+                            canPan = { scale > SQ_VIEWER_ZOOM_THRESHOLD },
+                            lockRotationOnZoomPan = true
+                        )
+                ) {
+                    val pageUri = uris[page]
+                    RotatedFullScreenPhoto(
+                        model = pageUri,
+                        rotationDegrees = rotations[pageUri] ?: 0,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                if (pagerState.currentPage == page) {
+                                    scaleX = scale
+                                    scaleY = scale
+                                    translationX = offset.x
+                                    translationY = offset.y
+                                }
+                            }
+                    )
+                }
+            }
+
+            // Fermeture (haut-droite), alignee sur la croix des miniatures.
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .statusBarsPadding()
+                    .padding(sizing.spacing(12.dp))
+                    .size(sizing.component(32.dp))
+                    .background(overlayButtonBg, CircleShape)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = stringResource(R.string.appstrings_close),
+                    tint = overlayContent,
+                    modifier = Modifier.size(sizing.component(18.dp))
+                )
+            }
+
+            // Fleche precedente.
+            if (pagerState.currentPage > 0 && scale <= SQ_VIEWER_ZOOM_THRESHOLD) {
+                IconButton(
+                    onClick = { scope.launch { pagerState.animateScrollToPage(pagerState.currentPage - 1) } },
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .padding(start = sizing.spacing(8.dp))
+                        .size(sizing.component(36.dp))
+                        .background(overlayButtonBg, CircleShape)
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                        contentDescription = stringResource(R.string.appstrings_previous),
+                        tint = overlayContent
+                    )
+                }
+            }
+            // Fleche suivante.
+            if (pagerState.currentPage < uris.lastIndex && scale <= SQ_VIEWER_ZOOM_THRESHOLD) {
+                IconButton(
+                    onClick = { scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) } },
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .padding(end = sizing.spacing(8.dp))
+                        .size(sizing.component(36.dp))
+                        .background(overlayButtonBg, CircleShape)
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = stringResource(R.string.appstrings_next),
+                        tint = overlayContent
+                    )
+                }
+            }
+
+            PhotoPositionBadge(
+                position = pagerState.currentPage + 1,
+                total = uris.size,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .padding(bottom = sizing.spacing(20.dp))
+            )
+        }
+    }
+}
+
+// Meme principe que la miniature : sur un quart de tour on cadre dans une boite aux dimensions
+// inversees, sinon l'image pivotee deborderait de l'ecran.
+@Composable
+private fun RotatedFullScreenPhoto(
+    model: Any?,
+    rotationDegrees: Int,
+    modifier: Modifier = Modifier
+) {
+    val isQuarterTurned = (rotationDegrees / 90) % 2 != 0
+    BoxWithConstraints(
+        modifier = modifier,
+        contentAlignment = Alignment.Center
+    ) {
+        AsyncImage(
+            model = model,
+            contentDescription = stringResource(R.string.appstrings_full_screen_photo_desc),
+            modifier = Modifier
+                .size(
+                    width = if (isQuarterTurned) maxHeight else maxWidth,
+                    height = if (isQuarterTurned) maxWidth else maxHeight
+                )
+                .graphicsLayer { rotationZ = rotationDegrees.toFloat() },
+            contentScale = ContentScale.Fit
         )
     }
 }

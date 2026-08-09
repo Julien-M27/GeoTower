@@ -27,6 +27,8 @@ import androidx.work.*
 import fr.geotower.data.upload.SignalQuestUploadDraftStore
 import fr.geotower.data.upload.SignalQuestUploadQueue
 import fr.geotower.data.upload.SignalQuestUploadQueueException
+import fr.geotower.data.upload.SignalQuestUploadTarget
+import fr.geotower.data.upload.SignalQuestUploadTargets
 import fr.geotower.data.workers.DatabaseDownloadWorker
 import fr.geotower.data.workers.SignalQuestUploadScheduler
 import fr.geotower.data.workers.UpdateCheckScheduler
@@ -180,12 +182,11 @@ private fun DisabledFeatureRoute(navController: NavHostController, message: Stri
     }
 }
 
-private fun decodeUploadOperatorNames(raw: String?): List<String> {
-    return Uri.decode(raw.orEmpty())
-        .split("|")
-        .map { it.trim() }
-        .filter { it.isNotBlank() }
-        .distinct()
+// Les cibles sont encodees une seule fois pour l'URL : Navigation decode deja la valeur du
+// parametre, et un second decodage reste sans effet sur des operateurs et des azimuts qui ne
+// contiennent aucun « % ».
+private fun decodeUploadTargets(raw: String?): List<SignalQuestUploadTarget> {
+    return SignalQuestUploadTargets.decode(Uri.decode(raw.orEmpty()))
 }
 
 class MainActivity : ComponentActivity() {
@@ -887,7 +888,7 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
 
-                            // Traitement local des données (5 crans), ouvert depuis Réglages.
+                            // Provenance des données (5 crans de traitement local), ouvert depuis Réglages.
                             // Les réglages des pannes y vivent désormais : le lien
                             // profond historique `geotower://outage_source`, encore porté par les
                             // notifications de récupération déjà postées, atterrit donc ici.
@@ -1250,7 +1251,7 @@ class MainActivity : ComponentActivity() {
                             // --- 3. ÉCRAN D'ENVOI SIGNAL QUEST ---
                             composable(
                                 // ✅ AJOUT DE &azimuts={azimuts} À LA FIN
-                                route = "sq_upload/{siteId}/{operatorName}?draftId={draftId}&lat={lat}&lon={lon}&azimuts={azimuts}&operatorNames={operatorNames}&address={address}&keepDraft={keepDraft}",
+                                route = "sq_upload/{siteId}/{operatorName}?draftId={draftId}&lat={lat}&lon={lon}&azimuts={azimuts}&operatorTargets={operatorTargets}&address={address}&keepDraft={keepDraft}",
                                 arguments = listOf(
                                     navArgument("siteId") { type = NavType.StringType },
                                     navArgument("operatorName") { type = NavType.StringType },
@@ -1260,7 +1261,7 @@ class MainActivity : ComponentActivity() {
 
                                     // ✅ NOUVEAU ARGUMENT
                                     navArgument("azimuts") { type = NavType.StringType; defaultValue = "" },
-                                    navArgument("operatorNames") { type = NavType.StringType; defaultValue = "" },
+                                    navArgument("operatorTargets") { type = NavType.StringType; defaultValue = "" },
                                     navArgument("address") { type = NavType.StringType; defaultValue = "" },
                                     navArgument("keepDraft") { type = NavType.BoolType; defaultValue = false }
                                 )
@@ -1274,8 +1275,9 @@ class MainActivity : ComponentActivity() {
                                 // ✅ NOUVEAU : On récupère et décode les azimuts
                                 val azimutsStr = backStackEntry.arguments?.getString("azimuts") ?: ""
                                 val decodedAzimuts = android.net.Uri.decode(azimutsStr)
-                                val operatorNamesRaw = backStackEntry.arguments?.getString("operatorNames") ?: ""
-                                val operatorNames = decodeUploadOperatorNames(operatorNamesRaw).ifEmpty { listOf(operatorName) }
+                                val operatorTargetsRaw = backStackEntry.arguments?.getString("operatorTargets") ?: ""
+                                val operatorTargets = decodeUploadTargets(operatorTargetsRaw)
+                                    .ifEmpty { listOf(SignalQuestUploadTarget(operatorName, decodedAzimuts)) }
                                 val uploadAddress = android.net.Uri.decode(backStackEntry.arguments?.getString("address") ?: "")
                                     .trim()
                                     .takeIf { it.isNotBlank() }
@@ -1302,7 +1304,7 @@ class MainActivity : ComponentActivity() {
                                         imageUris = uris,
                                         siteId = siteId,
                                         operatorName = operatorName,
-                                        operatorNames = operatorNames,
+                                        operatorTargets = operatorTargets,
                                         lat = lat,
                                         lon = lon,
                                         azimuts = decodedAzimuts,

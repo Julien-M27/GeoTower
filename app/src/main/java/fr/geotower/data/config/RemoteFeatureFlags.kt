@@ -273,6 +273,8 @@ object RemoteFeatureFlags {
         // navigation habituelle (accueil, fiches séparées), sans effacer le choix de l'utilisateur.
         const val SIMPLE_MODE_ENABLED = "simpleMode.enabled"
         const val OUTAGES_DATA = "outages.data"
+        // Bouton « demander une régénération » : coupe la demande sans couper la donnée elle-même.
+        const val OUTAGES_REBUILD = "outages.rebuild"
         const val OUTAGES_MAP_LAYER = "outages.mapLayer"
         const val OUTAGES_SITE_STATUS = "outages.siteStatus"
         const val OFFLINE_MAPS_CATALOG = "offlineMaps.catalog"
@@ -434,6 +436,7 @@ object RemoteFeatureFlags {
             Features.LOCAL_MODE_ENABLED to true,
             Features.SIMPLE_MODE_ENABLED to true,
             Features.OUTAGES_DATA to true,
+            Features.OUTAGES_REBUILD to true,
             Features.OUTAGES_MAP_LAYER to true,
             Features.OUTAGES_SITE_STATUS to true,
             Features.OFFLINE_MAPS_CATALOG to true,

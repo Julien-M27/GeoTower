@@ -292,7 +292,7 @@ fun SettingsScreen(
     val databaseBringIntoViewRequester = sectionBringIntoViewRequesters[SECTION_DATABASE]
     val offlineMapsBringIntoViewRequester = remember { BringIntoViewRequester() }
     // Les cibles de défilement d'un lien profond sont à usage unique et SURVIVENT à un aller-retour
-    // vers un sous-écran (rememberSaveable) : sinon, revenir de « Traitement local » relançait le
+    // vers un sous-écran (rememberSaveable) : sinon, revenir de « Provenance des données » relançait le
     // défilement vers la section base de données comme si on rouvrait la notification.
     var shouldBringDatabaseIntoView by rememberSaveable(initialSection) { mutableStateOf(initialSection == "database") }
     var shouldBringOfflineMapsIntoView by rememberSaveable(initialSection) { mutableStateOf(initialSection == "offline_maps") }
@@ -355,7 +355,7 @@ fun SettingsScreen(
     val usePhoneSections = !isWideScreen && settingsSectionsMode
     val useWideSections = isWideScreen && navMode != 0
     val useSectionsHome = usePhoneSections || useWideSections
-    // rememberSaveable : partir sur un sous-écran (Traitement local, Diagnostic, Historiques…) ou
+    // rememberSaveable : partir sur un sous-écran (Provenance des données, Diagnostic, Historiques…) ou
     // tourner l'appareil détruit la composition. Avec un simple `remember`, le retour retombait sur
     // l'accueil des sections au lieu de la section d'où l'on venait.
     var openedSection by rememberSaveable { mutableStateOf<Int?>(null) }
@@ -1012,11 +1012,13 @@ fun SettingsScreen(
             // Pannes : la carte de la section télécharge le fichier serveur, ou lance la génération
             // locale selon le niveau de traitement local — les deux vocabulaires mènent donc ici.
             entry(context.getString(R.string.outage_download_title), "pannes sites hs telecharger actualiser generer copie hors ligne serveur coupures", SECTION_DATABASE)
-            entry(context.getString(R.string.local_mode_settings_title), "traitement local autonomie serveur hors ligne generation", SECTION_DATABASE) { navController.navigate("local_mode") }
+            // La page a été rebaptisée « Provenance des données » : on garde son ancien nom dans les
+            // mots-clés, pour qui la cherche encore sous « traitement local ».
+            entry(context.getString(R.string.local_mode_settings_title), "provenance origine source des donnees serveur appareil traitement local autonomie hors ligne generation", SECTION_DATABASE) { navController.navigate("local_mode") }
             // Les pannes n'ont pas de page dédiée : leurs réglages d'exécution (fréquence,
             // arrière-plan, mise à jour immédiate) s'affichent DANS cette section, sous la carte
             // des sites en panne, dès que le cran les récupère sur l'appareil. La recherche mène
-            // donc à la section, plus à la page « Traitement local » qui ne porte que le choix.
+            // donc à la section, plus à la page « Provenance des données » qui ne porte que le choix.
             entry(context.getString(R.string.outage_local_settings_title), "coupures pannes source sites hs operateurs frequence arriere plan", SECTION_DATABASE)
 
             // --- Entrées directes (hors section) ---
@@ -3660,6 +3662,24 @@ fun SectionDatabase(
             SectionTitle(stringResource(R.string.settings_section_database))
         }
 
+        // Provenance des données : un SEUL écran décide d'où viennent la base ET les sites en panne
+        // (le niveau de traitement local). Il ouvre la section parce qu'il commande tout ce qui
+        // suit : selon le niveau choisi, des cartes de téléchargement disparaissent ou sont
+        // remplacées par la génération sur l'appareil. En bas de section, ce choix se lisait comme
+        // une option annexe, découverte après avoir cherché en vain la carte qu'il avait masquée.
+        PreferenceActionCard(
+            title = stringResource(R.string.local_mode_settings_title),
+            desc = stringResource(R.string.local_mode_settings_desc),
+            onClick = onLocalMode,
+            shape = shape,
+            border = border,
+            bubbleColor = bubbleColor,
+            useOneUi = useOneUi,
+            safeClick = safeClick
+        )
+
+        Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+
         if (showMobileCard) {
             Box(modifier = cardAnchor(ANCHOR_DB_MOBILE).fillMaxWidth()) {
                 fr.geotower.ui.components.DatabaseDownloadCard(
@@ -3744,12 +3764,12 @@ fun SectionDatabase(
             OutageLocalControls()
         }
 
-        Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
-
         // Génération locale : masquée sur un appareil qui ne peut pas la lancer (RAM/stockage).
         // Une carte dont l'action ne s'activera jamais n'apprend rien ici ; l'explication chiffrée
-        // est sur la page « Traitement local », où le choix se fait (LocalBuildIneligibleCard).
+        // est sur la page « Provenance des données », où le choix se fait (LocalBuildIneligibleCard).
         if (buildEligibility.eligible) {
+            Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+
             Box(modifier = cardAnchor(ANCHOR_DB_LOCAL_BUILD).fillMaxWidth()) {
                 fr.geotower.ui.components.LocalDbBuildCard(
                     useOneUi = useOneUi,
@@ -3760,21 +3780,6 @@ fun SectionDatabase(
                 )
             }
         }
-
-        // Provenance des données : un SEUL écran décide d'où viennent la base ET les sites en panne
-        // (le niveau de traitement local), leurs réglages d'exécution y sont rassemblés.
-        Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
-
-        PreferenceActionCard(
-            title = stringResource(R.string.local_mode_settings_title),
-            desc = stringResource(R.string.local_mode_settings_desc),
-            onClick = onLocalMode,
-            shape = shape,
-            border = border,
-            bubbleColor = bubbleColor,
-            useOneUi = useOneUi,
-            safeClick = safeClick
-        )
     }
 
 }
@@ -3851,6 +3856,9 @@ fun PreferenceSwitchCard(title: String, desc: String, checked: Boolean, onChecke
                 Text(title, style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface.copy(alpha = textAlpha))
                 Text(desc, style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = textAlpha))
             }
+            // La colonne prend tout le reste de la largeur : sans cet écart, une description
+            // longue (mode simplifié) se coupe au ras de la piste de l'interrupteur.
+            Spacer(Modifier.width(sizing.spacing(12.dp)))
             fr.geotower.ui.components.GeoTowerSwitch(
                 checked = checked,
                 onCheckedChange = onCheckedChange,

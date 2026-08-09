@@ -85,7 +85,7 @@ private data class ServerOutageSummary(
  *  - traitement local au niveau 0 → carte de **téléchargement** du fichier national du serveur,
  *    conservé sur l'appareil pour l'afficher au lancement et hors ligne ;
  *  - traitement local aux crans « pannes en local » → carte de **génération**, mêmes commandes
- *    que l'écran Traitement local ([OutageLocalGenerationControls]).
+ *    que l'écran « Provenance des données » ([OutageLocalGenerationControls]).
  *
  * Avant, la variante locale se contentait de griser un bouton de téléchargement inutile : l'unique
  * emplacement « pannes » de la section pointait vers une action qui n'était pas celle en vigueur.
@@ -197,6 +197,10 @@ private fun OutageServerCopySection(
     val outagesAvailable =
         featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.OUTAGES_DATA) &&
             featureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.OUTAGES_GEOTOWER)
+    // Kill-switch propre à la demande de régénération : la donnée peut rester servie alors que le
+    // serveur ne veut plus qu'on lui en réclame (maintenance, générateur en travaux).
+    val rebuildAvailable =
+        outagesAvailable && featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.OUTAGES_REBUILD)
 
     var summary by remember { mutableStateOf(ServerOutageSummary()) }
     var isDownloading by remember { mutableStateOf(false) }
@@ -376,6 +380,17 @@ private fun OutageServerCopySection(
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.error,
             textAlign = TextAlign.Center
+        )
+    }
+
+    // Le relevé du serveur peut être plus vieux que la panne constatée : on lui demande alors
+    // d'aller le refaire, dans la limite de ce qu'il accepte (deux générations par heure).
+    if (rebuildAvailable) {
+        Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
+        OutageServerRebuildControls(
+            repository = repository,
+            enabled = !isDownloading,
+            onOutagesRefreshed = { refreshTrigger++ },
         )
     }
 

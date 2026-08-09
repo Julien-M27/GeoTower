@@ -22,7 +22,7 @@ import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 
 /**
- * Page « Traitement local des données » (ouverte depuis Réglages ▸ au-dessus de la source des pannes).
+ * Page « Provenance des données » (ouverte depuis Réglages ▸ Base de données, en tête de section).
  *
  * Propose 5 crans (0 Serveur / 1 Base en local / 2 Sites en panne en local / 3 Base + sites en
  * local / 4 Autonomie maximale) qui décident de ce qui est traité sur l'appareil plutôt que fourni

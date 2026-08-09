@@ -1,5 +1,6 @@
 package fr.geotower.data.api
 
+import fr.geotower.data.models.LiveDbStatusDto
 import fr.geotower.data.models.LiveSiteResponseDto
 import fr.geotower.data.models.LiveSitesListResponseDto
 import fr.geotower.data.models.LiveDepartmentOperatorStatsResponseDto
@@ -14,6 +15,10 @@ import retrofit2.http.Path
 import retrofit2.http.Query
 
 interface LiveSitesApiService {
+    /** Jeu de données servi par la base live : versions, dates ANFR, nombre de stations. */
+    @GET("api/v2/live/fr/status")
+    suspend fun getStatus(): Response<LiveDbStatusDto>
+
     @GET("api/v2/live/fr/sites/nearby")
     suspend fun getNearbySites(
         @Query("lat") lat: Double,

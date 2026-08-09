@@ -36,6 +36,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Download
@@ -85,10 +86,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.navigation.NavController
+import fr.geotower.data.api.LiveDatabaseDataset
+import fr.geotower.data.api.LiveDatabaseStatus
 import fr.geotower.data.outages.OutageLocalConfig
 import fr.geotower.data.outages.OutageServerInfo
+import fr.geotower.ui.components.DatabaseRefreshMembership
+import fr.geotower.ui.components.DatabaseRefreshTimeout
+import fr.geotower.ui.components.DatabaseSectionRefreshButton
 import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.components.SafeClick
+import fr.geotower.ui.components.rememberDatabaseRefreshState
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AboutPagePrefs
 import fr.geotower.utils.AppConfig
@@ -119,6 +126,9 @@ import androidx.compose.ui.res.stringResource
 import fr.geotower.R
 
 private const val TAG_ABOUT = "GeoTower"
+
+/** Seul participant à l'actualisation de la section « Versions » (cf. DatabaseRefreshMembership). */
+private const val VERSIONS_REFRESH_ID = "about_versions"
 
 // Les parties de la page sont désignées par leur indice dans AboutPagePrefs.sections : c'est aussi
 // celui de leur ancre de défilement et de leur entrée de menu. Deux d'entre elles sont nommées, le
@@ -1059,12 +1069,27 @@ fun SectionVersions(
     var hsLocalGeneratedAt by remember { mutableLongStateOf(0L) }
     var hsServerGeneratedAt by remember { mutableLongStateOf(0L) }
     var hsRefreshTick by remember { mutableIntStateOf(0) }
+    // Base EN LIGNE : utilisée à la place d'une base installée, elle a son propre jeu de données.
+    // `liveDbInUse` commande l'affichage de la carte, `liveDbDataset` son contenu (null tant que le
+    // serveur n'a pas répondu, d'où le drapeau d'échec pour distinguer « en cours » de « raté »).
+    var liveDbInUse by remember { mutableStateOf(false) }
+    var liveDbDataset by remember { mutableStateOf<LiveDatabaseDataset?>(null) }
+    var liveDbUnreachable by remember { mutableStateOf(false) }
     val txtDownloadNewBase = stringResource(R.string.appstrings_about_download_new_database)
     val txtInvalidLocalDatabase = stringResource(R.string.appstrings_invalid_local_database)
     val txtNotInstalled = stringResource(R.string.appstrings_about_database_not_installed)
     val txtVersionTimeAt = stringResource(R.string.appstrings_version_time_at)
 
-    LaunchedEffect(txtDownloadNewBase, txtInvalidLocalDatabase, txtNotInstalled, txtVersionTimeAt) {
+    // Actualisation de la section : les versions ne bougent pas toutes seules pendant que la page
+    // est ouverte (téléchargement terminé ailleurs, base live régénérée côté serveur). Même
+    // mécanique que la section « Base de données » des réglages — animation, anti-clignotement et
+    // filet de sécurité compris.
+    val refreshState = rememberDatabaseRefreshState()
+    DatabaseRefreshMembership(refreshState, VERSIONS_REFRESH_ID)
+    DatabaseRefreshTimeout(refreshState)
+    val versionsRefreshKey = refreshState.refreshKey
+
+    LaunchedEffect(versionsRefreshKey, txtDownloadNewBase, txtInvalidLocalDatabase, txtNotInstalled, txtVersionTimeAt) {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             // 1. Version de l'application
             try {
@@ -1096,19 +1121,7 @@ fun SectionVersions(
 
                         // B. Date Hebdo (ANFR)
                         if (cursor.columnCount > 1 && !cursor.isNull(1)) {
-                            val rawAnfr = cursor.getString(1)
-                            anfrDate = try {
-                                if (rawAnfr.contains("T")) {
-                                    val datePart = rawAnfr.substringBefore("T")
-                                    val dParts = datePart.split("-")
-                                    if (dParts.size >= 3) "${dParts[2]}/${dParts[1]}/${dParts[0]}" else rawAnfr
-                                } else {
-                                    when (rawAnfr.length) {
-                                        13, 8 -> "${rawAnfr.substring(6, 8)}/${rawAnfr.substring(4, 6)}/${rawAnfr.substring(0, 4)}"
-                                        else -> rawAnfr
-                                    }
-                                }
-                            } catch (e: Exception) { rawAnfr }
+                            anfrDate = formatAnfrWeeklyDate(cursor.getString(1))
                         }
 
                         // C. ✅ Version Mensuelle Brute
@@ -1169,7 +1182,20 @@ fun SectionVersions(
                 invalidLabel = txtInvalidLocalDatabase,
                 timeAtLabel = txtVersionTimeAt
             )
+
+            // 5. Base EN LIGNE : sans base installée valide, la carte, la recherche et les fiches
+            // interrogent le serveur. Les versions ci-dessus ne disent alors rien des données
+            // réellement lues — on va donc demander au serveur ce qu'il sert.
+            liveDbInUse = LiveDatabaseStatus.isInUse(context)
+            if (liveDbInUse) {
+                // Une clé non nulle ne peut venir que du bouton : c'est là, et seulement là, qu'il
+                // faut passer outre le cache de dix minutes.
+                val dataset = LiveDatabaseStatus.dataset(context, forceRefresh = versionsRefreshKey > 0)
+                liveDbDataset = dataset
+                liveDbUnreachable = dataset == null
+            }
         }
+        refreshState.reportRefreshed(VERSIONS_REFRESH_ID, versionsRefreshKey)
     }
 
     // Les sites HS, eux, bougent pendant que la page est ouverte : une génération locale peut se
@@ -1179,7 +1205,7 @@ fun SectionVersions(
         hsRefreshTick++
         onPauseOrDispose { }
     }
-    LaunchedEffect(hsRefreshTick) {
+    LaunchedEffect(hsRefreshTick, versionsRefreshKey) {
         withContext(Dispatchers.IO) {
             val state = readSitesHsState(context)
             hsDate = state.serverDate
@@ -1188,7 +1214,23 @@ fun SectionVersions(
         }
     }
 
-    SectionTitle(stringResource(R.string.appstrings_about_versions_title))
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(12.dp)),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = stringResource(R.string.appstrings_about_versions_title),
+            style = sizing.textStyle(MaterialTheme.typography.titleMedium),
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.weight(1f)
+        )
+        DatabaseSectionRefreshButton(
+            state = refreshState,
+            contentDescription = stringResource(R.string.appstrings_about_versions_refresh),
+            clickKey = "about_versions_refresh"
+        )
+    }
     val cardColor = if (bubbleColor == Color.Transparent) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f) else bubbleColor
     val uriHandler = LocalUriHandler.current
 
@@ -1247,6 +1289,20 @@ fun SectionVersions(
         }
     }
 
+    // Les versions ci-dessus sont celles des fichiers posés sur l'appareil. Quand il n'y en a pas,
+    // ce sont les données du serveur qui s'affichent partout : elles ont droit à leur propre carte,
+    // pour qu'on ne prenne jamais l'une pour l'autre.
+    if (liveDbInUse) {
+        Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+        LiveDatabaseVersionsCard(
+            cardShape = cardShape,
+            cardColor = cardColor,
+            dataset = liveDbDataset,
+            unreachable = liveDbUnreachable,
+            timeAtLabel = txtVersionTimeAt
+        )
+    }
+
     Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
 
     Surface(
@@ -1279,6 +1335,133 @@ fun SectionVersions(
             Column {
                 Text(stringResource(R.string.appstrings_diagnostic_title), style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.Bold)
                 Text(stringResource(R.string.appstrings_diagnostic_desc), style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+/**
+ * Jeu de données servi par la base EN LIGNE, affiché uniquement quand c'est elle qui alimente
+ * l'app. Mêmes lignes que la carte des versions installées (hebdomadaire, mensuel…) : la valeur est
+ * comparable, seul l'endroit d'où elle vient change — d'où l'en-tête qui le dit, et le serveur
+ * nommé en dernière ligne (principal et miroir construisent leur base chacun de leur côté).
+ */
+@Composable
+private fun LiveDatabaseVersionsCard(
+    cardShape: Shape,
+    cardColor: Color,
+    dataset: LiveDatabaseDataset?,
+    unreachable: Boolean,
+    timeAtLabel: String
+) {
+    val context = LocalContext.current
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = cardColor),
+        shape = cardShape,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(12.dp))) {
+            Row(verticalAlignment = Alignment.Top) {
+                Icon(
+                    Icons.Outlined.Cloud,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(sizing.component(24.dp))
+                )
+                Spacer(modifier = Modifier.width(sizing.spacing(12.dp)))
+                Column {
+                    Text(
+                        stringResource(R.string.appstrings_version_live_db_title),
+                        style = sizing.textStyle(MaterialTheme.typography.titleMedium),
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        stringResource(R.string.appstrings_version_live_db_desc),
+                        style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = sizing.spacing(8.dp)),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
+            )
+
+            if (dataset == null) {
+                // Tant que le serveur n'a pas répondu, la carte reste : elle annonce déjà d'où
+                // viennent les données affichées ailleurs dans l'app, ce qui est l'essentiel.
+                Text(
+                    stringResource(
+                        if (unreachable) R.string.appstrings_version_live_db_unavailable
+                        else R.string.database_searching
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = sizing.spacing(4.dp)),
+                    style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+            } else {
+                val publishedAtMillis = LocalizedDateLabels.isoInstantMillis(dataset.generatedAt)
+                val quarterlyLabel = stringResource(R.string.appstrings_version_quarterly_label)
+                val liveRows = buildList {
+                    add(
+                        stringResource(R.string.appstrings_version_live_db_label) to
+                            formatAboutDatabaseVersion(dataset.offlineDbVersion, timeAtLabel)
+                    )
+                    add(
+                        stringResource(R.string.appstrings_version_weekly_label) to
+                            LocalizedDateLabels.formatWeeklyVersionWithWeekNumber(
+                                context,
+                                formatAnfrWeeklyDate(dataset.dateMajAnfr)
+                            )
+                    )
+                    add(
+                        stringResource(R.string.appstrings_version_monthly_label) to
+                            LocalizedDateLabels.formatMonthlyVersion(
+                                context,
+                                dataset.zipVersion?.takeIf { it.isNotBlank() } ?: "-"
+                            )
+                    )
+                    // Ligne absente, et non vide, quand le serveur ne publie pas la version
+                    // trimestrielle : la donnée ARCEP (zones blanches, NIDT) est bien servie par la
+                    // base en ligne, un « - » laisserait croire le contraire.
+                    dataset.quarterlyVersion?.takeIf { it.isNotBlank() }?.let { quarterly ->
+                        add(
+                            quarterlyLabel to LocalizedDateLabels.formatQuarterlyVersion(
+                                context,
+                                normalizeQuarterlyVersion(quarterly)
+                            )
+                        )
+                    }
+                    add(
+                        stringResource(R.string.appstrings_version_live_db_stations_label) to
+                            (dataset.stationCount?.takeIf { it > 0 }?.let { "%,d".format(it) } ?: "-")
+                    )
+                    add(
+                        stringResource(R.string.appstrings_version_live_db_published_label) to
+                            if (publishedAtMillis > 0L) {
+                                LocalizedDateLabels.formatVersionDateTime(context, publishedAtMillis, timeAtLabel)
+                            } else {
+                                "-"
+                            }
+                    )
+                    add(stringResource(R.string.appstrings_version_live_db_server_label) to dataset.host)
+                }
+
+                liveRows.forEachIndexed { index, row ->
+                    VersionLine(row.first, row.second)
+                    if (index < liveRows.lastIndex) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(vertical = sizing.spacing(2.dp)),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
+                        )
+                    }
+                }
             }
         }
     }
@@ -1401,6 +1584,30 @@ private fun normalizeQuarterlyVersion(rawValue: String?): String {
         ?.let { return "${it.groupValues[2]}-T${it.groupValues[1]}" }
 
     return raw
+}
+
+/**
+ * `date_maj_anfr` (ISO `2026-08-01T…` ou compact `20260801…`) -> `jj/MM/aaaa`, la forme attendue par
+ * [LocalizedDateLabels.formatWeeklyVersionWithWeekNumber]. Partagé par la base installée et la base
+ * en ligne : les deux lignes doivent se lire pareil pour être comparables.
+ */
+private fun formatAnfrWeeklyDate(rawValue: String?): String {
+    val raw = rawValue?.trim().orEmpty()
+    if (raw.isBlank()) return "-"
+
+    return try {
+        if (raw.contains("T")) {
+            val dParts = raw.substringBefore("T").split("-")
+            if (dParts.size >= 3) "${dParts[2]}/${dParts[1]}/${dParts[0]}" else raw
+        } else {
+            when (raw.length) {
+                13, 8 -> "${raw.substring(6, 8)}/${raw.substring(4, 6)}/${raw.substring(0, 4)}"
+                else -> raw
+            }
+        }
+    } catch (e: Exception) {
+        raw
+    }
 }
 
 private fun formatAboutDatabaseVersion(rawValue: String?, timeAtLabel: String): String {

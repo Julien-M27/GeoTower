@@ -133,17 +133,17 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
                 }
                 summary.uploadedCount == total -> {
                     SignalQuestUploadQueue.cleanupUpload(applicationContext, uploadId)
-                    showFinishedNotification(uploadId, summary.uploadedCount, total, partial = false, progressNotificationId, resultNotificationId)
+                    showFinishedNotification(uploadId, manifest.operator, summary.uploadedCount, total, partial = false, progressNotificationId, resultNotificationId)
                     Result.success(uploadResultData(summary.uploadedCount, total))
                 }
                 summary.uploadedCount > 0 -> {
                     SignalQuestUploadQueue.cleanupUpload(applicationContext, uploadId)
-                    showFinishedNotification(uploadId, summary.uploadedCount, total, partial = true, progressNotificationId, resultNotificationId)
+                    showFinishedNotification(uploadId, manifest.operator, summary.uploadedCount, total, partial = true, progressNotificationId, resultNotificationId)
                     Result.success(uploadResultData(summary.uploadedCount, total))
                 }
                 else -> {
                     SignalQuestUploadQueue.cleanupUpload(applicationContext, uploadId)
-                    showFinishedNotification(uploadId, summary.uploadedCount, total, partial = true, progressNotificationId, resultNotificationId)
+                    showFinishedNotification(uploadId, manifest.operator, summary.uploadedCount, total, partial = true, progressNotificationId, resultNotificationId)
                     Result.failure(uploadResultData(summary.uploadedCount, total))
                 }
             }
@@ -364,6 +364,7 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
 
     private fun showFinishedNotification(
         uploadId: String,
+        operator: String,
         successCount: Int,
         total: Int,
         partial: Boolean,
@@ -374,11 +375,14 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
         // Le bilan de l'envoi suit l'interrupteur maître des notifications ; la progression, elle,
         // appartient au service de premier plan et vient d'être retirée juste au-dessus.
         if (!AppNotifications.canPost(applicationContext)) return
-        val message = if (!partial) {
+        val result = if (!partial) {
             applicationContext.resources.getQuantityString(R.plurals.notification_upload_success, total, successCount, total)
         } else {
             applicationContext.resources.getQuantityString(R.plurals.notification_upload_partial, total, successCount, total)
         }
+        // Un envoi = un opérateur : le bilan le nomme comme la notification de progression, sinon
+        // les notifications d'un lot vers plusieurs opérateurs sont impossibles à distinguer.
+        val message = withOperatorPrefix(result, operator)
         notifySafely(
             resultNotificationId,
             createResultNotification(
@@ -407,6 +411,20 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
         )
     }
 
+    private fun withOperatorPrefix(message: String, operator: String): String {
+        val label = operatorDisplayLabel(operator)
+        if (label.isBlank()) return message
+        return applicationContext.getString(
+            R.string.notification_signalquest_upload_result_operator,
+            label,
+            message
+        )
+    }
+
+    private fun operatorDisplayLabel(operator: String): String {
+        return OperatorColors.specForKey(operator)?.label ?: operator
+    }
+
     private fun isRetryableHttpCode(code: Int): Boolean {
         return code == 408 || code == 425 || code == 429 || code in 500..599
     }
@@ -430,8 +448,10 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
         notificationId: Int
     ): Notification {
         ensureNotificationChannel()
-        val operatorLabel = OperatorColors.specForKey(manifest.operator)?.label ?: manifest.operator
-        val title = applicationContext.getString(R.string.notification_signalquest_upload_to_operator, operatorLabel)
+        val title = applicationContext.getString(
+            R.string.notification_signalquest_upload_to_operator,
+            operatorDisplayLabel(manifest.operator)
+        )
         val message = manifest.address?.takeIf { it.isNotBlank() }?.let { address ->
             applicationContext.getString(R.string.notification_signalquest_upload_progress_address, address, current, total)
         } ?: applicationContext.getString(R.string.notification_signalquest_upload_progress, current, total)

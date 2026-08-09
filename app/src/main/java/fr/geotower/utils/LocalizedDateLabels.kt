@@ -80,14 +80,26 @@ object LocalizedDateLabels {
         val value = rawValue?.trim().orEmpty()
         if (value.isBlank()) return 0L
 
+        val normalized = withMillisecondPrecision(value)
         return instantPatterns.firstNotNullOfOrNull { pattern ->
             SimpleDateFormat(pattern, Locale.US).apply {
                 isLenient = false
                 // Pour SimpleDateFormat, le « Z » de ce motif est une lettre littérale : sans ce
                 // forçage l'instant serait lu dans le fuseau du téléphone, donc décalé.
                 if (pattern.endsWith("'Z'")) timeZone = TimeZone.getTimeZone("UTC")
-            }.parseFull(value)?.time
+            }.parseFull(normalized)?.time
         } ?: 0L
+    }
+
+    /**
+     * `datetime.isoformat()` publie des MICROsecondes (« 2026-08-02T18:00:02.123456+00:00 », cf. le
+     * `generated_at` de la base en ligne). Aucun motif SimpleDateFormat ne les décrit : `SSS`
+     * lirait 123 456 millisecondes, valeur hors plage donc refusée, et l'instant serait perdu. On
+     * ramène la fraction à trois chiffres avant d'essayer les motifs.
+     */
+    private fun withMillisecondPrecision(value: String): String {
+        val fraction = Regex("""\.(\d{4,})""").find(value) ?: return value
+        return value.replaceRange(fraction.range, "." + fraction.groupValues[1].take(3))
     }
 
     fun formatQuarterlyVersion(context: Context, rawValue: String): String {

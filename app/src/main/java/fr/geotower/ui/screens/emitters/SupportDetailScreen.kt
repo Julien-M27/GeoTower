@@ -89,6 +89,8 @@ import fr.geotower.data.models.PhysiqueEntity
 import fr.geotower.data.models.RadioMapMarker
 import fr.geotower.data.models.TechniqueEntity
 import fr.geotower.data.upload.SignalQuestUploadDraftStore
+import fr.geotower.data.upload.SignalQuestUploadTarget
+import fr.geotower.data.upload.SignalQuestUploadTargets
 import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.components.GeoTowerBreadcrumbItem
 import fr.geotower.ui.components.GeoTowerLoadingMessage
@@ -665,11 +667,21 @@ fun SupportDetailScreen(
         val selectedOperators = sharedPhotoUploadOperators
             .filter { it.key in selectedSharedPhotoOperatorKeys }
             .filterNot { it.uploadOperator in uploadingOperatorParams }
-            .distinctBy { it.uploadOperator }
         val firstOperator = selectedOperators.firstOrNull() ?: return
         val targetAntenna = firstOperator.antenna
         val supportUploadId = physique?.idSupport?.takeIf { it.isNotBlank() } ?: siteId
-        val encodedOperators = Uri.encode(selectedOperators.joinToString("|") { it.uploadOperator })
+        // Chaque cible part avec SES azimuts : sur un pylone mutualise, deux operateurs n'ont pas les
+        // memes, et l'ecran de confirmation les dessine tous. Deux operateurs locaux peuvent viser la
+        // meme cible SignalQuest (SRR et SFR...) : une seule cible, mais tous leurs azimuts.
+        val targetsByOperator = linkedMapOf<String, SignalQuestUploadTarget>()
+        selectedOperators.forEach { operator ->
+            val known = targetsByOperator[operator.uploadOperator]
+            targetsByOperator[operator.uploadOperator] = SignalQuestUploadTarget(
+                operator = operator.uploadOperator,
+                azimuts = SignalQuestUploadTargets.mergeAzimuts(known?.azimuts, operator.azimuts)
+            )
+        }
+        val encodedTargets = Uri.encode(SignalQuestUploadTargets.encode(targetsByOperator.values.toList()))
         val uploadAddress = techniquesMap[targetAntenna.idAnfr]?.adresse?.trim().orEmpty()
 
         navController.navigate(
@@ -678,7 +690,7 @@ fun SupportDetailScreen(
                 "&lat=${targetAntenna.latitude}" +
                 "&lon=${targetAntenna.longitude}" +
                 "&azimuts=${Uri.encode(targetAntenna.azimuts ?: "")}" +
-                "&operatorNames=$encodedOperators" +
+                "&operatorTargets=$encodedTargets" +
                 "&address=${Uri.encode(uploadAddress)}" +
                 "&keepDraft=true"
         )
@@ -1364,7 +1376,10 @@ private data class SupportSharedPhotoUploadOperator(
     val key: String,
     val label: String,
     val uploadOperator: String,
-    val antenna: LocalisationEntity
+    val antenna: LocalisationEntity,
+    // Azimuts de TOUTES les stations de cet operateur sur le support : `antenna` n'en porte qu'une,
+    // et la confirmation d'envoi doit montrer tout ce qui appartient a l'operateur.
+    val azimuts: String
 )
 
 private fun supportSharedPhotoUploadOperators(
@@ -1375,7 +1390,15 @@ private fun supportSharedPhotoUploadOperators(
 
     antennas.forEach { antenna ->
         OperatorColors.keysFor(antenna.operateur).forEach { key ->
-            if (key in operatorsByKey) return@forEach
+            val known = operatorsByKey[key]
+            if (known != null) {
+                // Station supplementaire du meme operateur : on garde la premiere pour la position,
+                // mais ses azimuts rejoignent ceux deja retenus.
+                operatorsByKey[key] = known.copy(
+                    azimuts = SignalQuestUploadTargets.mergeAzimuts(known.azimuts, antenna.azimuts)
+                )
+                return@forEach
+            }
 
             val uploadOperator = SignalQuestOperators.operatorParamFor(key) ?: return@forEach
             if (!CommunityDataPreferences.isSignalQuestPhotosEnabled(prefs, key)) return@forEach
@@ -1384,7 +1407,8 @@ private fun supportSharedPhotoUploadOperators(
                 key = key,
                 label = OperatorColors.specForKey(key)?.label ?: uploadOperator,
                 uploadOperator = uploadOperator,
-                antenna = antenna
+                antenna = antenna,
+                azimuts = SignalQuestUploadTargets.mergeAzimuts(antenna.azimuts)
             )
         }
     }

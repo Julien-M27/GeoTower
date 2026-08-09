@@ -909,7 +909,7 @@ private fun DisplayModeCard(
 // --- ÉTAPE TRAITEMENT LOCAL DES DONNÉES ---
 // ==========================================
 /**
- * Étape « traitement local des données », posée juste AVANT la base de données.
+ * Étape « provenance des données », posée juste AVANT la base de données.
  *
  * L'ordre n'est pas cosmétique : le cran choisi ici décide de ce que la page suivante propose
  * (télécharger la base ou la générer sur l'appareil, cf. [AppConfig.dbForcedLocal]). Placée après,

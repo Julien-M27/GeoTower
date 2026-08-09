@@ -48,6 +48,43 @@ class LocalModeLevelScaleTest {
     }
 
     /**
+     * Generer sa base ici doit amener le cran sur l'option correspondante — sinon le prochain
+     * telechargement automatique ecrase la base fraichement construite ([AppConfig.dbForcedLocal]
+     * ne regarde que le cran). Le reglage des pannes, lui, ne bouge pas : les deux axes sont
+     * independants.
+     */
+    @Test
+    fun localBuildPromotesLevelWithoutTouchingOutages() {
+        assertEquals(AppConfig.LOCAL_MODE_DB, AppConfig.levelAfterLocalDbBuild(AppConfig.LOCAL_MODE_SERVER))
+        assertEquals(AppConfig.LOCAL_MODE_BOTH, AppConfig.levelAfterLocalDbBuild(AppConfig.LOCAL_MODE_OUTAGES))
+
+        // Deja en local : rien a promouvoir, et surtout pas de retrogradation du cran maximal.
+        listOf(
+            AppConfig.LOCAL_MODE_DB,
+            AppConfig.LOCAL_MODE_BOTH,
+            AppConfig.LOCAL_MODE_MAX,
+        ).forEach { level ->
+            assertEquals(level, AppConfig.levelAfterLocalDbBuild(level))
+        }
+
+        // Quel que soit le cran de depart, l'arrivee genere bien la base et conserve l'axe pannes.
+        listOf(
+            AppConfig.LOCAL_MODE_SERVER,
+            AppConfig.LOCAL_MODE_DB,
+            AppConfig.LOCAL_MODE_OUTAGES,
+            AppConfig.LOCAL_MODE_BOTH,
+            AppConfig.LOCAL_MODE_MAX,
+        ).forEach { level ->
+            val after = AppConfig.levelAfterLocalDbBuild(level)
+            assertTrue(AppConfig.levelBuildsDbLocally(after))
+            assertEquals(
+                AppConfig.levelFetchesOutagesLocally(level),
+                AppConfig.levelFetchesOutagesLocally(after),
+            )
+        }
+    }
+
+    /**
      * Le cran maximal ne doit jamais laisser un appareil sans aucune donnee : s'il ne sait pas
      * generer sa base (RAM/stockage), le serveur reste sa seule source et le manifeste doit
      * continuer d'etre lu. Couper les deux revenait a livrer une application vide.

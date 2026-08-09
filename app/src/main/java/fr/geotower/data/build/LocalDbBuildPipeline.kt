@@ -9,6 +9,7 @@ import fr.geotower.data.db.GeoTowerDatabaseValidator
 import fr.geotower.data.db.LocalDbProvenance
 import fr.geotower.data.db.RadioDatabaseValidator
 import fr.geotower.data.models.RadioServiceMasks
+import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
 import java.io.File
 import java.text.NumberFormat
@@ -321,6 +322,10 @@ class LocalDbBuildPipeline(
                         if (!DatabaseDownloader.installBuiltDatabase(context, builtFile)) {
                             return@withContext Result(false, "Installation impossible (échange du fichier de base)")
                         }
+                        // La base tourne desormais en local : le cran de traitement local doit le
+                        // dire (page « Provenance des donnees »), et surtout bloquer le
+                        // telechargement qui l'ecraserait au prochain passage.
+                        AppConfig.alignLocalModeLevelAfterLocalBuild(context)
 
                         // Base radio : staging DEJA peuple par le sink -> calcul/emission seulement, filtre par
                         // categorie(s) choisie(s). Best-effort (base radio optionnelle).
@@ -380,6 +385,9 @@ class LocalDbBuildPipeline(
                         }
                         // Provenance : memorise la version installee pour la distinguer d'un telechargement.
                         LocalDbProvenance.recordRadioLocalBuild(context, radioVersion)
+                        // Meme alignement du cran que pour la base mobile : le cran vaut pour les
+                        // deux bases generables (cf. [AppConfig.dbForcedLocal]).
+                        AppConfig.alignLocalModeLevelAfterLocalBuild(context)
                     }
                 } finally {
                     refSource?.close()

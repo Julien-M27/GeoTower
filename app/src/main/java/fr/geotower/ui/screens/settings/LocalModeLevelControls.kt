@@ -39,7 +39,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Panneau des 5 crans du « traitement local des données », partagé par [LocalModeScreen]
+ * Panneau des 5 crans de la « provenance des données », partagé par [LocalModeScreen]
  * (Réglages) et l'étape correspondante du premier lancement.
  *
  * Il porte le choix ET tout ce qui l'explique (kill-switch distant, appareil inéligible, écart
@@ -70,10 +70,12 @@ fun LocalModeLevelControls(
     // « Autonomie maximale » reste ouvert : ses coupures, elles, s'appliquent de toute façon.
     val canPickDbLevels = eligibility.eligible
 
-    // Provenance réelle de la base installée. La génération est aussi accessible depuis Réglages ▸
-    // Base de données et la première ouverture : un utilisateur peut donc tourner sur une base
-    // générée ailleurs alors que son cran dit « Serveur ». On le lui signale plutôt que de le
-    // laisser devant une page qui affirme le contraire de ce qu'il vit.
+    // Provenance réelle de la base installée. Une génération réussie aligne désormais le cran
+    // elle-même ([AppConfig.alignLocalModeLevelAfterLocalBuild]), mais il reste deux façons
+    // d'atterrir sur une base locale sous un cran qui dit « Serveur » : une base générée avant
+    // que cet alignement n'existe, et le retour manuel à « Serveur » (la base installée, elle,
+    // reste locale jusqu'au prochain téléchargement). On le signale plutôt que de laisser la page
+    // affirmer le contraire de ce que l'utilisateur vit.
     var dbLocallyBuilt by remember { mutableStateOf(false) }
     LaunchedEffect(level) {
         dbLocallyBuilt = withContext(Dispatchers.IO) {
@@ -102,8 +104,9 @@ fun LocalModeLevelControls(
             )
         }
 
-        // Écart entre l'état réel et le cran choisi : la base tourne en local sans que le cran
-        // le dise. Simple constat, aucune bascule automatique — le cran reste un choix.
+        // Écart résiduel entre l'état réel et le cran choisi : la base tourne en local sans que le
+        // cran le dise. Simple constat — à ce stade le cran est un choix délibéré de l'utilisateur
+        // (l'alignement, lui, se fait à la génération), on ne le lui reprend pas.
         if (dbLocallyBuilt && !AppConfig.levelBuildsDbLocally(level)) {
             Text(
                 text = stringResource(R.string.local_mode_db_actually_local),

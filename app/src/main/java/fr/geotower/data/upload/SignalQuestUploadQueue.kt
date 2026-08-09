@@ -183,6 +183,78 @@ data class SignalQuestUploadSource(
     val userRotationDegrees: Int = 0
 )
 
+// Cible d'un envoi : un operateur SignalQuest et les azimuts de SA station sur le support. Les deux
+// voyagent ensemble dans un seul parametre de navigation pour qu'aucun appelant ne puisse
+// desynchroniser une liste d'operateurs d'une liste d'azimuts : l'ecran de confirmation dessine un
+// azimut par operateur cible.
+data class SignalQuestUploadTarget(
+    val operator: String,
+    val azimuts: String = ""
+)
+
+object SignalQuestUploadTargets {
+    private const val TARGET_SEPARATOR = '|'
+    private const val FIELD_SEPARATOR = ':'
+    private const val AZIMUT_SEPARATOR = ','
+    // Les azimuts ANFR sont separes par des virgules : on les transporte avec un point-virgule pour
+    // que la valeur reste lisible dans une route et survive a un decodage d'URL supplementaire.
+    private const val ROUTE_AZIMUT_SEPARATOR = ';'
+
+    fun encode(targets: List<SignalQuestUploadTarget>): String {
+        return normalize(targets).joinToString(TARGET_SEPARATOR.toString()) { target ->
+            val azimuts = target.azimuts.replace(AZIMUT_SEPARATOR, ROUTE_AZIMUT_SEPARATOR)
+            if (azimuts.isBlank()) target.operator else "${target.operator}$FIELD_SEPARATOR$azimuts"
+        }
+    }
+
+    fun decode(raw: String?): List<SignalQuestUploadTarget> {
+        val entries = raw.orEmpty()
+            .split(TARGET_SEPARATOR)
+            .map { entry ->
+                SignalQuestUploadTarget(
+                    operator = entry.substringBefore(FIELD_SEPARATOR),
+                    azimuts = entry.substringAfter(FIELD_SEPARATOR, missingDelimiterValue = "")
+                        .replace(ROUTE_AZIMUT_SEPARATOR, AZIMUT_SEPARATOR)
+                )
+            }
+        return normalize(entries)
+    }
+
+    // Deux cibles identiques enverraient deux fois la meme photo au meme operateur : on ne garde
+    // qu'une occurrence. Les separateurs sont retires des valeurs pour que l'aller-retour soit sur.
+    private fun normalize(targets: List<SignalQuestUploadTarget>): List<SignalQuestUploadTarget> {
+        return targets
+            .map { target ->
+                SignalQuestUploadTarget(
+                    operator = target.operator.filterNot(::isSeparator).trim(),
+                    azimuts = target.azimuts.filterNot(::isSeparator).trim()
+                )
+            }
+            .filter { it.operator.isNotBlank() }
+            .distinctBy { it.operator.uppercase(Locale.US) }
+    }
+
+    private fun isSeparator(character: Char): Boolean {
+        return character == TARGET_SEPARATOR || character == FIELD_SEPARATOR
+    }
+
+    // Un operateur peut avoir plusieurs stations sur un meme pylone, et deux operateurs locaux
+    // peuvent viser la meme cible SignalQuest (SRR et SFR, Free Caraibe et Free) : leurs azimuts se
+    // rejoignent alors sur une seule cible. Meme forme que la base (degres separes par des virgules,
+    // dedoublonnes et ranges) pour que l'affichage ne trace pas deux fois le meme trait.
+    fun mergeAzimuts(vararg values: String?): String {
+        return values
+            .asSequence()
+            .filterNotNull()
+            .flatMap { it.split(AZIMUT_SEPARATOR).asSequence() }
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .sortedBy { it.toIntOrNull() ?: 999 }
+            .joinToString(AZIMUT_SEPARATOR.toString())
+    }
+}
+
 object SignalQuestUploadDraftStore {
     private val drafts = ConcurrentHashMap<String, List<String>>()
 

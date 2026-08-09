@@ -150,12 +150,18 @@ fun rememberDatabaseRefreshIndicator(state: DatabaseRefreshState): Boolean {
 /**
  * Bouton d'actualisation de la section, pour les modes d'affichage où le tirage vers le bas n'est
  * pas utilisable (page unique : la section n'est pas en haut du défilement).
+ *
+ * [contentDescription] et [clickKey] sont ouverts pour les sections hors réglages qui relisent les
+ * mêmes données (les versions de la page « À propos ») : même animation, même anti-clignotement,
+ * mais une annonce d'accessibilité qui parle de la bonne section.
  */
 @Composable
 fun DatabaseSectionRefreshButton(
     state: DatabaseRefreshState,
     modifier: Modifier = Modifier,
-    onSafeClick: SafeClick? = null
+    onSafeClick: SafeClick? = null,
+    contentDescription: String = stringResource(R.string.settings_database_refresh),
+    clickKey: String = "database_section_refresh"
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
     val safeClick = onSafeClick ?: rememberSafeClick()
@@ -177,13 +183,13 @@ fun DatabaseSectionRefreshButton(
     }
 
     IconButton(
-        onClick = { safeClick("database_section_refresh") { state.refresh() } },
+        onClick = { safeClick(clickKey) { state.refresh() } },
         enabled = !spinning,
         modifier = modifier
     ) {
         Icon(
             imageVector = Icons.Default.Refresh,
-            contentDescription = stringResource(R.string.settings_database_refresh),
+            contentDescription = contentDescription,
             tint = MaterialTheme.colorScheme.primary,
             modifier = Modifier
                 .size(sizing.component(22.dp))

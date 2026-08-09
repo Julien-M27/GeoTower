@@ -26,7 +26,7 @@
     <string name="settings_hub_preferences_desc">Operator, language, units, links, sharing</string>
     <string name="settings_hub_pages_desc">Home, map, compass, detail pages, tools</string>
     <string name="settings_hub_system_desc">Permissions, server, diagnostics</string>
-    <string name="settings_hub_database_desc">Downloads, local build, local processing</string>
+    <string name="settings_hub_database_desc">Downloads, local build, data source</string>
     <string name="settings_api_server_desc">Main server or backup mirror</string>
     <string name="settings_database_online_title">Online operators database</string>
     <string name="settings_search_placeholder">Search for a setting</string>
@@ -142,9 +142,9 @@
     <string name="onboarding_database_success_desc">The offline database has been successfully installed. The application is ready to run at full speed.</string>
     <string name="onboarding_theme_desc">Choose the style that suits you.</string>
     <string name="onboarding_offline_desc">Download the entire database to use the list offline. Warning: large file.</string>
-    <string name="onboarding_offline_desc_local_build">Your local processing level builds the database on this device: nothing to download here.</string>
+    <string name="onboarding_offline_desc_local_build">Your data source choice builds the database on this device: nothing to download here.</string>
     <string name="onboarding_database_enb_cut_by_level">The eNB / gNB database is not offered: maximum autonomy cuts it off, as it can\'t be built on the device.</string>
-    <string name="settings_database_hidden_by_local_build">Mobile and radio downloads are hidden here: your local processing level builds these databases on the device.</string>
+    <string name="settings_database_hidden_by_local_build">Mobile and radio downloads are hidden here: your data source choice builds these databases on the device.</string>
     <string name="settings_database_hidden_by_max_autonomy">Maximum autonomy: the eNB / gNB database is removed from here (it can\'t be built on the device), along with any download replaced by local building. A database still installed keeps its card, so you can delete it.</string>
     <string name="onboarding_display_mode_title">How do you want to use GeoTower?</string>
     <string name="onboarding_display_mode_desc">Two ways to browse the app. You can switch at any time from the settings.</string>
@@ -261,6 +261,7 @@
     <string name="notification_signalquest_upload_progress">Uploading (%1$d/%2$d)...</string>
     <string name="notification_signalquest_upload_to_operator">Uploading to %1$s</string>
     <string name="notification_signalquest_upload_progress_address">%1$s · %2$d/%3$d</string>
+    <string name="notification_signalquest_upload_result_operator">%1$s · %2$s</string>
     <string name="notification_signalquest_upload_retry">Network error, retrying later.</string>
     <string name="operator_count">↓ Number of operators: %1$d</string>
     <string name="upload_history_no_photo_recorded">No photo recorded</string>
@@ -1446,6 +1447,14 @@
     <string name="appstrings_version_quarterly_label">Quarterly\ndata</string>
     <string name="appstrings_version_time_at">at</string>
     <string name="appstrings_version_weekly_label">Weekly\ndata</string>
+    <string name="appstrings_about_versions_refresh">Refresh versions</string>
+    <string name="appstrings_version_live_db_title">Online database</string>
+    <string name="appstrings_version_live_db_desc">No database is installed on this device: the map, search and site sheets read the GeoTower server directly. Here is the data it serves.</string>
+    <string name="appstrings_version_live_db_label">Online database\nversion</string>
+    <string name="appstrings_version_live_db_stations_label">Published\nstations</string>
+    <string name="appstrings_version_live_db_published_label">Put online</string>
+    <string name="appstrings_version_live_db_server_label">Server</string>
+    <string name="appstrings_version_live_db_unavailable">The server did not report the details of the online data.</string>
     <string name="version_week_number_with_date">Week %1$d\n%2$s</string>
     <string name="photo_exif_label_camera_model">Device</string>
     <string name="photo_exif_label_distance_to_site">Distance to site</string>
@@ -2400,9 +2409,20 @@
     <string name="outage_download_running">Downloading…</string>
     <string name="outage_download_error">Download failed: %1$s</string>
     <string name="outage_download_failed">Server unreachable</string>
-    <string name="outage_download_local_source_note">Outages are currently prepared on this device (Local processing): the server file is not used.</string>
+    <string name="outage_download_local_source_note">Outages are currently prepared on this device (Data source): the server file is not used.</string>
     <string name="outage_download_unavailable">Outages are currently unavailable.</string>
     <string name="outage_download_delete_desc">Are you sure you want to delete the outage copy kept on this device?</string>
+    <string name="outage_rebuild_desc">Seeing an outage the server report does not have yet? Ask the server to fetch the operator files again.</string>
+    <string name="outage_rebuild_button">Request a new report</string>
+    <string name="outage_rebuild_quota">Server limit: %1$d per hour — available: %2$d</string>
+    <string name="outage_rebuild_requesting">Request sent…</string>
+    <string name="outage_rebuild_running">The server is rebuilding the report…</string>
+    <string name="outage_rebuild_downloading">Fetching the new report…</string>
+    <string name="outage_rebuild_done">Report rebuilt and downloaded.</string>
+    <string name="outage_rebuild_refused_global">This hour\'s quota is used up. Try again in %1$d min.</string>
+    <string name="outage_rebuild_refused_client">You already requested a report this hour. Try again in %1$d min.</string>
+    <string name="outage_rebuild_failed">Rebuild failed: %1$s</string>
+    <string name="outage_rebuild_failed_generic">Rebuild failed.</string>
     <!-- Outage update: live notification + steps -->
     <string name="outage_gen_notif_title">Updating outages</string>
     <string name="outage_gen_channel_name">Outage update</string>
@@ -2415,11 +2435,11 @@
     <string name="appstrings_release_section_outages">Network outages</string>
     <string name="appstrings_release_v1965_outage_local_source">Choose where outages come from: the GeoTower server, or fetched right on your device from the operators\' official files</string>
     <string name="appstrings_release_v1965_outage_generation">New Outage source screen: update frequency, optional background updates, an Update now button, last update date and count, with a progress notification</string>
-    <!-- Local data processing (server-autonomy mode) -->
-    <string name="local_mode_settings_title">Local data processing</string>
-    <string name="local_mode_settings_desc">Outages and database: server or on-device</string>
+    <!-- Data source: server or on-device processing -->
+    <string name="local_mode_settings_title">Data source</string>
+    <string name="local_mode_settings_desc">GeoTower server or your device</string>
     <string name="local_mode_intro">Choose how much data is processed on your device instead of being provided by the GeoTower server. Configuration stays controlled remotely at every level.</string>
-    <string name="local_mode_remote_disabled">Local processing is currently disabled remotely.</string>
+    <string name="local_mode_remote_disabled">Preparing data on your device is currently disabled remotely.</string>
     <string name="local_mode_level_off_title">Server (default)</string>
     <string name="local_mode_level_off_desc">Everything is downloaded from and provided by the GeoTower server.</string>
     <string name="local_mode_level_db_title">Database on-device</string>
@@ -2437,7 +2457,7 @@
     <string name="local_mode_db_ineligible_measured">Requires %1$s of app memory and %2$s free. This device: %3$s and %4$s free.</string>
     <string name="local_mode_max_partial_on_this_device">On this device, maximum autonomy is partial: photos, update checks, the live API and the eNB / gNB database are cut off, but the main databases (mobile, radio) keep coming from the GeoTower server — otherwise the app would hold no data at all.</string>
     <string name="enb_database_local_mode_unavailable">Maximum autonomy: this database can\'t be built on the device, so it is neither downloaded nor updated as long as that level is active.</string>
-    <string name="local_mode_download_disabled">Local processing active — server download disabled.</string>
+    <string name="local_mode_download_disabled">Data prepared on your device — server download disabled.</string>
 
     <!-- Aides au défilement (barre latérale + boutons haut/bas) -->
     <string name="appstrings_page_scrollbar_option">Side scrollbar</string>
@@ -2635,4 +2655,10 @@
     <string name="appstrings_release_v2018_photo_rotate">A button rotates a photo a quarter turn before uploading; the preview shows exactly what will be sent</string>
     <string name="appstrings_release_v2018_nearby_radius">Nearby search on the online database widens its radius in steps, instead of stopping at a limit that left everything outside France empty</string>
     <string name="appstrings_release_v2018_about_scrolling">The “About” page has its own scrolling setting: all parts in sequence, or one at a time from the side menu on large screens</string>
+
+    <!-- Release notes 2.0.19 -->
+    <string name="appstrings_release_v2019_outage_rebuild">A button asks the server to redo its outage reading when one is missing, within the hourly quota it announces</string>
+    <string name="appstrings_release_v2019_live_db_about">When no database is installed, “About” details the data served live by the server: version, published stations and the date it went online</string>
+    <string name="appstrings_release_v2019_about_refresh">A button refreshes the versions shown in “About”</string>
+    <string name="appstrings_release_v2019_local_mode_renamed">“Local processing” becomes “Data source”: GeoTower server or your device, said more plainly</string>
 </resources>
