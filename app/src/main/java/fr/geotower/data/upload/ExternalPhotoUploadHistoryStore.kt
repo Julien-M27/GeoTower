@@ -54,7 +54,8 @@ object ExternalPhotoUploadHistoryStore {
         operator: String,
         createdAtMillis: Long,
         sourceFile: File,
-        stripExifBeforeUpload: Boolean
+        stripExifBeforeUpload: Boolean,
+        userRotationDegrees: Int = 0
     ): String {
         val id = UUID.randomUUID().toString()
         val entry = ExternalPhotoUploadHistoryEntry(
@@ -64,7 +65,7 @@ object ExternalPhotoUploadHistoryStore {
             supportId = supportId,
             operator = operator,
             createdAtMillis = createdAtMillis,
-            thumbnailPath = createThumbnail(context, sourceFile, id),
+            thumbnailPath = createThumbnail(context, sourceFile, id, userRotationDegrees),
             status = STATUS_PENDING,
             stripExifBeforeUpload = stripExifBeforeUpload
         )
@@ -209,7 +210,12 @@ object ExternalPhotoUploadHistoryStore {
         thumbnailDir(context).deleteRecursively()
     }
 
-    private fun createThumbnail(context: Context, sourceFile: File, id: String): String? {
+    private fun createThumbnail(
+        context: Context,
+        sourceFile: File,
+        id: String,
+        userRotationDegrees: Int
+    ): String? {
         if (!sourceFile.isFile) return null
 
         var decoded: Bitmap? = null
@@ -229,7 +235,7 @@ object ExternalPhotoUploadHistoryStore {
                 inPreferredConfig = Bitmap.Config.RGB_565
             }
             decoded = BitmapFactory.decodeFile(sourceFile.absolutePath, options) ?: return@runCatching null
-            val orientedBitmap = applyExifOrientation(sourceFile, decoded!!)
+            val orientedBitmap = applyOrientation(sourceFile, userRotationDegrees, decoded!!)
             if (orientedBitmap !== decoded) {
                 oriented = orientedBitmap
             }
@@ -247,7 +253,9 @@ object ExternalPhotoUploadHistoryStore {
         }
     }
 
-    private fun applyExifOrientation(source: File, bitmap: Bitmap): Bitmap {
+    // La vignette doit montrer la photo telle qu'elle partira : orientation EXIF gravee, puis la
+    // rotation choisie sur l'ecran d'envoi.
+    private fun applyOrientation(source: File, userRotationDegrees: Int, bitmap: Bitmap): Bitmap {
         val orientation = runCatching {
             ExifInterface(source.absolutePath).getAttributeInt(
                 ExifInterface.TAG_ORIENTATION,
@@ -270,6 +278,11 @@ object ExternalPhotoUploadHistoryStore {
                 matrix.postRotate(270f)
                 matrix.preScale(-1f, 1f)
             }
+        }
+
+        val normalizedUserRotation = SignalQuestUploadRules.normalizeUserRotationDegrees(userRotationDegrees)
+        if (normalizedUserRotation != 0) {
+            matrix.postRotate(normalizedUserRotation.toFloat())
         }
 
         if (matrix.isIdentity) return bitmap

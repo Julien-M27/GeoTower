@@ -573,12 +573,23 @@ object AboutPagePrefs {
     /** Les six parties, dans l'ordre de la page : l'indice est celui utilisé par l'écran. */
     val sections = listOf(presentation, news, privacy, sources, versions, development)
 
+    /**
+     * Page défilante (défaut) : les parties se suivent d'un bloc. Sinon, sur grand écran, une seule
+     * partie occupe la page et le menu latéral en change.
+     *
+     * Volontairement à part du mode de navigation des réglages (`nav_mode`) : la page « À propos »
+     * décide pour elle-même. Sans barre latérale (téléphone), il n'y a pas de quoi passer d'une
+     * partie à l'autre : la page y défile toujours, comme avant.
+     */
+    val scrolling = BooleanPreference("page_about_scrolling", true)
+
     /** Indices des parties affichées, dans l'ordre de la page. Vide si tout est masqué. */
     fun visibleSections(prefs: SharedPreferences): List<Int> =
         sections.indices.filter { sections[it].read(prefs) }
 
     fun putDefaults(editor: SharedPreferences.Editor): SharedPreferences.Editor {
         sections.forEach { editor.putBoolean(it.key, it.defaultValue) }
+        editor.putBoolean(scrolling.key, scrolling.defaultValue)
         return editor
     }
 }

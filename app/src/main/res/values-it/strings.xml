@@ -61,7 +61,7 @@
     <string name="settings_page_compass_desc">Ordine dei blocchi, posizione, GPS, precisione</string>
     <string name="settings_page_stats_desc">Blocchi, modalità di visualizzazione, frequenze</string>
     <string name="settings_page_department_stats_desc">Blocchi della pagina per dipartimento</string>
-    <string name="settings_page_about_desc">Ordine e visibilità delle sue sei parti</string>
+    <string name="settings_page_about_desc">Scorrimento e visibilità delle sue sei parti</string>
     <string name="settings_page_support_desc">Blocchi, mini mappa, foto</string>
     <string name="settings_page_site_desc">Blocchi, frequenze, foto, speedtest</string>
     <string name="settings_page_speedtests_desc">Filtri, ordinamento, dettagli mostrati</string>
@@ -346,6 +346,8 @@
     <string name="appstrings_about_intro">GeoTower ti permette di localizzare le antenne mobili intorno a te e identificare le tecnologie disponibili.</string>
     <string name="appstrings_about_new">Novità</string>
     <string name="appstrings_about_presentation">Presentazione</string>
+    <string name="appstrings_about_scrolling_title">Pagina scorrevole</string>
+    <string name="appstrings_about_scrolling_desc">Tutte le parti una dopo l\'altra. Altrimenti una parte alla volta scelta nel menu laterale, su schermo grande; sul telefono la pagina scorre sempre.</string>
     <string name="appstrings_about_sources">Fonti dati</string>
     <string name="appstrings_about_versions_title">Versioni</string>
     <string name="appstrings_accuracy">PRECISIONE</string>
@@ -1420,6 +1422,7 @@
     <string name="appstrings_upload_preparing">Preparazione...</string>
     <string name="appstrings_upload_sq_desc_placeholder">Aggiungi una descrizione per questo lotto (opzionale)...</string>
     <string name="appstrings_upload_sq_limit">Limite: 20 MB per foto</string>
+    <string name="appstrings_upload_sq_rotate_left">Ruota di 90° a sinistra</string>
     <string name="appstrings_upload_sq_strip_exif">Rimuovi dati EXIF</string>
     <string name="appstrings_upload_sq_target_operator">Operatore target</string>
     <string name="appstrings_upload_sq_target_operators">Operatori target</string>
@@ -2627,4 +2630,9 @@
     <string name="appstrings_release_v2017_split_auto">La vista divisa segue ora la dimensione reale della finestra: attiva su tablet e pieghevoli aperti, si richiude da sola quando chiudi il dispositivo, senza riavvio</string>
     <string name="appstrings_release_v2017_split_all_devices">Ne beneficiano tutti i pieghevoli e tutti i tablet, invece di un breve elenco di modelli riconosciuti</string>
     <string name="appstrings_release_v2017_nav_style_removed">L\'impostazione «Stile di navigazione» scompare; se preferisci lo schermo intero, la scelta resta disponibile e ha sempre la precedenza</string>
+
+    <!-- Note di versione 2.0.18 -->
+    <string name="appstrings_release_v2018_photo_rotate">Un pulsante ruota la foto di un quarto di giro prima dell\'invio; l\'anteprima mostra esattamente ciò che partirà</string>
+    <string name="appstrings_release_v2018_nearby_radius">La ricerca dei siti vicini sul database online allarga il raggio per gradi, invece di fermarsi a un limite che fuori dalla Francia non dava alcun risultato</string>
+    <string name="appstrings_release_v2018_about_scrolling">La pagina «Informazioni» ha la sua impostazione di scorrimento: tutte le parti di seguito, oppure una alla volta dal menu laterale sui grandi schermi</string>
 </resources>

@@ -61,7 +61,7 @@
     <string name="settings_page_compass_desc">Ordem dos blocos, posição, GPS, precisão</string>
     <string name="settings_page_stats_desc">Blocos, modo de apresentação, frequências</string>
     <string name="settings_page_department_stats_desc">Blocos da página por departamento</string>
-    <string name="settings_page_about_desc">Ordem e visibilidade das suas seis partes</string>
+    <string name="settings_page_about_desc">Deslizamento e visibilidade das suas seis partes</string>
     <string name="settings_page_support_desc">Blocos, mini-mapa, fotografias</string>
     <string name="settings_page_site_desc">Blocos, frequências, fotografias, speedtests</string>
     <string name="settings_page_speedtests_desc">Filtros, ordenação, detalhes mostrados</string>
@@ -346,6 +346,8 @@
     <string name="appstrings_about_intro">A GeoTower permite-lhe localizar torres de celular à sua volta e identificar as tecnologias disponibles.</string>
     <string name="appstrings_about_new">Novidades</string>
     <string name="appstrings_about_presentation">Apresentação</string>
+    <string name="appstrings_about_scrolling_title">Página deslizável</string>
+    <string name="appstrings_about_scrolling_desc">Todas as partes seguidas. Caso contrário, uma parte de cada vez escolhida no menu lateral, em ecrã grande; no telemóvel a página desliza sempre.</string>
     <string name="appstrings_about_sources">Fontes de données</string>
     <string name="appstrings_about_versions_title">Versões</string>
     <string name="appstrings_accuracy">PRECISÃO</string>
@@ -1420,6 +1422,7 @@
     <string name="appstrings_upload_preparing">Preparando...</string>
     <string name="appstrings_upload_sq_desc_placeholder">Adicionar uma descrição pour este lote (optionnal)...</string>
     <string name="appstrings_upload_sq_limit">Limite: 20 MB por foto</string>
+    <string name="appstrings_upload_sq_rotate_left">Rodar 90° para a esquerda</string>
     <string name="appstrings_upload_sq_strip_exif">Remover dados EXIF</string>
     <string name="appstrings_upload_sq_target_operator">Operadora destino</string>
     <string name="appstrings_upload_sq_target_operators">Operadoras destino</string>
@@ -2627,4 +2630,9 @@
     <string name="appstrings_release_v2017_split_auto">A vista dividida passa a seguir o tamanho real da janela: ativa em tablets e dobráveis abertos, recolhe sozinha quando fecha o dispositivo, sem reiniciar</string>
     <string name="appstrings_release_v2017_split_all_devices">Beneficiam todos os dobráveis e todos os tablets, em vez de uma lista curta de modelos reconhecidos</string>
     <string name="appstrings_release_v2017_nav_style_removed">A definição «Estilo de navegação» desaparece; se preferir o ecrã inteiro, essa escolha continua disponível e prevalece sempre</string>
+
+    <!-- Notas da versão 2.0.18 -->
+    <string name="appstrings_release_v2018_photo_rotate">Um botão roda a foto um quarto de volta antes do envio; a pré-visualização mostra exatamente o que será enviado</string>
+    <string name="appstrings_release_v2018_nearby_radius">A procura de sites próximos na base online alarga o raio por etapas, em vez de parar num limite que fora de França não devolvia nada</string>
+    <string name="appstrings_release_v2018_about_scrolling">A página «Acerca de» tem a sua própria definição de deslocamento: todas as partes seguidas, ou uma de cada vez a partir do menu lateral em ecrãs grandes</string>
 </resources>

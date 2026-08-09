@@ -940,7 +940,8 @@ fun HomeSettingsSheet(
 
 // === LE SOUS-MENU POUR LA PAGE À PROPOS ===
 /**
- * Les six parties de la page « À propos », à afficher ou masquer une par une.
+ * La façon de parcourir la page « À propos », puis ses six parties à afficher ou masquer une par
+ * une.
  *
  * Pas de glisser-déposer ici : l'ordre des parties est aussi celui du menu latéral de la page sur
  * grand écran, et il suit le fil de lecture (ce qu'est l'app, ce qui a changé, ce qu'elle fait de
@@ -977,6 +978,7 @@ fun AboutPageSettingsSheet(
     var sectionsVisible by remember {
         mutableStateOf(AboutPagePrefs.sections.map { it.read(prefs) })
     }
+    var scrollingPage by remember { mutableStateOf(AboutPagePrefs.scrolling.read(prefs)) }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
         BackHandler(onBack = onBack)
@@ -1004,6 +1006,21 @@ fun AboutPageSettingsSheet(
             val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
 
             Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))) {
+                // En tête, parce que ce choix décide de ce qu'on voit des parties réglées en
+                // dessous : tout à la suite, ou une seule à la fois via le menu latéral.
+                SimpleSwitchCardWithDesc(
+                    title = stringResource(R.string.appstrings_about_scrolling_title),
+                    desc = stringResource(R.string.appstrings_about_scrolling_desc),
+                    checked = scrollingPage,
+                    onCheckedChange = { enabled ->
+                        scrollingPage = enabled
+                        AboutPagePrefs.scrolling.write(prefs.edit(), enabled).apply()
+                    },
+                    shape = shape,
+                    border = border,
+                    bubbleColor = bubbleColor,
+                    useOneUi = useOneUi
+                )
                 AboutPagePrefs.sections.forEachIndexed { index, section ->
                     SimpleSwitchCard(
                         title = stringResource(sectionTitles[index]),
@@ -1026,6 +1043,7 @@ fun AboutPageSettingsSheet(
                 onClick = {
                     AboutPagePrefs.putDefaults(prefs.edit()).apply()
                     sectionsVisible = AboutPagePrefs.sections.map { it.defaultValue }
+                    scrollingPage = AboutPagePrefs.scrolling.defaultValue
                     PageScrollPrefs.Aid.entries.forEach { aid ->
                         PageScrollPrefs.set(prefs, aid, PageScrollPrefs.ABOUT, PageScrollPrefs.defaultEnabled(aid, PageScrollPrefs.ABOUT))
                     }

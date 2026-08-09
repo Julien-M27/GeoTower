@@ -74,7 +74,7 @@
     <string name="settings_page_compass_desc">Block order, position, GPS, accuracy</string>
     <string name="settings_page_stats_desc">Blocks, display mode, frequencies</string>
     <string name="settings_page_department_stats_desc">Blocks of the per-department page</string>
-    <string name="settings_page_about_desc">Order and visibility of its six parts</string>
+    <string name="settings_page_about_desc">Scrolling and visibility of its six parts</string>
     <string name="settings_page_support_desc">Blocks, mini map, photos</string>
     <string name="settings_page_site_desc">Blocks, frequencies, photos, speedtests</string>
     <string name="settings_page_speedtests_desc">Filters, sorting, details shown</string>
@@ -423,6 +423,8 @@
     <string name="appstrings_about_intro">GeoTower allows you to locate cell towers around you and identify available technologies.</string>
     <string name="appstrings_about_new">What\'s New</string>
     <string name="appstrings_about_presentation">Presentation</string>
+    <string name="appstrings_about_scrolling_title">Scrolling page</string>
+    <string name="appstrings_about_scrolling_desc">All parts one after another. Otherwise one part at a time, chosen from the side menu on a large screen; on a phone the page always scrolls.</string>
     <string name="appstrings_about_sources">Data Sources</string>
     <string name="appstrings_about_versions_title">Versions</string>
     <string name="appstrings_accuracy">ACCURACY</string>
@@ -1502,6 +1504,7 @@
     <string name="appstrings_upload_preparing">Preparing...</string>
     <string name="appstrings_upload_sq_desc_placeholder">Add a description for this batch (optional)...</string>
     <string name="appstrings_upload_sq_limit">Limit: 20 MB per photo</string>
+    <string name="appstrings_upload_sq_rotate_left">Rotate 90° left</string>
     <string name="appstrings_upload_sq_strip_exif">Remove EXIF data</string>
     <string name="appstrings_upload_sq_target_operator">Target operator</string>
     <string name="appstrings_upload_sq_target_operators">Target operators</string>
@@ -2649,4 +2652,9 @@
     <string name="appstrings_release_v2017_split_auto">Split view now follows the real window size: active on tablets and unfolded foldables, it collapses on its own when you close the device, without a restart</string>
     <string name="appstrings_release_v2017_split_all_devices">Every foldable and every tablet benefits, instead of a short list of recognised models</string>
     <string name="appstrings_release_v2017_nav_style_removed">The “Navigation style” setting is gone; if you prefer full screen, that choice is still available and always wins</string>
+
+    <!-- Release notes 2.0.18 -->
+    <string name="appstrings_release_v2018_photo_rotate">A button rotates a photo a quarter turn before uploading; the preview shows exactly what will be sent</string>
+    <string name="appstrings_release_v2018_nearby_radius">Nearby search on the online database widens its radius in steps, instead of stopping at a limit that left everything outside France empty</string>
+    <string name="appstrings_release_v2018_about_scrolling">The “About” page has its own scrolling setting: all parts in sequence, or one at a time from the side menu on large screens</string>
 </resources>

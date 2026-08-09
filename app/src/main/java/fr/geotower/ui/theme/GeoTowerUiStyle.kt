@@ -24,6 +24,11 @@ internal const val GEO_TOWER_SIZE_SMALL_SCALE = 0.85f
 internal const val GEO_TOWER_SIZE_NORMAL_SCALE = 0.925f
 internal const val GEO_TOWER_SIZE_LARGE_SCALE = 1f
 
+// Couleurs des cartes en theme sombre, communes aux deux designs (OneUI et normal) : les deux modes
+// ne se distinguent alors plus que par les formes et les bordures.
+private val GeoTowerDarkCardColor = Color(0xFF212121)
+private val GeoTowerDarkSecondaryCardColor = Color(0xFF2B2B2B)
+
 // --- Dimensionnement adaptatif de l'UI ---
 // L'ancien palier "normal" (x0.925) devient la reference : 100% du reglage utilisateur, sur un
 // ecran de reference. La taille finale = base(dp) x facteurEcran x (reglageUtilisateur / 100).
@@ -152,19 +157,19 @@ fun rememberGeoTowerUiStyle(): GeoTowerUiStyle {
     val useOneUi = uiMode.usesOneUi()
     val backgroundColor = if (isDark && isOled) Color.Black else MaterialTheme.colorScheme.background
     val bubbleColor = if (useOneUi) {
-        if (isDark) Color(0xFF212121) else MaterialTheme.colorScheme.surfaceVariant
+        if (isDark) GeoTowerDarkCardColor else MaterialTheme.colorScheme.surfaceVariant
     } else {
         Color.Transparent
     }
-    val cardColor = if (useOneUi) {
-        bubbleColor
-    } else {
-        MaterialTheme.colorScheme.surfaceVariant
+    val cardColor = when {
+        isDark -> GeoTowerDarkCardColor
+        useOneUi -> bubbleColor
+        else -> MaterialTheme.colorScheme.surfaceVariant
     }
-    val secondaryCardColor = if (useOneUi) {
-        if (isDark) Color(0xFF2B2B2B) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
-    } else {
-        MaterialTheme.colorScheme.surfaceContainerLow
+    val secondaryCardColor = when {
+        isDark -> GeoTowerDarkSecondaryCardColor
+        useOneUi -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
+        else -> MaterialTheme.colorScheme.surfaceContainerLow
     }
     val cardBorder = if (useOneUi) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
     val subtleBorder = if (useOneUi) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.16f))

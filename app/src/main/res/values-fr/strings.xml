@@ -61,7 +61,7 @@
     <string name="settings_page_compass_desc">Ordre des blocs, position, GPS, précision</string>
     <string name="settings_page_stats_desc">Blocs, mode d\'affichage, fréquences</string>
     <string name="settings_page_department_stats_desc">Blocs de la page par département</string>
-    <string name="settings_page_about_desc">Ordre et visibilité de ses six parties</string>
+    <string name="settings_page_about_desc">Défilement et visibilité de ses six parties</string>
     <string name="settings_page_support_desc">Blocs, mini-carte, photos</string>
     <string name="settings_page_site_desc">Blocs, fréquences, photos, speedtests</string>
     <string name="settings_page_speedtests_desc">Filtres, tri, détails affichés</string>
@@ -346,6 +346,8 @@
     <string name="appstrings_about_intro">GeoTower vous permet de localiser les antennes relais autour de vous et d\'identifier les technologies disponibles.</string>
     <string name="appstrings_about_new">Nouveautés</string>
     <string name="appstrings_about_presentation">Présentation</string>
+    <string name="appstrings_about_scrolling_title">Page défilante</string>
+    <string name="appstrings_about_scrolling_desc">Toutes les parties à la suite. Sinon, une partie à la fois choisie dans le menu latéral, sur grand écran ; sur téléphone la page défile toujours.</string>
     <string name="appstrings_about_sources">Sources de données</string>
     <string name="appstrings_about_versions_title">Versions</string>
     <string name="appstrings_accuracy">PRÉCISION</string>
@@ -1420,6 +1422,7 @@
     <string name="appstrings_upload_preparing">Préparation...</string>
     <string name="appstrings_upload_sq_desc_placeholder">Ajouter une description pour ce lot (optionnel)...</string>
     <string name="appstrings_upload_sq_limit">Limite : 20 Mo par photo</string>
+    <string name="appstrings_upload_sq_rotate_left">Pivoter de 90° vers la gauche</string>
     <string name="appstrings_upload_sq_strip_exif">Supprimer les données EXIF</string>
     <string name="appstrings_upload_sq_target_operator">Opérateur cible</string>
     <string name="appstrings_upload_sq_target_operators">Opérateurs cibles</string>
@@ -2629,4 +2632,9 @@
     <string name="appstrings_release_v2017_split_auto">L\'affichage fractionné suit maintenant la taille réelle de la fenêtre : actif sur tablette et sur pliable déplié, il se replie tout seul quand vous refermez l\'appareil, sans redémarrage</string>
     <string name="appstrings_release_v2017_split_all_devices">Tous les pliables et toutes les tablettes en profitent, au lieu d\'une courte liste de modèles reconnus</string>
     <string name="appstrings_release_v2017_nav_style_removed">Le réglage « Style de navigation » disparaît ; si vous préférez le plein écran, ce choix reste possible et l\'emporte toujours</string>
+
+    <!-- Notes de version 2.0.18 -->
+    <string name="appstrings_release_v2018_photo_rotate">Un bouton permet de pivoter une photo d\'un quart de tour avant l\'envoi ; l\'aperçu montre exactement ce qui partira</string>
+    <string name="appstrings_release_v2018_nearby_radius">La recherche de sites à proximité sur la base en ligne élargit son rayon par paliers, au lieu de s\'arrêter net à une limite qui laissait l\'étranger sans résultat</string>
+    <string name="appstrings_release_v2018_about_scrolling">La page « À propos » a son propre réglage de défilement : toutes les parties à la suite, ou une seule à la fois depuis le menu latéral sur grand écran</string>
 </resources>

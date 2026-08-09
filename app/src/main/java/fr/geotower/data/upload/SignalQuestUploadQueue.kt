@@ -69,6 +69,21 @@ object SignalQuestUploadRules {
             exifOrientation != ExifInterface.ORIENTATION_UNDEFINED
     }
 
+    // Rotation demandee par l'utilisateur avant l'envoi, en degres dans le sens horaire. On ne
+    // retient que les quarts de tour : c'est tout ce que l'ecran d'envoi propose, et une valeur
+    // relue d'un manifeste altere ne doit pas produire de bitmap de travers.
+    fun normalizeUserRotationDegrees(degrees: Int): Int {
+        val positive = ((degrees % 360) + 360) % 360
+        return (positive / 90) * 90
+    }
+
+    // La rotation choisie a la main s'ajoute a l'orientation EXIF : des qu'il y en a une, la photo
+    // doit repasser par un reencodage, meme si le fichier source etait deja droit.
+    fun needsRotationBaking(exifOrientation: Int, userRotationDegrees: Int): Boolean {
+        return needsOrientationBaking(exifOrientation) ||
+            normalizeUserRotationDegrees(userRotationDegrees) != 0
+    }
+
     // Plus petit facteur (puissance de 2) qui ramene l'image sous les limites serveur en
     // dimension ET en nombre de pixels. Retourne 1 quand la photo tient deja : pas de downscale.
     fun calculateInSampleSize(
@@ -96,6 +111,8 @@ data class SignalQuestUploadFile(
     val sourceFileName: String,
     val sourceMimeType: String,
     val sourceSizeBytes: Long,
+    // Quart(s) de tour horaire(s) demande(s) sur l'ecran d'envoi, a graver en plus de l'EXIF.
+    val userRotationDegrees: Int = 0,
     val historyEntryId: String? = null,
     val status: String? = SignalQuestUploadFileStatus.PENDING,
     val remotePhotoId: String? = null,
@@ -157,6 +174,14 @@ object SignalQuestUploadManifestCodec {
         return gson.fromJson(json, SignalQuestUploadManifest::class.java)
     }
 }
+
+// Photo telle que l'ecran d'envoi la remet a la file : son URI et la rotation que l'utilisateur a
+// appliquee dans l'apercu. Les deux voyagent ensemble pour qu'aucun appelant ne puisse desynchroniser
+// une liste de rotations d'une liste d'URI.
+data class SignalQuestUploadSource(
+    val uriString: String,
+    val userRotationDegrees: Int = 0
+)
 
 object SignalQuestUploadDraftStore {
     private val drafts = ConcurrentHashMap<String, List<String>>()
@@ -245,7 +270,7 @@ object SignalQuestUploadQueue {
         siteId: String,
         operator: String,
         description: String,
-        uriStrings: List<String>,
+        sources: List<SignalQuestUploadSource>,
         stripExifBeforeUpload: Boolean = true,
         address: String? = null
     ): SignalQuestUploadManifest {
@@ -255,7 +280,7 @@ object SignalQuestUploadQueue {
         if (normalizedSiteId.isBlank()) {
             throw SignalQuestUploadQueueException(context.getString(R.string.signalquest_invalid_site))
         }
-        if (uriStrings.isEmpty()) {
+        if (sources.isEmpty()) {
             throw SignalQuestUploadQueueException(context.getString(R.string.signalquest_photo_required))
         }
         // Pas de limite de nombre cote app : le serveur recoit et traite les photos une par une.
@@ -272,8 +297,10 @@ object SignalQuestUploadQueue {
         val files = mutableListOf<SignalQuestUploadFile>()
 
         try {
-            uriStrings.forEachIndexed { index, uriString ->
-                val uri = Uri.parse(uriString)
+            sources.forEachIndexed { index, source ->
+                val uri = Uri.parse(source.uriString)
+                val userRotationDegrees = SignalQuestUploadRules
+                    .normalizeUserRotationDegrees(source.userRotationDegrees)
                 val mimeType = resolveMimeType(context, uri)
                 if (!SignalQuestUploadRules.isAcceptedMimeType(mimeType)) {
                     throw SignalQuestUploadQueueException(context.getString(R.string.signalquest_unsupported_photo_format))
@@ -300,13 +327,15 @@ object SignalQuestUploadQueue {
                     operator = signalQuestOperator,
                     createdAtMillis = createdAtMillis,
                     sourceFile = targetFile,
-                    stripExifBeforeUpload = stripExifBeforeUpload
+                    stripExifBeforeUpload = stripExifBeforeUpload,
+                    userRotationDegrees = userRotationDegrees
                 )
 
                 files += SignalQuestUploadFile(
                     sourceFileName = targetFile.name,
                     sourceMimeType = mimeType.lowercase(Locale.US),
                     sourceSizeBytes = copiedBytes,
+                    userRotationDegrees = userRotationDegrees,
                     historyEntryId = historyEntryId
                 )
             }
@@ -462,13 +491,16 @@ object SignalQuestUploadQueue {
         }
 
         val sourceOrientation = readExifOrientation(source)
+        val userRotation = SignalQuestUploadRules.normalizeUserRotationDegrees(uploadFile.userRotationDegrees)
 
         // Chemin sans aucune perte : JPEG d'origine qui tient deja sous la limite serveur et dont
         // on conserve les metadonnees. Reserve aux photos deja droites : si l'orientation vit dans
-        // l'EXIF, elle disparait au reencodage du destinataire et la photo s'affiche couchee.
+        // l'EXIF, elle disparait au reencodage du destinataire et la photo s'affiche couchee. Une
+        // rotation choisie a la main disqualifie aussi ce raccourci : elle n'existe nulle part dans
+        // le fichier source.
         if (
             !manifest.stripExifBeforeUpload &&
-            !SignalQuestUploadRules.needsOrientationBaking(sourceOrientation) &&
+            !SignalQuestUploadRules.needsRotationBaking(sourceOrientation, userRotation) &&
             canUploadOriginalJpeg(uploadFile, source, bounds)
         ) {
             return source
@@ -491,8 +523,10 @@ object SignalQuestUploadQueue {
             bitmap = working
 
             // L'orientation est toujours gravee dans les pixels, EXIF conserve ou non : le tag ne
-            // survit pas au traitement du destinataire, la photo partirait couchee.
-            val oriented = applyExifOrientation(sourceOrientation, working)
+            // survit pas au traitement du destinataire, la photo partirait couchee. La rotation
+            // manuelle vient par-dessus, dans la meme matrice : deux createBitmap successifs
+            // doubleraient le pic memoire sur une photo pleine resolution.
+            val oriented = applyOrientation(sourceOrientation, userRotation, working)
             if (oriented !== working) {
                 working.recycle()
                 working = oriented
@@ -751,7 +785,15 @@ object SignalQuestUploadQueue {
         }.getOrDefault(ExifInterface.ORIENTATION_NORMAL)
     }
 
-    private fun applyExifOrientation(orientation: Int, bitmap: Bitmap): Bitmap {
+    private fun applyOrientation(orientation: Int, userRotationDegrees: Int, bitmap: Bitmap): Bitmap {
+        val matrix = orientationMatrix(orientation, userRotationDegrees)
+        if (matrix.isIdentity) return bitmap
+        return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+    }
+
+    // L'utilisateur pivote ce qu'il voit dans l'apercu, c'est-a-dire la photo deja redressee par son
+    // EXIF : sa rotation se compose donc APRES celle du tag (postRotate), jamais avant.
+    private fun orientationMatrix(orientation: Int, userRotationDegrees: Int): Matrix {
         val matrix = Matrix()
         when (orientation) {
             ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
@@ -769,8 +811,11 @@ object SignalQuestUploadQueue {
             }
         }
 
-        if (matrix.isIdentity) return bitmap
-        return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+        val normalizedUserRotation = SignalQuestUploadRules.normalizeUserRotationDegrees(userRotationDegrees)
+        if (normalizedUserRotation != 0) {
+            matrix.postRotate(normalizedUserRotation.toFloat())
+        }
+        return matrix
     }
 
     private fun scaleToMaxDimension(bitmap: Bitmap, maxDimension: Int): Bitmap {

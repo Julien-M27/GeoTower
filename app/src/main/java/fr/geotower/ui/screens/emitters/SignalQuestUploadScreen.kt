@@ -42,6 +42,7 @@ import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.Rotate90DegreesCcw
 import androidx.compose.material.icons.filled.Add // 🚨 NOUVEAU
 import androidx.compose.material.icons.filled.PhotoLibrary // 🚨 NOUVEAU
 import androidx.compose.material3.AlertDialog
@@ -66,6 +67,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 // The crucial imports that fix the delegation error:
@@ -86,6 +88,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.sp
@@ -100,6 +103,7 @@ import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.ui.components.oneUiActionButtonShape
 import fr.geotower.data.upload.SignalQuestUploadQueue
+import fr.geotower.data.upload.SignalQuestUploadSource
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.MapUtils
 import fr.geotower.utils.isNetworkAvailable
@@ -129,7 +133,7 @@ fun SignalQuestUploadScreen(
     lon: Double,
     azimuts: String,
     onNavigateBack: () -> Unit,
-    onStartUpload: (List<String>, String, Boolean, List<String>) -> Unit
+    onStartUpload: (List<SignalQuestUploadSource>, String, Boolean, List<String>) -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val sizing = LocalGeoTowerUiStyle.current.sizing
@@ -152,6 +156,8 @@ fun SignalQuestUploadScreen(
 
     // --- 1. ÉTATS ---
     val currentUris = remember { mutableStateListOf<String>().apply { addAll(imageUris) } }
+    // Quarts de tour horaires demandes par photo. Absent = photo laissee telle quelle.
+    val photoRotations = remember { mutableStateMapOf<String, Int>() }
     val targetOperatorNames = remember(operatorName, operatorNames) {
         operatorNames
             .ifEmpty { listOf(operatorName) }
@@ -170,6 +176,21 @@ fun SignalQuestUploadScreen(
         if (uris.isNotEmpty()) {
             val newUris = uris.map { it.toString() }.filter { !currentUris.contains(it) }
             currentUris.addAll(newUris)
+        }
+    }
+
+    fun removePhoto(uri: String) {
+        currentUris.remove(uri)
+        photoRotations.remove(uri)
+    }
+
+    // Un quart de tour vers la gauche par appui, et retour a l'endroit au quatrieme.
+    fun rotatePhotoLeft(uri: String) {
+        val nextRotation = ((photoRotations[uri] ?: 0) + 270) % 360
+        if (nextRotation == 0) {
+            photoRotations.remove(uri)
+        } else {
+            photoRotations[uri] = nextRotation
         }
     }
 
@@ -594,11 +615,32 @@ fun SignalQuestUploadScreen(
                                         shape = photoShape,
                                         colors = CardDefaults.cardColors(containerColor = surfaceColor)
                                     ) {
-                                        AsyncImage(model = uri, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                                        RotatedPhotoPreview(
+                                            model = uri,
+                                            rotationDegrees = photoRotations[uri] ?: 0,
+                                            cardWidth = photoCardWidth,
+                                            cardHeight = photoCardHeight
+                                        )
+                                    }
+                                    // Rotation d'un quart de tour vers la gauche
+                                    IconButton(
+                                        onClick = { safeClick { rotatePhotoLeft(uri) } },
+                                        modifier = Modifier
+                                            .align(Alignment.BottomStart)
+                                            .padding(sizing.spacing(if (useOneUi) 16.dp else 8.dp))
+                                            .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                                            .size(sizing.component(32.dp))
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Rotate90DegreesCcw,
+                                            contentDescription = stringResource(R.string.appstrings_upload_sq_rotate_left),
+                                            tint = Color.White,
+                                            modifier = Modifier.size(sizing.component(16.dp))
+                                        )
                                     }
                                     // Bouton de suppression avec marge dynamique
                                     IconButton(
-                                        onClick = { safeClick { currentUris.remove(uri) } },
+                                        onClick = { safeClick { removePhoto(uri) } },
                                         modifier = Modifier
                                             .align(Alignment.TopEnd)
                                             // NOUVEAU : 16.dp pour OneUI (radius 32), 8.dp pour Classique (radius 24)
@@ -685,7 +727,28 @@ fun SignalQuestUploadScreen(
                                 shape = photoShape,
                                 colors = CardDefaults.cardColors(containerColor = surfaceColor)
                             ) {
-                                AsyncImage(model = draggedUri, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                                RotatedPhotoPreview(
+                                    model = draggedUri,
+                                    rotationDegrees = photoRotations[draggedUri] ?: 0,
+                                    cardWidth = photoCardWidth,
+                                    cardHeight = photoCardHeight
+                                )
+                            }
+                            IconButton(
+                                onClick = {},
+                                enabled = false,
+                                modifier = Modifier
+                                    .align(Alignment.BottomStart)
+                                    .padding(sizing.spacing(if (useOneUi) 16.dp else 8.dp))
+                                    .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                                    .size(sizing.component(32.dp))
+                            ) {
+                                Icon(
+                                    Icons.Default.Rotate90DegreesCcw,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(sizing.component(16.dp))
+                                )
                             }
                             IconButton(
                                 onClick = {},
@@ -1022,7 +1085,13 @@ fun SignalQuestUploadScreen(
                         onClick = {
                             safeClick {
                                 showConfirmDialog = false
-                                onStartUpload(currentUris.toList(), description, stripExifBeforeUpload, targetOperatorNames)
+                                val sources = currentUris.map { uri ->
+                                    SignalQuestUploadSource(
+                                        uriString = uri,
+                                        userRotationDegrees = photoRotations[uri] ?: 0
+                                    )
+                                }
+                                onStartUpload(sources, description, stripExifBeforeUpload, targetOperatorNames)
                             }
                         },
                         shape = buttonShape,
@@ -1038,6 +1107,35 @@ fun SignalQuestUploadScreen(
                 }
             )
         }
+    }
+}
+
+// La photo est cadree dans la carte APRES rotation : sur un quart de tour, on la compose dans une
+// boite aux dimensions inversees, sinon le recadrage laisserait des bandes vides sur les cotes.
+@Composable
+private fun RotatedPhotoPreview(
+    model: Any?,
+    rotationDegrees: Int,
+    cardWidth: Dp,
+    cardHeight: Dp,
+    modifier: Modifier = Modifier
+) {
+    val isQuarterTurned = (rotationDegrees / 90) % 2 != 0
+    Box(
+        modifier = modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        AsyncImage(
+            model = model,
+            contentDescription = null,
+            modifier = Modifier
+                .size(
+                    width = if (isQuarterTurned) cardHeight else cardWidth,
+                    height = if (isQuarterTurned) cardWidth else cardHeight
+                )
+                .graphicsLayer { rotationZ = rotationDegrees.toFloat() },
+            contentScale = ContentScale.Crop
+        )
     }
 }
 

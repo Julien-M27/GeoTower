@@ -315,6 +315,42 @@ private fun radioBandMaskForKey(key: String): Int {
     }
 }
 
+/**
+ * Rayons de repli de la recherche « à proximité » en base en ligne, en km.
+ *
+ * Le dernier palier vaut le plafond du serveur (`liveApiNearbyHardMaxRadiusKm`), soit un peu plus
+ * que la demi-circonférence terrestre (20 037 km) : aucun point du globe ne peut lui échapper.
+ */
+private val LIVE_NEARBY_FALLBACK_RADII_KM = listOf(200.0, 1_000.0, 20_100.0)
+
+/** Tolérance de comparaison des rayons renvoyés par le serveur, en km. */
+private const val LIVE_NEARBY_RADIUS_EPSILON_KM = 0.001
+
+/**
+ * Le serveur renvoie le rayon qu'il a réellement appliqué (`radius_km`) et le borne de son côté.
+ * S'il l'a rogné, élargir encore ne changerait rien à la réponse : autant s'arrêter là plutôt que
+ * de rejouer la même requête plafonnée.
+ */
+internal fun liveNearbyRadiusWasClampedByServer(requestedKm: Double, effectiveKm: Double?): Boolean {
+    if (effectiveKm == null) return false
+    return effectiveKm < requestedKm - LIVE_NEARBY_RADIUS_EPSILON_KM
+}
+
+/**
+ * Rayons successifs essayés par la recherche « à proximité » quand la base est en ligne.
+ *
+ * Le chemin base locale n'a aucun rayon (cf. [AnfrRepository.getNearest] : rayons croissants puis
+ * repli sur le plus proche quelle que soit la distance). Sans cet élargissement, une position hors
+ * de la zone ANFR — émulateur à l'étranger, plein océan — rend une liste vide alors que la base
+ * téléchargée, elle, sortirait bien les sites les plus proches.
+ *
+ * Le premier rayon reste celui de la limite distante : le cas nominal ne coûte qu'une requête.
+ */
+internal fun liveNearbyRadiusEscalationKm(baseRadiusKm: Double): List<Double> {
+    val base = baseRadiusKm.coerceAtLeast(1.0)
+    return listOf(base) + LIVE_NEARBY_FALLBACK_RADII_KM.filter { it > base }
+}
+
 class AnfrRepository(
     private val api: AnfrService,
     private val context: Context // ✅ NOUVEAU : On passe le context
@@ -348,6 +384,12 @@ class AnfrRepository(
     private data class LiveBboxFetchResult(
         val sites: List<LocalisationEntity>,
         val mayBeTruncated: Boolean
+    )
+
+    private data class LiveNearestFetchResult(
+        val sites: List<LocalisationEntity>,
+        /** Rayon réellement appliqué par le serveur, qui peut être plus petit que celui demandé. */
+        val effectiveRadiusKm: Double?
     )
 
     private class LiveBboxRequestBudget(remaining: Int) {
@@ -536,25 +578,59 @@ class AnfrRepository(
         limit: Int,
         zbOnly: Boolean
     ): List<LocalisationEntity> {
+        val radii = liveNearbyRadiusEscalationKm(liveNearbyRadiusKm())
+        radii.forEachIndexed { index, radiusKm ->
+            // null = requête en échec (réseau, ou rayon refusé par le serveur) : inutile
+            // d'élargir, on ne ferait que rejouer l'erreur.
+            val result = getLiveNearestWithinRadius(
+                lat = lat,
+                lon = lon,
+                limit = limit,
+                zbOnly = zbOnly,
+                radiusKm = radiusKm
+            ) ?: return emptyList()
+
+            if (result.sites.isNotEmpty()) {
+                if (index > 0) {
+                    AppLogger.d(TAG_DB, "Live sites nearby: rayon élargi à $radiusKm km")
+                }
+                return result.sites
+            }
+
+            if (liveNearbyRadiusWasClampedByServer(radiusKm, result.effectiveRadiusKm)) {
+                return emptyList()
+            }
+        }
+        return emptyList()
+    }
+
+    private suspend fun getLiveNearestWithinRadius(
+        lat: Double,
+        lon: Double,
+        limit: Int,
+        zbOnly: Boolean,
+        radiusKm: Double
+    ): LiveNearestFetchResult? {
         return try {
             val response = LiveSitesClient.api.getNearbySites(
                 lat = lat,
                 lon = lon,
                 limit = limit.coerceAtLeast(1),
-                radiusKm = liveNearbyRadiusKm(),
+                radiusKm = radiusKm,
                 zbOnly = zbOnly.takeIf { it },
                 activeOnly = null
             )
-            if (!response.isSuccessful) return emptyList()
-            response.body()
-                ?.sites
-                ?.mapNotNull { it.toLocalisationEntity() }
-                .orEmpty()
+            if (!response.isSuccessful) return null
+            val body = response.body()
+            LiveNearestFetchResult(
+                sites = body?.sites?.mapNotNull { it.toLocalisationEntity() }.orEmpty(),
+                effectiveRadiusKm = body?.radiusKm
+            )
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             AppLogger.w(TAG_DB, "Live sites nearby request failed", e)
-            emptyList()
+            null
         }
     }
 

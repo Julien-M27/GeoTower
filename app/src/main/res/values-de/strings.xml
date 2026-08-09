@@ -61,7 +61,7 @@
     <string name="settings_page_compass_desc">Blockreihenfolge, Position, GPS, Genauigkeit</string>
     <string name="settings_page_stats_desc">Blöcke, Anzeigemodus, Frequenzen</string>
     <string name="settings_page_department_stats_desc">Blöcke der Seite nach Département</string>
-    <string name="settings_page_about_desc">Reihenfolge und Sichtbarkeit der sechs Teile</string>
+    <string name="settings_page_about_desc">Scrollen und Sichtbarkeit der sechs Teile</string>
     <string name="settings_page_support_desc">Blöcke, Mini-Karte, Fotos</string>
     <string name="settings_page_site_desc">Blöcke, Frequenzen, Fotos, Speedtests</string>
     <string name="settings_page_speedtests_desc">Filter, Sortierung, angezeigte Details</string>
@@ -346,6 +346,8 @@
     <string name="appstrings_about_intro">GeoTower ermöglicht es dir, Mobilfunkstandorte in deiner Umgebung zu finden und verfügbare Technologien zu erkennen.</string>
     <string name="appstrings_about_new">Neuigkeiten</string>
     <string name="appstrings_about_presentation">Präsentation</string>
+    <string name="appstrings_about_scrolling_title">Scrollende Seite</string>
+    <string name="appstrings_about_scrolling_desc">Alle Teile nacheinander. Sonst jeweils ein Teil, im Seitenmenü auf großem Bildschirm gewählt; auf dem Telefon scrollt die Seite immer.</string>
     <string name="appstrings_about_sources">Datenquellen</string>
     <string name="appstrings_about_versions_title">Versionen</string>
     <string name="appstrings_accuracy">GENAUIGKEIT</string>
@@ -1420,6 +1422,7 @@
     <string name="appstrings_upload_preparing">Vorbereitung...</string>
     <string name="appstrings_upload_sq_desc_placeholder">Beschreibung für diesen Stapel hinzufügen (optional)...</string>
     <string name="appstrings_upload_sq_limit">Limit: 20 MB pro Foto</string>
+    <string name="appstrings_upload_sq_rotate_left">Um 90° nach links drehen</string>
     <string name="appstrings_upload_sq_strip_exif">EXIF-Daten entfernen</string>
     <string name="appstrings_upload_sq_target_operator">Zielbetreiber</string>
     <string name="appstrings_upload_sq_target_operators">Zielbetreiber</string>
@@ -2627,4 +2630,9 @@
     <string name="appstrings_release_v2017_split_auto">Die geteilte Ansicht richtet sich jetzt nach der tatsächlichen Fenstergröße: aktiv auf Tablets und aufgeklappten Foldables, klappt sie beim Zusammenklappen von selbst zusammen, ohne Neustart</string>
     <string name="appstrings_release_v2017_split_all_devices">Davon profitieren alle Foldables und alle Tablets statt nur einer kurzen Liste erkannter Modelle</string>
     <string name="appstrings_release_v2017_nav_style_removed">Die Einstellung „Navigationsstil“ entfällt; wer Vollbild bevorzugt, kann das weiterhin wählen, und diese Wahl hat immer Vorrang</string>
+
+    <!-- Versionshinweise 2.0.18 -->
+    <string name="appstrings_release_v2018_photo_rotate">Eine Schaltfläche dreht das Foto vor dem Senden um eine Vierteldrehung; die Vorschau zeigt genau das, was gesendet wird</string>
+    <string name="appstrings_release_v2018_nearby_radius">Die Suche nach nahen Standorten in der Online-Datenbank erweitert ihren Radius schrittweise, statt an einer Grenze zu enden, die außerhalb Frankreichs nichts lieferte</string>
+    <string name="appstrings_release_v2018_about_scrolling">Die Seite „Über“ hat ihre eigene Scroll-Einstellung: alle Teile nacheinander oder einer nach dem anderen über das Seitenmenü auf großen Bildschirmen</string>
 </resources>

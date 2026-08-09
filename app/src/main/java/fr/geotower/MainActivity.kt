@@ -1307,7 +1307,7 @@ class MainActivity : ComponentActivity() {
                                         lon = lon,
                                         azimuts = decodedAzimuts,
                                         onNavigateBack = { navController.popBackStack() },
-                                        onStartUpload = { finalUris, description, stripExifBeforeUpload, targetOperators ->
+                                        onStartUpload = { finalSources, description, stripExifBeforeUpload, targetOperators ->
                                             if (
                                                 !RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SIGNALQUEST_UPLOAD) ||
                                                 !RemoteFeatureFlags.isActionEnabled(RemoteFeatureFlags.Actions.START_SIGNALQUEST_UPLOAD) ||
@@ -1328,7 +1328,7 @@ class MainActivity : ComponentActivity() {
                                                                 siteId = siteId,
                                                                 operator = targetOperator,
                                                                 description = description,
-                                                                uriStrings = finalUris,
+                                                                sources = finalSources,
                                                                 stripExifBeforeUpload = stripExifBeforeUpload,
                                                                 address = uploadAddress
                                                             )

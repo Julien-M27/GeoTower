@@ -59,6 +59,87 @@ class SignalQuestUploadRulesTest {
     }
 
     @Test
+    fun userRotationIsKeptAsQuarterTurns() {
+        assertEquals(0, SignalQuestUploadRules.normalizeUserRotationDegrees(0))
+        assertEquals(270, SignalQuestUploadRules.normalizeUserRotationDegrees(270))
+        assertEquals(0, SignalQuestUploadRules.normalizeUserRotationDegrees(360))
+        assertEquals(90, SignalQuestUploadRules.normalizeUserRotationDegrees(450))
+        // Valeur relue d'un manifeste altere : ramenee au quart de tour, jamais de photo de travers.
+        assertEquals(270, SignalQuestUploadRules.normalizeUserRotationDegrees(-90))
+        assertEquals(0, SignalQuestUploadRules.normalizeUserRotationDegrees(45))
+    }
+
+    @Test
+    fun manualRotationForcesReencodingEvenOnUprightPhotos() {
+        // Photo droite et sans rotation manuelle : elle peut toujours partir sans reencodage.
+        assertFalse(
+            SignalQuestUploadRules.needsRotationBaking(ExifInterface.ORIENTATION_NORMAL, 0)
+        )
+
+        // Des que l'utilisateur pivote la photo, la rotation n'existe que dans l'app : elle doit
+        // etre gravee dans les pixels, sinon SignalQuest recoit l'image d'origine.
+        assertTrue(
+            SignalQuestUploadRules.needsRotationBaking(ExifInterface.ORIENTATION_NORMAL, 90)
+        )
+        assertTrue(
+            SignalQuestUploadRules.needsRotationBaking(ExifInterface.ORIENTATION_UNDEFINED, 270)
+        )
+        assertTrue(
+            SignalQuestUploadRules.needsRotationBaking(ExifInterface.ORIENTATION_ROTATE_90, 0)
+        )
+    }
+
+    @Test
+    fun manifestCodecRoundTripsUserRotation() {
+        val manifest = SignalQuestUploadManifest(
+            uploadId = "upload-rotated",
+            siteId = "12345",
+            operator = "SFR",
+            description = "",
+            createdAtMillis = 123L,
+            files = listOf(
+                SignalQuestUploadFile(
+                    sourceFileName = "source_0.jpg",
+                    sourceMimeType = "image/jpeg",
+                    sourceSizeBytes = 42L,
+                    userRotationDegrees = 270
+                )
+            )
+        )
+
+        val decoded = SignalQuestUploadManifestCodec.decode(
+            SignalQuestUploadManifestCodec.encode(manifest)
+        )
+
+        assertEquals(270, decoded.files.single().userRotationDegrees)
+    }
+
+    @Test
+    fun legacyManifestFileWithoutRotationStaysUnrotated() {
+        val decoded = SignalQuestUploadManifestCodec.decode(
+            """
+            {
+              "uploadId": "upload-legacy",
+              "siteId": "12345",
+              "operator": "SFR",
+              "description": "",
+              "createdAtMillis": 123,
+              "files": [
+                {
+                  "sourceFileName": "source_0.jpg",
+                  "sourceMimeType": "image/jpeg",
+                  "sourceSizeBytes": 42
+                }
+              ],
+              "stripExifBeforeUpload": false
+            }
+            """.trimIndent()
+        )
+
+        assertEquals(0, decoded.files.single().userRotationDegrees)
+    }
+
+    @Test
     fun draftStorePreservesUrisWithCommas() {
         val uri = "content://media/external/images/media/a,b?token=1%2C2"
         val draftId = SignalQuestUploadDraftStore.put(listOf(uri))

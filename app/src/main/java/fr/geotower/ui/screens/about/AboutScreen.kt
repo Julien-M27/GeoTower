@@ -10,6 +10,7 @@ import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -32,8 +33,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Folder
@@ -44,6 +47,7 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.material.icons.outlined.NewReleases
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Storage
+import androidx.compose.material.icons.outlined.ViewAgenda
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -56,6 +60,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -63,6 +68,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -82,6 +88,7 @@ import androidx.navigation.NavController
 import fr.geotower.data.outages.OutageLocalConfig
 import fr.geotower.data.outages.OutageServerInfo
 import fr.geotower.ui.components.GeoTowerBackTopBar
+import fr.geotower.ui.components.SafeClick
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AboutPagePrefs
 import fr.geotower.utils.AppConfig
@@ -125,10 +132,6 @@ fun AboutScreen(navController: NavController) {
     val safeClick = rememberSafeClick()
     val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = ROOT_FALLBACK_ROUTE)
 
-    BackHandler(enabled = !safeBackNavigation.isLocked) {
-        safeBackNavigation.navigateBack()
-    }
-
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
     val scope = rememberCoroutineScope()
@@ -160,8 +163,6 @@ fun AboutScreen(navController: NavController) {
         MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f) // Style classique
     }
 
-    // --- LECTURE DU MODE DE NAVIGATION DEPUIS AppConfig ---
-    val navMode = AppConfig.navMode.intValue
     val sizing = LocalGeoTowerUiStyle.current.sizing
 
     val txtVersion = stringResource(R.string.appstrings_version)
@@ -189,7 +190,18 @@ fun AboutScreen(navController: NavController) {
     val prefs = remember(context) { context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE) }
     val visibleSections = remember(prefs) { AboutPagePrefs.visibleSections(prefs) }
 
+    // Toutes les parties d'un bloc, ou une seule à la fois. Ce choix est propre à la page — bascule
+    // dans la barre du haut (ou dans l'en-tête sur grand écran), et interrupteur dans
+    // « Personnalisation des pages » > « À propos ». Il ne suit PAS le mode de navigation des
+    // réglages : les deux pages se règlent chacune de leur côté.
+    var isScrollingPage by remember { mutableStateOf(AboutPagePrefs.scrolling.read(prefs)) }
+
     var activeSectionIndex by remember { mutableIntStateOf(visibleSections.firstOrNull() ?: 0) }
+    // Téléphone en « une partie à la fois » : null = accueil des parties, sinon la partie occupe la
+    // page. Sur grand écran, c'est la barre latérale qui choisit (`activeSectionIndex`). Saveable :
+    // une rotation ne doit pas renvoyer sur l'accueil.
+    var openedSection by rememberSaveable { mutableStateOf<Int?>(null) }
+    val phoneOpenedSection = openedSection?.takeIf { !isScrollingPage && !isWideScreen && it in visibleSections }
 
     val menuItems = listOf(
         Triple(stringResource(R.string.appstrings_about_presentation), Icons.Outlined.Info, 0),
@@ -199,6 +211,27 @@ fun AboutScreen(navController: NavController) {
         Triple(stringResource(R.string.appstrings_about_versions_title), Icons.Outlined.Storage, 4),
         Triple(stringResource(R.string.appstrings_about_dev), Icons.Default.EditNote, 5)
     ).filter { it.third in visibleSections }
+
+    fun openPhoneSection(index: Int?) {
+        openedSection = index
+        // La barre latérale du grand écran repart de la même partie si l'appareil se déplie.
+        if (index != null) activeSectionIndex = index
+        scope.launch { scrollState.scrollTo(0) }
+    }
+
+    // Même bascule que dans les réglages, mais pour cette page seule. La préférence est écrite tout
+    // de suite : sans ça, la page rouvrirait dans l'autre mode au prochain passage.
+    fun setScrollingPage(enabled: Boolean) {
+        isScrollingPage = enabled
+        AboutPagePrefs.scrolling.write(prefs.edit(), enabled).apply()
+        openedSection = null
+        scope.launch { scrollState.scrollTo(0) }
+    }
+
+    // Un cran par appui sur « retour » : refermer la partie ouverte (téléphone), puis quitter.
+    BackHandler(enabled = phoneOpenedSection != null || !safeBackNavigation.isLocked) {
+        if (phoneOpenedSection != null) openPhoneSection(null) else safeBackNavigation.navigateBack()
+    }
 
     suspend fun alignAnchorToViewportTop(anchorContentY: Float?) {
         if (anchorContentY == null || anchorContentY.isNaN() || scrollState.maxValue <= 0) return
@@ -227,7 +260,8 @@ fun AboutScreen(navController: NavController) {
     }
 
     // --- LOGIQUE DE SYNCHRONISATION FLUIDE ---
-    if (navMode == 0) {
+    // Ce suivi ne sert qu'à surligner l'entrée du menu latéral : inutile sans barre latérale.
+    if (isScrollingPage && isWideScreen) {
         LaunchedEffect(scrollState.value, sectionContentSnapshot, sectionHeightSnapshot, scrollViewportHeight, visibleSections) {
             if (visibleSections.isEmpty()) return@LaunchedEffect
             val sortedSections = sectionContentSnapshot
@@ -309,7 +343,19 @@ fun AboutScreen(navController: NavController) {
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             if (!isWideScreen) {
-                AboutTopBar { safeBackNavigation.navigateBack() }
+                AboutTopBar(
+                    title = phoneOpenedSection
+                        ?.let { section -> menuItems.firstOrNull { it.third == section }?.first }
+                        ?: stringResource(R.string.appstrings_about),
+                    onBack = {
+                        if (phoneOpenedSection != null) openPhoneSection(null)
+                        else safeBackNavigation.navigateBack()
+                    },
+                    isScrollingPage = isScrollingPage,
+                    onToggleScrollingPage = {
+                        safeClick("about_scrolling_page") { setScrollingPage(!isScrollingPage) }
+                    }
+                )
             }
         }
     ) { innerPadding ->
@@ -363,16 +409,16 @@ fun AboutScreen(navController: NavController) {
                                 useOneUi = useOneUi,
                                 onClick = {
                                     activeSectionIndex = index
-                                    if (navMode == 0) {
+                                    if (isScrollingPage) {
                                         scope.launch {
                                             sectionBringIntoViewRequesters[index].bringIntoView()
                                             kotlinx.coroutines.delay(80)
                                             alignAnchorToViewportTop(sectionContentPositions[index])
                                         }
                                     } else {
-                                        // Mode « pages » : la nouvelle section remplace l'ancienne,
-                                        // on repart de son début (sinon on hérite du défilement
-                                        // précédent, désormais possible dans ce mode aussi).
+                                        // Page non défilante : la nouvelle section remplace
+                                        // l'ancienne, on repart de son début (sinon on hérite du
+                                        // défilement précédent, possible dans ce mode aussi).
                                         scope.launch { scrollState.scrollTo(0) }
                                     }
                                 }
@@ -447,6 +493,16 @@ fun AboutScreen(navController: NavController) {
                                 }
                             }
 
+                            AnimatedVisibility(
+                                visible = isSidebarVisible,
+                                enter = fadeIn(animationSpec = tween(300)) + expandHorizontally(),
+                                exit = fadeOut(animationSpec = tween(200)) + shrinkHorizontally()
+                            ) {
+                                // La bascule de droite est toujours là : sans le bouton de menu, il
+                                // faut la même largeur à gauche pour garder le titre centré.
+                                Spacer(modifier = Modifier.width(sizing.spacing(56.dp)))
+                            }
+
                             Text(
                                 text = stringResource(R.string.appstrings_about),
                                 style = sizing.textStyle(MaterialTheme.typography.headlineSmall),
@@ -455,13 +511,13 @@ fun AboutScreen(navController: NavController) {
                                 textAlign = TextAlign.Center
                             )
 
-                            AnimatedVisibility(
-                                visible = !isSidebarVisible,
-                                enter = fadeIn(animationSpec = tween(300)) + expandHorizontally(),
-                                exit = fadeOut(animationSpec = tween(200)) + shrinkHorizontally()
-                            ) {
-                                Spacer(modifier = Modifier.width(sizing.spacing(56.dp)))
-                            }
+                            AboutScrollingModeButton(
+                                isScrollingPage = isScrollingPage,
+                                onClick = {
+                                    safeClick("about_scrolling_page") { setScrollingPage(!isScrollingPage) }
+                                },
+                                modifier = Modifier.padding(end = sizing.spacing(8.dp))
+                            )
                         }
                     }
 
@@ -474,9 +530,9 @@ fun AboutScreen(navController: NavController) {
                                 scrollViewportTop = coordinates.positionInRoot().y
                                 scrollViewportHeight = coordinates.size.height.toFloat()
                             }
-                            // Le défilement vaut pour TOUS les modes : en « pages » sur grand écran
-                            // une section (Nouveautés, Sources…) peut dépasser la hauteur d'écran,
-                            // et sans défilement son bas était simplement inatteignable.
+                            // Le défilement vaut pour TOUS les modes : même en « une partie à la
+                            // fois », une section (Nouveautés, Sources…) peut dépasser la hauteur
+                            // d'écran, et sans défilement son bas serait inatteignable.
                             .geoTowerFadingEdge(scrollState)
                             .pageScrollbar(PageScrollPrefs.ABOUT, scrollState)
                             .verticalScroll(scrollState)
@@ -484,7 +540,7 @@ fun AboutScreen(navController: NavController) {
                             // 🚨 CORRECTION 3 : Ajout de la marge de sécurité
                             .navigationBarsPadding()
                     ) {
-                        if (navMode == 0 || !isExpanded) {
+                        if (isScrollingPage) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 AllAboutContent(
                                     appTitle = appTitle,
@@ -506,7 +562,7 @@ fun AboutScreen(navController: NavController) {
                                 )
                                 Spacer(modifier = Modifier.height(sizing.spacing(60.dp)))
                             }
-                        } else {
+                        } else if (isExpanded) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 if (activeSectionIndex in visibleSections) {
                                     AboutSectionContent(
@@ -521,6 +577,35 @@ fun AboutScreen(navController: NavController) {
                                         onOpenTerms = { navController.navigate("terms") }
                                     )
                                 }
+                            }
+                        } else {
+                            // Téléphone : pas de barre latérale, donc l'accueil des parties tient ce
+                            // rôle, et la partie choisie occupe ensuite la page.
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                if (phoneOpenedSection == null) {
+                                    AboutSectionsHome(
+                                        sections = menuItems,
+                                        onSectionClick = { openPhoneSection(it) },
+                                        onShowAll = { setScrollingPage(true) },
+                                        cardShape = cardShape,
+                                        bubbleColor = bubbleBaseColor,
+                                        useOneUi = useOneUi,
+                                        safeClick = safeClick
+                                    )
+                                } else {
+                                    AboutSectionContent(
+                                        section = phoneOpenedSection,
+                                        appTitle = appTitle,
+                                        appVersion = appVersion,
+                                        logoResId = displayLogoResId,
+                                        cardShape = cardShape,
+                                        bubbleColor = bubbleBaseColor,
+                                        onOpenHistories = { navController.navigate("histories") },
+                                        onOpenDiagnostic = { navController.navigate("diagnostic") },
+                                        onOpenTerms = { navController.navigate("terms") }
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(sizing.spacing(60.dp)))
                             }
                         }
                     }
@@ -570,8 +655,108 @@ fun AboutNavigationMenuItem(title: String, icon: ImageVector, isSelected: Boolea
 }
 
 @Composable
-fun AboutTopBar(onBack: () -> Unit) {
-    GeoTowerBackTopBar(title = stringResource(R.string.appstrings_about), onBack = onBack)
+fun AboutTopBar(
+    title: String,
+    onBack: () -> Unit,
+    isScrollingPage: Boolean,
+    onToggleScrollingPage: () -> Unit
+) {
+    GeoTowerBackTopBar(
+        title = title,
+        onBack = onBack,
+        actions = {
+            AboutScrollingModeButton(isScrollingPage = isScrollingPage, onClick = onToggleScrollingPage)
+        }
+    )
+}
+
+/**
+ * Bascule « toutes les parties à la suite » ↔ « une partie à la fois », comme celle des réglages :
+ * l'icône montre le mode vers lequel on part, pas celui où l'on est.
+ */
+@Composable
+private fun AboutScrollingModeButton(
+    isScrollingPage: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    IconButton(onClick = onClick, modifier = modifier) {
+        Icon(
+            imageVector = if (isScrollingPage) Icons.Outlined.Dashboard else Icons.Outlined.ViewAgenda,
+            contentDescription = stringResource(R.string.appstrings_about_scrolling_title),
+            tint = MaterialTheme.colorScheme.onSurface
+        )
+    }
+}
+
+/**
+ * Accueil des parties sur téléphone, quand la page n'est pas défilante : un bouton par partie, puis
+ * la partie choisie occupe la page. C'est le pendant de la barre latérale du grand écran, qui n'a
+ * pas sa place sur un écran étroit.
+ */
+@Composable
+private fun AboutSectionsHome(
+    sections: List<Triple<String, ImageVector, Int>>,
+    onSectionClick: (Int) -> Unit,
+    onShowAll: () -> Unit,
+    cardShape: Shape,
+    bubbleColor: Color,
+    useOneUi: Boolean,
+    safeClick: SafeClick
+) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    val cardBg = if (useOneUi) bubbleColor else Color.Transparent
+    val cardBorder = if (useOneUi) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+
+    Column(modifier = Modifier.fillMaxWidth().padding(top = sizing.spacing(8.dp))) {
+        sections.forEach { (title, icon, index) ->
+            Surface(
+                onClick = { safeClick("about_section_$index") { onSectionClick(index) } },
+                shape = cardShape,
+                border = cardBorder,
+                color = cardBg,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(modifier = Modifier.padding(sizing.spacing(16.dp)), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(sizing.component(26.dp))
+                    )
+                    Spacer(Modifier.width(sizing.spacing(16.dp)))
+                    Text(
+                        text = title,
+                        style = sizing.textStyle(MaterialTheme.typography.titleMedium),
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(sizing.component(24.dp))
+                    )
+                }
+            }
+            Spacer(Modifier.height(sizing.spacing(12.dp)))
+        }
+        // Le même raccourci que sur l'accueil des réglages : repasser la page en défilement d'un
+        // seul geste, sans aller chercher la bascule de la barre du haut.
+        TextButton(onClick = onShowAll, modifier = Modifier.fillMaxWidth()) {
+            Icon(
+                imageVector = Icons.Outlined.ViewAgenda,
+                contentDescription = null,
+                modifier = Modifier.size(sizing.component(20.dp))
+            )
+            Spacer(Modifier.width(sizing.spacing(8.dp)))
+            Text(
+                text = stringResource(R.string.appstrings_about_scrolling_title),
+                style = sizing.textStyle(MaterialTheme.typography.labelLarge),
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
 }
 
 // ============================================================

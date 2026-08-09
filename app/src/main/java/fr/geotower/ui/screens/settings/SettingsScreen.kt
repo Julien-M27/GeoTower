@@ -967,7 +967,7 @@ fun SettingsScreen(
                     entry(context.getString(R.string.department_stats_title), "departement department statistiques blocs autorisations", SECTION_PAGES) { showDepartmentStatsSettingsSheet = true }
                 }
                 if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.ABOUT)) {
-                    entry(context.getString(R.string.appstrings_about), "a propos about parties sections ordre visibilite", SECTION_PAGES) { showAboutPageSettingsSheet = true }
+                    entry(context.getString(R.string.appstrings_about), "a propos about parties sections ordre visibilite defilant defilement scrolling une a la fois", SECTION_PAGES) { showAboutPageSettingsSheet = true }
                 }
                 if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.SUPPORT_DETAIL)) {
                     entry(context.getString(R.string.appstrings_page_support_settings), "support pylone fiche blocs mini carte photos operateurs", SECTION_PAGES) { showSupportSettingsSheet = true }

@@ -31,10 +31,16 @@ internal data class ReleaseNoteItem(
  */
 @Composable
 internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
-    section(stringResource(R.string.appstrings_release_section_interface)) {
-        item(stringResource(R.string.appstrings_release_v2017_split_auto))
-        item(stringResource(R.string.appstrings_release_v2017_split_all_devices))
-        item(stringResource(R.string.appstrings_release_v2017_nav_style_removed))
+    section(stringResource(R.string.appstrings_release_section_signalquest)) {
+        item(stringResource(R.string.appstrings_release_v2018_photo_rotate))
+    }
+
+    section(stringResource(R.string.appstrings_release_section_online_data)) {
+        item(stringResource(R.string.appstrings_release_v2018_nearby_radius))
+    }
+
+    section(stringResource(R.string.appstrings_release_section_about)) {
+        item(stringResource(R.string.appstrings_release_v2018_about_scrolling))
     }
 }
 
