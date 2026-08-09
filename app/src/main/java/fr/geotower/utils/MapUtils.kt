@@ -14,6 +14,35 @@ import org.osmdroid.util.MapTileIndex
 
 object MapUtils {
     private val INACTIVE_OPERATOR_COLOR = android.graphics.Color.rgb(196, 199, 204)
+
+    // Liseré de lisibilité des marqueurs sur fond satellite : l'orthophoto occupe toute la gamme
+    // des gris (bitume, toitures, terres nues), le gris Free s'y dissout et les autres aplats
+    // perdent leur netteté. On cerne donc chaque aplat d'un trait clair ou sombre, et UNIQUEMENT
+    // là : sur le plan IGN / OSM les couleurs ressortent déjà, le liseré ne ferait qu'alourdir.
+    private const val PIE_OUTLINE_UNITS = 4f // repère du camembert (canvas de 230 unités)
+    private const val AZIMUTH_OUTLINE_UNITS = 2.5f // débord de part et d'autre d'un épi d'azimut
+    private val DARK_OUTLINE_COLOR = android.graphics.Color.parseColor("#1B1B1B")
+
+    /**
+     * Vrai quand les tuiles réellement affichées sont des orthophotos. Le style « satellite »
+     * n'existe que sur les fonds IGN (0 et repli) et OSM (1) : les fonds 2 (Carto) et 3
+     * (OpenTopo) n'en ont pas, et le 4 est une carte hors ligne. À garder aligné sur le `when`
+     * qui choisit la source de tuiles dans MapScreen / SharedMiniMapCard.
+     */
+    fun isSatelliteBasemap(provider: Int, ignStyle: Int): Boolean {
+        return ignStyle == 2 && provider != 2 && provider != 3 && provider != 4
+    }
+
+    /** Trait de contraste d'un aplat : blanc sur couleur sombre, anthracite sur couleur claire. */
+    fun contrastOutlineColor(fillColor: Int): Int {
+        val luminance = (
+            0.2126f * android.graphics.Color.red(fillColor) +
+                0.7152f * android.graphics.Color.green(fillColor) +
+                0.0722f * android.graphics.Color.blue(fillColor)
+            ) / 255f
+        return if (luminance < 0.6f) android.graphics.Color.WHITE else DARK_OUTLINE_COLOR
+    }
+
     private val markerAzimuthWithUnitRegex = Regex(
         "([0-9]{1,3}(?:[.,][0-9]+)?)\\s*(?:\\u00B0|\\u00C2\\u00B0|deg(?:res|ree|rees)?|degrees?)",
         RegexOption.IGNORE_CASE
@@ -102,7 +131,8 @@ object MapUtils {
         siteAntennas: List<LocalisationEntity>,
         showAzimuths: Boolean,
         defaultOp: String,
-        inactiveOperatorKeys: Set<String> = emptySet()
+        inactiveOperatorKeys: Set<String> = emptySet(),
+        satelliteContrast: Boolean = false
     ): BitmapDrawable {
         // --- Ordre de priorité des opérateurs (selon l'opérateur par défaut) ---
         val def = defaultOp.uppercase()
@@ -149,7 +179,7 @@ object MapUtils {
             ""
         }
         val cacheKey =
-            "m2|$showAzimuths|$def|${operatorsOnSite.joinToString(",")}|$inactiveSignature|$azimuthSignature"
+            "m3|$showAzimuths|$def|${operatorsOnSite.joinToString(",")}|$inactiveSignature|$azimuthSignature|$satelliteContrast"
 
         markerIconCache.get(cacheKey)?.let { return it }
 
@@ -197,9 +227,22 @@ object MapUtils {
                 val segmentLength = (outerRadius - innerRadius) / sortedOpsForAz.size
 
                 paint.style = Paint.Style.STROKE
-                paint.strokeWidth = strokeWidth
                 paint.strokeCap = Paint.Cap.ROUND
 
+                // Les segments d'un même épi sont bout à bout : on pose TOUS les liserés d'abord,
+                // sinon celui d'un segment mangerait la couleur de son voisin. Le débord côté
+                // centre est ensuite recouvert par le camembert, dessiné juste après.
+                if (satelliteContrast) {
+                    paint.strokeWidth = strokeWidth + 2f * AZIMUTH_OUTLINE_UNITS
+                    sortedOpsForAz.forEachIndexed { index, op ->
+                        paint.color = contrastOutlineColor(colorForOperator(op))
+                        val startY = center - innerRadius - (index * segmentLength)
+                        val endY = startY - segmentLength
+                        canvas.drawLine(center, startY, center, endY, paint)
+                    }
+                }
+
+                paint.strokeWidth = strokeWidth
                 sortedOpsForAz.forEachIndexed { index, op ->
                     paint.color = colorForOperator(op)
                     val startY = center - innerRadius - (index * segmentLength)
@@ -215,9 +258,26 @@ object MapUtils {
         val rect = android.graphics.RectF(center - pieRadius, center - pieRadius, center + pieRadius, center + pieRadius)
 
         if (operatorsOnSite.isEmpty()) {
+            if (satelliteContrast) {
+                paint.color = contrastOutlineColor(android.graphics.Color.GRAY)
+                canvas.drawCircle(center, center, pieRadius + PIE_OUTLINE_UNITS, paint)
+            }
             paint.color = android.graphics.Color.GRAY
             canvas.drawCircle(center, center, pieRadius, paint)
         } else {
+            if (satelliteContrast) {
+                // Le liseré est le même camembert, à peine plus grand et peint dessous : la bande
+                // de couleur garde toute son épaisseur, le trait ne fait que déborder au-dehors.
+                val outlineRect = android.graphics.RectF(
+                    center - pieRadius - PIE_OUTLINE_UNITS,
+                    center - pieRadius - PIE_OUTLINE_UNITS,
+                    center + pieRadius + PIE_OUTLINE_UNITS,
+                    center + pieRadius + PIE_OUTLINE_UNITS
+                )
+                drawOperatorSlices(canvas, outlineRect, operatorsOnSite, paint) { op ->
+                    contrastOutlineColor(colorForOperator(op))
+                }
+            }
             drawOperatorSlices(canvas, rect, operatorsOnSite, paint, ::colorForOperator)
         }
 
@@ -443,9 +503,15 @@ object MapUtils {
         return colors.distinct()
     }
 
-    fun createClusterIcon(context: Context, operators: List<String>, count: Int, defaultOp: String): BitmapDrawable {
+    fun createClusterIcon(
+        context: Context,
+        operators: List<String>,
+        count: Int,
+        defaultOp: String,
+        satelliteContrast: Boolean = false
+    ): BitmapDrawable {
         // ✅ CORRECTION : On intègre l'opérateur par défaut dans le cache pour forcer le redessin si on change d'avis !
-        val cacheKey = "${operators.sorted().joinToString("_")}_${count}_$defaultOp"
+        val cacheKey = "${operators.sorted().joinToString("_")}_${count}_${defaultOp}_$satelliteContrast"
 
         clusterIconCache.get(cacheKey)?.let { return it }
 
@@ -481,7 +547,7 @@ object MapUtils {
             paint.color = android.graphics.Color.GRAY
             canvas.drawCircle(size / 2f, size / 2f, size / 2f, paint)
         } else {
-            drawOperatorRing(canvas, size.toFloat(), sortedOps, colorMap, paint)
+            drawOperatorRing(canvas, size.toFloat(), sortedOps, colorMap, paint, satelliteContrast)
         }
 
         val centerPoint = size / 2f
@@ -529,7 +595,8 @@ object MapUtils {
         size: Float,
         operators: List<String>,
         colorMap: Map<String, Int>,
-        paint: Paint
+        paint: Paint,
+        satelliteContrast: Boolean = false
     ) {
         val center = size / 2f
         val strokeWidth = size * 0.22f
@@ -550,6 +617,24 @@ object MapUtils {
         operators.forEachIndexed { index, op ->
             paint.color = colorMap[op] ?: android.graphics.Color.GRAY
             canvas.drawArc(ringRect, -90f + index * sweep, sweep + overlap, false, paint)
+        }
+
+        // L'anneau touche déjà le bord du bitmap : impossible de déborder comme sur le camembert,
+        // le liseré est donc posé sur la tranche extérieure de l'anneau.
+        if (satelliteContrast) {
+            val outlineWidth = size * 0.05f
+            val outlineRadius = center - outlineWidth / 2f
+            val outlineRect = android.graphics.RectF(
+                center - outlineRadius,
+                center - outlineRadius,
+                center + outlineRadius,
+                center + outlineRadius
+            )
+            paint.strokeWidth = outlineWidth
+            operators.forEachIndexed { index, op ->
+                paint.color = contrastOutlineColor(colorMap[op] ?: android.graphics.Color.GRAY)
+                canvas.drawArc(outlineRect, -90f + index * sweep, sweep + overlap, false, paint)
+            }
         }
 
         paint.style = Paint.Style.FILL

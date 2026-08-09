@@ -186,7 +186,7 @@ fun HelpScreen(navController: NavController) {
         softShape = if (useOneUi) RoundedCornerShape(24.dp) else RoundedCornerShape(18.dp),
         chipShape = if (useOneUi) RoundedCornerShape(18.dp) else RoundedCornerShape(12.dp),
         cardColor = if (useOneUi) {
-            if (isDark) Color(0xFF212121) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f)
+            if (isDark) Color(0xFF212121) else MaterialTheme.colorScheme.surfaceVariant
         } else {
             MaterialTheme.colorScheme.surface
         },

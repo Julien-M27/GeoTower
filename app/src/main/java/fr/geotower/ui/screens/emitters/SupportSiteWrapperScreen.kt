@@ -25,6 +25,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import fr.geotower.data.AnfrRepository
@@ -35,6 +36,21 @@ import fr.geotower.utils.AppLogger
 private enum class SiteDetailSidePane {
     ElevationProfile,
     ThroughputCalculator
+}
+
+/**
+ * Ouvre-t-on les fiches en deux volets ? Deux conditions, jamais une seule : le style d'affichage
+ * (le mode simplifié impose le plein écran, et sans choix explicite on est en AUTO) ET une fenêtre
+ * assez large. La taille est relue à chaque composition, donc plier/déplier ou redimensionner en
+ * multi-fenêtre bascule tout seul, sans redémarrage.
+ */
+@Composable
+private fun splitDisplayEnabled(): Boolean {
+    val configuration = LocalConfiguration.current
+    return AppConfig.splitDisplayEnabled(
+        style = AppConfig.effectiveDisplayStyle(),
+        smallestDimensionDp = minOf(configuration.screenWidthDp, configuration.screenHeightDp)
+    )
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -59,10 +75,9 @@ fun SupportSiteWrapperScreen(
     // l'ouverture d'une fiche et ajoutait un second écran de chargement.
     var selectedSiteId by remember { mutableStateOf<String?>(null) }
     var selectedSidePane by remember { mutableStateOf<SiteDetailSidePane?>(null) }
-    // Lit les deux états observables (style choisi + mode simplifié) : le mode simplifié impose 0.
-    val displayStyle = AppConfig.effectiveDisplayStyle()
+    val splitDisplay = splitDisplayEnabled()
 
-    val canOpenSiteSplit = displayStyle == 1 && !isSplitScreen
+    val canOpenSiteSplit = splitDisplay && !isSplitScreen
     val isSplitActive = canOpenSiteSplit && selectedSiteId != null
     val isSiteToolSplitActive = isSplitActive && selectedSidePane != null
     val leftWidthFraction by animateFloatAsState(
@@ -157,13 +172,12 @@ fun NearEmittersSupportWrapperScreen(
     repository: AnfrRepository,
     radioRepository: RadioRepository
 ) {
-    // Lit les deux états observables (style choisi + mode simplifié) : le mode simplifié impose 0.
-    val displayStyle = AppConfig.effectiveDisplayStyle()
+    val splitDisplay = splitDisplayEnabled()
     var selectedSupportId by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedSupportOperatorKey by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedSiteId by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedSidePane by remember { mutableStateOf<SiteDetailSidePane?>(null) }
-    val isSplitActive = displayStyle == 1 && selectedSupportId != null
+    val isSplitActive = splitDisplay && selectedSupportId != null
     val leftWidthFraction by animateFloatAsState(
         targetValue = if (isSplitActive) 0.5f else 1f,
         animationSpec = tween(durationMillis = 400, easing = FastOutSlowInEasing),
@@ -202,7 +216,7 @@ fun NearEmittersSupportWrapperScreen(
                     repository = repository,
                     onSupportClick = { site, searchedOperatorKey ->
                         val supportId = site.idSupport?.takeIf { it.isNotBlank() } ?: site.id.toString()
-                        if (displayStyle == 1) {
+                        if (splitDisplay) {
                             if (selectedSupportId == supportId && selectedSiteId == null) {
                                 selectedSupportId = null
                                 selectedSupportOperatorKey = null
@@ -276,10 +290,9 @@ fun SiteDetailToolWrapperScreen(
     antennaId: String,
     applyMapFilters: Boolean = false
 ) {
-    // Lit les deux états observables (style choisi + mode simplifié) : le mode simplifié impose 0.
-    val displayStyle = AppConfig.effectiveDisplayStyle()
+    val splitDisplay = splitDisplayEnabled()
     var selectedSidePane by remember(antennaId) { mutableStateOf<SiteDetailSidePane?>(null) }
-    val isSplitActive = displayStyle == 1 && selectedSidePane != null
+    val isSplitActive = splitDisplay && selectedSidePane != null
     val siteWidthFraction by animateFloatAsState(
         targetValue = if (isSplitActive) 0.5f else 1f,
         animationSpec = tween(durationMillis = 400, easing = FastOutSlowInEasing),
@@ -296,11 +309,11 @@ fun SiteDetailToolWrapperScreen(
                 isSplitScreen = isSplitActive,
                 onCloseSplitScreen = { selectedSidePane = null },
                 onOpenElevationProfile = {
-                    if (displayStyle == 1) selectedSidePane = SiteDetailSidePane.ElevationProfile
+                    if (splitDisplay) selectedSidePane = SiteDetailSidePane.ElevationProfile
                     else navController.navigate("elevation_profile/$it")
                 },
                 onOpenThroughputCalculator = {
-                    if (displayStyle == 1) selectedSidePane = SiteDetailSidePane.ThroughputCalculator
+                    if (splitDisplay) selectedSidePane = SiteDetailSidePane.ThroughputCalculator
                     else navController.navigate("throughput_calculator/$it")
                 }
             )

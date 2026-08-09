@@ -160,7 +160,8 @@ fun SupportDetailScreen(
     var globalMapRef by remember { mutableStateOf<org.osmdroid.views.MapView?>(null) }
 
     val mainBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.background
-    val cardBgColor = if (useOneUi && isDark) Color(0xFF212121) else MaterialTheme.colorScheme.surfaceVariant
+    // Même source que la fiche site : une seule définition du fond des cartes de premier plan.
+    val cardBgColor = uiStyle.cardColor
 
     val blockShape = if (useOneUi) RoundedCornerShape(24.dp) else RoundedCornerShape(12.dp)
     val buttonShape = oneUiActionButtonShape(useOneUi)

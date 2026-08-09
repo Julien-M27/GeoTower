@@ -372,11 +372,11 @@ fun SiteDetailScreen(
     val isOled = isOledMode
 
     val mainBgColor = if (isDark && isOled) Color.Black else MaterialTheme.colorScheme.background
-    val cardBgColor = if (useOneUi) {
-        if (isDark) Color(0xFF212121) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f)
-    } else {
-        MaterialTheme.colorScheme.surfaceContainerLow
-    }
+    // Même gris que la fiche support. Hors One UI cette page lisait `surfaceContainerLow`, qui est
+    // le fond des cartes SECONDAIRES (uiStyle.secondaryCardColor) : à peine détaché de
+    // l'arrière-plan, les blocs photos et détails du site paraissaient plus sombres que les mêmes
+    // blocs sur le support. `uiStyle.cardColor` est le fond des cartes de premier plan.
+    val cardBgColor = uiStyle.cardColor
     val sheetBgColor = if (isDark && isOled) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
 
     val blockShape = if (useOneUi) RoundedCornerShape(24.dp) else RoundedCornerShape(12.dp)

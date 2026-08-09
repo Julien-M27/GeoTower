@@ -152,7 +152,7 @@ fun rememberGeoTowerUiStyle(): GeoTowerUiStyle {
     val useOneUi = uiMode.usesOneUi()
     val backgroundColor = if (isDark && isOled) Color.Black else MaterialTheme.colorScheme.background
     val bubbleColor = if (useOneUi) {
-        if (isDark) Color(0xFF212121) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f)
+        if (isDark) Color(0xFF212121) else MaterialTheme.colorScheme.surfaceVariant
     } else {
         Color.Transparent
     }

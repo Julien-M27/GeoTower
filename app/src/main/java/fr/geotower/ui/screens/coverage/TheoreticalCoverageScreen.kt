@@ -129,7 +129,7 @@ fun TheoreticalCoverageScreen(
     val isDark = (themeMode == 2) || (themeMode == 0 && androidx.compose.foundation.isSystemInDarkTheme())
     val mainBgColor = if (isDark && isOledMode) androidx.compose.ui.graphics.Color.Black else MaterialTheme.colorScheme.background
     val cardBgColor = if (useOneUi) {
-        if (isDark) androidx.compose.ui.graphics.Color(0xFF212121) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f)
+        if (isDark) androidx.compose.ui.graphics.Color(0xFF212121) else MaterialTheme.colorScheme.surfaceVariant
     } else {
         MaterialTheme.colorScheme.surfaceContainerLow
     }

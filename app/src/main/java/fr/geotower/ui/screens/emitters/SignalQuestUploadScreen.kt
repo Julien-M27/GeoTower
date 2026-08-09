@@ -993,10 +993,20 @@ fun SignalQuestUploadScreen(
                                     val shouldInvertColors = (effectiveProvider == 0 && ignStyle == 1)
                                     map.overlayManager.tilesOverlay.setColorFilter(if (shouldInvertColors) MapUtils.getInvertFilter() else null)
 
+                                    // Sur orthophoto seulement, marqueur et azimuts sont cernés d'un liseré.
+                                    val satelliteMarkerContrast = MapUtils.isSatelliteBasemap(effectiveProvider, ignStyle)
+
                                     // ✅ 3. ON MET À JOUR LE MARQUEUR PERSONNALISÉ
                                     val marker = map.overlays.filterIsInstance<fr.geotower.ui.components.MiniMapAntennaMarker>().firstOrNull()
                                     if (marker != null) {
-                                        marker.icon = MapUtils.createAdaptiveMarker(context, mappedAntennas, true, primaryTargetOperator)
+                                        marker.satelliteContrast = satelliteMarkerContrast
+                                        marker.icon = MapUtils.createAdaptiveMarker(
+                                            context,
+                                            mappedAntennas,
+                                            true,
+                                            primaryTargetOperator,
+                                            satelliteContrast = satelliteMarkerContrast
+                                        )
                                     }
                                     map.invalidate()
                                 }

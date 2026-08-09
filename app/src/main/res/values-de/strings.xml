@@ -187,12 +187,7 @@
     <string name="settings_reset_warning_title">Warnung</string>
     <string name="settings_reset_warning_desc">Möchtest du wirklich die Standardeinstellungen wiederherstellen? Dadurch werden alle Einstellungen gelöscht, die du in der App vorgenommen hast.</string>
     <string name="settings_navigation_mode_title">Navigationsmodus in den Einstellungen</string>
-    <string name="settings_navigation_mode_scroll">Fortlaufendes Scrollen</string>
-    <string name="settings_navigation_mode_pages">Seitensystem</string>
-    <string name="settings_navigation_style_title">Navigationsstil</string>
-    <string name="settings_navigation_scroll_title">Scrollen</string>
     <string name="settings_navigation_scroll_desc">Alle Optionen auf einer Seite</string>
-    <string name="settings_navigation_pages_title">Seiten</string>
     <string name="settings_navigation_pages_desc">Bereichsübersicht, dann eine Kategorie auf einmal</string>
     <string name="settings_display_style_title">Anzeigestil</string>
     <string name="settings_simple_mode_title">Einfacher Modus</string>
@@ -2627,4 +2622,9 @@
     <string name="appstrings_release_v2016_share_frequency_pages">Ein voll belegter Standort wird jetzt auf so viele nummerierte Bilder verteilt wie nötig, statt auf zwei</string>
     <string name="appstrings_release_v2016_share_many_bands_hint">Werden es zu viele Bilder, schlägt die App den PDF-Bericht vor, der alles in einer lesbaren Datei behält</string>
     <string name="appstrings_release_v2016_photo_orientation">Gesendete Fotos stehen jetzt immer aufrecht: Die Drehung steckt in den Pixeln, statt von Metadaten abzuhängen, die der Empfänger ignoriert</string>
+
+    <!-- Versionshinweise 2.0.17 -->
+    <string name="appstrings_release_v2017_split_auto">Die geteilte Ansicht richtet sich jetzt nach der tatsächlichen Fenstergröße: aktiv auf Tablets und aufgeklappten Foldables, klappt sie beim Zusammenklappen von selbst zusammen, ohne Neustart</string>
+    <string name="appstrings_release_v2017_split_all_devices">Davon profitieren alle Foldables und alle Tablets statt nur einer kurzen Liste erkannter Modelle</string>
+    <string name="appstrings_release_v2017_nav_style_removed">Die Einstellung „Navigationsstil“ entfällt; wer Vollbild bevorzugt, kann das weiterhin wählen, und diese Wahl hat immer Vorrang</string>
 </resources>

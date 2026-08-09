@@ -187,12 +187,7 @@
     <string name="settings_reset_warning_title">Attenzione</string>
     <string name="settings_reset_warning_desc">Vuoi davvero ripristinare le impostazioni predefinite? Verranno eliminate tutte le impostazioni che hai configurato nell\'app.</string>
     <string name="settings_navigation_mode_title">Modalità di navigazione nelle impostazioni</string>
-    <string name="settings_navigation_mode_scroll">Scorrimento continuo</string>
-    <string name="settings_navigation_mode_pages">Sistema a pagine</string>
-    <string name="settings_navigation_style_title">Stile di navigazione</string>
-    <string name="settings_navigation_scroll_title">Scorrimento</string>
     <string name="settings_navigation_scroll_desc">Tutte le opzioni in una pagina</string>
-    <string name="settings_navigation_pages_title">Pagine</string>
     <string name="settings_navigation_pages_desc">Home per sezioni, poi una categoria alla volta</string>
     <string name="settings_display_style_title">Stile di visualizzazione</string>
     <string name="settings_simple_mode_title">Modalità semplificata</string>
@@ -2627,4 +2622,9 @@
     <string name="appstrings_release_v2016_share_frequency_pages">Una stazione molto carica viene ora condivisa su tutte le immagini numerate necessarie, invece che su due</string>
     <string name="appstrings_release_v2016_share_many_bands_hint">Quando le immagini si moltiplicano, l\'app suggerisce il rapporto PDF, che tiene tutto in un unico file leggibile</string>
     <string name="appstrings_release_v2016_photo_orientation">Le foto inviate risultano sempre dritte: la rotazione è impressa nei pixel, invece di dipendere da metadati che il destinatario ignora</string>
+
+    <!-- Note di versione 2.0.17 -->
+    <string name="appstrings_release_v2017_split_auto">La vista divisa segue ora la dimensione reale della finestra: attiva su tablet e pieghevoli aperti, si richiude da sola quando chiudi il dispositivo, senza riavvio</string>
+    <string name="appstrings_release_v2017_split_all_devices">Ne beneficiano tutti i pieghevoli e tutti i tablet, invece di un breve elenco di modelli riconosciuti</string>
+    <string name="appstrings_release_v2017_nav_style_removed">L\'impostazione «Stile di navigazione» scompare; se preferisci lo schermo intero, la scelta resta disponibile e ha sempre la precedenza</string>
 </resources>

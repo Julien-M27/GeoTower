@@ -187,12 +187,7 @@
     <string name="settings_reset_warning_title">Attention</string>
     <string name="settings_reset_warning_desc">Êtes-vous sûr de vouloir rétablir les paramètres par défaut ? Cela supprimera tous les réglages que vous avez faits dans l\'application.</string>
     <string name="settings_navigation_mode_title">Mode de navigation dans les paramètres</string>
-    <string name="settings_navigation_mode_scroll">Défilement continu</string>
-    <string name="settings_navigation_mode_pages">Système par pages</string>
-    <string name="settings_navigation_style_title">Style de navigation</string>
-    <string name="settings_navigation_scroll_title">Défilant</string>
     <string name="settings_navigation_scroll_desc">Toutes les options sur une page</string>
-    <string name="settings_navigation_pages_title">Pages</string>
     <string name="settings_navigation_pages_desc">Accueil par sections, puis une catégorie à la fois</string>
     <string name="settings_display_style_title">Style d\'affichage</string>
     <string name="settings_simple_mode_title">Mode simplifié</string>
@@ -2629,4 +2624,9 @@
     <string name="appstrings_release_v2016_share_frequency_pages">Une station chargée se partage désormais sur autant d\'images numérotées que nécessaire, au lieu de deux</string>
     <string name="appstrings_release_v2016_share_many_bands_hint">Quand les images se multiplient, l\'application suggère le rapport PDF, qui garde tout dans un seul fichier lisible</string>
     <string name="appstrings_release_v2016_photo_orientation">Les photos envoyées partent toujours droites : la rotation est appliquée aux pixels, au lieu de dépendre d\'une métadonnée que le destinataire ignore</string>
+
+    <!-- Notes de version 2.0.17 -->
+    <string name="appstrings_release_v2017_split_auto">L\'affichage fractionné suit maintenant la taille réelle de la fenêtre : actif sur tablette et sur pliable déplié, il se replie tout seul quand vous refermez l\'appareil, sans redémarrage</string>
+    <string name="appstrings_release_v2017_split_all_devices">Tous les pliables et toutes les tablettes en profitent, au lieu d\'une courte liste de modèles reconnus</string>
+    <string name="appstrings_release_v2017_nav_style_removed">Le réglage « Style de navigation » disparaît ; si vous préférez le plein écran, ce choix reste possible et l\'emporte toujours</string>
 </resources>

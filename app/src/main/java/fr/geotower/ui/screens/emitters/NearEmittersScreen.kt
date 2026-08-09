@@ -260,7 +260,7 @@ fun NearEmittersScreen(
     val cardShape = if (useOneUi) RoundedCornerShape(28.dp) else RoundedCornerShape(12.dp)
     val mainBgColor = if (isDark && isOled) Color.Black else MaterialTheme.colorScheme.background
     val cardColor = if (useOneUi) {
-        if (isDark) Color(0xFF212121) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f)
+        if (isDark) Color(0xFF212121) else MaterialTheme.colorScheme.surfaceVariant
     } else {
         MaterialTheme.colorScheme.surfaceContainer
     }

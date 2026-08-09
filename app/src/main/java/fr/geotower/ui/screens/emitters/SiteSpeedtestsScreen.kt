@@ -128,7 +128,7 @@ fun SiteSpeedtestsScreen(
     val isDark = (themeMode == 2) || (themeMode == 0 && isSystemDark)
     val mainBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.background
     val cardBgColor = if (useOneUi) {
-        if (isDark) Color(0xFF212121) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f)
+        if (isDark) Color(0xFF212121) else MaterialTheme.colorScheme.surfaceVariant
     } else {
         MaterialTheme.colorScheme.surfaceContainerLow
     }

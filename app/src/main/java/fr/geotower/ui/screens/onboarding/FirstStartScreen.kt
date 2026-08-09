@@ -297,7 +297,7 @@ fun FirstStartScreen(
     val cardShape = if (useOneUi) RoundedCornerShape(28.dp) else RoundedCornerShape(12.dp)
     val cardBorder = if (useOneUi) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
     val bubbleColor = if (useOneUi) {
-        if (isDark) Color(0xFF212121) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f)
+        if (isDark) Color(0xFF212121) else MaterialTheme.colorScheme.surfaceVariant
     } else {
         Color.Transparent
     }

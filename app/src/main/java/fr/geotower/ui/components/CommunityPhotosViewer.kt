@@ -80,8 +80,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
@@ -90,7 +92,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -152,6 +153,24 @@ private const val PHOTO_VIEWER_MAX_SCALE = 5f
 private const val PHOTO_VIEWER_DOUBLE_TAP_SCALE = 2.6f
 private const val PHOTO_VIEWER_ZOOMED_THRESHOLD = 1.01f
 private const val PHOTO_VIEWER_RESET_THRESHOLD = 1.03f
+// Hauteur des voiles dégradés posés sur la photo, sous le titre et sous les commandes du bas.
+// Le palier intermédiaire garde le voile assez couvrant sous le texte, la disparition se fait en fin de course.
+private val PHOTO_VIEWER_TOP_SCRIM_HEIGHT = 140.dp
+private val PHOTO_VIEWER_BOTTOM_SCRIM_HEIGHT = 152.dp
+
+// Le voile reprend la couleur de fond du visionneur : sur les marges il se confond avec le fond
+// (aucune couture visible) et sur la photo il ramène le contraste attendu par le thème.
+private fun photoViewerTopScrimBrush(baseColor: Color) = Brush.verticalGradient(
+    0f to baseColor.copy(alpha = 0.78f),
+    0.6f to baseColor.copy(alpha = 0.60f),
+    1f to baseColor.copy(alpha = 0f)
+)
+
+private fun photoViewerBottomScrimBrush(baseColor: Color) = Brush.verticalGradient(
+    0f to baseColor.copy(alpha = 0f),
+    0.4f to baseColor.copy(alpha = 0.60f),
+    1f to baseColor.copy(alpha = 0.82f)
+)
 
 private fun CommunityPhoto.resolvedSourceId(): String? {
     return sourceId ?: CommunityDataPreferences.sourceIdForCommunityName(communityName)
@@ -1513,14 +1532,22 @@ fun CommunityPhotosSectionShared(
             properties = DialogProperties(usePlatformDefaultWidth = false)
         ) {
             val bgAlpha = (1f - (abs(dismissOffset.value) / 800f)).coerceIn(0f, 1f)
-            val density = LocalDensity.current
             val currentPhotoSourceSize = photoSourceSizes[pagerState.currentPage]
-            val currentPhotoFrame = fittedPhotoFrame(viewerContainerSize, currentPhotoSourceSize)
-            val photoStartPadding = with(density) { currentPhotoFrame.left.coerceAtLeast(0f).toDp() + 16.dp }
-            val photoEndPadding = with(density) { (viewerContainerSize.width - currentPhotoFrame.right).coerceAtLeast(0f).toDp() + 16.dp }
-            val photoTopPadding = with(density) { currentPhotoFrame.top.coerceAtLeast(0f).toDp() + 16.dp }
+            // L'habillage se cale sur le visionneur, pas sur les bords calculés de la photo : sinon il flotte
+            // au milieu du fond dès que l'image ne remplit pas l'écran.
+            val chromeSidePadding = sizing.spacing(16.dp)
             val navigationBottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
             val photoBottomPadding = navigationBottomPadding + 12.dp
+
+            // --- VOILES DÉGRADÉS ---
+            // Pleine largeur du visionneur, et non l'emprise de la photo : sinon le rectangle du voile
+            // se voit sur les marges et l'habillage se retrouve moitié sur le voile, moitié sur le fond nu.
+            val bottomScrimHeight = photoBottomPadding + PHOTO_VIEWER_BOTTOM_SCRIM_HEIGHT
+            val topScrimBrush = remember(viewerBgBaseColor) { photoViewerTopScrimBrush(viewerBgBaseColor) }
+            val bottomScrimBrush = remember(viewerBgBaseColor) { photoViewerBottomScrimBrush(viewerBgBaseColor) }
+            // Tout l'habillage haut/bas repose sur le voile : couleur du thème partout, sans pastille.
+            val chromeContentColor = viewerContentColor
+            val chromeButtonBg = Color.Transparent
 
             Surface(modifier = Modifier.fillMaxSize(), color = viewerBgBaseColor.copy(alpha = bgAlpha)) {
                 Box(
@@ -1665,11 +1692,29 @@ fun CommunityPhotosSectionShared(
                         }
                     }
 
+                    // --- VOILES DÉGRADÉS (purement décoratifs : ils ne captent aucun geste) ---
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .fillMaxWidth()
+                            .height(PHOTO_VIEWER_TOP_SCRIM_HEIGHT)
+                            .alpha(bgAlpha)
+                            .background(topScrimBrush)
+                    )
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .height(bottomScrimHeight)
+                            .alpha(bgAlpha)
+                            .background(bottomScrimBrush)
+                    )
+
                     // --- FLÈCHE GAUCHE ---
                     if (pagerState.currentPage > 0) {
                         IconButton(
                             onClick = { coroutineScope.launch { pagerState.animateScrollToPage(pagerState.currentPage - 1) } },
-                            modifier = Modifier.align(Alignment.CenterStart).padding(start = photoStartPadding).size(sizing.component(28.dp)).background(overlayButtonBg, CircleShape)
+                            modifier = Modifier.align(Alignment.CenterStart).padding(start = chromeSidePadding).size(sizing.component(28.dp)).background(overlayButtonBg, CircleShape)
                         ) {
                             Icon(imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = stringResource(R.string.appstrings_previous), tint = viewerContentColor, modifier = Modifier.size(sizing.component(20.dp)))
                         }
@@ -1679,7 +1724,7 @@ fun CommunityPhotosSectionShared(
                     if (pagerState.currentPage < viewerPhotos.size - 1) {
                         IconButton(
                             onClick = { coroutineScope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) } },
-                            modifier = Modifier.align(Alignment.CenterEnd).padding(end = photoEndPadding).size(sizing.component(28.dp)).background(overlayButtonBg, CircleShape)
+                            modifier = Modifier.align(Alignment.CenterEnd).padding(end = chromeSidePadding).size(sizing.component(28.dp)).background(overlayButtonBg, CircleShape)
                         ) {
                             Icon(imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = stringResource(R.string.appstrings_next), tint = viewerContentColor, modifier = Modifier.size(sizing.component(20.dp)))
                         }
@@ -1693,8 +1738,11 @@ fun CommunityPhotosSectionShared(
                     ) {
                         Text(
                             text = fullScreenTitle,
-                            color = viewerContentColor,
-                            style = sizing.textStyle(MaterialTheme.typography.titleLarge).copy(shadow = if (isDark) androidx.compose.ui.graphics.Shadow(color = Color.Black, blurRadius = 8f) else null),
+                            color = chromeContentColor,
+                            style = sizing.textStyle(MaterialTheme.typography.titleLarge).copy(
+                                // Halo de la couleur du fond : noir en sombre, blanc en clair.
+                                shadow = androidx.compose.ui.graphics.Shadow(color = viewerBgBaseColor, blurRadius = 8f)
+                            ),
                             fontWeight = FontWeight.Bold,
                             textAlign = TextAlign.Center
                         )
@@ -1709,8 +1757,8 @@ fun CommunityPhotosSectionShared(
                             PhotoFavoriteButton(
                                 isFavorite = isCurrentPhotoFavorite,
                                 modifier = Modifier,
-                                backgroundColor = overlayButtonBg,
-                                contentColor = viewerContentColor,
+                                backgroundColor = chromeButtonBg,
+                                contentColor = chromeContentColor,
                                 onClick = { toggleFavoritePhoto(currentPhoto) }
                             )
                         }
@@ -1722,16 +1770,16 @@ fun CommunityPhotosSectionShared(
                             selectedPhotosSnapshot = emptyList()
                             coroutineScope.launch { dismissOffset.snapTo(0f) }
                         },
-                        modifier = Modifier.align(Alignment.TopEnd).padding(top = sizing.spacing(20.dp), end = sizing.spacing(4.dp)).background(overlayButtonBg, shape = CircleShape)
+                        modifier = Modifier.align(Alignment.TopEnd).padding(top = sizing.spacing(20.dp), end = sizing.spacing(4.dp)).background(chromeButtonBg, shape = CircleShape)
                     ) {
-                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.appstrings_close), tint = viewerContentColor)
+                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.appstrings_close), tint = chromeContentColor)
                     }
 
                     // --- AUTEUR ET DATE ---
                     val hasCurrentPhotoCaption = !currentPhoto.author.isNullOrBlank() || !currentPhoto.date.isNullOrBlank()
                     val hasCurrentPhotoInfo = showPhotoExif && currentPhoto.hasExifInfo() && currentPhotoSourceSize != null
                     Column(
-                        modifier = Modifier.align(Alignment.BottomStart).padding(bottom = photoBottomPadding, start = photoStartPadding),
+                        modifier = Modifier.align(Alignment.BottomStart).padding(bottom = photoBottomPadding, start = chromeSidePadding),
                         horizontalAlignment = Alignment.Start
                     ) {
                         Row(
@@ -1741,16 +1789,16 @@ fun CommunityPhotosSectionShared(
                             if (hasCurrentPhotoInfo) {
                                 PhotoInfoButton(
                                     modifier = Modifier,
-                                    backgroundColor = overlayButtonBg,
-                                    contentColor = viewerContentColor,
+                                    backgroundColor = chromeButtonBg,
+                                    contentColor = chromeContentColor,
                                     onClick = { exifDialogPhoto = currentPhoto }
                                 )
                             }
                             PhotoViewerActionButton(
                                 imageVector = Icons.Default.ContentCopy,
                                 contentDescription = txtPhotoCopy,
-                                backgroundColor = overlayButtonBg,
-                                contentColor = viewerContentColor,
+                                backgroundColor = chromeButtonBg,
+                                contentColor = chromeContentColor,
                                 enabled = !photoExportInProgress,
                                 onClick = {
                                     runPhotoExport(txtPhotoCopiedToClipboard) {
@@ -1761,8 +1809,8 @@ fun CommunityPhotosSectionShared(
                             PhotoViewerActionButton(
                                 imageVector = Icons.Default.Download,
                                 contentDescription = txtPhotoDownload,
-                                backgroundColor = overlayButtonBg,
-                                contentColor = viewerContentColor,
+                                backgroundColor = chromeButtonBg,
+                                contentColor = chromeContentColor,
                                 enabled = !photoExportInProgress,
                                 onClick = {
                                     runPhotoExport(txtPhotoSavedToGallery) {
@@ -1773,16 +1821,17 @@ fun CommunityPhotosSectionShared(
                         }
                         if (hasCurrentPhotoCaption) {
                             Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
+                            // Sur le voile la légende n'a plus besoin de pastille : elle s'aligne sur les boutons.
                             Column(
-                                modifier = Modifier.background(overlayButtonBg, badgeShape).padding(horizontal = sizing.spacing(12.dp), vertical = sizing.spacing(8.dp)),
+                                modifier = Modifier.background(chromeButtonBg, badgeShape).padding(horizontal = sizing.spacing(4.dp)),
                                 horizontalAlignment = Alignment.Start
                             ) {
                                 if (!currentPhoto.author.isNullOrBlank() && currentPhoto.author != "null") {
-                                    Text(text = stringResource(R.string.photo_by_author, currentPhoto.author), color = viewerContentColor, style = sizing.textStyle(MaterialTheme.typography.labelMedium), fontWeight = FontWeight.Bold)
+                                    Text(text = stringResource(R.string.photo_by_author, currentPhoto.author), color = chromeContentColor, style = sizing.textStyle(MaterialTheme.typography.labelMedium), fontWeight = FontWeight.Bold)
                                 }
                                 val formattedDate = formatPhotoDate(currentPhoto.date)
                                 if (formattedDate.isNotEmpty()) {
-                                    Text(text = stringResource(R.string.photo_on_date, formattedDate), color = viewerContentColor.copy(alpha = 0.8f), style = sizing.textStyle(MaterialTheme.typography.labelSmall))
+                                    Text(text = stringResource(R.string.photo_on_date, formattedDate), color = chromeContentColor.copy(alpha = 0.8f), style = sizing.textStyle(MaterialTheme.typography.labelSmall))
                                 }
                             }
                         }
@@ -1791,13 +1840,13 @@ fun CommunityPhotosSectionShared(
                     // --- COMPTEUR (On utilise filteredPhotos.size) ---
                     if (viewerPhotos.size > 1) {
                         Column(
-                            modifier = Modifier.align(Alignment.BottomEnd).padding(bottom = photoBottomPadding, end = photoEndPadding).background(overlayButtonBg, pillButtonShape).padding(horizontal = sizing.spacing(12.dp), vertical = sizing.spacing(6.dp)),
+                            modifier = Modifier.align(Alignment.BottomEnd).padding(bottom = photoBottomPadding, end = chromeSidePadding).background(chromeButtonBg, pillButtonShape).padding(horizontal = sizing.spacing(12.dp), vertical = sizing.spacing(6.dp)),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
                         ) {
-                            Icon(imageVector = Icons.Default.Collections, contentDescription = null, tint = viewerContentColor, modifier = Modifier.size(sizing.component(18.dp)))
+                            Icon(imageVector = Icons.Default.Collections, contentDescription = null, tint = chromeContentColor, modifier = Modifier.size(sizing.component(18.dp)))
                             Spacer(modifier = Modifier.height(sizing.spacing(2.dp)))
-                            Text(text = "${pagerState.currentPage + 1} / ${viewerPhotos.size}", color = viewerContentColor, style = sizing.textStyle(MaterialTheme.typography.labelSmall), fontWeight = FontWeight.Bold)
+                            Text(text = "${pagerState.currentPage + 1} / ${viewerPhotos.size}", color = chromeContentColor, style = sizing.textStyle(MaterialTheme.typography.labelSmall), fontWeight = FontWeight.Bold)
                         }
                     }
 
@@ -1810,7 +1859,7 @@ fun CommunityPhotosSectionShared(
                                 .align(Alignment.BottomCenter)
                                 .padding(bottom = photoBottomPadding)
                                 .onSizeChanged { containerWidth = it.width }
-                                .background(color = if (isDark) Color(0xFF2C2C2C) else Color(0xFFF0F0F0), shape = CircleShape)
+                                .background(color = chromeButtonBg, shape = CircleShape)
                                 .padding(horizontal = sizing.spacing(12.dp), vertical = sizing.spacing(6.dp))
                                 .pointerInput(viewerPhotos.size) {
                                     detectDragGestures { change, _ ->
@@ -1834,11 +1883,10 @@ fun CommunityPhotosSectionShared(
 
                                 (startDot until endDot).forEach { iteration ->
                                     val isActive = pagerState.currentPage == iteration
-                                    val dotColor = when {
-                                        isActive && isDark -> Color.White
-                                        isActive && !isDark -> Color(0xFF424242)
-                                        !isActive && isDark -> Color.White.copy(alpha = 0.2f)
-                                        else -> Color(0xFFC0C0C0)
+                                    val dotColor = if (isActive) {
+                                        chromeContentColor
+                                    } else {
+                                        chromeContentColor.copy(alpha = 0.45f)
                                     }
 
                                     val animatedWidth by animateDpAsState(targetValue = if (isActive) 18.dp else 8.dp, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow), label = "pillWidth")

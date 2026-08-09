@@ -187,12 +187,7 @@
     <string name="settings_reset_warning_title">Warning</string>
     <string name="settings_reset_warning_desc">Are you sure you want to restore default settings? This will delete all settings you have made in the app.</string>
     <string name="settings_navigation_mode_title">Navigation mode in settings</string>
-    <string name="settings_navigation_mode_scroll">Continuous scroll</string>
-    <string name="settings_navigation_mode_pages">Page system</string>
-    <string name="settings_navigation_style_title">Navigation style</string>
-    <string name="settings_navigation_scroll_title">Scrolling</string>
     <string name="settings_navigation_scroll_desc">All options on one page</string>
-    <string name="settings_navigation_pages_title">Pages</string>
     <string name="settings_navigation_pages_desc">Sections home, then one category at a time</string>
     <string name="settings_display_style_title">Display Style</string>
     <string name="settings_simple_mode_title">Simple mode</string>
@@ -2627,4 +2622,9 @@
     <string name="appstrings_release_v2016_share_frequency_pages">A busy station is now shared across as many numbered images as needed, instead of two</string>
     <string name="appstrings_release_v2016_share_many_bands_hint">When the images pile up, the app suggests the PDF report, which keeps everything in a single readable file</string>
     <string name="appstrings_release_v2016_photo_orientation">Uploaded photos always come out upright: the rotation is baked into the pixels, instead of relying on metadata the recipient ignores</string>
+
+    <!-- Release notes 2.0.17 -->
+    <string name="appstrings_release_v2017_split_auto">Split view now follows the real window size: active on tablets and unfolded foldables, it collapses on its own when you close the device, without a restart</string>
+    <string name="appstrings_release_v2017_split_all_devices">Every foldable and every tablet benefits, instead of a short list of recognised models</string>
+    <string name="appstrings_release_v2017_nav_style_removed">The “Navigation style” setting is gone; if you prefer full screen, that choice is still available and always wins</string>
 </resources>

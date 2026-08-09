@@ -83,7 +83,7 @@ fun ExternalLinksSettingsSheet(
     val cardShape = if (useOneUi) RoundedCornerShape(sizing.component(24.dp)) else RoundedCornerShape(sizing.component(12.dp))
     val cardBorder = if (useOneUi) null else BorderStroke(sizing.component(1.dp), MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
     val bubbleColor = if (useOneUi) {
-        if (isDark) Color(0xFF212121) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f)
+        if (isDark) Color(0xFF212121) else MaterialTheme.colorScheme.surfaceVariant
     } else {
         MaterialTheme.colorScheme.surface
     }

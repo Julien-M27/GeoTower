@@ -74,8 +74,20 @@ object AppConfig {
     var isBlurEnabled = mutableStateOf(true)
     var colorPalette = mutableStateOf(DEFAULT_COLOR_PALETTE)
     var appLogoDrawingChoice = mutableStateOf(AppLogoDrawingResources.AUTO)
-    // 0 = Plein écran, 1 = Fractionné
-    var displayStyle = mutableIntStateOf(0)
+
+    // Style d'affichage des fiches : plein écran, ou fractionné (le contexte reste à gauche, le
+    // détail s'ouvre à droite). Tant que l'utilisateur n'a rien choisi dans les réglages, on reste
+    // sur AUTO, qui suit la taille de la fenêtre — cf. [splitDisplayEnabled].
+    const val PREF_DISPLAY_STYLE = "display_style"
+    const val DISPLAY_STYLE_AUTO = -1
+    const val DISPLAY_STYLE_FULL_SCREEN = 0
+    const val DISPLAY_STYLE_SPLIT = 1
+
+    // Seuil « grand écran » de l'app, aligné sur celui des mises en page à deux volets
+    // (ResponsiveDualPaneLayout, accueil, réglages).
+    const val LARGE_SCREEN_MIN_DIMENSION_DP = 600
+
+    var displayStyle = mutableIntStateOf(DISPLAY_STYLE_AUTO)
 
     // Taille de l'interface, en pourcentage (100 = rendu de reference "normal" historique).
     // Le facteur d'ecran est applique par-dessus dans GeoTowerUiStyle (dimensionnement adaptatif).
@@ -539,7 +551,24 @@ object AppConfig {
      * Style d'affichage effectif. Le mode simplifié impose le plein écran : les fiches y sont déjà
      * fusionnées, garder en plus le volet fractionné ferait un troisième comportement à maintenir.
      */
-    fun effectiveDisplayStyle(): Int = if (simpleModeActive()) 0 else displayStyle.intValue
+    fun effectiveDisplayStyle(): Int =
+        if (simpleModeActive()) DISPLAY_STYLE_FULL_SCREEN else displayStyle.intValue
+
+    /** Fold déplié, tablette : la fenêtre est assez grande pour une mise en page à deux volets. */
+    fun isLargeScreenDimension(smallestDimensionDp: Int): Boolean =
+        smallestDimensionDp >= LARGE_SCREEN_MIN_DIMENSION_DP
+
+    /**
+     * Deux volets réellement applicables, à ne PAS confondre avec le réglage : le fractionné suppose
+     * de la place. Sur une fenêtre étroite — téléphone, écran de couverture d'un fold replié,
+     * multi-fenêtre — deux colonnes à 50 % seraient illisibles, donc on reste en plein écran quoi
+     * qu'ait choisi l'utilisateur (le réglage n'est d'ailleurs proposé que sur grand écran).
+     *
+     * [smallestDimensionDp] est la plus petite dimension de la fenêtre : la rotation ne doit rien
+     * changer, seul le pliage ou le redimensionnement compte.
+     */
+    fun splitDisplayEnabled(style: Int, smallestDimensionDp: Int): Boolean =
+        style != DISPLAY_STYLE_FULL_SCREEN && isLargeScreenDimension(smallestDimensionDp)
 
     /** Applique un choix de mode simplifié : état en mémoire + persistance. */
     fun setSimpleMode(context: Context, enabled: Boolean) {
@@ -584,17 +613,9 @@ object AppConfig {
         appLogoDrawingChoice.value = AppLogoDrawingResources.normalize(
             prefs.getString(AppLogoDrawingResources.PREF_KEY, AppLogoDrawingResources.AUTO)
         )
-        val model = DeviceProfile.model
-        val device = DeviceProfile.device
-
-        AppLogger.d("GeoTower", "Fold device detection model=$model device=$device")
-
         //Statut
         shareSiteStatus.value = prefs.getBoolean("share_site_status", true)
         shareSiteSpeedtest.value = prefs.getBoolean("share_site_speedtest", true) // 🚨 NEW
-
-        // Si c'est un Z Fold OU un Pixel Fold, la valeur par défaut est 1 (Fractionné), sinon 0 (Plein écran)
-        val defaultDisplayStyle = if (DeviceProfile.prefersSplitDisplay) 1 else 0
 
         // Suivi live (clé historique conservée)
         enableLiveTracking.value = prefs.getBoolean(PREF_ENABLE_LIVE_TRACKING, false)
@@ -611,8 +632,11 @@ object AppConfig {
         // Mode simplifié (carte au lancement, tiroir latéral, fiches fusionnées).
         simpleMode.value = prefs.getBoolean(PREF_SIMPLE_MODE, false)
 
-        // ✅ CHARGEMENT DU STYLE D'AFFICHAGE (avec la nouvelle valeur par défaut)
-        displayStyle.intValue = prefs.getInt("display_style", defaultDisplayStyle)
+        // Style d'affichage : on ne relit QUE le choix explicite. Sans choix, on reste sur AUTO, et
+        // c'est [splitDisplayEnabled] qui tranche à l'affichage — fractionné dès que la fenêtre est
+        // assez grande (fold déplié, tablette), plein écran sinon. Cette valeur n'est donc plus liée
+        // à un modèle d'appareil, et elle suit le pliage sans redémarrage.
+        displayStyle.intValue = prefs.getInt(PREF_DISPLAY_STYLE, DISPLAY_STYLE_AUTO)
 
         // --- CHARGEMENT DES UNITÉS ---
         distanceUnit.intValue = prefs.getInt("distance_unit", 0)

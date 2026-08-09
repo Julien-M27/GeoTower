@@ -187,12 +187,7 @@
     <string name="settings_reset_warning_title">Aviso</string>
     <string name="settings_reset_warning_desc">Tem a certeza de que pretende restaurar as configurações padrão? Isto eliminará todas as configurações feitas na aplicação.</string>
     <string name="settings_navigation_mode_title">Modo de navegação nas configurações</string>
-    <string name="settings_navigation_mode_scroll">Deslocamento contínuo</string>
-    <string name="settings_navigation_mode_pages">Sistema de páginas</string>
-    <string name="settings_navigation_style_title">Estilo de navegação</string>
-    <string name="settings_navigation_scroll_title">Rolagem</string>
     <string name="settings_navigation_scroll_desc">Todas as opções numa página</string>
-    <string name="settings_navigation_pages_title">Páginas</string>
     <string name="settings_navigation_pages_desc">Início por secções, depois uma categoria de cada vez</string>
     <string name="settings_display_style_title">Estilo de exibição</string>
     <string name="settings_simple_mode_title">Modo simplificado</string>
@@ -2627,4 +2622,9 @@
     <string name="appstrings_release_v2016_share_frequency_pages">Uma estação muito carregada passa a ser partilhada em tantas imagens numeradas quantas forem necessárias, em vez de duas</string>
     <string name="appstrings_release_v2016_share_many_bands_hint">Quando as imagens se multiplicam, a aplicação sugere o relatório PDF, que mantém tudo num único ficheiro legível</string>
     <string name="appstrings_release_v2016_photo_orientation">As fotos enviadas saem sempre direitas: a rotação é gravada nos píxeis, em vez de depender de metadados que o destinatário ignora</string>
+
+    <!-- Notas da versão 2.0.17 -->
+    <string name="appstrings_release_v2017_split_auto">A vista dividida passa a seguir o tamanho real da janela: ativa em tablets e dobráveis abertos, recolhe sozinha quando fecha o dispositivo, sem reiniciar</string>
+    <string name="appstrings_release_v2017_split_all_devices">Beneficiam todos os dobráveis e todos os tablets, em vez de uma lista curta de modelos reconhecidos</string>
+    <string name="appstrings_release_v2017_nav_style_removed">A definição «Estilo de navegação» desaparece; se preferir o ecrã inteiro, essa escolha continua disponível e prevalece sempre</string>
 </resources>

@@ -127,6 +127,8 @@ fun SharedMiniMapCard(
     val showAzimuthLines by AppConfig.showAzimuths
     val showAzimuthCones by AppConfig.showAzimuthsCone
     val shouldInvertColors = (mapProvider == 0 && ignStyle == 1)
+    // Sur orthophoto seulement, le marqueur est cerné d'un liseré de contraste (cf. MapUtils).
+    val satelliteMarkerContrast = MapUtils.isSatelliteBasemap(effectiveProvider, ignStyle)
     var currentZoom by remember(initialZoom) { mutableDoubleStateOf(initialZoom) }
     var lastFitSelectedPointRequest by remember { mutableIntStateOf(fitSelectedPointRequest) }
     var viewMode by remember(defaultViewMode, centerLat, centerLon) { mutableStateOf(defaultViewMode) }
@@ -328,6 +330,7 @@ fun SharedMiniMapCard(
                     marker.radioMarkers = radioMarkers
                     marker.showAzimuthLines = showAzimuthLines
                     marker.showAzimuthCones = showAzimuthCones
+                    marker.satelliteContrast = satelliteMarkerContrast
 
                     val hasOperatorMarkerColors = mappedAntennas.any { antenna ->
                         OperatorColors.keysFor(antenna.operateur).isNotEmpty()
@@ -349,7 +352,8 @@ fun SharedMiniMapCard(
                             mappedAntennas,
                             false,
                             focusOperator ?: AppConfig.defaultOperator.value,
-                            inactiveOperatorKeys
+                            inactiveOperatorKeys,
+                            satelliteMarkerContrast
                         )
                     }
 
@@ -862,6 +866,12 @@ class MiniMapAntennaMarker(
     private val ptCenter = android.graphics.Point()
     private val inactiveOperatorColor = android.graphics.Color.rgb(196, 199, 204)
 
+    // Débord du liseré de contraste (fond satellite seulement), de part et d'autre du trait
+    // ou de la pastille. Les azimuts estompés (opérateur non consulté) n'en reçoivent pas :
+    // un liseré opaque sous un trait à 27 % d'opacité annulerait justement l'estompage.
+    private val outlineWidthPx = 1.2f * density
+    private val thinOutlineWidthPx = 0.9f * density // pastilles FH et bords de cône : liseré plus fin
+
     // Cache pour les pinceaux de couleur
     private val dotPaints = mutableMapOf<Int, android.graphics.Paint>()
     private fun getDotPaint(colorInt: Int): android.graphics.Paint {
@@ -873,6 +883,16 @@ class MiniMapAntennaMarker(
         }
     }
 
+    private val dotOutlinePaints = mutableMapOf<Int, android.graphics.Paint>()
+    private fun getDotOutlinePaint(colorInt: Int): android.graphics.Paint {
+        return dotOutlinePaints.getOrPut(colorInt) {
+            android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                style = android.graphics.Paint.Style.FILL
+                color = MapUtils.contrastOutlineColor(colorInt)
+            }
+        }
+    }
+
     private class GroupedAzimuthData(
         val azimuth: Float,
         val cos: Float,
@@ -880,7 +900,9 @@ class MiniMapAntennaMarker(
         val linePaint: android.graphics.Paint,
         val conePaint: android.graphics.Paint?,
         val coneEdgePaint: android.graphics.Paint?,
-        val dotColors: List<Int>
+        val dotColors: List<Int>,
+        val lineOutlinePaint: android.graphics.Paint? = null, // liseré de contraste (satellite)
+        val coneEdgeOutlinePaint: android.graphics.Paint? = null
     )
 
     private val precalculatedMobileAzimuths = mutableListOf<GroupedAzimuthData>()
@@ -947,8 +969,32 @@ class MiniMapAntennaMarker(
     var showAzimuthLines: Boolean = AppConfig.showAzimuths.value
     var showAzimuthCones: Boolean = AppConfig.showAzimuthsCone.value
 
+    /** Fond orthophoto : les traits sont doublés d'un liseré. Change les pinceaux, donc recalcul. */
+    var satelliteContrast: Boolean = false
+        set(value) {
+            if (field == value) return
+            field = value
+            recalculateAzimuths()
+        }
+
     init {
         recalculateAzimuths()
+    }
+
+    private fun outlinePaintFor(
+        sourcePaint: android.graphics.Paint,
+        baseColor: Int,
+        widthPx: Float = outlineWidthPx
+    ): android.graphics.Paint {
+        return android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            style = android.graphics.Paint.Style.STROKE
+            color = MapUtils.contrastOutlineColor(baseColor)
+            strokeWidth = sourcePaint.strokeWidth + 2f * widthPx
+            strokeCap = android.graphics.Paint.Cap.ROUND
+            // Le liseré d'un trait pointillé doit reprendre le MÊME pointillé, sinon il
+            // apparaîtrait comme un trait plein sous les tirets de couleur.
+            pathEffect = sourcePaint.pathEffect
+        }
     }
 
     private fun recalculateAzimuths() {
@@ -1028,7 +1074,21 @@ class MiniMapAntennaMarker(
                 strokeCap = android.graphics.Paint.Cap.ROUND
             }
 
-            precalculatedMobileAzimuths.add(GroupedAzimuthData(az, cos, sin, linePaint, conePaint, coneEdgePaint, dotColors))
+            // Le remplissage du cône reste tel quel (voile translucide, on ne peut pas le cerner
+            // sans le déformer) : ce sont ses deux bords qu'on souligne.
+            val lineOutlinePaint = if (satelliteContrast && !isMuted) outlinePaintFor(linePaint, mainColor) else null
+            val coneEdgeOutlinePaint = if (satelliteContrast && !isMuted) {
+                outlinePaintFor(coneEdgePaint, mainColor, thinOutlineWidthPx)
+            } else {
+                null
+            }
+
+            precalculatedMobileAzimuths.add(
+                GroupedAzimuthData(
+                    az, cos, sin, linePaint, conePaint, coneEdgePaint, dotColors,
+                    lineOutlinePaint, coneEdgeOutlinePaint
+                )
+            )
         }
 
         angleToOperatorsFh.forEach { (az, operatorKeys) ->
@@ -1051,7 +1111,11 @@ class MiniMapAntennaMarker(
                 pathEffect = android.graphics.DashPathEffect(floatArrayOf(5f * density, 5f * density), 0f)
             }
 
-            precalculatedFhAzimuths.add(GroupedAzimuthData(az, cos, sin, dashedPaint, null, null, dotColors))
+            val dashedOutlinePaint = if (satelliteContrast && !isMuted) outlinePaintFor(dashedPaint, mainColor) else null
+
+            precalculatedFhAzimuths.add(
+                GroupedAzimuthData(az, cos, sin, dashedPaint, null, null, dotColors, dashedOutlinePaint)
+            )
         }
 
         angleToRadioKinds.forEach { (az, kindsSet) ->
@@ -1069,8 +1133,10 @@ class MiniMapAntennaMarker(
                 strokeCap = android.graphics.Paint.Cap.ROUND
             }
 
+            val radioOutlinePaint = if (satelliteContrast) outlinePaintFor(radioPaint, mainColor) else null
+
             precalculatedRadioAzimuths.add(
-                GroupedAzimuthData(az, cos, sin, radioPaint, null, null, dotColors)
+                GroupedAzimuthData(az, cos, sin, radioPaint, null, null, dotColors, radioOutlinePaint)
             )
         }
     }
@@ -1113,6 +1179,9 @@ class MiniMapAntennaMarker(
                 if (showCones && data.conePaint != null) {
                     val startAngle = data.azimuth - 90f - 35f
                     canvas.drawArc(rectF, startAngle, 70f, true, data.conePaint)
+                    data.coneEdgeOutlinePaint?.let { outlinePaint ->
+                        drawConeEdgeLines(canvas, data.azimuth, circleOffsetPx, totalRadiusPx, outlinePaint)
+                    }
                     data.coneEdgePaint?.let { edgePaint ->
                         drawConeEdgeLines(canvas, data.azimuth, circleOffsetPx, totalRadiusPx, edgePaint)
                     }
@@ -1124,7 +1193,22 @@ class MiniMapAntennaMarker(
                     val endX = ptCenter.x + totalRadiusPx * data.cos
                     val endY = ptCenter.y + totalRadiusPx * data.sin
 
+                    data.lineOutlinePaint?.let { canvas.drawLine(startX, startY, endX, endY, it) }
                     canvas.drawLine(startX, startY, endX, endY, data.linePaint)
+
+                    // Les pastilles se touchent (écart = un diamètre) : on pose TOUS les liserés
+                    // d'abord, sinon celui d'une pastille rognerait la couleur de la précédente.
+                    if (data.lineOutlinePaint != null) {
+                        data.dotColors.forEachIndexed { index, colorInt ->
+                            val offsetMag = index * gapMobile
+                            canvas.drawCircle(
+                                endX + (data.cos * offsetMag),
+                                endY + (data.sin * offsetMag),
+                                pointRadius + outlineWidthPx,
+                                getDotOutlinePaint(colorInt)
+                            )
+                        }
+                    }
 
                     // Alignement des points dans le prolongement
                     data.dotColors.forEachIndexed { index, colorInt ->
@@ -1145,7 +1229,20 @@ class MiniMapAntennaMarker(
                     val endX = ptCenter.x + totalRadiusPx * data.cos
                     val endY = ptCenter.y + totalRadiusPx * data.sin
 
+                    data.lineOutlinePaint?.let { canvas.drawLine(startX, startY, endX, endY, it) }
                     canvas.drawLine(startX, startY, endX, endY, data.linePaint)
+
+                    if (data.lineOutlinePaint != null) {
+                        data.dotColors.forEachIndexed { index, colorInt ->
+                            val offsetMag = index * gapFh
+                            canvas.drawCircle(
+                                endX + (data.cos * offsetMag),
+                                endY + (data.sin * offsetMag),
+                                fhRadius + thinOutlineWidthPx,
+                                getDotOutlinePaint(colorInt)
+                            )
+                        }
+                    }
 
                     data.dotColors.forEachIndexed { index, colorInt ->
                         val offsetMag = index * gapFh
@@ -1166,7 +1263,20 @@ class MiniMapAntennaMarker(
                     val endX = ptCenter.x + totalRadiusPx * data.cos
                     val endY = ptCenter.y + totalRadiusPx * data.sin
 
+                    data.lineOutlinePaint?.let { canvas.drawLine(startX, startY, endX, endY, it) }
                     canvas.drawLine(startX, startY, endX, endY, data.linePaint)
+
+                    if (data.lineOutlinePaint != null) {
+                        data.dotColors.forEachIndexed { index, colorInt ->
+                            val offsetMag = index * radioGap
+                            canvas.drawCircle(
+                                endX + (data.cos * offsetMag),
+                                endY + (data.sin * offsetMag),
+                                radioRadius + outlineWidthPx,
+                                getDotOutlinePaint(colorInt)
+                            )
+                        }
+                    }
 
                     data.dotColors.forEachIndexed { index, colorInt ->
                         val offsetMag = index * radioGap

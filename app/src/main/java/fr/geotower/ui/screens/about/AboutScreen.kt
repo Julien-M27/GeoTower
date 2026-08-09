@@ -155,7 +155,7 @@ fun AboutScreen(navController: NavController) {
 
     // Couleur des bulles/cartes selon le mode (One UI utilise un gris anthracite en sombre)
     val bubbleBaseColor = if (useOneUi) {
-        if (isDark) Color(0xFF212121) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f)
+        if (isDark) Color(0xFF212121) else MaterialTheme.colorScheme.surfaceVariant
     } else {
         MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f) // Style classique
     }

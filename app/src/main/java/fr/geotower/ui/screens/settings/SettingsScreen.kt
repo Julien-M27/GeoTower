@@ -925,7 +925,6 @@ fun SettingsScreen(
             entry(context.getString(R.string.appearance_in_app_logo_title), "logo dessin drawing application interne", SECTION_APPEARANCE) { showLogoDrawingSheet = true }
             entry(context.getString(R.string.appearance_menu_size_title), "taille menu size police texte echelle zoom", SECTION_APPEARANCE)
             if (isWideScreen) {
-                entry(context.getString(R.string.settings_navigation_mode_title), "navigation mode defilement pages scroll mise en page", SECTION_APPEARANCE)
                 entry(context.getString(R.string.settings_display_style_title), "affichage display plein ecran split divise tablette", SECTION_APPEARANCE)
             }
 
@@ -1479,8 +1478,6 @@ fun SettingsScreen(
                             } else if (isAllInOnePage) {
                                 AllSettingsContent(
                                     isWide = isExpanded,
-                                    nav = navMode,
-                                    onNav = { setNavMode(it) },
                                     theme = themeMode,
                                     onTheme = { themeMode = it; prefs.edit().putInt("theme_mode", it).apply() },
                                     oled = isOledMode,
@@ -1581,9 +1578,7 @@ fun SettingsScreen(
                                         useOneUi,
                                         safeClick,
                                         { showColorPalettePage = true },
-                                        isWide = isExpanded,
-                                        nav = navMode,
-                                        onNav = { setNavMode(it) }
+                                        isWide = isExpanded
                                     )
                                     SECTION_MAPPING -> SectionCartographie(
                                         mapProvider,
@@ -2576,7 +2571,7 @@ fun SectionTitle(title: String) {
 
 @Composable
 fun AllSettingsContent(
-    isWide: Boolean, nav: Int, onNav: (Int) -> Unit, theme: Int, onTheme: (Int) -> Unit, oled: Boolean, onOled: (Boolean) -> Unit, oneUi: Boolean, onOneUi: (Boolean) -> Unit, blur: Boolean, onBlur: (Boolean) -> Unit, logo: Int, onIcon: () -> Unit, onLogoDrawing: () -> Unit, op: String, onOp: () -> Unit, lang: String, onLang: () -> Unit,
+    isWide: Boolean, theme: Int, onTheme: (Int) -> Unit, oled: Boolean, onOled: (Boolean) -> Unit, oneUi: Boolean, onOneUi: (Boolean) -> Unit, blur: Boolean, onBlur: (Boolean) -> Unit, logo: Int, onIcon: () -> Unit, onLogoDrawing: () -> Unit, op: String, onOp: () -> Unit, lang: String, onLang: () -> Unit,
     onUnitSettings: () -> Unit,
     pagesActions: PagesSectionActions,
     showPagesSection: Boolean,
@@ -2619,7 +2614,7 @@ fun AllSettingsContent(
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
     Column(modifier = appearanceSectionModifier.fillMaxWidth()) {
-        SectionApparence(theme, onTheme, oled, onOled, oneUi, onOneUi, blur, onBlur, logo, onIcon, onLogoDrawing, shape, border, bubbleColor, useOneUi, safeClick, onColorPaletteClick, isWide = isWide, nav = nav, onNav = onNav)
+        SectionApparence(theme, onTheme, oled, onOled, oneUi, onOneUi, blur, onBlur, logo, onIcon, onLogoDrawing, shape, border, bubbleColor, useOneUi, safeClick, onColorPaletteClick, isWide = isWide)
     }
     Spacer(Modifier.height(sizing.spacing(32.dp)))
     Column(modifier = mappingSectionModifier.fillMaxWidth()) {
@@ -2693,11 +2688,8 @@ fun SectionApparence(
     logo: Int, onIcon: () -> Unit, onLogoDrawing: () -> Unit,
     shape: Shape, border: BorderStroke?, bubbleColor: Color, useOneUi: Boolean, safeClick: SafeClick,
     onColorPaletteClick: () -> Unit,
-    // Mise en page des réglages : réservée aux grands écrans. Les téléphones basculent
-    // « par sections » / « page unique » depuis la barre du haut.
-    isWide: Boolean = false,
-    nav: Int = 0,
-    onNav: (Int) -> Unit = {}
+    // Grand écran : la réinitialisation est déjà dans la barre latérale, on ne la répète pas ici.
+    isWide: Boolean = false
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val prefs = context.getSharedPreferences(PreferenceStores.APP, android.content.Context.MODE_PRIVATE)
@@ -2709,7 +2701,10 @@ fun SectionApparence(
     val isOledMode by AppConfig.isOledMode
     val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
     val logoDrawingRes = AppLogoDrawingResources.resolve(logoDrawingChoice, logo, isDark)
-    var displayStyle by remember { mutableIntStateOf(prefs.getInt("display_style", 0)) }
+    // État partagé, pas la préférence brute : sans choix explicite on est en AUTO, et cette carte
+    // n'est visible que sur grand écran — donc AUTO s'y lit « Fractionné », ce qui est bien ce que
+    // l'utilisateur a sous les yeux.
+    val isFullScreenStyle = AppConfig.displayStyle.intValue == AppConfig.DISPLAY_STYLE_FULL_SCREEN
     var showDisplayStylesSheet by remember { mutableStateOf(false) }
 
     SectionTitle(stringResource(R.string.settings_section_appearance))
@@ -2736,58 +2731,21 @@ fun SectionApparence(
     // Le mode simplifié n'est plus ici : il change toute la navigation de l'app, il est donc
     // présenté en tête des réglages (cf. SimpleModeSettingsCard), au-dessus des sections.
 
-    // --- MISE EN PAGE DES RÉGLAGES (grands écrans) ---
-    if (isWide) {
-        Spacer(Modifier.height(sizing.spacing(12.dp)))
-        var showModeSheet by remember { mutableStateOf(false) }
-        val cardBg = if (useOneUi) bubbleColor else Color.Transparent
-        Surface(onClick = { showModeSheet = true }, modifier = Modifier.fillMaxWidth(), shape = shape, border = border, color = cardBg) {
-            Row(modifier = Modifier.padding(sizing.spacing(16.dp)), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.settings_navigation_mode_title), style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.Bold)
-                    Text(if (nav == 0) stringResource(R.string.settings_navigation_mode_scroll) else stringResource(R.string.settings_navigation_mode_pages), style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Icon(Icons.Default.UnfoldMore, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-        if (showModeSheet) {
-            val modeScrollState = rememberScrollState()
-            ModalBottomSheet(
-                onDismissRequest = { showModeSheet = false },
-                containerColor = sheetBgColor
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .settingsPopupFadingEdge(modeScrollState)
-                        .verticalScroll(modeScrollState)
-                        .padding(bottom = sizing.spacing(48.dp), start = sizing.spacing(24.dp), end = sizing.spacing(24.dp))
-                ) {
-                    Text(stringResource(R.string.settings_navigation_style_title), style = sizing.textStyle(MaterialTheme.typography.titleLarge), fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(sizing.spacing(16.dp)))
-                    NavigationModeOption(stringResource(R.string.settings_navigation_scroll_title), stringResource(R.string.settings_navigation_scroll_desc), nav == 0, useOneUi) {
-                        onNav(0)
-                        showModeSheet = false
-                    }
-                    Spacer(Modifier.height(sizing.spacing(12.dp)))
-                    NavigationModeOption(stringResource(R.string.settings_navigation_pages_title), stringResource(R.string.settings_navigation_pages_desc), nav == 1, useOneUi) {
-                        onNav(1)
-                        showModeSheet = false
-                    }
-                }
-            }
-        }
-    }
+    // Plus de carte « Mode de navigation » ici : le même réglage (nav_mode) se change déjà d'un
+    // appui depuis l'en-tête des grands écrans et depuis le bouton de bas de page unique, exactement
+    // comme le bouton de la barre du haut sur téléphone. Trois entrées pour un interrupteur, c'était
+    // deux de trop.
 
-    // Style d'affichage plein écran / fractionné : uniquement sur grand écran réel.
-    if (minOf(configuration.screenWidthDp, configuration.screenHeightDp) >= 600) {
+    // Style d'affichage plein écran / fractionné : uniquement sur grand écran réel — c'est le même
+    // seuil qui décide de l'affichage lui-même, donc le réglage n'apparaît que là où il agit.
+    if (AppConfig.isLargeScreenDimension(minOf(configuration.screenWidthDp, configuration.screenHeightDp))) {
         Spacer(Modifier.height(sizing.spacing(12.dp)))
         val cardBg = if (useOneUi) bubbleColor else Color.Transparent
         Surface(onClick = { safeClick("display_styles_sheet") { showDisplayStylesSheet = true } }, modifier = Modifier.fillMaxWidth(), shape = shape, border = border, color = cardBg) {
             Row(modifier = Modifier.padding(sizing.spacing(16.dp)), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(stringResource(R.string.settings_display_style_title), style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.Bold)
-                    Text(if (displayStyle == 0) stringResource(R.string.settings_display_fullscreen_title) else stringResource(R.string.settings_display_split_title), style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(if (isFullScreenStyle) stringResource(R.string.settings_display_fullscreen_title) else stringResource(R.string.settings_display_split_title), style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Icon(Icons.Default.UnfoldMore, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -2816,12 +2774,11 @@ fun SectionApparence(
                     NavigationModeOption(
                         title = stringResource(R.string.settings_display_fullscreen_title),
                         desc = stringResource(R.string.settings_display_fullscreen_desc),
-                        isSelected = displayStyle == 0,
+                        isSelected = isFullScreenStyle,
                         useOneUi = useOneUi,
                         onClick = {
-                            displayStyle = 0
-                            prefs.edit().putInt("display_style", 0).apply()
-                            AppConfig.displayStyle.intValue = 0
+                            prefs.edit().putInt(AppConfig.PREF_DISPLAY_STYLE, AppConfig.DISPLAY_STYLE_FULL_SCREEN).apply()
+                            AppConfig.displayStyle.intValue = AppConfig.DISPLAY_STYLE_FULL_SCREEN
                             showDisplayStylesSheet = false
                         }
                     )
@@ -2831,12 +2788,11 @@ fun SectionApparence(
                     NavigationModeOption(
                         title = stringResource(R.string.settings_display_split_title),
                         desc = stringResource(R.string.settings_display_split_desc),
-                        isSelected = displayStyle == 1,
+                        isSelected = !isFullScreenStyle,
                         useOneUi = useOneUi,
                         onClick = {
-                            displayStyle = 1
-                            prefs.edit().putInt("display_style", 1).apply()
-                            AppConfig.displayStyle.intValue = 1
+                            prefs.edit().putInt(AppConfig.PREF_DISPLAY_STYLE, AppConfig.DISPLAY_STYLE_SPLIT).apply()
+                            AppConfig.displayStyle.intValue = AppConfig.DISPLAY_STYLE_SPLIT
                             showDisplayStylesSheet = false
                         }
                     )

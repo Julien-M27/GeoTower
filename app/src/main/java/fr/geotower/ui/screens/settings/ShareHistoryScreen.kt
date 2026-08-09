@@ -202,7 +202,7 @@ fun ShareHistoryScreen(
     val isDark = themeMode == 2 || (themeMode == 0 && isSystemInDarkTheme())
     val pageColor = if (isDark && isOled) Color.Black else MaterialTheme.colorScheme.background
     val cardColor = if (AppConfig.useOneUiDesign) {
-        if (isDark) Color(0xFF212121) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f)
+        if (isDark) Color(0xFF212121) else MaterialTheme.colorScheme.surfaceVariant
     } else {
         MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
     }

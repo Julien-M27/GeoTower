@@ -187,12 +187,7 @@
     <string name="settings_reset_warning_title">Atención</string>
     <string name="settings_reset_warning_desc">¿Seguro que quieres restaurar los ajustes predeterminados? Esto eliminará todos los ajustes que has hecho en la app.</string>
     <string name="settings_navigation_mode_title">Modo de navegación en ajustes</string>
-    <string name="settings_navigation_mode_scroll">Desplazamiento continuo</string>
-    <string name="settings_navigation_mode_pages">Sistema por páginas</string>
-    <string name="settings_navigation_style_title">Estilo de navegación</string>
-    <string name="settings_navigation_scroll_title">Desplazamiento</string>
     <string name="settings_navigation_scroll_desc">Todas las opciones en una página</string>
-    <string name="settings_navigation_pages_title">Páginas</string>
     <string name="settings_navigation_pages_desc">Inicio por secciones, luego una categoría cada vez</string>
     <string name="settings_display_style_title">Estilo de visualización</string>
     <string name="settings_simple_mode_title">Modo simplificado</string>
@@ -2627,4 +2622,9 @@
     <string name="appstrings_release_v2016_share_frequency_pages">Una estación cargada se comparte ahora en tantas imágenes numeradas como haga falta, en lugar de dos</string>
     <string name="appstrings_release_v2016_share_many_bands_hint">Cuando las imágenes se multiplican, la aplicación sugiere el informe PDF, que lo mantiene todo en un único archivo legible</string>
     <string name="appstrings_release_v2016_photo_orientation">Las fotos enviadas salen siempre derechas: la rotación se aplica a los píxeles, en vez de depender de unos metadatos que el destinatario ignora</string>
+
+    <!-- Notas de la versión 2.0.17 -->
+    <string name="appstrings_release_v2017_split_auto">La vista dividida sigue ahora el tamaño real de la ventana: activa en tabletas y plegables abiertos, se repliega sola al cerrar el dispositivo, sin reiniciar</string>
+    <string name="appstrings_release_v2017_split_all_devices">Se benefician todos los plegables y todas las tabletas, en lugar de una lista corta de modelos reconocidos</string>
+    <string name="appstrings_release_v2017_nav_style_removed">El ajuste «Estilo de navegación» desaparece; si prefieres la pantalla completa, esa opción sigue disponible y siempre prevalece</string>
 </resources>

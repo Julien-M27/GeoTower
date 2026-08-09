@@ -1448,6 +1448,8 @@ fun MapScreen(
 
     val ignStyle by AppConfig.ignStyle
     val shouldInvertColors = ((mapProvider == 0 || mapProvider == 1) && ignStyle == 1)
+    // Sur orthophoto seulement, les marqueurs sont cernés d'un liseré de contraste (cf. MapUtils).
+    val satelliteMarkerContrast = MapUtils.isSatelliteBasemap(effectiveProvider, ignStyle)
 
     var azimuth by remember { mutableFloatStateOf(0f) }
     val continuousAzimuth = remember { floatArrayOf(0f) }
@@ -2150,7 +2152,7 @@ fun MapScreen(
 
         fun addRadioAzimuthMarker(item: RadioMapMarker) {
             if (item.isCluster || item.azimuths.isEmpty()) return
-            val azimuthMarker = RadioMarker(map, item, showCircle = false).apply {
+            val azimuthMarker = RadioMarker(map, item, showCircle = false, satelliteContrast = satelliteMarkerContrast).apply {
                 position = GeoPoint(item.latitude, item.longitude)
                 setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
                 icon = MapUtils.createTransparentMarkerIcon(context)
@@ -2181,7 +2183,7 @@ fun MapScreen(
             members.forEach(::addRadioAzimuthMarker)
             if (!showRadioCircle) return@forEach
 
-            val marker = RadioMarker(map, item, showRadioCircle).apply {
+            val marker = RadioMarker(map, item, showRadioCircle, satelliteMarkerContrast).apply {
                 position = GeoPoint(item.latitude, item.longitude)
                 setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
                 icon = MapUtils.createRadioMarkerIcon(context, item.serviceMask, item.systemMask, item.clusterCount)
@@ -2307,7 +2309,7 @@ fun MapScreen(
                     }
 
                     ensureMapNotDisposed()
-                    AntennaMarker(map, filteredSiteAntennas, safePrimaryColor).apply {
+                    AntennaMarker(map, filteredSiteAntennas, safePrimaryColor, satelliteMarkerContrast).apply {
                         position = GeoPoint(mainAntenna.latitude, mainAntenna.longitude)
                         setAnchor(org.osmdroid.views.overlay.Marker.ANCHOR_CENTER, org.osmdroid.views.overlay.Marker.ANCHOR_CENTER)
 
@@ -2318,7 +2320,13 @@ fun MapScreen(
                             .distinct()
                         relatedObject = operatorsOnSite
 
-                        val baseIcon = MapUtils.createAdaptiveMarker(context, filteredSiteAntennas, false, AppConfig.defaultOperator.value)
+                        val baseIcon = MapUtils.createAdaptiveMarker(
+                            context,
+                            filteredSiteAntennas,
+                            false,
+                            AppConfig.defaultOperator.value,
+                            satelliteContrast = satelliteMarkerContrast
+                        )
 
                         if (isHs) {
                             icon = createHsMarkerIcon(context, baseIcon)
@@ -2358,7 +2366,13 @@ fun MapScreen(
                             showProjectSites = showProjectSites,
                             selectedOperatorKeys = selectedOperators
                         )
-                        icon = MapUtils.createClusterIcon(context, activeOps, count, AppConfig.defaultOperator.value)
+                        icon = MapUtils.createClusterIcon(
+                            context,
+                            activeOps,
+                            count,
+                            AppConfig.defaultOperator.value,
+                            satelliteMarkerContrast
+                        )
                         setOnMarkerClickListener { clickedMarker, m ->
                             val targetPoint = org.osmdroid.util.GeoPoint(clickedMarker.position.latitude, clickedMarker.position.longitude)
                             m.post { m.controller.stopAnimation(false); m.controller.setZoom(m.zoomLevelDouble + 1.5); m.controller.setCenter(targetPoint) }
@@ -2405,7 +2419,7 @@ fun MapScreen(
 
                     // Le marqueur UNIQUE (L'antenne)
                     ensureMapNotDisposed()
-                    AntennaMarker(map, filteredSiteAntennas, safePrimaryColor).apply {
+                    AntennaMarker(map, filteredSiteAntennas, safePrimaryColor, satelliteMarkerContrast).apply {
                         position = GeoPoint(mainAntenna.latitude, mainAntenna.longitude)
                         setAnchor(org.osmdroid.views.overlay.Marker.ANCHOR_CENTER, org.osmdroid.views.overlay.Marker.ANCHOR_CENTER)
 
@@ -2417,7 +2431,13 @@ fun MapScreen(
                         relatedObject = operatorsOnSite
 
                         // 1. On génère l'icône de base (avec la bordure de couleur de l'opérateur)
-                        val baseIcon = MapUtils.createAdaptiveMarker(context, filteredSiteAntennas, false, AppConfig.defaultOperator.value)
+                        val baseIcon = MapUtils.createAdaptiveMarker(
+                            context,
+                            filteredSiteAntennas,
+                            false,
+                            AppConfig.defaultOperator.value,
+                            satelliteContrast = satelliteMarkerContrast
+                        )
 
                         // 2. LOGIQUE DE FUSION : On vérifie TOUTES les antennes du pylône partagé !
                         if (isHs) {
@@ -2469,6 +2489,7 @@ fun MapScreen(
         sitesHs, // ✅ AJOUT ICI
         isMeasuringMode,
         safePrimaryColor,
+        satelliteMarkerContrast, // bascule plan <-> satellite : les icônes changent de liseré
         AppConfig.showAzimuths.value,
         AppConfig.showAzimuthsCone.value,
         PowerProfile.level, // mode faible conso : reconstruit + invalide (cônes/plafond/repère)
@@ -2506,7 +2527,7 @@ fun MapScreen(
         }
     }
 
-    LaunchedEffect(radioMarkers, filteredAntennas, AppConfig.radioMapCategoryMask(), isMeasuringMode) {
+    LaunchedEffect(radioMarkers, filteredAntennas, AppConfig.radioMapCategoryMask(), isMeasuringMode, satelliteMarkerContrast) {
         mapViewRef?.let { map ->
             updateRadioMarkers(map, radioMarkers)
         }
@@ -4718,11 +4739,16 @@ open class CustomLocationOverlay(
 class AntennaMarker(
     private val mapView: org.osmdroid.views.MapView,
     private val siteAntennas: List<LocalisationEntity>,
-    private val primaryColor: Int
+    private val primaryColor: Int,
+    private val satelliteContrast: Boolean = false
 ) : org.osmdroid.views.overlay.Marker(mapView) {
 
     private val density = mapView.context.resources.displayMetrics.density
     private val ptCenter = android.graphics.Point()
+
+    // Débord du liseré de contraste, de part et d'autre du trait ou de la pastille (satellite only).
+    private val outlineWidthPx = 1.2f * density
+    private val thinOutlineWidthPx = 0.9f * density // pastilles FH et bords de cône : liseré plus fin
 
     // 🚨 NOUVEAU : On redéfinit la HitBox pour qu'elle ignore les faisceaux et soit 100% ronde
     override fun hitTest(event: android.view.MotionEvent, mapView: org.osmdroid.views.MapView): Boolean {
@@ -4746,7 +4772,9 @@ class AntennaMarker(
         val linePaint: android.graphics.Paint,
         val conePaint: android.graphics.Paint?, // 🚨 NOUVEAU : Le pinceau translucide
         val coneEdgePaint: android.graphics.Paint?,
-        val dotColors: List<Int>
+        val dotColors: List<Int>,
+        val lineOutlinePaint: android.graphics.Paint? = null, // liseré de contraste (satellite)
+        val coneEdgeOutlinePaint: android.graphics.Paint? = null
     )
 
     private val precalculatedMobileAzimuths = mutableListOf<GroupedAzimuthData>()
@@ -4759,6 +4787,16 @@ class AntennaMarker(
             android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
                 style = android.graphics.Paint.Style.FILL
                 color = colorInt
+            }
+        }
+    }
+
+    private val dotOutlinePaints = mutableMapOf<Int, android.graphics.Paint>()
+    private fun getDotOutlinePaint(colorInt: Int): android.graphics.Paint {
+        return dotOutlinePaints.getOrPut(colorInt) {
+            android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                style = android.graphics.Paint.Style.FILL
+                color = MapUtils.contrastOutlineColor(colorInt)
             }
         }
     }
@@ -4829,6 +4867,19 @@ class AntennaMarker(
                 strokeCap = android.graphics.Paint.Cap.ROUND
             }
 
+            // Sur orthophoto, le trait est doublé d'un liseré peint dessous : sans lui, un azimut
+            // Free (gris) se perd dans le bitume et les toitures (cf. MapUtils.contrastOutlineColor).
+            val lineOutlinePaint = if (satelliteContrast) {
+                android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                    style = android.graphics.Paint.Style.STROKE
+                    color = MapUtils.contrastOutlineColor(mainColor)
+                    strokeWidth = 3.5f * density + 2f * outlineWidthPx
+                    strokeCap = android.graphics.Paint.Cap.ROUND
+                }
+            } else {
+                null
+            }
+
             // Le pinceau pour le cône (Alpha = 40/255, soit environ 15% d'opacité)
             val conePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
                 style = android.graphics.Paint.Style.FILL
@@ -4842,7 +4893,25 @@ class AntennaMarker(
                 strokeCap = android.graphics.Paint.Cap.ROUND
             }
 
-            precalculatedMobileAzimuths.add(GroupedAzimuthData(az, cos, sin, linePaint, conePaint, coneEdgePaint, sortedColors))
+            // Le remplissage du cône reste tel quel (c'est un voile à 20 %, on ne peut pas le
+            // cerner sans le déformer) : ce sont ses deux bords qu'on souligne.
+            val coneEdgeOutlinePaint = if (satelliteContrast) {
+                android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                    style = android.graphics.Paint.Style.STROKE
+                    color = MapUtils.contrastOutlineColor(mainColor)
+                    strokeWidth = 2.2f * density + 2f * thinOutlineWidthPx
+                    strokeCap = android.graphics.Paint.Cap.ROUND
+                }
+            } else {
+                null
+            }
+
+            precalculatedMobileAzimuths.add(
+                GroupedAzimuthData(
+                    az, cos, sin, linePaint, conePaint, coneEdgePaint, sortedColors,
+                    lineOutlinePaint, coneEdgeOutlinePaint
+                )
+            )
         }
 
         // Pareil pour les faisceaux hertziens (FH)
@@ -4863,8 +4932,24 @@ class AntennaMarker(
                 pathEffect = android.graphics.DashPathEffect(floatArrayOf(5f * density, 5f * density), 0f)
             }
 
+            // Le liseré reprend le MÊME pointillé, sinon il apparaîtrait comme un trait plein
+            // sous les tirets de couleur.
+            val dashedOutlinePaint = if (satelliteContrast) {
+                android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                    style = android.graphics.Paint.Style.STROKE
+                    color = MapUtils.contrastOutlineColor(mainColor)
+                    strokeWidth = 3f * density + 2f * outlineWidthPx
+                    strokeCap = android.graphics.Paint.Cap.ROUND
+                    pathEffect = android.graphics.DashPathEffect(floatArrayOf(5f * density, 5f * density), 0f)
+                }
+            } else {
+                null
+            }
+
             // On passe bien "az" et "null" (Pas de cône pour les FH)
-            precalculatedFhAzimuths.add(GroupedAzimuthData(az, cos, sin, dashedPaint, null, null, sortedColors))
+            precalculatedFhAzimuths.add(
+                GroupedAzimuthData(az, cos, sin, dashedPaint, null, null, sortedColors, dashedOutlinePaint)
+            )
         }
     }
 
@@ -4917,6 +5002,9 @@ class AntennaMarker(
                     // Pour un cône de 70°, on doit reculer de 35° pour que le centre du cône pointe sur l'azimut exact.
                     val startAngle = data.azimuth - 90f - 35f
                     canvas.drawArc(rectF, startAngle, 70f, true, data.conePaint)
+                    data.coneEdgeOutlinePaint?.let { outlinePaint ->
+                        drawConeEdgeLines(canvas, data.azimuth, circleOffsetPx, totalRadiusPx, outlinePaint)
+                    }
                     data.coneEdgePaint?.let { edgePaint ->
                         drawConeEdgeLines(canvas, data.azimuth, circleOffsetPx, totalRadiusPx, edgePaint)
                     }
@@ -4929,7 +5017,22 @@ class AntennaMarker(
                     val endX = ptCenter.x + totalRadiusPx * data.cos
                     val endY = ptCenter.y + totalRadiusPx * data.sin
 
+                    data.lineOutlinePaint?.let { canvas.drawLine(startX, startY, endX, endY, it) }
                     canvas.drawLine(startX, startY, endX, endY, data.linePaint)
+
+                    // Les pastilles se touchent (écart = un diamètre) : on pose TOUS les liserés
+                    // d'abord, sinon celui d'une pastille rognerait la couleur de la précédente.
+                    if (satelliteContrast) {
+                        data.dotColors.forEachIndexed { index, colorInt ->
+                            val offsetMag = index * gapMobile
+                            canvas.drawCircle(
+                                endX + (data.cos * offsetMag),
+                                endY + (data.sin * offsetMag),
+                                pointRadius + outlineWidthPx,
+                                getDotOutlinePaint(colorInt)
+                            )
+                        }
+                    }
 
                     data.dotColors.forEachIndexed { index, colorInt ->
                         val offsetMag = index * gapMobile
@@ -4949,7 +5052,20 @@ class AntennaMarker(
                     val endX = ptCenter.x + totalRadiusPx * data.cos
                     val endY = ptCenter.y + totalRadiusPx * data.sin
 
+                    data.lineOutlinePaint?.let { canvas.drawLine(startX, startY, endX, endY, it) }
                     canvas.drawLine(startX, startY, endX, endY, data.linePaint)
+
+                    if (satelliteContrast) {
+                        data.dotColors.forEachIndexed { index, colorInt ->
+                            val offsetMag = index * gapFh
+                            canvas.drawCircle(
+                                endX + (data.cos * offsetMag),
+                                endY + (data.sin * offsetMag),
+                                fhRadius + thinOutlineWidthPx,
+                                getDotOutlinePaint(colorInt)
+                            )
+                        }
+                    }
 
                     data.dotColors.forEachIndexed { index, colorInt ->
                         val offsetMag = index * gapFh
@@ -4989,7 +5105,8 @@ class AntennaMarker(
 class RadioMarker(
     private val mapView: org.osmdroid.views.MapView,
     private val radioMarker: RadioMapMarker,
-    private val showCircle: Boolean
+    private val showCircle: Boolean,
+    private val satelliteContrast: Boolean = false
 ) : org.osmdroid.views.overlay.Marker(mapView) {
 
     private data class RadioAzimuthLine(
@@ -5016,6 +5133,28 @@ class RadioMarker(
     private val dotPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
         style = android.graphics.Paint.Style.FILL
         color = androidx.core.graphics.ColorUtils.setAlphaComponent(this@RadioMarker.color, 230)
+    }
+
+    // Liseré de contraste sur fond satellite : les couleurs radio les plus sombres (FH bleu nuit,
+    // « autres » quasi noir) se perdent dans les ombres de l'orthophoto.
+    private val outlineWidthPx = 1.2f * density
+    private val lineOutlinePaint = if (satelliteContrast) {
+        android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            style = android.graphics.Paint.Style.STROKE
+            color = MapUtils.contrastOutlineColor(this@RadioMarker.color)
+            strokeWidth = 2.35f * density + 2f * outlineWidthPx
+            strokeCap = android.graphics.Paint.Cap.ROUND
+        }
+    } else {
+        null
+    }
+    private val dotOutlinePaint = if (satelliteContrast) {
+        android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            style = android.graphics.Paint.Style.FILL
+            color = MapUtils.contrastOutlineColor(this@RadioMarker.color)
+        }
+    } else {
+        null
     }
 
     override fun hitTest(event: android.view.MotionEvent, mapView: org.osmdroid.views.MapView): Boolean {
@@ -5057,7 +5196,9 @@ class RadioMarker(
                 val endX = ptCenter.x + totalRadiusPx * data.cos
                 val endY = ptCenter.y + totalRadiusPx * data.sin
 
+                lineOutlinePaint?.let { canvas.drawLine(startX, startY, endX, endY, it) }
                 canvas.drawLine(startX, startY, endX, endY, linePaint)
+                dotOutlinePaint?.let { canvas.drawCircle(endX, endY, dotRadius + outlineWidthPx, it) }
                 canvas.drawCircle(endX, endY, dotRadius, dotPaint)
             }
         }
