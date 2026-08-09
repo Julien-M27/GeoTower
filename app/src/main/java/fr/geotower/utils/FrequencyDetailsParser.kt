@@ -111,6 +111,45 @@ private fun isAzimuthPlaceholder(phys: String, localized: String): Boolean {
  */
 fun FreqBand.isAnnouncedOnly(): Boolean = spectrumLines.isEmpty() && physDetails.isEmpty()
 
+/**
+ * Hauteurs de fixation (metres, ordre croissant, sans doublon) des antennes qui portent les
+ * emetteurs de la station, lues dans la partie « physique » de `details_frequences` :
+ * `"LTE 1800 : 1860-1880 MHz | En service | 2016-03-14 | Panneau : 20° (8,1m) [AER_ID: 148839] [DIM: 0,2m]"`.
+ *
+ * Le tag `[DIM: 0,2m]` (taille du panneau) n'est jamais pris pour une hauteur : seule la valeur
+ * entre parentheses compte.
+ *
+ * Les paraboles FH sont ecartees des qu'un emetteur mobile est declare : chacune se pose a sa
+ * propre hauteur (jusqu'a une quinzaine de valeurs distinctes sur un pylone charge) et la ligne
+ * s'allongerait sans rien dire du reseau mobile. Une station qui n'a QUE des FH garde les siennes,
+ * sinon elle n'afficherait rien.
+ */
+fun emitterHeightsMeters(freqStr: String?): List<Double> {
+    if (freqStr.isNullOrBlank()) return emptyList()
+
+    val mobile = sortedSetOf<Double>()
+    val microwave = sortedSetOf<Double>()
+
+    for (line in freqStr.split("\n")) {
+        val parts = line.split("|")
+        val physical = parts.getOrNull(3) ?: continue
+        val systemName = parts[0].substringBefore(":").trim()
+        val heights = if (isMicrowaveSystem(systemName)) microwave else mobile
+
+        antennaHeightRegex.findAll(physical).forEach { match ->
+            match.groupValues[1]
+                .replace(',', '.')
+                .toDoubleOrNull()
+                ?.takeIf { it > 0.0 }
+                ?.let { heights.add(it) }
+        }
+    }
+
+    return (if (mobile.isNotEmpty()) mobile else microwave).toList()
+}
+
+private val antennaHeightRegex = Regex("""\(\s*(\d+(?:[.,]\d+)?)\s*m\s*\)""", RegexOption.IGNORE_CASE)
+
 internal fun addMicrowaveFallbackBands(
     bands: List<FreqBand>,
     info: LocalisationEntity,

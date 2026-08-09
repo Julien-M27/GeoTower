@@ -84,4 +84,56 @@ class FrequencyDetailsParserTest {
         assertEquals(listOf(true, false), bands.map { it.isAnnouncedOnly() })
         assertEquals(listOf(5, 4), bands.map { it.gen })
     }
+
+    @Test
+    fun readsTheMountingHeightsOfTheEmittersWithoutDuplicates() {
+        // Trois panneaux, deux hauteurs : la carte operateur du support en fait une seule ligne.
+        val heights = emitterHeightsMeters(
+            "LTE 800 : 852-862 MHz | En service | 25/03/2019 | Panneau : 185° (28,7m) [AER_ID: AE1]\n" +
+                "LTE 1800 : 1860-1880 MHz | En service | 25/03/2019 | Panneau : 65° (28,7m) [AER_ID: AE2]\n" +
+                "5G NR 3500 : 3490-3540 MHz | En service | 2021-06-02 | Panneau : 305° (31m) [AER_ID: AE3]",
+        )
+
+        assertEquals(listOf(28.7, 31.0), heights)
+    }
+
+    @Test
+    fun neverTakesThePanelDimensionTagForAHeight() {
+        // `[DIM: 0,2m]` est la taille du panneau, pas sa hauteur : sans parentheses, jamais captee.
+        val heights = emitterHeightsMeters(
+            "LTE 1800 : 1860-1880 MHz | En service | 2016-03-14 | Panneau : 20° (8,1m) [AER_ID: AE1] [DIM: 0,2m]",
+        )
+
+        assertEquals(listOf(8.1), heights)
+    }
+
+    @Test
+    fun leavesOutTheMicrowaveDishesWhenTheStationAlsoCarriesMobileEmitters() {
+        val heights = emitterHeightsMeters(
+            "LTE 800 : 852-862 MHz | En service | 25/03/2019 | Panneau : 185° (28,7m) [AER_ID: AE1]\n" +
+                "FH : 25,5-26,3 GHz | En service |  | Antenne parabolique : 75° (12,7m) [AER_ID: AE2]",
+        )
+
+        assertEquals(listOf(28.7), heights)
+    }
+
+    @Test
+    fun fallsBackOnTheMicrowaveDishesWhenTheStationHasNothingElse() {
+        val heights = emitterHeightsMeters(
+            "FH : 25,5-26,3 GHz | En service |  | Antenne parabolique : 75° (12,7m) [AER_ID: AE2]",
+        )
+
+        assertEquals(listOf(12.7), heights)
+    }
+
+    @Test
+    fun ignoresTheAntennasWhoseHeightTheAnfrDoesNotPublish() {
+        // Hauteur absente : les builders ecrivent « (N/Am) », il n'y a pas de valeur a montrer.
+        val heights = emitterHeightsMeters(
+            "5G NR 2100 :  | Projet approuve |  | Azimut non specifie\n" +
+                "LTE 700 : 758-768 MHz | En service | 2020-01-01 | Panneau : 90° (N/Am) [AER_ID: AE1]",
+        )
+
+        assertEquals(emptyList<Double>(), heights)
+    }
 }

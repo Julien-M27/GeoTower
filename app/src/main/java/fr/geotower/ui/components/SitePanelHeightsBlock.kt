@@ -10,6 +10,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
@@ -30,14 +31,15 @@ fun SitePanelHeightsBlock(
     val txtPanelHeightsTitle = stringResource(R.string.appstrings_panel_heights_title)
 
     val distanceUnit = AppConfig.distanceUnit.intValue
-    val formattedHeights = remember(info.azimuts, distanceUnit) {
+    val locale = LocalConfiguration.current.locales[0]
+    val formattedHeights = remember(info.azimuts, distanceUnit, locale) {
         if (info.azimuts.isNullOrBlank()) ""
         else {
             val heights = info.azimuts?.split(",")
                 ?.mapNotNull { it.substringAfter("(", "").substringBefore("m", "").trim().toFloatOrNull() }
                 ?.filter { it > 0f }?.distinct()?.sorted() ?: emptyList()
             if (heights.isNotEmpty()) {
-                heights.joinToString(" - ") { formatPanelHeightForUnit(it.toDouble(), distanceUnit) }
+                heights.joinToString(" - ") { formatPanelHeightForUnit(it.toDouble(), distanceUnit, locale) }
             } else ""
         }
     }
@@ -57,10 +59,16 @@ fun SitePanelHeightsBlock(
     }
 }
 
-private fun formatPanelHeightForUnit(heightMeters: Double, distanceUnit: Int): String {
+/**
+ * Partage avec la ligne « Emetteur a ... » des cartes operateur du support.
+ *
+ * `locale` vient de la configuration de la composition (donc de la langue FORCEE dans l'app, pas de
+ * celle du telephone) : « 28,9 m » en francais, « 28.9 m » en anglais, comme l'ANFR l'ecrit.
+ */
+internal fun formatPanelHeightForUnit(heightMeters: Double, distanceUnit: Int, locale: Locale): String {
     return if (distanceUnit == 1) {
         "${(heightMeters * 3.28084).roundToInt()} ft"
     } else {
-        if (heightMeters % 1.0 == 0.0) "${heightMeters.toInt()} m" else String.format(Locale.US, "%.1f m", heightMeters)
+        if (heightMeters % 1.0 == 0.0) "${heightMeters.toInt()} m" else String.format(locale, "%.1f m", heightMeters)
     }
 }

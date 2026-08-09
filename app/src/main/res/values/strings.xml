@@ -736,6 +736,7 @@
     <string name="appstrings_light_color_warning">Your MaterialUi color is too light. For better readability, dark blue has been applied.</string>
     <string name="appstrings_light_mode_desc">Ideal for emails or messages</string>
     <string name="appstrings_likely_network_vendor">Likely network vendor</string>
+    <string name="appstrings_list_and">%1$s and %2$s</string>
     <string name="appstrings_live_notification_desc">Enable real-time notifications</string>
     <string name="appstrings_live_notification_desc_nearest">Track the nearest antenna in real time, whatever its operator.</string>
     <string name="appstrings_live_notification_requires_op">Requires choosing a default operator</string>

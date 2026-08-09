@@ -28,7 +28,9 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -39,10 +41,12 @@ import androidx.compose.ui.unit.sp
 import fr.geotower.R
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.TechniqueEntity // ✅ NOUVEL IMPORT
+import fr.geotower.utils.emitterHeightsMeters // ✅ Hauteurs lues dans details_frequences
 import fr.geotower.utils.formatDateToFrench // ✅ Formatage localisé des dates
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.OperatorLogos
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 
 @Composable
@@ -345,6 +349,84 @@ fun OperatorDetailItem(
         if (dateMod != "-") {
             DateLine(txtModif, dateMod)
         }
+
+        EmitterHeightsLine(technique)
+    }
+}
+
+/**
+ * « Émetteur à 28 m », « Émetteurs à 25 m et 30 m » : a quelle hauteur cet operateur emet depuis ce
+ * pylone. L'information existe deja dans la fiche site mais enfouie dans le tableau des frequences,
+ * une colonne par bande — alors qu'elle tient en une ligne et se lit d'un coup d'oeil ici.
+ */
+@Composable
+private fun EmitterHeightsLine(technique: TechniqueEntity?) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    // `detailsFrequences` decompresse le blob `Z1:` a CHAQUE lecture : on ne le fait qu'une fois.
+    val heights = remember(technique?.encodedDetailsFrequences) {
+        emitterHeightsMeters(technique?.detailsFrequences)
+    }
+    if (heights.isEmpty()) return
+
+    val distanceUnit = AppConfig.distanceUnit.intValue
+    val locale = LocalConfiguration.current.locales[0]
+    val formatted = heights.map { formatPanelHeightForUnit(it, distanceUnit, locale) }
+
+    // Seules les hauteurs passent en gras, pas le reste de la phrase. On ne peut pas les retrouver
+    // par indexOf dans le texte fini (« 3 m » est un morceau de « 33 m ») : on demande aux formats
+    // traduits de poser un marqueur d'un caractere, puis on rebatit la chaine autour. Ca suit aussi
+    // les langues qui rangent le trou ailleurs dans la phrase (« Sendeantennen in %1$s Höhe »).
+    val heightsText = if (formatted.size == 1) {
+        buildAnnotatedString { appendBoldHeight(formatted.first()) }
+    } else {
+        annotatedFromTemplate(
+            template = stringResource(
+                R.string.appstrings_list_and,
+                MARK_LIST_HEAD.toString(),
+                MARK_LIST_TAIL.toString()
+            ),
+            parts = mapOf(
+                MARK_LIST_HEAD to {
+                    formatted.dropLast(1).forEachIndexed { index, height ->
+                        if (index > 0) append(", ")
+                        appendBoldHeight(height)
+                    }
+                },
+                MARK_LIST_TAIL to { appendBoldHeight(formatted.last()) }
+            )
+        )
+    }
+
+    Text(
+        text = annotatedFromTemplate(
+            template = pluralStringResource(
+                R.plurals.emitter_heights,
+                formatted.size,
+                MARK_LIST_HEAD.toString()
+            ),
+            parts = mapOf(MARK_LIST_HEAD to { append(heightsText) })
+        ),
+        fontSize = sizing.text(13.sp),
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(top = sizing.spacing(4.dp))
+    )
+}
+
+private const val MARK_LIST_HEAD = '\u0001'
+private const val MARK_LIST_TAIL = '\u0002'
+
+private fun AnnotatedString.Builder.appendBoldHeight(height: String) {
+    withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(height) }
+}
+
+/** Remplace chaque marqueur d'un caractere du libelle traduit par un fragment deja mis en forme. */
+private fun annotatedFromTemplate(
+    template: String,
+    parts: Map<Char, AnnotatedString.Builder.() -> Unit>
+): AnnotatedString = buildAnnotatedString {
+    template.forEach { char ->
+        val part = parts[char]
+        if (part != null) part() else append(char)
     }
 }
 

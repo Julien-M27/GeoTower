@@ -83,4 +83,8 @@
         <item quantity="one">Identificador 5G</item>
         <item quantity="other">Identificadores 5G</item>
     </plurals>
+    <plurals name="emitter_heights">
+        <item quantity="one">Emisor a %1$s</item>
+        <item quantity="other">Emisores a %1$s</item>
+    </plurals>
 </resources>

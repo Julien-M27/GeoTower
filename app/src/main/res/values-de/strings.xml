@@ -659,6 +659,7 @@
     <string name="appstrings_light_color_warning">Deine MaterialUi-Farbe ist zu hell. Für bessere Lesbarkeit wurde Dunkelblau angewendet.</string>
     <string name="appstrings_light_mode_desc">Ideal für E-Mails oder Nachrichten</string>
     <string name="appstrings_likely_network_vendor">Wahrscheinlicher Netzausrüster</string>
+    <string name="appstrings_list_and">%1$s und %2$s</string>
     <string name="appstrings_live_notification_desc">Echtzeitbenachrichtigungen aktivieren</string>
     <string name="appstrings_live_notification_desc_nearest">Verfolge die nächstgelegene Antenne in Echtzeit, unabhängig vom Betreiber.</string>
     <string name="appstrings_live_notification_requires_op">Erfordert einen Standardbetreiber</string>

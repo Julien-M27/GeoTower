@@ -659,6 +659,7 @@
     <string name="appstrings_light_color_warning">Il colore MaterialUi è troppo chiaro. Per una migliore leggibilità è stato applicato il blu scuro.</string>
     <string name="appstrings_light_mode_desc">Ideale per email o messaggi</string>
     <string name="appstrings_likely_network_vendor">Probabile fornitore di rete</string>
+    <string name="appstrings_list_and">%1$s e %2$s</string>
     <string name="appstrings_live_notification_desc">Attiva le notifiche in tempo reale</string>
     <string name="appstrings_live_notification_desc_nearest">Segui l\'antenna più vicina in tempo reale, qualunque sia il suo operatore.</string>
     <string name="appstrings_live_notification_requires_op">Richiede la scelta di un operatore predefinito</string>

@@ -83,4 +83,8 @@
         <item quantity="one">Identificativo 5G</item>
         <item quantity="other">Identificativi 5G</item>
     </plurals>
+    <plurals name="emitter_heights">
+        <item quantity="one">Trasmettitore a %1$s</item>
+        <item quantity="other">Trasmettitori a %1$s</item>
+    </plurals>
 </resources>

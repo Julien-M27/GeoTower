@@ -83,4 +83,8 @@
         <item quantity="one">5G-Kennung</item>
         <item quantity="other">5G-Kennungen</item>
     </plurals>
+    <plurals name="emitter_heights">
+        <item quantity="one">Sendeantenne in %1$s Höhe</item>
+        <item quantity="other">Sendeantennen in %1$s Höhe</item>
+    </plurals>
 </resources>

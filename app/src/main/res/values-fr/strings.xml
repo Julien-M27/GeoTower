@@ -659,6 +659,7 @@
     <string name="appstrings_light_color_warning">Votre couleur MaterialUi est trop claire. Pour plus de lisibilité, la couleur bleu foncé a été appliquée.</string>
     <string name="appstrings_light_mode_desc">Idéal pour les emails ou messages</string>
     <string name="appstrings_likely_network_vendor">Équipementier réseau probable</string>
+    <string name="appstrings_list_and">%1$s et %2$s</string>
     <string name="appstrings_live_notification_desc">Activez les notifications en temps réel pour être informé de l\'antenne de votre opérateur par défaut la plus proche de vous</string>
     <string name="appstrings_live_notification_desc_nearest">Suivez l\'antenne la plus proche en temps réel, quel que soit son opérateur.</string>
     <string name="appstrings_live_notification_requires_op">Nécessite de choisir un opérateur par défaut</string>
