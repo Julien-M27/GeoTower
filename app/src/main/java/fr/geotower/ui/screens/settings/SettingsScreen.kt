@@ -138,11 +138,7 @@ import fr.geotower.utils.PageScrollPrefs
 import fr.geotower.utils.PowerProfile
 import fr.geotower.utils.PreferenceStores
 import fr.geotower.data.build.LocalBuildCapability
-import fr.geotower.data.db.GeoTowerDatabaseValidator
-import fr.geotower.data.db.RadioDatabaseValidator
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import androidx.compose.runtime.collectAsState
 import androidx.compose.material.icons.filled.Straighten
 import androidx.compose.material.icons.filled.Edit
@@ -3646,31 +3642,20 @@ fun SectionDatabase(
     val generatesInstead = AppConfig.dbForcedLocal()
     val serverDataCutOff = AppConfig.blockCommunityAndUpdates()
     val buildEligibility = remember { LocalBuildCapability.evaluate(context) }
-    // MAIS, contrairement au tuto, une carte n'est pas qu'une offre : c'est aussi l'inventaire de
-    // ce qui occupe le téléphone (version, date, nombre de lignes) et le SEUL endroit d'où
-    // supprimer la base. Aux crans intermédiaires on ne masque donc que les cartes devenues de
-    // vraies impasses : rien à proposer ET rien d'installé. Une base présente garde sa carte, avec
-    // son bouton Supprimer.
-    // Défaut `true` : tant que le disque n'a pas répondu, on n'escamote rien.
-    var mobileInstalled by remember { mutableStateOf(true) }
-    var radioInstalled by remember { mutableStateOf(true) }
-    val installedProbeKey = refreshState?.refreshKey ?: 0
-    LaunchedEffect(generatesInstead, serverDataCutOff, installedProbeKey) {
-        withContext(Dispatchers.IO) {
-            mobileInstalled = context.getDatabasePath(GeoTowerDatabaseValidator.DB_NAME).exists()
-            radioInstalled = context.getDatabasePath(RadioDatabaseValidator.DB_NAME).exists()
-        }
-    }
-    // « Autonomie maximale » tranche autrement : plus AUCUNE base ne peut être téléchargée depuis
-    // cette section, l'exception « base installée » y laisserait donc des cartes de téléchargement
-    // qui n'en sont plus. Elles partent toutes, installées ou non. Rien n'est perdu : le fichier
-    // reste sur l'appareil et sa carte — donc son bouton Supprimer — revient dès qu'on quitte ce
-    // cran, ce que dit le texte sous la liste.
-    // Un appareil INÉLIGIBLE à la génération garde mobile + radio même à ce cran : `generatesInstead`
-    // y est faux parce que ses bases continuent d'être téléchargées (cf. AppConfig.blockServerDatabase),
-    // et une carte qui télécharge encore n'a aucune raison de disparaître.
-    val showMobileCard = !generatesInstead || (mobileInstalled && !serverDataCutOff)
-    val showRadioCard = !generatesInstead || (radioInstalled && !serverDataCutOff)
+    // Dès qu'un cran génère la base sur un appareil qui en est capable, les deux cartes partent —
+    // installées ou non. Le téléchargement y est bloqué (cf. AppConfig.dbForcedLocal) : ce qu'elles
+    // montraient encore, c'était la base du serveur et un bouton mort, alors que la mise à jour se
+    // joue désormais sur la carte de génération locale, juste en dessous.
+    // Elles gardaient auparavant leur place tant qu'une base était installée, pour l'inventaire
+    // (version, date, nombre de lignes) et surtout pour leur bouton Supprimer. Rien n'est effacé
+    // au passage : le fichier reste sur l'appareil, et sa carte — donc son bouton Supprimer —
+    // revient dès qu'on choisit une autre provenance, ce que dit le texte sous la liste.
+    // Un appareil INÉLIGIBLE à la génération garde mobile + radio à TOUS les crans, cran maximal
+    // compris : `generatesInstead` y est faux parce que ses bases continuent d'être téléchargées
+    // (cf. AppConfig.blockServerDatabase), et une carte qui télécharge encore n'a aucune raison de
+    // disparaître.
+    val showMobileCard = !generatesInstead
+    val showRadioCard = !generatesInstead
     val showEnbCard = !serverDataCutOff
 
     // 🚀 LA CARTE DE LA BASE DE DONNÉES (Existante)

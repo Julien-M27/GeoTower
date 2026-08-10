@@ -171,6 +171,10 @@ object AppConfig {
     // Outil de mesure : true = supprimer un trait reconnecte la chaîne (recalcule avec le point
     // précédent) ; false = les autres traits ne bougent pas (comportement par défaut).
     var measureReconnectOnDelete = mutableStateOf(false)
+    // Outil de mesure : 0 = trait direct (à vol d'oiseau), 1 = par la route, 2 = par les chemins.
+    // Les deux derniers demandent un itinéraire au service navigation IGN (RouteApi) et affichent
+    // la distance réelle du trajet ; le trait direct ne consomme aucun réseau.
+    var measureFollowRoadsMode = mutableIntStateOf(0)
     var showMapLocationMarker = mutableStateOf(true)
     // Déplacement continu du repère de position entre deux points GPS (interpolation, extrapolation
     // et estime piétonne). Coupé d'office en mode faible consommation, cf. PowerProfile.
@@ -386,6 +390,7 @@ object AppConfig {
         selectedSignalQuestCoverageOperatorKeys.value = loadSignalQuestCoverageOperatorKeys(prefs)
         showSpeedometer.value = MapDisplayPrefs.showSpeedometer.read(prefs)
         measureReconnectOnDelete.value = MapDisplayPrefs.measureReconnectOnDelete.read(prefs)
+        measureFollowRoadsMode.intValue = MapDisplayPrefs.measureFollowRoadsMode.read(prefs)
 
         showSitesInService.value = MapDisplayPrefs.showSitesInService.read(prefs)
         showSitesOutOfService.value = MapDisplayPrefs.showSitesOutOfService.read(prefs)

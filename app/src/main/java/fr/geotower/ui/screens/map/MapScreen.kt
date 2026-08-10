@@ -57,11 +57,15 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Straighten
+import androidx.compose.material.icons.filled.Timeline
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.LocationDisabled
 import androidx.compose.material.icons.filled.MyLocation
@@ -96,6 +100,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableFloatStateOf
@@ -146,6 +151,7 @@ import androidx.navigation.NavController
 import fr.geotower.data.upload.SignalQuestUploadDraftStore
 import fr.geotower.data.api.GeoTowerDataCoverage
 import fr.geotower.data.api.NominatimApi
+import fr.geotower.data.api.RouteApi
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.ui.components.SecureScreenEffect
 import fr.geotower.data.models.LocalisationEntity
@@ -175,6 +181,7 @@ import fr.geotower.utils.MapUtils
 import fr.geotower.ui.screens.emitters.OperatorGrid
 import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.filteredAzimuthsForFrequencySelection
+import fr.geotower.utils.formatSiteDistanceMeters
 import fr.geotower.utils.isNetworkAvailable
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
@@ -194,7 +201,6 @@ import org.osmdroid.views.overlay.MapEventsOverlay
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Overlay
 import org.osmdroid.views.overlay.Polyline
-import org.osmdroid.views.overlay.gestures.RotationGestureDetector
 import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
 import androidx.compose.foundation.Canvas as ComposeCanvas
 import androidx.compose.runtime.withFrameNanos
@@ -214,6 +220,7 @@ import java.text.Normalizer
 import java.util.Locale
 import android.os.Environment
 import kotlin.math.abs
+import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.hypot
 import kotlin.math.log2
@@ -255,6 +262,12 @@ private const val PREF_LAST_MAP_ORIENTATION = "last_map_orientation"
 private const val MAP_FOLLOW_ORIENTATION_MIN_DELTA_DEG = 2f
 private const val MAP_FOLLOW_ORIENTATION_INTERVAL_MS = 100L
 private const val MAP_ROTATION_GESTURE_INTERVAL_MS = 25L
+/**
+ * Amorce du geste : tant que les deux doigts n'ont pas tourné d'au moins autant, la carte ne bouge
+ * pas. Écarter deux doigts pour zoomer fait toujours pivoter un peu la main — sans ce seuil, un
+ * simple zoom fait tourner la carte de plusieurs dizaines de degrés sans qu'on l'ait demandé.
+ */
+private const val MAP_ROTATION_GESTURE_THRESHOLD_DEG = 12f
 
 private val hsBadgeDrawableCache = android.util.LruCache<Int, BitmapDrawable>(4)
 private val hsMarkerIconCache = android.util.LruCache<String, BitmapDrawable>(500)
@@ -600,6 +613,112 @@ private fun decodeMeasureVertices(encoded: String?): List<MeasureVertex> {
             }
         }
     }
+}
+
+/**
+ * Un trait de la chaîne de mesure, une fois ses sommets résolus en coordonnées : de quoi le
+ * dessiner, en calculer la longueur et lui demander un itinéraire, sans retoucher la chaîne.
+ */
+private data class MeasureSegment(
+    val startVertex: MeasureVertex,
+    val endVertex: MeasureVertex,
+    val start: GeoPoint,
+    val end: GeoPoint,
+    /** Index du sommet d'arrivée dans la chaîne ; -1 pour le trait de fermeture de la boucle. */
+    val toIndex: Int
+)
+
+/**
+ * La chaîne peut être refermée en boucle si c'est un chemin ouvert unique d'au moins 3 sommets
+ * (tous reliés de proche en proche, sans trou).
+ */
+private fun isMeasureChainClosable(vertices: List<MeasureVertex>, linkedToPrev: List<Boolean>): Boolean =
+    vertices.size >= 3 && (1 until vertices.size).all { linkedToPrev.getOrNull(it) == true }
+
+/**
+ * Les traits de la chaîne, dans l'ordre : d'abord les segments reliant deux sommets consécutifs,
+ * puis le trait de fermeture si la boucle est fermée. Un sommet « ma position » encore inconnu
+ * (GPS pas prêt) fait simplement disparaître les traits qui le touchent.
+ */
+private fun measureSegments(
+    vertices: List<MeasureVertex>,
+    linkedToPrev: List<Boolean>,
+    loopClosed: Boolean,
+    myLocation: GeoPoint?
+): List<MeasureSegment> {
+    fun resolve(vertex: MeasureVertex): GeoPoint? = when (vertex) {
+        is MeasureVertex.Fixed -> vertex.point
+        MeasureVertex.CurrentLocation -> myLocation
+    }
+
+    val segments = mutableListOf<MeasureSegment>()
+    for (index in 1 until vertices.size) {
+        if (linkedToPrev.getOrNull(index) != true) continue
+        val startVertex = vertices[index - 1]
+        val endVertex = vertices[index]
+        val start = resolve(startVertex) ?: continue
+        val end = resolve(endVertex) ?: continue
+        segments += MeasureSegment(startVertex, endVertex, start, end, toIndex = index)
+    }
+
+    if (loopClosed && isMeasureChainClosable(vertices, linkedToPrev)) {
+        val startVertex = vertices.last()
+        val endVertex = vertices.first()
+        val start = resolve(startVertex)
+        val end = resolve(endVertex)
+        if (start != null && end != null) {
+            segments += MeasureSegment(startVertex, endVertex, start, end, toIndex = -1)
+        }
+    }
+    return segments
+}
+
+/**
+ * Un itinéraire demandé pour un trait de mesure. Absent du cache = pas encore calculé (le trait
+ * reste direct en attendant) ; [Unavailable] = calcul impossible, le trait direct est définitif.
+ */
+private sealed interface MeasureRoute {
+    object Unavailable : MeasureRoute
+    data class Ready(val points: List<GeoPoint>, val distanceMeters: Double) : MeasureRoute
+}
+
+/**
+ * Clé de cache de l'itinéraire d'un trait. Un point posé garde toute sa précision (deux taps
+ * voisins doivent donner deux itinéraires distincts), tandis que « ma position » est ramenée sur
+ * une grille d'environ 110 m : sans cet arrondi, chaque point GPS relancerait une requête.
+ */
+private fun measureRouteKey(segment: MeasureSegment, profile: String): String {
+    fun vertexKey(vertex: MeasureVertex, point: GeoPoint): String = when (vertex) {
+        is MeasureVertex.Fixed -> String.format(Locale.US, "%.6f,%.6f", point.latitude, point.longitude)
+        MeasureVertex.CurrentLocation -> String.format(Locale.US, "L%.3f,%.3f", point.latitude, point.longitude)
+    }
+    return "$profile|${vertexKey(segment.startVertex, segment.start)}>${vertexKey(segment.endVertex, segment.end)}"
+}
+
+/**
+ * Point situé à mi-longueur du tracé : c'est là que se pose l'étiquette de distance. Sur un trait
+ * direct cela revient au milieu géométrique ; sur un itinéraire, au milieu du parcours réel (et non
+ * au milieu de la liste de points, qui se densifie dans les virages).
+ */
+private fun measureLabelPosition(path: List<GeoPoint>): GeoPoint {
+    if (path.size < 2) return path.first()
+    val lengths = DoubleArray(path.size - 1) { path[it].distanceToAsDouble(path[it + 1]) }
+    val half = lengths.sum() / 2.0
+    var walked = 0.0
+    for (index in lengths.indices) {
+        val length = lengths[index]
+        if (walked + length >= half) {
+            val ratio = if (length <= 0.0) 0.0 else (half - walked) / length
+            val from = path[index]
+            val to = path[index + 1]
+            return GeoPoint(
+                from.latitude + (to.latitude - from.latitude) * ratio,
+                from.longitude + (to.longitude - from.longitude) * ratio
+            )
+        }
+        walked += length
+    }
+    return path[path.size / 2]
 }
 
 private fun normalizedAnfrId(value: String): String {
@@ -1223,6 +1342,25 @@ fun MapScreen(
 
     var isClosestSiteExpanded by rememberSaveable { mutableStateOf(true) }
     var isClosestFavSiteExpanded by rememberSaveable { mutableStateOf(true) }
+    var isMeasureRouteExpanded by rememberSaveable { mutableStateOf(true) }
+
+    // « Suivre les routes » : itinéraires déjà calculés, un par trait (clé = profil + extrémités).
+    // Une clé absente = itinéraire encore à demander ; les échecs sont mémorisés (Unavailable) pour
+    // ne pas relancer sans fin une requête qui ne passera pas (hors couverture BD TOPO).
+    val measureRoutes = remember { mutableStateMapOf<String, MeasureRoute>() }
+    // Le service itinéraire IGN peut être coupé à distance ; le trait direct, lui, reste toujours
+    // disponible puisqu'il ne demande rien au réseau.
+    val canUseMeasureRouting = canUseMapMeasure &&
+        featureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.ROUTING_IGN)
+    // Profil d'itinéraire courant, ou null pour le trait direct (aucune requête réseau).
+    fun measureRouteProfile(): String? {
+        if (!canUseMeasureRouting) return null
+        return when (AppConfig.measureFollowRoadsMode.intValue) {
+            1 -> RouteApi.PROFILE_CAR
+            2 -> RouteApi.PROFILE_PEDESTRIAN
+            else -> null
+        }
+    }
 
     fun saveMeasureSelections() {
         measuredVerticesEncoded = encodeMeasureVertices(measuredVertices)
@@ -1234,6 +1372,9 @@ fun MapScreen(
         measuredVertices.clear()
         measuredLinkedToPrev.clear()
         measuredLoopClosed = false
+        // Les itinéraires gardés en cache peuvent peser plusieurs centaines de points chacun : plus
+        // de traits, plus de raison de les garder.
+        measureRoutes.clear()
         saveMeasureSelections()
     }
 
@@ -1262,11 +1403,7 @@ fun MapScreen(
         saveMeasureSelections()
     }
 
-    // La chaîne peut être refermée en boucle si c'est un chemin ouvert unique d'au moins 3 sommets
-    // (tous reliés de proche en proche, sans trou).
-    fun isMeasureLoopClosable(): Boolean =
-        measuredVertices.size >= 3 &&
-            (1 until measuredVertices.size).all { measuredLinkedToPrev.getOrNull(it) == true }
+    fun isMeasureLoopClosable(): Boolean = isMeasureChainClosable(measuredVertices, measuredLinkedToPrev)
 
     fun toggleMeasureLoop() {
         measuredLoopClosed = if (measuredLoopClosed) false else isMeasureLoopClosable()
@@ -1327,6 +1464,7 @@ fun MapScreen(
         if (isMeasuringMode) {
             isClosestSiteExpanded = true
             isClosestFavSiteExpanded = true
+            isMeasureRouteExpanded = true
         }
     }
 
@@ -2017,9 +2155,27 @@ fun MapScreen(
             }
         }
 
-        fun addMeasureSegment(startPoint: GeoPoint, endPoint: GeoPoint, onRemove: () -> Unit) {
+        // route = itinéraire calculé pour ce trait (mode « par la route / par les chemins ») ; null
+        // ⇒ trait direct, à vol d'oiseau, et distance à vol d'oiseau.
+        fun addMeasureSegment(
+            startPoint: GeoPoint,
+            endPoint: GeoPoint,
+            route: MeasureRoute.Ready?,
+            onRemove: () -> Unit
+        ) {
+            // Le moteur d'itinéraire part du point du réseau le plus proche, pas du point posé : on
+            // raccorde les extrémités réelles pour que le trait touche bien les deux pastilles.
+            val path = if (route != null) {
+                buildList {
+                    add(startPoint)
+                    addAll(route.points)
+                    add(endPoint)
+                }
+            } else {
+                listOf(startPoint, endPoint)
+            }
             val line = Polyline(map).apply {
-                setPoints(listOf(startPoint, endPoint))
+                setPoints(path)
                 outlinePaint.color = android.graphics.Color.parseColor("#3B5998")
                 outlinePaint.strokeWidth = 10f
             }
@@ -2031,12 +2187,11 @@ fun MapScreen(
             measureOverlay.add(line)
 
             val labelMarker = Marker(map).apply {
-                position = GeoPoint(
-                    (startPoint.latitude + endPoint.latitude) / 2,
-                    (startPoint.longitude + endPoint.longitude) / 2
-                )
+                position = measureLabelPosition(path)
                 setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-                icon = createDistanceLabel(formatMeasureDistance(startPoint.distanceToAsDouble(endPoint)))
+                icon = createDistanceLabel(
+                    formatMeasureDistance(route?.distanceMeters ?: startPoint.distanceToAsDouble(endPoint))
+                )
                 infoWindow = null
             }
             labelMarker.setOnMarkerClickListener { _, _ ->
@@ -2069,20 +2224,21 @@ fun MapScreen(
             MeasureVertex.CurrentLocation -> myLoc
         }
 
-        // 1) Un trait + une étiquette de distance entre deux sommets consécutifs reliés.
-        for (index in 1 until measuredVertices.size) {
-            if (measuredLinkedToPrev.getOrNull(index) != true) continue
-            val start = resolveVertex(measuredVertices[index - 1]) ?: continue
-            val end = resolveVertex(measuredVertices[index]) ?: continue
-            addMeasureSegment(start, end) { deleteMeasureSegment(index) }
-        }
-
-        // 2) Trait de fermeture (dernier sommet -> premier) quand la boucle est fermée.
-        if (measuredLoopClosed && isMeasureLoopClosable()) {
-            val loopStart = resolveVertex(measuredVertices.last())
-            val loopEnd = resolveVertex(measuredVertices.first())
-            if (loopStart != null && loopEnd != null) {
-                addMeasureSegment(loopStart, loopEnd) { measuredLoopClosed = false }
+        // 1) et 2) Un trait + une étiquette de distance par segment de la chaîne, trait de fermeture
+        //    de la boucle compris (toIndex = -1). Le trait épouse le réseau routier dès que son
+        //    itinéraire est arrivé, sinon il reste direct.
+        val routeProfile = measureRouteProfile()
+        measureSegments(
+            vertices = measuredVertices,
+            linkedToPrev = measuredLinkedToPrev,
+            loopClosed = measuredLoopClosed,
+            myLocation = myLoc
+        ).forEach { segment ->
+            val route = routeProfile
+                ?.let { profile -> measureRoutes[measureRouteKey(segment, profile)] }
+                ?.let { it as? MeasureRoute.Ready }
+            addMeasureSegment(segment.start, segment.end, route) {
+                if (segment.toIndex >= 0) deleteMeasureSegment(segment.toIndex) else measuredLoopClosed = false
             }
         }
 
@@ -2787,6 +2943,94 @@ fun MapScreen(
 
     LaunchedEffect(isMeasuringMode, measuredVertices.size, measuredLinkedToPrev.size, measuredLoopClosed, mapViewRef) {
         if (isMeasuringMode && measuredVertices.isNotEmpty()) {
+            mapViewRef?.let { refreshMeasureLayers(it) }
+        }
+    }
+
+    // Traits de la chaîne, extrémités résolues. Recalculé à chaque changement de sommet et à chaque
+    // déplacement de « ma position », qui est un sommet mouvant.
+    val currentMeasureSegments by remember {
+        derivedStateOf {
+            measureSegments(
+                vertices = measuredVertices,
+                linkedToPrev = measuredLinkedToPrev,
+                loopClosed = measuredLoopClosed,
+                myLocation = myCurrentLoc
+            )
+        }
+    }
+    val measureRouteProfileValue = measureRouteProfile()
+    // Signature des itinéraires à obtenir. On relance les requêtes là-dessus et non sur les segments
+    // eux-mêmes : la clé arrondit « ma position » (cf. measureRouteKey), donc marcher quelques
+    // mètres ne repart pas de zéro et n'interrompt pas un calcul en cours.
+    val measureRouteSignature = measureRouteProfileValue?.let { profile ->
+        currentMeasureSegments.joinToString("|") { measureRouteKey(it, profile) }
+    }
+    // Un seul avertissement par activation : un itinéraire qui échoue échoue souvent pour tous les
+    // traits (hors de France, réseau coupé), et autant de toasts serait insupportable.
+    var measureRouteWarningShown by remember { mutableStateOf(false) }
+
+    val measureFollowRoadsMode = AppConfig.measureFollowRoadsMode.intValue
+    val measureFollowRoadsLabel = when (measureFollowRoadsMode) {
+        1 -> stringResource(R.string.appstrings_measure_follow_roads_car)
+        2 -> stringResource(R.string.appstrings_measure_follow_roads_walk)
+        else -> stringResource(R.string.appstrings_measure_follow_roads_straight)
+    }
+
+    fun setMeasureFollowRoadsMode(mode: Int) {
+        AppConfig.measureFollowRoadsMode.intValue = mode
+        prefs.edit().putInt(MapDisplayPrefs.measureFollowRoadsMode.key, mode).apply()
+        // Nouvelle tentative : on redonne le droit d'avertir si les itinéraires échouent encore.
+        measureRouteWarningShown = false
+        mapViewRef?.let { refreshMeasureLayers(it) }
+    }
+
+    // Mode « par la route / par les chemins » : on demande son itinéraire à chaque trait, un par un
+    // — le service de la Géoplateforme est public et sans clé, on ne le sollicite pas en rafale. Le
+    // trait reste direct tant que la réponse n'est pas là, et le redevient si le calcul échoue.
+    LaunchedEffect(isMeasuringMode, measureRouteProfileValue, measureRouteSignature) {
+        val profile = measureRouteProfileValue ?: return@LaunchedEffect
+        if (!isMeasuringMode) return@LaunchedEffect
+        currentMeasureSegments.forEach { segment ->
+            val key = measureRouteKey(segment, profile)
+            if (measureRoutes.containsKey(key)) return@forEach
+            if (segment.start.distanceToAsDouble(segment.end) > RouteApi.MAX_ROUTABLE_DISTANCE_METERS) {
+                measureRoutes[key] = MeasureRoute.Unavailable
+                return@forEach
+            }
+            val route = try {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    RouteApi.getRoute(
+                        fromLatitude = segment.start.latitude,
+                        fromLongitude = segment.start.longitude,
+                        toLatitude = segment.end.latitude,
+                        toLongitude = segment.end.longitude,
+                        profile = profile
+                    )
+                }
+            } catch (cancellation: kotlinx.coroutines.CancellationException) {
+                // Chaîne modifiée en cours de route : on laisse la clé libre pour un nouvel essai.
+                throw cancellation
+            } catch (error: Throwable) {
+                AppLogger.w("GeoTowerMap", "Measure route unavailable", error)
+                null
+            }
+            measureRoutes[key] = route
+                ?.let { result ->
+                    MeasureRoute.Ready(
+                        points = result.points.map { GeoPoint(it[0], it[1]) },
+                        distanceMeters = result.distanceMeters
+                    )
+                }
+                ?: MeasureRoute.Unavailable
+            if (route == null && !measureRouteWarningShown) {
+                measureRouteWarningShown = true
+                Toast.makeText(
+                    context,
+                    context.getString(R.string.appstrings_measure_route_unavailable),
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
             mapViewRef?.let { refreshMeasureLayers(it) }
         }
     }
@@ -3655,6 +3899,8 @@ fun MapScreen(
         }
 
         val darkMaterialColor = Color(0xFF37474F)
+        // Même bleu que les traits de mesure dessinés sur la carte (cf. refreshMeasureLayers).
+        val measureLineColor = Color(0xFF3B5998)
         val opColor = OperatorColors.keyFor(defaultOp)
             ?.let { Color(OperatorColors.colorArgbForKey(it)) }
             ?: MaterialTheme.colorScheme.primary
@@ -3779,6 +4025,68 @@ fun MapScreen(
                         }
                     }
                 }
+
+                // ========================================================
+                // 3. TIROIR « FORME DES TRAITS » : direct, par la route, par les chemins
+                // ========================================================
+                if (canUseMeasureRouting) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        // Actif : la couleur des traits de mesure, pour relier le bouton à ce qu'il change.
+                        val routeColor = if (measureFollowRoadsMode == 0) darkMaterialColor else measureLineColor
+                        val handle: @Composable () -> Unit = {
+                            Box(
+                                modifier = Modifier
+                                    .height(trackingButtonHeight).width(sizing.component(12.dp))
+                                    .background(routeColor, RoundedCornerShape(6.dp))
+                                    .clickable { safeClick { isMeasureRouteExpanded = !isMeasureRouteExpanded } }
+                            )
+                        }
+
+                        val pill: @Composable () -> Unit = {
+                            AnimatedVisibility(
+                                visible = isMeasureRouteExpanded,
+                                enter = expandHorizontally(expandFrom = if (measureDrawerOnLeft) Alignment.Start else Alignment.End) + fadeIn(),
+                                exit = shrinkHorizontally(shrinkTowards = if (measureDrawerOnLeft) Alignment.Start else Alignment.End) + fadeOut()
+                            ) {
+                                Button(
+                                    // Un seul bouton pour les trois formes : chaque appui passe à la
+                                    // suivante, le libellé et l'icône disent laquelle est en cours.
+                                    onClick = { safeClick { setMeasureFollowRoadsMode((measureFollowRoadsMode + 1) % 3) } },
+                                    modifier = Modifier.height(trackingButtonHeight).width(sizing.component(210.dp)),
+                                    contentPadding = PaddingValues(horizontal = sizing.spacing(14.dp)),
+                                    shape = RoundedCornerShape(trackingButtonHeight / 2f),
+                                    colors = ButtonDefaults.buttonColors(containerColor = routeColor, contentColor = Color.White)
+                                ) {
+                                    Icon(
+                                        when (measureFollowRoadsMode) {
+                                            1 -> Icons.Default.DirectionsCar
+                                            2 -> Icons.AutoMirrored.Filled.DirectionsWalk
+                                            else -> Icons.Default.Timeline
+                                        },
+                                        null,
+                                        modifier = Modifier.size(sizing.component(18.dp))
+                                    )
+                                    Spacer(Modifier.width(sizing.spacing(8.dp)))
+                                    Text(
+                                        text = measureFollowRoadsLabel,
+                                        fontSize = sizing.text(11.sp),
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+
+                        if (measureDrawerOnLeft) {
+                            pill()
+                            Spacer(modifier = Modifier.width(sizing.spacing(6.dp)))
+                            handle()
+                        } else {
+                            handle()
+                            Spacer(modifier = Modifier.width(sizing.spacing(6.dp)))
+                            pill()
+                        }
+                    }
+                }
             }
         }
 
@@ -3854,6 +4162,65 @@ fun MapScreen(
                 label = "deleteButtonAnim"
             )
             Spacer(modifier = Modifier.height(deleteButtonSpacer))
+
+            // Longueur totale de la chaîne : la somme des traits affichés (distance de l'itinéraire
+            // quand il est arrivé, à vol d'oiseau sinon). Les traits de suivi vers le site le plus
+            // proche n'y entrent pas : ils mesurent une portée radio, pas un parcours.
+            val measureTotalDistanceMeters = currentMeasureSegments.sumOf { segment ->
+                val route = measureRouteProfileValue
+                    ?.let { profile -> measureRoutes[measureRouteKey(segment, profile)] }
+                    ?.let { it as? MeasureRoute.Ready }
+                route?.distanceMeters ?: segment.start.distanceToAsDouble(segment.end)
+            }
+            // Itinéraires encore attendus : la clé n'est pas dans le cache. On le dit par des points
+            // de suspension, le total affiché étant encore celui des traits directs.
+            val measureRoutesPending = measureRouteProfileValue?.let { profile ->
+                currentMeasureSegments.any { !measureRoutes.containsKey(measureRouteKey(it, profile)) }
+            } == true
+
+            AnimatedVisibility(
+                visible = currentMeasureSegments.isNotEmpty(),
+                enter = fadeIn(),
+                exit = fadeOut()
+            ) {
+                Surface(
+                    modifier = Modifier.padding(bottom = sizing.spacing(10.dp)),
+                    shape = RoundedCornerShape(32.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    shadowElevation = 4.dp,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(
+                            horizontal = sizing.spacing(16.dp),
+                            vertical = sizing.spacing(10.dp)
+                        ),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // L'icône suit ce qui est réellement tracé (et non le réglage) : si le
+                        // service d'itinéraire est coupé, les traits restent directs.
+                        Icon(
+                            when (measureRouteProfileValue) {
+                                RouteApi.PROFILE_CAR -> Icons.Default.DirectionsCar
+                                RouteApi.PROFILE_PEDESTRIAN -> Icons.AutoMirrored.Filled.DirectionsWalk
+                                else -> Icons.Default.Straighten
+                            },
+                            null,
+                            tint = measureLineColor,
+                            modifier = Modifier.size(sizing.component(18.dp))
+                        )
+                        Spacer(Modifier.width(sizing.spacing(8.dp)))
+                        Text(
+                            text = stringResource(
+                                R.string.appstrings_measure_total_distance,
+                                formatSiteDistanceMeters(measureTotalDistanceMeters)
+                            ) + if (measureRoutesPending) "…" else "",
+                            fontSize = sizing.text(13.sp),
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
 
             AnimatedVisibility(
                 visible = measuredSites.isNotEmpty() || measuredVertices.isNotEmpty(),
@@ -5567,25 +5934,73 @@ private class MapRotationGestureOverlay(
     private val onRotated: (Float) -> Unit
 ) : Overlay() {
 
+    /** Angle courant entre les deux doigts. NaN = aucune paire suivie pour l'instant. */
+    private var lastFingerAngle = Float.NaN
+    /** Rotation accumulée depuis la pose des doigts, tant que l'amorce n'est pas franchie. */
+    private var rotationSinceTouch = 0f
+    private var engaged = false
     private var pendingAngle = 0f
     private var lastAppliedMs = 0L
 
-    private val detector = RotationGestureDetector { deltaAngle ->
-        pendingAngle += deltaAngle
-        val now = SystemClock.uptimeMillis()
-        if (now - lastAppliedMs >= MAP_ROTATION_GESTURE_INTERVAL_MS) {
-            lastAppliedMs = now
-            val orientation = normalizeMapOrientation(map.mapOrientation + pendingAngle)
-            pendingAngle = 0f
-            map.mapOrientation = orientation
-            onRotated(orientation)
-        }
-    }
-
     override fun onTouchEvent(event: MotionEvent, mapView: MapView): Boolean {
-        if (isEnabled) detector.onTouch(event)
+        if (!isEnabled) {
+            resetGesture()
+            return false
+        }
+        if (event.actionMasked == MotionEvent.ACTION_MOVE) {
+            onMove(event)
+        } else {
+            // Doigt posé ou levé : les indices de pointeur sont rebattus, et comparer l'ancien
+            // angle au nouveau ferait sauter la carte d'un bloc. On repart d'une référence neuve.
+            resetGesture()
+        }
         // On ne consomme jamais : le pincement doit continuer à zoomer et le glissement à déplacer.
         return false
+    }
+
+    private fun onMove(event: MotionEvent) {
+        if (event.pointerCount != 2) {
+            resetGesture()
+            return
+        }
+
+        val angle = fingerAngle(event)
+        val previous = lastFingerAngle
+        lastFingerAngle = angle
+        if (previous.isNaN()) return // premier relevé du geste : rien à comparer
+
+        val delta = shortestAngleDelta(previous, angle)
+        if (!engaged) {
+            rotationSinceTouch += delta
+            if (abs(rotationSinceTouch) < MAP_ROTATION_GESTURE_THRESHOLD_DEG) return
+            // Amorcé. On ne rattrape pas le seuil d'un coup : la carte repart d'où elle est, et
+            // suivra le doigt au degré près à partir d'ici.
+            engaged = true
+            return
+        }
+
+        pendingAngle += delta
+        val now = SystemClock.uptimeMillis()
+        if (now - lastAppliedMs < MAP_ROTATION_GESTURE_INTERVAL_MS) return
+        lastAppliedMs = now
+        val orientation = normalizeMapOrientation(map.mapOrientation + pendingAngle)
+        pendingAngle = 0f
+        map.mapOrientation = orientation
+        onRotated(orientation)
+    }
+
+    private fun resetGesture() {
+        lastFingerAngle = Float.NaN
+        rotationSinceTouch = 0f
+        pendingAngle = 0f
+        engaged = false
+    }
+
+    /** Angle de la droite reliant les deux doigts, en degrés, sens horaire à l'écran. */
+    private fun fingerAngle(event: MotionEvent): Float {
+        val dx = (event.getX(1) - event.getX(0)).toDouble()
+        val dy = (event.getY(1) - event.getY(0)).toDouble()
+        return Math.toDegrees(atan2(dy, dx)).toFloat()
     }
 }
 

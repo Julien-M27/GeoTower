@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -144,5 +145,68 @@ class NetworkingParsersTest {
         assertEquals(2, profile.points.size)
         assertEquals(35.0, profile.points.first().elevation, 0.0)
         assertTrue(profile.distanceMeters > 0f)
+    }
+
+    @Test
+    fun parseRoutePath_readsGeometryAndAnnouncedDistance() {
+        val json = """
+            {
+              "distance": 1234.5,
+              "duration": 300,
+              "geometry": {
+                "type": "LineString",
+                "coordinates": [[2.0, 48.0], [2.001, 48.0], [2.001, 48.001]]
+              }
+            }
+        """.trimIndent()
+
+        val route = parseRoutePath(json)
+
+        assertEquals(3, route.points.size)
+        // Les coordonnées GeoJSON arrivent en [lon, lat] et repartent en [lat, lon].
+        assertEquals(48.0, route.points.first()[0], 0.0)
+        assertEquals(2.0, route.points.first()[1], 0.0)
+        assertEquals(1234.5, route.distanceMeters, 0.0)
+    }
+
+    @Test
+    fun parseRoutePath_fallsBackToGeometryLengthAndRejectsErrors() {
+        val withoutDistance = """
+            {
+              "geometry": {
+                "type": "LineString",
+                "coordinates": [[2.0, 48.0], [2.0, 48.01]]
+              }
+            }
+        """.trimIndent()
+
+        // Sans champ distance, la longueur est recalculée depuis la géométrie (~1,1 km).
+        assertEquals(1112.0, parseRoutePath(withoutDistance).distanceMeters, 5.0)
+
+        // Réponse d'erreur du service : aucun itinéraire exploitable.
+        assertThrows(IllegalStateException::class.java) {
+            parseRoutePath("""{"message": "no route found"}""")
+        }
+    }
+
+    @Test
+    fun routeApi_rejectsRoutesSnappedOutsideTheRequestedArea() {
+        val paris = RoutePathResult(
+            points = listOf(doubleArrayOf(48.8600, 2.3370), doubleArrayOf(48.8560, 2.3520)),
+            distanceMeters = 1170.0
+        )
+        assertTrue(
+            RouteApi.isRouteAnchoredOnRequest(paris, 48.8601, 2.3371, 48.8559, 2.3519)
+        )
+
+        // Hors couverture BD TOPO, le service rabat les points sur le réseau le plus proche : le
+        // tracé renvoyé n'a alors plus rien à voir avec les points demandés (Berlin -> Alsace).
+        val snapped = RoutePathResult(
+            points = listOf(doubleArrayOf(48.9764, 8.2216), doubleArrayOf(48.9764, 8.2216)),
+            distanceMeters = 0.0
+        )
+        assertFalse(
+            RouteApi.isRouteAnchoredOnRequest(snapped, 52.5200, 13.4000, 52.5000, 13.4200)
+        )
     }
 }

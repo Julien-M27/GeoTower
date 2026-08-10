@@ -31,17 +31,9 @@ internal data class ReleaseNoteItem(
  */
 @Composable
 internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
-    section(stringResource(R.string.appstrings_release_section_search)) {
-        item(stringResource(R.string.appstrings_release_v2021_search_admin_areas))
-    }
-
     section(stringResource(R.string.appstrings_release_section_map)) {
-        item(stringResource(R.string.appstrings_release_v2021_location_zoom))
-        item(stringResource(R.string.appstrings_release_v2021_compass_follow))
-    }
-
-    section(stringResource(R.string.appstrings_release_section_about)) {
-        item(stringResource(R.string.appstrings_release_v2021_about_sources))
+        item(stringResource(R.string.appstrings_release_v2022_measure_total))
+        item(stringResource(R.string.appstrings_release_v2022_measure_follow_roads))
     }
 }
 

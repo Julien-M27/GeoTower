@@ -144,7 +144,7 @@
     <string name="onboarding_offline_desc">Scarica l\'intero database per usare l\'elenco senza rete. Attenzione: file grande.</string>
     <string name="onboarding_offline_desc_local_build">La tua scelta di origine dei dati genera il database su questo dispositivo: qui non c\'è nulla da scaricare.</string>
     <string name="onboarding_database_enb_cut_by_level">Il database eNB / gNB non viene proposto: l\'autonomia massima lo interrompe, non essendo generabile sul dispositivo.</string>
-    <string name="settings_database_hidden_by_local_build">Qui i download mobile e radio sono nascosti: la tua scelta di origine dei dati genera quei database sul dispositivo.</string>
+    <string name="settings_database_hidden_by_local_build">Qui i download mobile e radio sono nascosti: la tua scelta di origine dei dati genera quei database sul dispositivo. I database già installati restano sul dispositivo: scegli un altro livello di provenienza per ritrovare la loro scheda, e il suo pulsante Elimina.</string>
     <string name="settings_database_hidden_by_max_autonomy">Autonomia massima: il database eNB / gNB viene tolto da qui (non è generabile sul dispositivo), insieme agli eventuali download sostituiti dalla generazione locale. I database già installati restano sul dispositivo: scegli un altro livello di provenienza per ritrovare la loro scheda, e il suo pulsante Elimina.</string>
     <string name="onboarding_display_mode_title">Come vuoi usare GeoTower?</string>
     <string name="onboarding_display_mode_desc">Due modi di sfogliare l\'app. Puoi cambiarlo in qualsiasi momento nelle impostazioni.</string>
@@ -1278,7 +1278,7 @@
     <string name="appstrings_src_geocoding_desc">Ricerca di luoghi e indirizzi, basata sui dati OpenStreetMap.</string>
     <string name="appstrings_src_ign">Mappa base IGN</string>
     <string name="appstrings_src_ign_desc">© IGN - Istituto nazionale dell\'informazione geografica e forestale.</string>
-    <string name="appstrings_src_ign_services">Mappe di base, quota del terreno (RGE ALTI) ed edifici (BD TOPO) tramite la Géoplateforme.</string>
+    <string name="appstrings_src_ign_services">Mappe di base, quota del terreno (RGE ALTI), edifici e percorsi (BD TOPO) tramite la Géoplateforme.</string>
     <string name="appstrings_src_inspo">Ispirazione e fonti esterne</string>
     <!-- CellularFR masqué — voir CellularFrApi.ENABLED. Valeur originale :
          "• © CellularFR sviluppato da Luis Baker\n• © Signal Quest sviluppato da Alexandre Germain\n• © RNC Mobile sviluppato da Cédric\n• © eNB-Analytics sviluppato da Tristan\n• © GeoRadio - L'icona alternativa proviene dall'app GéoRadio per iOS sviluppata da Hugo Martin.\n• Concetto originale basato sull'app GéoRadio\n• Icona fun disegnata da Johan" -->
@@ -2334,6 +2334,11 @@
     <string name="appstrings_measure_delete_mode_desc">Scegli cosa succede alle altre linee quando ne elimini una.</string>
     <string name="appstrings_measure_delete_independent">Indipendente (le altre linee non si spostano)</string>
     <string name="appstrings_measure_delete_reconnect">Ricollega (ricalcola con il punto precedente)</string>
+    <string name="appstrings_measure_total_distance">Totale: %1$s</string>
+    <string name="appstrings_measure_follow_roads_straight">Linea retta</string>
+    <string name="appstrings_measure_follow_roads_car">Lungo le strade</string>
+    <string name="appstrings_measure_follow_roads_walk">Lungo i sentieri</string>
+    <string name="appstrings_measure_route_unavailable">Nessun percorso trovato: resta la linea retta.</string>
     <!-- Foto preferite (Impostazioni > Preferenze) -->
     <string name="photos_favorites_title">Foto preferite</string>
     <string name="photos_favorites_desc">Trova e gestisci le foto dei siti aggiunte ai preferiti.</string>
@@ -2711,4 +2716,8 @@
     <string name="appstrings_release_v2021_location_zoom">Lo zoom applicato dal pulsante di localizzazione è regolabile, dalla regione all\'edificio</string>
     <string name="appstrings_release_v2021_compass_follow">La bussola può seguire il tuo orientamento: una pressione prolungata lo attiva o lo disattiva, e anche una rotazione a due dita lo disattiva</string>
     <string name="appstrings_release_v2021_about_sources">«Informazioni» dettaglia tutte le fonti di dati usate: il server GeoTower e il suo mirror, IGN, OpenStreetMap, i file degli operatori e il riferimento amministrativo</string>
+
+    <!-- Note di versione 2.0.22 -->
+    <string name="appstrings_release_v2022_measure_total">Lo strumento di misura mostra la distanza totale del tracciato</string>
+    <string name="appstrings_release_v2022_measure_follow_roads">La misura può seguire strade o sentieri invece della linea retta, tramite gli itinerari della Géoplateforme; se non si trova alcun percorso, la linea retta viene mantenuta</string>
 </resources>

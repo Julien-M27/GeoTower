@@ -144,7 +144,7 @@
     <string name="onboarding_offline_desc">Lade die gesamte Datenbank herunter, um die Liste ohne Netzwerk zu nutzen. Warnung: große Datei.</string>
     <string name="onboarding_offline_desc_local_build">Ihre Wahl der Datenherkunft erstellt die Datenbank auf diesem Gerät: Hier gibt es nichts herunterzuladen.</string>
     <string name="onboarding_database_enb_cut_by_level">Die eNB-/gNB-Datenbank wird nicht angeboten: Die maximale Autonomie schaltet sie ab, da sie auf dem Gerät nicht erstellt werden kann.</string>
-    <string name="settings_database_hidden_by_local_build">Die Downloads für Mobilfunk und Rundfunk sind hier ausgeblendet: Ihre Wahl der Datenherkunft erstellt diese Datenbanken auf dem Gerät.</string>
+    <string name="settings_database_hidden_by_local_build">Die Downloads für Mobilfunk und Rundfunk sind hier ausgeblendet: Ihre Wahl der Datenherkunft erstellt diese Datenbanken auf dem Gerät. Bereits installierte Datenbanken bleiben auf dem Gerät: Wählen Sie eine andere Datenherkunft, um ihre Karte samt Löschen-Schaltfläche zurückzuholen.</string>
     <string name="settings_database_hidden_by_max_autonomy">Maximale Autonomie: Die eNB-/gNB-Datenbank wird hier entfernt (sie lässt sich auf dem Gerät nicht erstellen), ebenso alle Downloads, die durch die lokale Erstellung ersetzt werden. Bereits installierte Datenbanken bleiben auf dem Gerät: Wählen Sie eine andere Datenherkunft, um ihre Karte samt Löschen-Schaltfläche zurückzuholen.</string>
     <string name="onboarding_display_mode_title">Wie möchten Sie GeoTower nutzen?</string>
     <string name="onboarding_display_mode_desc">Zwei Arten, die App zu durchstöbern. Sie können jederzeit in den Einstellungen wechseln.</string>
@@ -1278,7 +1278,7 @@
     <string name="appstrings_src_geocoding_desc">Suche nach Orten und Adressen auf Basis von OpenStreetMap-Daten.</string>
     <string name="appstrings_src_ign">IGN-Basiskarte</string>
     <string name="appstrings_src_ign_desc">© IGN - Nationales Institut für geografische und forstliche Informationen.</string>
-    <string name="appstrings_src_ign_services">Kartenhintergründe, Geländehöhe (RGE ALTI) und Gebäude (BD TOPO) über die Géoplateforme.</string>
+    <string name="appstrings_src_ign_services">Kartenhintergründe, Geländehöhe (RGE ALTI), Gebäude und Routen (BD TOPO) über die Géoplateforme.</string>
     <string name="appstrings_src_inspo">Inspiration und externe Quellen</string>
     <!-- CellularFR masqué — voir CellularFrApi.ENABLED. Valeur originale :
          "• © CellularFR entwickelt von Luis Baker\n• © Signal Quest entwickelt von Alexandre Germain\n• © RNC Mobile entwickelt von Cédric\n• © eNB-Analytics entwickelt von Tristan\n• © GeoRadio - Das alternative Symbol stammt aus der von Hugo Martin entwickelten iOS-App GéoRadio.\n• Ursprüngliches Konzept auf Basis der GéoRadio-App\n• Fun-Symbol von Johan gestaltet" -->
@@ -2334,6 +2334,11 @@
     <string name="appstrings_measure_delete_mode_desc">Lege fest, was mit den anderen Linien passiert, wenn du eine löschst.</string>
     <string name="appstrings_measure_delete_independent">Unabhängig (die anderen Linien bleiben unverändert)</string>
     <string name="appstrings_measure_delete_reconnect">Neu verbinden (mit dem vorherigen Punkt neu berechnen)</string>
+    <string name="appstrings_measure_total_distance">Gesamt: %1$s</string>
+    <string name="appstrings_measure_follow_roads_straight">Luftlinie</string>
+    <string name="appstrings_measure_follow_roads_car">Entlang der Straßen</string>
+    <string name="appstrings_measure_follow_roads_walk">Entlang der Wege</string>
+    <string name="appstrings_measure_route_unavailable">Keine Route gefunden: Luftlinie bleibt.</string>
     <!-- Lieblingsfotos (Einstellungen > Präferenzen) -->
     <string name="photos_favorites_title">Lieblingsfotos</string>
     <string name="photos_favorites_desc">Finde und verwalte die als Favorit markierten Standortfotos.</string>
@@ -2711,4 +2716,8 @@
     <string name="appstrings_release_v2021_location_zoom">Der Zoom der Standort-Schaltfläche ist jetzt einstellbar, von der Region bis zum Gebäude</string>
     <string name="appstrings_release_v2021_compass_follow">Der Kompass kann deiner Ausrichtung folgen: Ein langer Druck schaltet ihn ein oder aus, eine Zwei-Finger-Drehung schaltet ihn ebenfalls aus</string>
     <string name="appstrings_release_v2021_about_sources">„Über“ führt alle genutzten Datenquellen auf: den GeoTower-Server und seinen Spiegel, IGN, OpenStreetMap, die Dateien der Betreiber und die Verwaltungsreferenz</string>
+
+    <!-- Versionshinweise 2.0.22 -->
+    <string name="appstrings_release_v2022_measure_total">Das Messwerkzeug zeigt die Gesamtlänge der Strecke</string>
+    <string name="appstrings_release_v2022_measure_follow_roads">Die Messung kann Straßen oder Wegen folgen statt der Luftlinie, über die Routen der Géoplateforme; wird keine Route gefunden, bleibt die Luftlinie erhalten</string>
 </resources>

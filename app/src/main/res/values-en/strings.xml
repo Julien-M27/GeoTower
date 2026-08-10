@@ -144,7 +144,7 @@
     <string name="onboarding_offline_desc">Download the entire database to use the list offline. Warning: large file.</string>
     <string name="onboarding_offline_desc_local_build">Your data source choice builds the database on this device: nothing to download here.</string>
     <string name="onboarding_database_enb_cut_by_level">The eNB / gNB database is not offered: maximum autonomy cuts it off, as it can\'t be built on the device.</string>
-    <string name="settings_database_hidden_by_local_build">Mobile and radio downloads are hidden here: your data source choice builds these databases on the device.</string>
+    <string name="settings_database_hidden_by_local_build">Mobile and radio downloads are hidden here: your data source choice builds these databases on the device. Databases already installed stay on the device: pick another data-origin level to get their card, and its Delete button, back.</string>
     <string name="settings_database_hidden_by_max_autonomy">Maximum autonomy: the eNB / gNB database is removed from here (it can\'t be built on the device), along with any download replaced by local building. Databases already installed stay on the device: pick another data-origin level to get their card, and its Delete button, back.</string>
     <string name="onboarding_display_mode_title">How do you want to use GeoTower?</string>
     <string name="onboarding_display_mode_desc">Two ways to browse the app. You can switch at any time from the settings.</string>
@@ -1278,7 +1278,7 @@
     <string name="appstrings_src_geocoding_desc">Place and address lookup, based on OpenStreetMap data.</string>
     <string name="appstrings_src_ign">IGN Basemap</string>
     <string name="appstrings_src_ign_desc">© IGN - National Institute of Geographic and Forest Information.</string>
-    <string name="appstrings_src_ign_services">Basemaps, terrain elevation (RGE ALTI) and buildings (BD TOPO) through the Géoplateforme.</string>
+    <string name="appstrings_src_ign_services">Basemaps, terrain elevation (RGE ALTI), buildings and routes (BD TOPO) through the Géoplateforme.</string>
     <string name="appstrings_src_inspo">Inspiration &amp; External Sources</string>
     <!-- CellularFR masqué — voir CellularFrApi.ENABLED. Valeur originale :
          "• © CellularFR developed by Luis Baker\n• © Signal Quest developed by Alexandre Germain\n• © RNC Mobile developed by Cédric\n• © eNB-Analytics developed by Tristan\n• © GeoRadio - The alternative icon comes from the GéoRadio iOS app developed by Hugo Martin.\n• Original concept based on the GéoRadio app\n• Fun icon designed by Johan" -->
@@ -2334,6 +2334,11 @@
     <string name="appstrings_measure_delete_mode_desc">Choose what happens to the other segments when you delete one.</string>
     <string name="appstrings_measure_delete_independent">Independent (the other segments don\'t move)</string>
     <string name="appstrings_measure_delete_reconnect">Reconnect (recalculate with the previous point)</string>
+    <string name="appstrings_measure_total_distance">Total: %1$s</string>
+    <string name="appstrings_measure_follow_roads_straight">Straight line</string>
+    <string name="appstrings_measure_follow_roads_car">Along roads</string>
+    <string name="appstrings_measure_follow_roads_walk">Along paths</string>
+    <string name="appstrings_measure_route_unavailable">No route found: straight line kept.</string>
     <!-- Favorite photos page (Settings > Preferences) -->
     <string name="photos_favorites_title">Favorite photos</string>
     <string name="photos_favorites_desc">Find and manage the site photos you starred.</string>
@@ -2711,4 +2716,8 @@
     <string name="appstrings_release_v2021_location_zoom">The zoom applied by the location button is now adjustable, from region down to building</string>
     <string name="appstrings_release_v2021_compass_follow">The compass can follow your heading: a long press turns it on or off, and a two-finger rotation turns it off too</string>
     <string name="appstrings_release_v2021_about_sources">“About” details every data source used: the GeoTower server and its mirror, IGN, OpenStreetMap, the operators\' files and the administrative reference data</string>
+
+    <!-- Release notes 2.0.22 -->
+    <string name="appstrings_release_v2022_measure_total">The measuring tool shows the total distance of the path</string>
+    <string name="appstrings_release_v2022_measure_follow_roads">Measurements can follow roads or trails instead of a straight line, using Géoplateforme routing; when no route is found, the straight line is kept</string>
 </resources>

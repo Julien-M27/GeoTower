@@ -347,6 +347,7 @@ object RemoteFeatureFlags {
         const val MAP_OFFLINE = "map.offline"
         const val SEARCH_NOMINATIM = "search.nominatim"
         const val ELEVATION_IGN = "elevation.ign"
+        const val ROUTING_IGN = "routing.ign"
         const val OUTAGES_GEOTOWER = "outages.geotower"
         const val SIGNALQUEST = "signalQuest"
         const val CELLULARFR = "cellularFr"
@@ -507,6 +508,7 @@ object RemoteFeatureFlags {
             Providers.MAP_OFFLINE to true,
             Providers.SEARCH_NOMINATIM to true,
             Providers.ELEVATION_IGN to true,
+            Providers.ROUTING_IGN to true,
             Providers.OUTAGES_GEOTOWER to true,
             Providers.SIGNALQUEST to true,
             Providers.CELLULARFR to false,
