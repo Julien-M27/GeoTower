@@ -37,6 +37,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -120,8 +121,10 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.PlatformTextStyle
@@ -147,6 +150,7 @@ import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.ui.components.SecureScreenEffect
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.RadioMapMarker
+import fr.geotower.data.AdminAreaExtent
 import fr.geotower.data.models.SiteHsEntity
 import fr.geotower.data.models.isDeclaredActive
 import fr.geotower.data.models.physicalSiteKey
@@ -158,6 +162,7 @@ import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.PowerProfile
 import fr.geotower.utils.AppLogger
+import fr.geotower.utils.FrenchAdminAreas
 import fr.geotower.utils.FrequencyFilterSelection
 import fr.geotower.utils.MapFilterDefaults
 import fr.geotower.utils.LocationReadiness
@@ -187,7 +192,9 @@ import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.FolderOverlay
 import org.osmdroid.views.overlay.MapEventsOverlay
 import org.osmdroid.views.overlay.Marker
+import org.osmdroid.views.overlay.Overlay
 import org.osmdroid.views.overlay.Polyline
+import org.osmdroid.views.overlay.gestures.RotationGestureDetector
 import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
 import androidx.compose.foundation.Canvas as ComposeCanvas
 import androidx.compose.runtime.withFrameNanos
@@ -207,14 +214,16 @@ import java.text.Normalizer
 import java.util.Locale
 import android.os.Environment
 import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.hypot
 import kotlin.math.log2
 import kotlin.math.roundToInt
+import kotlin.math.sin
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import fr.geotower.R
 
 private const val HS_OPERATOR_WILDCARD = "*"
-private const val INITIAL_LOCATION_ZOOM = 16.0
 private const val MOUSE_WHEEL_ZOOM_STEP = 1.0
 private const val MOUSE_WHEEL_ZOOM_ANIMATION_MS = 80L
 private const val WEB_MERCATOR_WORLD_TILE_SIZE_PX = 256.0
@@ -226,8 +235,26 @@ private const val MAP_RELOAD_MIN_VIEWPORT_SHIFT_RATIO = 0.10
 private const val MAP_MARKER_REDRAW_DEBOUNCE_MS = 40L
 private const val MAP_COMPASS_UPDATE_INTERVAL_MS = 80L
 private const val MAP_ACTIVE_FILTER_LIST_LIMIT = 3
+/**
+ * Au-delà de ce nombre de stations, une recherche de département / région se contente de cadrer la
+ * carte : le filtrage par zone désactive le regroupement, et poser d'un coup les marqueurs d'une
+ * grande région (Auvergne-Rhône-Alpes en compte plus de 18 000) fige l'affichage.
+ */
+private const val ADMIN_AREA_DETAIL_LIMIT = 8000
 /** Repos de la boucle de rendu fluide quand il n'y a rien à animer (immobile ou sans position). */
 private const val SMOOTH_LOCATION_IDLE_POLL_MS = 50L
+
+/**
+ * Rotation de la carte : chaque pas repose TOUS les marqueurs de la vue. On ne suit donc pas le
+ * capteur au degré près — en dessous de cet écart la carte ne bouge pas, et deux pas sont espacés
+ * d'au moins cet intervalle. Le geste à deux doigts, lui, doit rester collé au doigt : sa cadence
+ * est plus rapide, mais le nombre d'images reste borné pendant tout le pincement.
+ */
+/** Orientation de la carte au moment où on l'a quittée, pour la retrouver telle quelle. */
+private const val PREF_LAST_MAP_ORIENTATION = "last_map_orientation"
+private const val MAP_FOLLOW_ORIENTATION_MIN_DELTA_DEG = 2f
+private const val MAP_FOLLOW_ORIENTATION_INTERVAL_MS = 100L
+private const val MAP_ROTATION_GESTURE_INTERVAL_MS = 25L
 
 private val hsBadgeDrawableCache = android.util.LruCache<Int, BitmapDrawable>(4)
 private val hsMarkerIconCache = android.util.LruCache<String, BitmapDrawable>(500)
@@ -304,6 +331,15 @@ private fun parseServiceDateInt(raw: String?): Int? {
     }
 }
 
+/**
+ * Niveau de zoom du recentrage sur la position : réglable dans Réglages > Cartographie
+ * (AppConfig.PREF_MAP_LOCATION_ZOOM). Il sert aussi bien au bouton de localisation qu'au tout
+ * premier centrage automatique, qui sont le même geste vu par l'utilisateur.
+ */
+private fun preferredLocationZoom(): Double = AppConfig.mapLocationZoom.intValue
+    .coerceIn(AppConfig.MIN_MAP_LOCATION_ZOOM, AppConfig.MAX_MAP_LOCATION_ZOOM)
+    .toDouble()
+
 private fun MapView.enableMouseWheelZoom() {
     setOnGenericMotionListener { _, event ->
         if (event.action != MotionEvent.ACTION_SCROLL) return@setOnGenericMotionListener false
@@ -342,6 +378,48 @@ private fun MapView.applyWorldMapBounds() {
         controller.stopAnimation(false)
         controller.setZoom(minZoom)
     }
+}
+
+/** Écart signé le plus court entre deux caps, ramené dans ]-180°, 180°]. */
+private fun shortestAngleDelta(from: Float, to: Float): Float {
+    var delta = (to - from) % 360f
+    if (delta <= -180f) delta += 360f
+    else if (delta > 180f) delta -= 360f
+    return delta
+}
+
+/** Orientation ramenée dans [0°, 360°[, pour ne pas laisser filer l'angle au fil des gestes. */
+private fun normalizeMapOrientation(degrees: Float): Float {
+    val normalized = degrees % 360f
+    return if (normalized < 0f) normalized + 360f else normalized
+}
+
+/**
+ * Angle auquel un cap géographique apparaît à l'écran, carte tournée comprise : plein nord n'est
+ * en haut que tant que l'orientation vaut zéro.
+ */
+private fun MapView.screenAngleOf(bearingDegrees: Float): Float = bearingDegrees + mapOrientation
+
+/**
+ * Passe un point de la projection osmdroid (repère « carte au nord », celui que rend `toPixels`)
+ * aux coordonnées réellement affichées.
+ *
+ * osmdroid tourne lui-même le canevas avant de dessiner ses calques : la conversion n'est utile
+ * qu'aux dessins posés PAR-DESSUS la MapView (couche fluide du repère, capture de partage), qui
+ * n'héritent d'aucune matrice.
+ */
+private fun MapView.projectedPointToScreen(point: android.graphics.Point) {
+    val orientation = mapOrientation
+    if (orientation % 360f == 0f) return
+    val centerX = width / 2f
+    val centerY = height / 2f
+    val radians = Math.toRadians(orientation.toDouble())
+    val cosAngle = cos(radians).toFloat()
+    val sinAngle = sin(radians).toFloat()
+    val dx = point.x - centerX
+    val dy = point.y - centerY
+    point.x = (centerX + dx * cosAngle - dy * sinAngle).roundToInt()
+    point.y = (centerY + dx * sinAngle + dy * cosAngle).roundToInt()
 }
 
 private fun MapView.visibleLongitudeBounds(): Pair<Double, Double> {
@@ -461,6 +539,21 @@ private fun decodeSearchAreaBounds(encoded: String?): SearchAreaBounds? {
     } else {
         null
     }
+}
+
+/** `D:35`, `R:53` — le nom et les départements couverts se relisent dans [FrenchAdminAreas]. */
+private fun encodeAdminArea(area: FrenchAdminAreas.Area): String {
+    val kind = if (area.kind == FrenchAdminAreas.Kind.REGION) "R" else "D"
+    return "$kind:${area.code}"
+}
+
+private fun decodeAdminArea(encoded: String?): FrenchAdminAreas.Area? {
+    if (encoded.isNullOrBlank()) return null
+    val parts = encoded.split(":", limit = 2)
+    if (parts.size != 2) return null
+
+    val prefix = if (parts[0] == "R") "region" else "dept"
+    return FrenchAdminAreas.match("$prefix:${parts[1]}")
 }
 
 private fun encodeBooleanList(values: List<Boolean>): String? {
@@ -973,6 +1066,7 @@ fun MapScreen(
     val sitesHs by viewModel.sitesHs.collectAsState()
     val cityStatsTechniques by viewModel.cityStatsTechniques.collectAsState()
     val isCityStatsTechniquesLoading by viewModel.isCityStatsTechniquesLoading.collectAsState()
+    val adminAreaOutline by viewModel.adminAreaOutline.collectAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
     val featureFlags by RemoteFeatureFlags.config
     val canUseSignalQuestCoverage by androidx.compose.runtime.rememberUpdatedState(
@@ -993,14 +1087,28 @@ fun MapScreen(
     var currentSearchAreaBoundsEncoded by rememberSaveable { mutableStateOf<String?>(null) }
     var currentSearchAreaBounds by remember { mutableStateOf(decodeSearchAreaBounds(currentSearchAreaBoundsEncoded)) }
     var loadedCitySearchKey by remember { mutableStateOf<String?>(null) }
+    // Recherche par département / région : seul le code est mémorisé, le référentiel étant figé
+    // dans l'app. L'emprise, elle, réutilise `currentSearchAreaBounds` — les deux recherches de
+    // zone s'excluent, il n'y en a jamais qu'une active.
+    var currentAdminAreaCode by rememberSaveable { mutableStateOf<String?>(null) }
+    var loadedAdminAreaKey by remember { mutableStateOf<String?>(null) }
+    val currentAdminArea = remember(currentAdminAreaCode) { decodeAdminArea(currentAdminAreaCode) }
+
     fun setCurrentCitySearch(bounds: SearchAreaBounds?, polygons: List<List<GeoPoint>>?) {
         currentSearchAreaBounds = bounds
         currentSearchAreaBoundsEncoded = encodeSearchAreaBounds(bounds)
         currentCityPolygons = polygons
         currentCityPolygonsEncoded = encodeGeoPointPolygons(polygons)
+        currentAdminAreaCode = null
+        loadedAdminAreaKey = null
         if (bounds == null || polygons.isNullOrEmpty()) {
             loadedCitySearchKey = null
         }
+    }
+
+    fun setCurrentAdminAreaSearch(area: FrenchAdminAreas.Area, bounds: SearchAreaBounds) {
+        setCurrentCitySearch(bounds, null)
+        currentAdminAreaCode = encodeAdminArea(area)
     }
 
     fun loadCurrentCitySearchIfNeeded(force: Boolean = false) {
@@ -1016,6 +1124,22 @@ fun MapScreen(
             latSouth = bounds.latSouth,
             lonWest = bounds.lonWest,
             polygons = polygons
+        )
+    }
+
+    fun loadCurrentAdminAreaSearchIfNeeded(force: Boolean = false) {
+        val area = currentAdminArea ?: return
+        val bounds = currentSearchAreaBounds ?: return
+        val searchKey = "${currentAdminAreaCode.orEmpty()}|${currentSearchAreaBoundsEncoded.orEmpty()}"
+        if (!force && loadedAdminAreaKey == searchKey) return
+
+        loadedAdminAreaKey = searchKey
+        viewModel.loadAntennasForAdminArea(
+            departmentCodes = area.departmentCodes,
+            latNorth = bounds.latNorth,
+            lonEast = bounds.lonEast,
+            latSouth = bounds.latSouth,
+            lonWest = bounds.lonWest
         )
     }
 
@@ -1062,6 +1186,7 @@ fun MapScreen(
     val pageSettingsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var mapViewRef by remember { mutableStateOf<MapView?>(null) }
     var locationOverlayRef by remember { mutableStateOf<MyLocationNewOverlay?>(null) }
+    var rotationOverlayRef by remember { mutableStateOf<MapRotationGestureOverlay?>(null) }
     val mapViewUsable = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
 
     // Supports superposés (mêmes coordonnées GPS) en attente de choix par l'utilisateur.
@@ -1287,6 +1412,40 @@ fun MapScreen(
     var showScale by remember { mutableStateOf(prefs.getBoolean("show_map_scale", true)) }
     var showAttribution by remember { mutableStateOf(prefs.getBoolean("show_map_attribution", true)) }
     val showLocationMarker by AppConfig.showMapLocationMarker
+
+    // --- Orientation de la carte ---------------------------------------------------------------
+    // Deux réglages distincts : le droit de tourner la carte à deux doigts, et l'alignement
+    // automatique sur la boussole. Ce dernier se coupe aussi depuis la carte (appui long sur la
+    // boussole) et dès qu'un doigt reprend la main sur la rotation.
+    val mapRotationEnabled by AppConfig.mapRotationEnabled
+    val followOrientation = PowerProfile.mapFollowOrientation && AppConfig.hasCompass.value
+    val setFollowOrientation: (Boolean) -> Unit = remember(prefs) {
+        { enabled ->
+            AppConfig.mapFollowOrientation.value = enabled
+            prefs.edit().putBoolean(AppConfig.PREF_MAP_FOLLOW_ORIENTATION, enabled).apply()
+        }
+    }
+    // Cadence d'application du cap à la carte (cf. MAP_FOLLOW_ORIENTATION_*), gardée hors de la
+    // composition : ces valeurs ne doivent déclencher aucun redessin par elles-mêmes.
+    val followOrientationState = remember { longArrayOf(0L) }
+    // Orientation courante, reflétée dans la composition : la MapView n'est pas observable, or la
+    // rose des vents du bouton boussole doit tourner avec la carte.
+    val mapOrientationState = remember {
+        mutableFloatStateOf(normalizeMapOrientation(prefs.getFloat(PREF_LAST_MAP_ORIENTATION, 0f)))
+    }
+    // Appui court sur la rose des vents : nord en haut, et on lâche le cap de l'appareil — sans quoi
+    // le capteur reprendrait la main dans la foulée.
+    val resetMapOrientation: () -> Unit = {
+        if (AppConfig.mapFollowOrientation.value) setFollowOrientation(false)
+        mapViewRef?.let { map ->
+            map.mapOrientation = 0f
+            map.invalidate()
+        }
+        mapOrientationState.floatValue = 0f
+    }
+    val toggleFollowOrientation: () -> Unit = {
+        setFollowOrientation(!AppConfig.mapFollowOrientation.value)
+    }
 
     var myCurrentLoc by remember { mutableStateOf<GeoPoint?>(null) }
     var currentSpeedKmH by remember { mutableIntStateOf(0) }
@@ -1606,6 +1765,7 @@ fun MapScreen(
                             .putFloat("last_map_lat", map.mapCenter.latitude.toFloat())
                             .putFloat("last_map_lon", map.mapCenter.longitude.toFloat())
                             .putFloat("last_map_zoom", map.zoomLevelDouble.toFloat())
+                            .putFloat(PREF_LAST_MAP_ORIENTATION, map.mapOrientation)
                             .apply()
                     }
 
@@ -2552,10 +2712,36 @@ fun MapScreen(
         }
     }
 
-    LaunchedEffect(mapViewRef, currentSearchAreaBoundsEncoded, currentCityPolygonsEncoded) {
+    // Le contour d'un département vient du réseau : il arrive après les sites, et seulement si la
+    // zone dessinée est bien celle qui est sélectionnée.
+    val searchBoundaryPolygons = currentCityPolygons
+        ?: adminAreaOutline?.takeIf { it.areaCode == currentAdminAreaCode }?.polygons
+
+    LaunchedEffect(currentAdminAreaCode) {
+        val area = currentAdminArea
+        val areaCode = currentAdminAreaCode
+        if (area == null || areaCode == null) {
+            viewModel.clearAdminAreaOutline()
+        } else {
+            viewModel.loadAdminAreaOutline(
+                areaCode = areaCode,
+                areaName = area.name,
+                isRegion = area.kind == FrenchAdminAreas.Kind.REGION
+            )
+        }
+    }
+
+    LaunchedEffect(
+        mapViewRef,
+        currentSearchAreaBoundsEncoded,
+        currentCityPolygonsEncoded,
+        currentAdminAreaCode,
+        searchBoundaryPolygons
+    ) {
         mapViewRef?.let { map ->
-            refreshSearchBoundaryOverlay(map, currentCityPolygons)
+            refreshSearchBoundaryOverlay(map, searchBoundaryPolygons)
             loadCurrentCitySearchIfNeeded()
+            loadCurrentAdminAreaSearchIfNeeded()
         }
     }
 
@@ -2755,6 +2941,9 @@ fun MapScreen(
                     ))
 
                     controller.setZoom(prefs.getFloat("last_map_zoom", 6.0f).toDouble())
+                    // On retrouve la carte comme on l'a laissée, sauf si la rotation a été coupée
+                    // entre-temps : le `update` remettra alors le nord en haut.
+                    mapOrientation = normalizeMapOrientation(prefs.getFloat(PREF_LAST_MAP_ORIENTATION, 0f))
 
                     val locationOverlay = object : CustomLocationOverlay(FusedMyLocationProvider(ctx), this, safePrimaryColor) {
                         override fun onLocationChanged(location: android.location.Location?, source: org.osmdroid.views.overlay.mylocation.IMyLocationProvider?) {
@@ -2791,16 +2980,17 @@ fun MapScreen(
                             post {
                                 myCurrentLoc = initialLoc
                                 if (!hasSavedPosition) {
+                                    val initialZoom = preferredLocationZoom()
                                     controller.stopAnimation(false)
-                                    controller.setZoom(INITIAL_LOCATION_ZOOM)
+                                    controller.setZoom(initialZoom)
                                     controller.setCenter(initialLoc)
-                                    currentZoom = INITIAL_LOCATION_ZOOM
+                                    currentZoom = initialZoom
                                     currentLat = initialLoc.latitude
 
                                     prefs.edit()
                                         .putFloat("last_map_lat", initialLoc.latitude.toFloat())
                                         .putFloat("last_map_lon", initialLoc.longitude.toFloat())
-                                        .putFloat("last_map_zoom", INITIAL_LOCATION_ZOOM.toFloat())
+                                        .putFloat("last_map_zoom", initialZoom.toFloat())
                                         .apply()
                                 }
                             }
@@ -2817,7 +3007,22 @@ fun MapScreen(
                     overlays.add(markersOverlay) // <-- Calque micro au milieu
                     overlays.add(locationOverlay) // <-- Curseur devant
 
+                    // Ajouté en dernier : les calques reçoivent les gestes dans l'ordre inverse du
+                    // dessin, la rotation voit donc le pincement avant que quiconque puisse l'avaler.
+                    val rotationOverlay = MapRotationGestureOverlay(this) { orientation ->
+                        mapOrientationState.floatValue = orientation
+                        // Le doigt reprend la main : l'alignement automatique se coupe, sinon le
+                        // capteur ramènerait la carte sur le cap à l'image suivante.
+                        if (AppConfig.mapFollowOrientation.value) {
+                            AppConfig.mapFollowOrientation.value = false
+                            prefs.edit().putBoolean(AppConfig.PREF_MAP_FOLLOW_ORIENTATION, false).apply()
+                        }
+                    }
+                    rotationOverlay.isEnabled = AppConfig.mapRotationEnabled.value
+                    overlays.add(rotationOverlay)
+
                     locationOverlayRef = locationOverlay
+                    rotationOverlayRef = rotationOverlay
 
                     var lastRadius = 250
                     var lastLoadedViewport: MapViewportSnapshot? = null
@@ -2895,6 +3100,26 @@ fun MapScreen(
                         shouldInvalidateMap = true
                     }
                     overlay.smoothFollowActive = smoothLocationEnabled && isTrackingActive
+                }
+
+                // --- Orientation de la carte ---------------------------------------------------
+                rotationOverlayRef?.isEnabled = mapRotationEnabled
+                if (followOrientation) {
+                    // Un pas de rotation redessine toute la carte : on ne suit le cap ni au degré
+                    // près, ni à la cadence du capteur (cf. MAP_FOLLOW_ORIENTATION_*).
+                    val target = normalizeMapOrientation(-azimuth)
+                    val now = SystemClock.uptimeMillis()
+                    if (abs(shortestAngleDelta(map.mapOrientation, target)) >= MAP_FOLLOW_ORIENTATION_MIN_DELTA_DEG &&
+                        now - followOrientationState[0] >= MAP_FOLLOW_ORIENTATION_INTERVAL_MS
+                    ) {
+                        followOrientationState[0] = now
+                        map.mapOrientation = target
+                        mapOrientationState.floatValue = target
+                    }
+                } else if (!mapRotationEnabled && map.mapOrientation % 360f != 0f) {
+                    // Plus aucun moyen de la redresser à la main : on remet le nord en haut.
+                    map.mapOrientation = 0f
+                    mapOrientationState.floatValue = 0f
                 }
 
                 // 🗺️ LOGIQUE HORS-LIGNE
@@ -2993,6 +3218,11 @@ fun MapScreen(
                 // le repère reste collé à la carte même pendant une inertie ou un pincement.
                 @Suppress("UNUSED_EXPRESSION")
                 smoothFrameTick
+                // Même raison pour l'orientation : la MapView n'est pas observable, donc sans cette
+                // lecture une rotation au doigt laisserait le repère collé à son ancien pixel tant
+                // que rien d'autre ne rejoue ce dessin.
+                @Suppress("UNUSED_EXPRESSION")
+                mapOrientationState.floatValue
                 if (!showLocationMarker) return@ComposeCanvas
                 val map = mapViewRef ?: return@ComposeCanvas
                 val position = smoothEngine.sample(SystemClock.elapsedRealtime())
@@ -3000,11 +3230,14 @@ fun MapScreen(
 
                 drawPoint.setCoords(position.latitude, position.longitude)
                 map.projection.toPixels(drawPoint, drawPixel)
+                // Cette couche est peinte au-dessus de la MapView, donc hors du canevas que
+                // osmdroid a tourné : la rotation de la carte, elle, est à appliquer à la main.
+                map.projectedPointToScreen(drawPixel)
                 markerPainter.draw(
                     canvas = drawContext.canvas.nativeCanvas,
                     x = drawPixel.x.toFloat(),
                     y = drawPixel.y.toFloat(),
-                    rotationDegrees = if (PowerProfile.mapCompassRotation) azimuth else 0f,
+                    rotationDegrees = map.screenAngleOf(if (PowerProfile.mapCompassRotation) azimuth else 0f),
                     showDirection = AppConfig.hasCompass.value
                 )
             }
@@ -3057,6 +3290,50 @@ fun MapScreen(
             }
         }
 
+        /**
+         * Cadre la carte sur un département / une région, et n'y affiche que ses stations tant
+         * qu'elle tient dans un affichage détaillé. Au-delà, on se contente du déplacement : le
+         * chargement normal (avec regroupement) reprend la main au premier mouvement.
+         */
+        fun applyAdminAreaSearch(area: FrenchAdminAreas.Area, extent: AdminAreaExtent) {
+            val map = mapViewRef ?: return
+            searchBoundaryOverlay.items.clear()
+
+            if (extent.siteCount <= ADMIN_AREA_DETAIL_LIMIT) {
+                setCurrentAdminAreaSearch(
+                    area,
+                    SearchAreaBounds(
+                        latNorth = extent.latNorth,
+                        lonEast = extent.lonEast,
+                        latSouth = extent.latSouth,
+                        lonWest = extent.lonWest
+                    )
+                )
+                loadCurrentAdminAreaSearchIfNeeded(force = true)
+                showCityStatsPopup = true
+            } else {
+                setCurrentCitySearch(null, null)
+                viewModel.resetCityLock()
+                Toast.makeText(
+                    context,
+                    resources.getString(R.string.map_search_area_too_large, area.name),
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+
+            map.zoomToBoundingBox(
+                org.osmdroid.util.BoundingBox(
+                    extent.latNorth,
+                    extent.lonEast,
+                    extent.latSouth,
+                    extent.lonWest
+                ),
+                true,
+                100
+            )
+            map.invalidate()
+        }
+
         fun performSearch(query: String) {
             val cleanQuery = query.trim()
             if (cleanQuery.isBlank()) {
@@ -3080,9 +3357,27 @@ fun MapScreen(
             }
 
             scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                // 2. ✅ NOUVEAU : Recherche Globale d'ID (Base de données entière)
+                // 2. Département / région (« 35 », « Ille-et-Vilaine », « region:Occitanie ») :
+                // avant la recherche d'ID, sinon un code d'outre-mer comme « 974 » partirait en
+                // « id_anfr LIKE %974% » et tomberait sur un site quelconque.
+                val adminArea = FrenchAdminAreas.match(cleanQuery)
+                if (adminArea != null) {
+                    val extent = viewModel.findAdminAreaExtent(adminArea.departmentCodes)
+                    if (extent != null) {
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                            applyAdminAreaSearch(adminArea, extent)
+                        }
+                        return@launch
+                    }
+                }
+
+                // Sans base locale (repli API live), la zone reste cadrable en ligne : on y va avec
+                // son nom complet, un code nu comme « 35 » ne voudrait rien dire pour un géocodeur.
+                val locationQuery = adminArea?.let { "${it.name}, France" } ?: cleanQuery
+
+                // 3. ✅ NOUVEAU : Recherche Globale d'ID (Base de données entière)
                 val hasDigits = cleanQuery.any { it.isDigit() }
-                if (hasDigits && cleanQuery.length >= 3) {
+                if (adminArea == null && hasDigits && cleanQuery.length >= 3) {
                     val globalSite = viewModel.searchSiteById(cleanQuery)
 
                     if (globalSite != null) {
@@ -3103,8 +3398,8 @@ fun MapScreen(
                     }
                 }
 
-                // 3. Recherche de Ville / Adresse via internet (Nominatim)
-                val nominatimArea = NominatimApi.searchArea(cleanQuery)
+                // 4. Recherche de Ville / Adresse via internet (Nominatim)
+                val nominatimArea = NominatimApi.searchArea(locationQuery)
                 if (nominatimArea != null) {
                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                         mapViewRef?.let { map ->
@@ -3144,7 +3439,7 @@ fun MapScreen(
                 try {
                     val geocoder = android.location.Geocoder(context)
                     @Suppress("DEPRECATION")
-                    val results = geocoder.getFromLocationName(cleanQuery, 1)
+                    val results = geocoder.getFromLocationName(locationQuery, 1)
 
                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                         if (!results.isNullOrEmpty()) {
@@ -3315,11 +3610,14 @@ fun MapScreen(
                                 GeoPoint(position.latitude, position.longitude),
                                 pixel
                             )
+                            // La capture rend la MapView déjà tournée : le repère, repeint par-dessus,
+                            // doit suivre la même rotation (cf. la couche fluide à l'écran).
+                            map.projectedPointToScreen(pixel)
                             locationMarkerPainter.draw(
                                 canvas = canvas,
                                 x = pixel.x.toFloat(),
                                 y = pixel.y.toFloat(),
-                                rotationDegrees = if (PowerProfile.mapCompassRotation) azimuth else 0f,
+                                rotationDegrees = map.screenAngleOf(if (PowerProfile.mapCompassRotation) azimuth else 0f),
                                 showDirection = AppConfig.hasCompass.value
                             )
                         }
@@ -3344,15 +3642,15 @@ fun MapScreen(
         if (showCompass && AppConfig.hasCompass.value && !useCompactCompassPlacement && !showCompassInMapHeader) {
             MapCompassButton(
                 azimuth = azimuth,
+                mapOrientation = mapOrientationState.floatValue,
+                followActive = followOrientation,
+                onToggleFollow = if (PowerProfile.isEco) null else toggleFollowOrientation,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(end = compassEndPadding, top = compassTopPadding)
                     .size(mapControlButtonDiameter)
             ) {
-                safeClick {
-                    mapViewRef?.mapOrientation = 0f
-                    mapViewRef?.invalidate()
-                }
+                safeClick { resetMapOrientation() }
             }
         }
 
@@ -3520,12 +3818,12 @@ fun MapScreen(
                     if (showCompassInMapHeader) {
                         MapCompassButton(
                             azimuth = azimuth,
+                            mapOrientation = mapOrientationState.floatValue,
+                            followActive = followOrientation,
+                            onToggleFollow = if (PowerProfile.isEco) null else toggleFollowOrientation,
                             modifier = Modifier.size(mapControlButtonDiameter)
                         ) {
-                            safeClick {
-                                mapViewRef?.mapOrientation = 0f
-                                mapViewRef?.invalidate()
-                            }
+                            safeClick { resetMapOrientation() }
                         }
                     }
 
@@ -3636,12 +3934,12 @@ fun MapScreen(
             if (showCompactCompass) {
                 MapCompassButton(
                     azimuth = azimuth,
+                    mapOrientation = mapOrientationState.floatValue,
+                    followActive = followOrientation,
+                    onToggleFollow = if (PowerProfile.isEco) null else toggleFollowOrientation,
                     modifier = Modifier.size(mapControlButtonDiameter)
                 ) {
-                    safeClick {
-                        mapViewRef?.mapOrientation = 0f
-                        mapViewRef?.invalidate()
-                    }
+                    safeClick { resetMapOrientation() }
                 }
             }
 
@@ -3801,10 +4099,11 @@ fun MapScreen(
                             }
 
                             fun centerOnLocation(location: GeoPoint) {
+                                val zoom = preferredLocationZoom()
                                 map.controller.stopAnimation(false)
-                                map.controller.setZoom(16.0)
+                                map.controller.setZoom(zoom)
                                 map.controller.setCenter(location)
-                                currentZoom = 16.0
+                                currentZoom = zoom
                                 currentLat = location.latitude
                                 hasCenteredOnLocation = true
                             }
@@ -4121,6 +4420,13 @@ fun MapScreen(
                     showCompass = it
                     prefs.edit().putBoolean("show_map_compass", it).apply()
                 },
+                mapRotation = mapRotationEnabled,
+                onMapRotationChange = {
+                    AppConfig.mapRotationEnabled.value = it
+                    prefs.edit().putBoolean(AppConfig.PREF_MAP_ROTATION_ENABLED, it).apply()
+                },
+                followOrientation = AppConfig.mapFollowOrientation.value,
+                onFollowOrientationChange = setFollowOrientation,
                 showScale = showScale,
                 onScaleChange = {
                     showScale = it
@@ -4225,13 +4531,30 @@ fun MapScreen(
                 ) {
                     val cityStats = if (isLoading) null else declaredSiteStats(filteredAntennas)
 
-                    Text(
-                        text = stringResource(R.string.appstrings_city_stats_title),
-                        style = sizing.textStyle(MaterialTheme.typography.titleMedium),
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        textAlign = TextAlign.Center
-                    )
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(sizing.spacing(4.dp))
+                    ) {
+                        Text(
+                            text = stringResource(R.string.appstrings_city_stats_title),
+                            style = sizing.textStyle(MaterialTheme.typography.titleMedium),
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.Center
+                        )
+
+                        // Une commune est identifiable d'un coup d'œil sur la carte, un département
+                        // beaucoup moins : on rappelle la zone sur laquelle portent les compteurs.
+                        currentAdminArea?.let { area ->
+                            Text(
+                                text = area.name,
+                                style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
 
                     Card(
                         shape = RoundedCornerShape(16.dp),
@@ -4326,6 +4649,9 @@ fun MapScreen(
             antennas = filteredAntennas,
             techniques = cityStatsTechniques,
             isFrequencyStatusLoading = isCityStatsTechniquesLoading,
+            // Un département couvre des centaines de communes : garder la commune dominante
+            // n'y compterait qu'une fraction des sites, alors que le total en compte la totalité.
+            restrictToMainCity = currentAdminArea == null,
             onRequestFrequencyStatus = { idAnfrs ->
                 viewModel.loadCityStatsTechniques(idAnfrs.toList())
             },
@@ -4569,22 +4895,43 @@ private fun ActiveMapFiltersBanner(
     }
 }
 
+/**
+ * Rose des vents de la carte : appui court pour remettre le nord en haut, appui long pour que la
+ * carte suive (ou non) l'orientation de l'appareil.
+ *
+ * La rose entière tourne avec la carte — c'est elle qui dit où est le nord — tandis que l'aiguille
+ * garde son cap à l'écran. Carte au nord, l'ensemble est strictement identique à un compas figé.
+ */
 @Composable
 private fun MapCompassButton(
     azimuth: Float,
+    mapOrientation: Float,
+    followActive: Boolean,
     modifier: Modifier = Modifier,
+    onToggleFollow: (() -> Unit)? = null,
     onReset: () -> Unit
 ) {
     val sizing = LocalGeoTowerUiSizing.current
+    val haptic = LocalHapticFeedback.current
+    val longPress: (() -> Unit)? = onToggleFollow?.let { toggle ->
+        {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            toggle()
+        }
+    }
     Surface(
-        modifier = modifier.clickable(onClick = onReset),
+        modifier = modifier.combinedClickable(onClick = onReset, onLongClick = longPress),
         shape = CircleShape,
         color = MaterialTheme.colorScheme.surface,
         shadowElevation = 4.dp,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        border = if (followActive) {
+            BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+        } else {
+            BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        }
     ) {
         Box(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().rotate(mapOrientation),
             contentAlignment = Alignment.Center
         ) {
             Text(
@@ -4621,7 +4968,9 @@ private fun MapCompassButton(
             ComposeCanvas(
                 modifier = Modifier
                     .size(sizing.component(30.dp))
-                    .rotate(-azimuth)
+                    // La rose tourne déjà avec la carte : on l'annule ici pour que l'aiguille garde
+                    // le cap de l'appareil à l'écran, comme un compas posé sur la carte.
+                    .rotate(-azimuth - mapOrientation)
             ) {
                 val w = size.width
                 val h = size.height
@@ -5206,6 +5555,40 @@ class RadioMarker(
     }
 }
 
+/**
+ * Rotation de la carte au pincement à deux doigts.
+ *
+ * osmdroid fournit bien un `RotationGestureOverlay`, mais il ne prévient pas quand l'utilisateur
+ * tourne : on a besoin de le savoir pour couper l'alignement automatique sur la boussole, sans quoi
+ * le doigt et le capteur se disputeraient la carte à chaque image.
+ */
+private class MapRotationGestureOverlay(
+    private val map: MapView,
+    private val onRotated: (Float) -> Unit
+) : Overlay() {
+
+    private var pendingAngle = 0f
+    private var lastAppliedMs = 0L
+
+    private val detector = RotationGestureDetector { deltaAngle ->
+        pendingAngle += deltaAngle
+        val now = SystemClock.uptimeMillis()
+        if (now - lastAppliedMs >= MAP_ROTATION_GESTURE_INTERVAL_MS) {
+            lastAppliedMs = now
+            val orientation = normalizeMapOrientation(map.mapOrientation + pendingAngle)
+            pendingAngle = 0f
+            map.mapOrientation = orientation
+            onRotated(orientation)
+        }
+    }
+
+    override fun onTouchEvent(event: MotionEvent, mapView: MapView): Boolean {
+        if (isEnabled) detector.onTouch(event)
+        // On ne consomme jamais : le pincement doit continuer à zoomer et le glissement à déplacer.
+        return false
+    }
+}
+
 private class SignalQuestCoverageOverlay(context: Context) : org.osmdroid.views.overlay.Overlay() {
     private val density = context.resources.displayMetrics.density
     private val point = android.graphics.Point()
@@ -5228,13 +5611,25 @@ private class SignalQuestCoverageOverlay(context: Context) : org.osmdroid.views.
         // Culling viewport : on ne rasterise (drawCircle) que les points à l'écran (+ marge). Sur un
         // zoom serré, l'écrasante majorité des ~5000 points est hors cadre → autant d'appels évités.
         val margin = radius + 1f
-        val maxX = canvas.width + margin
-        val maxY = canvas.height + margin
+        // Carte tournée : le canevas l'est aussi, et le cadre visible déborde alors du rectangle de
+        // la vue dans le repère de dessin. On l'élargit à la diagonale, sinon les points des coins
+        // seraient écartés à tort. Carte au nord, le cadre reste au plus juste.
+        val halfWidth = canvas.width / 2f
+        val halfHeight = canvas.height / 2f
+        val halfSpan = if (projection.orientation % 360f == 0f) {
+            null
+        } else {
+            hypot(halfWidth, halfHeight)
+        }
+        val minX = if (halfSpan == null) -margin else halfWidth - halfSpan - margin
+        val minY = if (halfSpan == null) -margin else halfHeight - halfSpan - margin
+        val maxX = if (halfSpan == null) canvas.width + margin else halfWidth + halfSpan + margin
+        val maxY = if (halfSpan == null) canvas.height + margin else halfHeight + halfSpan + margin
         points.forEach { coveragePoint ->
             projection.toPixels(GeoPoint(coveragePoint.latitude, coveragePoint.longitude), point)
             val px = point.x
             val py = point.y
-            if (px < -margin || px > maxX || py < -margin || py > maxY) return@forEach
+            if (px < minX || px > maxX || py < minY || py > maxY) return@forEach
             fillPaint.color = rsrpColor(coveragePoint.signalStrength)
             canvas.drawCircle(px.toFloat(), py.toFloat(), radius, fillPaint)
         }

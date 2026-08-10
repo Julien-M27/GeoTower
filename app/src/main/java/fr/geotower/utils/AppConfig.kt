@@ -21,6 +21,20 @@ object AppConfig {
     const val PREF_SHOW_MAP_LOCATION_MARKER = "show_map_location_marker"
     const val PREF_SMOOTH_MAP_LOCATION = "map_smooth_location"
     const val DEFAULT_SMOOTH_MAP_LOCATION = true
+    // Niveau de zoom appliqué quand la carte se recentre sur la position (bouton de localisation
+    // et tout premier centrage automatique). Borné : en dessous de 10 le repère se perd dans une
+    // vue régionale, au-delà de 19 les fournisseurs de tuiles n'ont plus de rendu.
+    const val PREF_MAP_LOCATION_ZOOM = "map_location_zoom"
+    const val DEFAULT_MAP_LOCATION_ZOOM = 16
+    const val MIN_MAP_LOCATION_ZOOM = 10
+    const val MAX_MAP_LOCATION_ZOOM = 19
+    // Rotation de la carte. « enabled » = le pincement à deux doigts peut faire pivoter la carte
+    // (sinon elle reste bloquée plein nord, comportement historique). « follow orientation » = la
+    // carte s'aligne toute seule sur la boussole, comme en navigation.
+    const val PREF_MAP_ROTATION_ENABLED = "map_rotation_enabled"
+    const val PREF_MAP_FOLLOW_ORIENTATION = "map_follow_orientation"
+    const val DEFAULT_MAP_ROTATION_ENABLED = false
+    const val DEFAULT_MAP_FOLLOW_ORIENTATION = false
     const val PREF_SHOW_AZIMUTH_LINES = "show_azimuths"
     const val PREF_SHOW_AZIMUTH_CONES = "show_azimuths_cone"
     const val PREF_SHOW_RADIO_SITES = "show_radio_sites"
@@ -161,6 +175,11 @@ object AppConfig {
     // Déplacement continu du repère de position entre deux points GPS (interpolation, extrapolation
     // et estime piétonne). Coupé d'office en mode faible consommation, cf. PowerProfile.
     var smoothMapLocation = mutableStateOf(DEFAULT_SMOOTH_MAP_LOCATION)
+    // Rotation de la carte au doigt, et alignement automatique sur la boussole. Les deux sont
+    // indépendants : on peut vouloir suivre son cap sans jamais tourner la carte à la main.
+    var mapRotationEnabled = mutableStateOf(DEFAULT_MAP_ROTATION_ENABLED)
+    var mapFollowOrientation = mutableStateOf(DEFAULT_MAP_FOLLOW_ORIENTATION)
+    var mapLocationZoom = mutableIntStateOf(DEFAULT_MAP_LOCATION_ZOOM)
     var showRadioSites = mutableStateOf(false)
     var showRadioTv = mutableStateOf(false)
     var showRadioBroadcast = mutableStateOf(false)
@@ -352,6 +371,10 @@ object AppConfig {
         showAzimuthsCone.value = MapDisplayPrefs.showAzimuthCones.read(prefs)
         showMapLocationMarker.value = MapDisplayPrefs.showLocationMarker.read(prefs)
         smoothMapLocation.value = MapDisplayPrefs.smoothLocation.read(prefs)
+        mapRotationEnabled.value = MapDisplayPrefs.mapRotationEnabled.read(prefs)
+        mapFollowOrientation.value = MapDisplayPrefs.mapFollowOrientation.read(prefs)
+        mapLocationZoom.intValue = MapDisplayPrefs.locationZoom.read(prefs)
+            .coerceIn(MIN_MAP_LOCATION_ZOOM, MAX_MAP_LOCATION_ZOOM)
         val legacyShowRadioSites = MapDisplayPrefs.showRadioSites.read(prefs)
         showRadioTv.value = prefs.getBoolean(PREF_SHOW_RADIO_TV, legacyShowRadioSites)
         showRadioBroadcast.value = prefs.getBoolean(PREF_SHOW_RADIO_BROADCAST, legacyShowRadioSites)

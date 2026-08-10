@@ -63,6 +63,11 @@ object PowerProfile {
     val mapMarkerCap: Int get() = if (isEco) 2000 else 6000
     /** Rotation continue du repère de position selon la boussole (figée en Éco). */
     val mapCompassRotation: Boolean get() = !isEco
+    /**
+     * Alignement de la carte sur la boussole : chaque pas de rotation redessine TOUS les marqueurs,
+     * c'est le réglage le plus coûteux de la carte — coupé dès le niveau Éco.
+     */
+    val mapFollowOrientation: Boolean get() = if (isEco) false else AppConfig.mapFollowOrientation.value
     /** N'utiliser que les tuiles en cache/hors-ligne (zéro réseau tuiles) — Éco+ uniquement. */
     val mapTilesOfflineOnly: Boolean get() = isEcoPlus
 

@@ -3,9 +3,11 @@ package fr.geotower.ui.screens.map
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import fr.geotower.data.AdminAreaExtent
 import fr.geotower.data.AnfrRepository
 import fr.geotower.data.RadioRepository
 import fr.geotower.data.config.RemoteFeatureFlags
+import fr.geotower.data.api.NominatimApi
 import fr.geotower.data.api.SignalQuestClient
 import fr.geotower.data.api.SignalQuestOperators
 import fr.geotower.data.api.SqCoveragePointData
@@ -25,6 +27,12 @@ import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.FrequencyFilterSelection
 import fr.geotower.utils.OperatorColors
+
+/** Contour d'une zone administrative, associé au code qui l'a demandé pour éviter tout décalage. */
+data class AdminAreaOutline(
+    val areaCode: String,
+    val polygons: List<List<GeoPoint>>
+)
 
 data class SignalQuestCoveragePoint(
     val id: String?,
@@ -92,7 +100,11 @@ class MapViewModel(
     private val _isCityStatsTechniquesLoading = MutableStateFlow(false)
     val isCityStatsTechniquesLoading = _isCityStatsTechniquesLoading.asStateFlow()
 
+    private val _adminAreaOutline = MutableStateFlow<AdminAreaOutline?>(null)
+    val adminAreaOutline = _adminAreaOutline.asStateFlow()
+
     private var searchJob: Job? = null
+    private var adminAreaOutlineJob: Job? = null
     private var signalQuestCoverageJob: Job? = null
     private var lastSignalQuestCoverageRequestKey: String? = null
     private var cityStatsTechniquesJob: Job? = null
@@ -127,6 +139,47 @@ class MapViewModel(
                 throw e
             } catch (e: Exception) {
                 AppLogger.w(TAG, "City map request failed", e)
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    /**
+     * Recherche par département ou région : le tri se fait sur le code INSEE en SQL, il n'y a donc
+     * pas de polygone à découper comme pour une commune — la carte n'affiche que les stations de la
+     * zone, jamais celles des voisins pris dans la même emprise.
+     *
+     * Les émetteurs radio, eux, n'ont pas de code commune exploitable ici : ils restent chargés sur
+     * l'emprise, à quelques unités près en bordure.
+     */
+    fun loadAntennasForAdminArea(
+        departmentCodes: List<String>,
+        latNorth: Double,
+        lonEast: Double,
+        latSouth: Double,
+        lonWest: Double
+    ) {
+        searchJob?.cancel()
+        cityPolygons = null
+        isCityLocked = true // ✅ ON VERROUILLE LE CHARGEMENT AUTOMATIQUE
+
+        searchJob = viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                val frequencyFilter = FrequencyFilterSelection.fromMapConfig()
+                val markers = repository.getAntennasInAdminArea(
+                    departmentCodes,
+                    detailBackedBandMask = frequencyFilter.detailBackedBandMaskForEnrichment()
+                )
+
+                _antennas.value = markers
+                _radioMarkers.value = loadRadioMarkers(13.0, latNorth, lonEast, latSouth, lonWest)
+                AppLogger.d(TAG, "Admin area markers=${markers.size} depts=${departmentCodes.joinToString(",")}")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                AppLogger.w(TAG, "Admin area map request failed", e)
             } finally {
                 _isLoading.value = false
             }
@@ -529,6 +582,56 @@ class MapViewModel(
         _radioMarkers.value = emptyList()
     }
 
+    /**
+     * Contour d'un département / d'une région, récupéré en ligne pour l'habillage de la carte
+     * (masque + liseré rouge, comme une commune).
+     *
+     * Il ne sert JAMAIS à filtrer : le tri des sites passe par le code INSEE en SQL, donc la
+     * recherche reste exacte et fonctionne hors réseau, contour ou pas. Gardé dans le ViewModel et
+     * non dans l'état sauvegardé : un contour départemental, même simplifié, dépasse ce qu'on peut
+     * raisonnablement mettre dans un Bundle.
+     */
+    fun loadAdminAreaOutline(areaCode: String, areaName: String, isRegion: Boolean) {
+        if (_adminAreaOutline.value?.areaCode == areaCode) return
+
+        adminAreaOutlineJob?.cancel()
+        _adminAreaOutline.value = null
+        adminAreaOutlineJob = viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val area = NominatimApi.searchAdminAreaOutline(areaName, isRegion)
+                val polygons = area?.polygons
+                    ?.map { ring -> ring.map { GeoPoint(it.latitude, it.longitude) } }
+                    ?.filter { it.size >= 3 }
+                    .orEmpty()
+                val trimmed = trimOutlineRings(polygons)
+                if (trimmed.isNotEmpty()) {
+                    _adminAreaOutline.value = AdminAreaOutline(areaCode, trimmed)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                AppLogger.w(TAG, "Admin area outline failed", e)
+            }
+        }
+    }
+
+    fun clearAdminAreaOutline() {
+        adminAreaOutlineJob?.cancel()
+        _adminAreaOutline.value = null
+    }
+
+    /** Emprise d'un département / d'une région, ou null si la base locale ne sait rien en dire. */
+    suspend fun findAdminAreaExtent(departmentCodes: List<String>): AdminAreaExtent? {
+        return try {
+            repository.getAdminAreaExtent(departmentCodes)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLogger.w(TAG, "Admin area extent failed", e)
+            null
+        }
+    }
+
     suspend fun searchSiteById(query: String): LocalisationEntity? {
         return try {
             val results = repository.searchAntennasById(query)
@@ -538,6 +641,51 @@ class MapViewModel(
         } catch (e: Exception) {
             null
         }
+    }
+
+    /**
+     * Dégraisse un contour administratif avant affichage.
+     *
+     * Un contour régional brut compte près de 8 000 points, dont l'essentiel vient de centaines
+     * d'îlots : la simplification demandée au serveur n'y peut rien, chaque anneau garde un nombre
+     * minimal de sommets. Or ce tracé est reconstruit à chaque image sous la carte. On ne garde
+     * donc que les anneaux visibles à cette échelle (≥ ~1 km), dans un budget de points fixe, en
+     * commençant par le plus gros — la partie continentale.
+     */
+    private fun trimOutlineRings(polygons: List<List<GeoPoint>>): List<List<GeoPoint>> {
+        if (polygons.isEmpty()) return emptyList()
+
+        val candidates = polygons
+            .filter { ring -> ringSpanDegrees(ring) >= OUTLINE_MIN_RING_SPAN_DEGREES }
+            .sortedByDescending { it.size }
+            .ifEmpty { listOfNotNull(polygons.maxByOrNull { it.size }) }
+
+        val kept = mutableListOf<List<GeoPoint>>()
+        var used = 0
+        candidates.forEachIndexed { index, ring ->
+            // Le plus gros anneau passe toujours : sans lui il n'y aurait plus de contour du tout.
+            if (index == 0 || used + ring.size <= OUTLINE_MAX_POINTS) {
+                kept += ring
+                used += ring.size
+            }
+        }
+        return kept
+    }
+
+    /** Plus grande dimension de l'anneau, en degrés — assez pour juger s'il fera plus d'un pixel. */
+    private fun ringSpanDegrees(ring: List<GeoPoint>): Double {
+        if (ring.isEmpty()) return 0.0
+        var minLat = Double.MAX_VALUE
+        var maxLat = -Double.MAX_VALUE
+        var minLon = Double.MAX_VALUE
+        var maxLon = -Double.MAX_VALUE
+        ring.forEach { point ->
+            if (point.latitude < minLat) minLat = point.latitude
+            if (point.latitude > maxLat) maxLat = point.latitude
+            if (point.longitude < minLon) minLon = point.longitude
+            if (point.longitude > maxLon) maxLon = point.longitude
+        }
+        return maxOf(maxLat - minLat, maxLon - minLon)
     }
 
     private fun isPointInPolygon(lat: Double, lon: Double, polygons: List<List<GeoPoint>>): Boolean {
@@ -628,6 +776,9 @@ class MapViewModelFactory(
 
 private const val TAG = "GeoTowerMap"
 private const val CITY_STATS_TECHNIQUE_BATCH_SIZE = 400
+/** ~1 km : en dessous, un anneau ne fait même pas un pixel à l'échelle d'un département. */
+private const val OUTLINE_MIN_RING_SPAN_DEGREES = 0.01
+private const val OUTLINE_MAX_POINTS = 2500
 private const val MAP_AZIMUTH_TECHNIQUE_BATCH_SIZE = 400
 private const val SIGNALQUEST_COVERAGE_MIN_ZOOM = 13.0
 private const val SIGNALQUEST_COVERAGE_MAX_POINTS = 5000

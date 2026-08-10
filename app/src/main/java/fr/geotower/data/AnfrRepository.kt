@@ -13,6 +13,7 @@ import fr.geotower.data.db.DepartmentOperatorTechRow
 import fr.geotower.data.db.DepartmentStatRow
 import fr.geotower.data.db.GeoTowerDatabaseValidator
 import fr.geotower.data.db.GeoTowerDao
+import fr.geotower.data.db.InseeRangeBoundsRow
 import fr.geotower.data.db.InvalidGeoTowerDatabaseException
 import fr.geotower.data.db.RadioStatRow
 import fr.geotower.data.db.SupportRadioStatsRow
@@ -50,6 +51,7 @@ import fr.geotower.data.outages.toRebuildStatus
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.DepartmentCodes
+import fr.geotower.utils.FrenchAdminAreas
 import fr.geotower.utils.FrequencyFilterSelection
 import fr.geotower.data.models.toDepartmentOperatorTechRow
 import fr.geotower.data.models.toDepartmentStatRow
@@ -78,6 +80,20 @@ import kotlin.math.cos
 data class ActiveSupportRadioCounts(
     val techCounts: Map<String, Int>,
     val bandCounts: Map<String, Int>
+)
+
+/**
+ * Emprise d'une zone administrative (département ou région), déduite des stations qui y sont
+ * déclarées : la base ne porte aucun contour administratif, l'enveloppe des sites est donc le
+ * meilleur cadrage disponible. [siteCount] sert à décider si la zone tient dans un affichage
+ * détaillé ou s'il faut se contenter d'y déplacer la carte.
+ */
+data class AdminAreaExtent(
+    val latNorth: Double,
+    val lonEast: Double,
+    val latSouth: Double,
+    val lonWest: Double,
+    val siteCount: Int
 )
 
 private data class ActiveRadioKeys(
@@ -905,6 +921,55 @@ class AnfrRepository(
                         minLon = range.min,
                         maxLon = range.max
                     )
+                }
+                .distinctBy { it.idAnfr }
+        }
+        return enrichRadioBandMasksFromDetails(localisations, detailBackedBandMask)
+    }
+
+    /**
+     * Emprise d'un département ou d'une région, pour la recherche de la carte.
+     *
+     * Renvoie null quand la zone ne contient aucune station, ce qui couvre aussi le cas « pas de
+     * base locale installée » (repli API live) : l'appelant retombe alors sur le géocodeur.
+     */
+    suspend fun getAdminAreaExtent(departmentCodes: List<String>): AdminAreaExtent? {
+        if (departmentCodes.isEmpty()) return null
+
+        val rows = queryLocalDatabase(emptyList<InseeRangeBoundsRow>()) {
+            departmentCodes.mapNotNull { code ->
+                val (start, end) = FrenchAdminAreas.inseeRange(code)
+                getInseeRangeBounds(start, end)
+            }
+        }.filter { it.count > 0 }
+
+        if (rows.isEmpty()) return null
+
+        return AdminAreaExtent(
+            latNorth = rows.mapNotNull { it.maxLat }.maxOrNull() ?: return null,
+            lonEast = rows.mapNotNull { it.maxLon }.maxOrNull() ?: return null,
+            latSouth = rows.mapNotNull { it.minLat }.minOrNull() ?: return null,
+            lonWest = rows.mapNotNull { it.minLon }.minOrNull() ?: return null,
+            siteCount = rows.sumOf { it.count }
+        )
+    }
+
+    /**
+     * Stations d'un département ou d'une région. Le filtre porte sur le code INSEE, donc la carte
+     * n'affiche que la zone demandée — sans avoir besoin d'un contour, contrairement à la recherche
+     * de commune qui découpe une bbox au polygone.
+     */
+    suspend fun getAntennasInAdminArea(
+        departmentCodes: List<String>,
+        detailBackedBandMask: Int = DETAIL_BACKED_5G_BANDS
+    ): List<LocalisationEntity> {
+        if (departmentCodes.isEmpty()) return emptyList()
+
+        val localisations = queryLocalDatabase(emptyList<LocalisationEntity>()) {
+            departmentCodes
+                .flatMap { code ->
+                    val (start, end) = FrenchAdminAreas.inseeRange(code)
+                    getLocalisationsInInseeRange(start, end)
                 }
                 .distinctBy { it.idAnfr }
         }

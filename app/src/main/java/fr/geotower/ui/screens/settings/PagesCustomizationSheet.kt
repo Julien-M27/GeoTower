@@ -1373,6 +1373,8 @@ fun MapSettingsSheet(
     showZoom: Boolean, onZoomChange: (Boolean) -> Unit,
     showToolbox: Boolean, onToolboxChange: (Boolean) -> Unit,
     showCompass: Boolean, onCompassChange: (Boolean) -> Unit,
+    mapRotation: Boolean, onMapRotationChange: (Boolean) -> Unit,
+    followOrientation: Boolean, onFollowOrientationChange: (Boolean) -> Unit,
     showScale: Boolean, onScaleChange: (Boolean) -> Unit,
     showAttribution: Boolean, onAttributionChange: (Boolean) -> Unit,
     showSpeedometer: Boolean, onSpeedometerChange: (Boolean) -> Unit,
@@ -1387,6 +1389,7 @@ fun MapSettingsSheet(
     val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
     val showAnyAzimuths = showAzimuths || showAzimuthsCone
     var showAzimuthSettings by remember { mutableStateOf(false) }
+    var showCompassSettings by remember { mutableStateOf(false) }
 
     fun setAzimuthsVisible(visible: Boolean) {
         if (visible) {
@@ -1401,7 +1404,11 @@ fun MapSettingsSheet(
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
         BackHandler {
-            if (showAzimuthSettings) showAzimuthSettings = false else onBack()
+            when {
+                showAzimuthSettings -> showAzimuthSettings = false
+                showCompassSettings -> showCompassSettings = false
+                else -> onBack()
+            }
         }
         Column(
             modifier = Modifier
@@ -1412,11 +1419,21 @@ fun MapSettingsSheet(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Row(modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(24.dp)), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { if (showAzimuthSettings) showAzimuthSettings = false else onBack() }) {
+                IconButton(onClick = {
+                    when {
+                        showAzimuthSettings -> showAzimuthSettings = false
+                        showCompassSettings -> showCompassSettings = false
+                        else -> onBack()
+                    }
+                }) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
                 }
                 Text(
-                    if (showAzimuthSettings) stringResource(R.string.appstrings_map_azimuths_option) else stringResource(R.string.appstrings_page_map_settings),
+                    when {
+                        showAzimuthSettings -> stringResource(R.string.appstrings_map_azimuths_option)
+                        showCompassSettings -> stringResource(R.string.appstrings_map_compass_option)
+                        else -> stringResource(R.string.appstrings_page_map_settings)
+                    },
                     style = sizing.textStyle(MaterialTheme.typography.titleLarge),
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f),
@@ -1433,6 +1450,22 @@ fun MapSettingsSheet(
                     SimpleSwitchCard(stringResource(R.string.appstrings_map_azimuth_lines_option), showMapLocation = showAzimuths, onLocationChange = onAzimuthsChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
                     // Mode faible conso : les cônes sont forcés OFF → on montre le toggle éteint et grisé.
                     SimpleSwitchCard(stringResource(R.string.appstrings_map_azimuth_cones_option), showMapLocation = showAzimuthsCone && !fr.geotower.utils.PowerProfile.isEco, onLocationChange = onAzimuthsConeChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi, enabled = !fr.geotower.utils.PowerProfile.isEco)
+                }
+            } else if (showCompassSettings) {
+                Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))) {
+                    SimpleSwitchCard(stringResource(R.string.appstrings_map_compass_option), showMapLocation = showCompass, onLocationChange = onCompassChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
+                    SimpleSwitchCard(stringResource(R.string.appstrings_map_compass_rotation_option), showMapLocation = mapRotation, onLocationChange = onMapRotationChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
+                    // Chaque pas de rotation repose toute la carte : le suivi est forcé OFF en mode
+                    // faible conso → toggle éteint et grisé, comme pour les cônes d'azimut.
+                    SimpleSwitchCard(stringResource(R.string.appstrings_map_compass_follow_option), showMapLocation = followOrientation && !fr.geotower.utils.PowerProfile.isEco, onLocationChange = onFollowOrientationChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi, enabled = !fr.geotower.utils.PowerProfile.isEco)
+                }
+                if (!fr.geotower.utils.PowerProfile.isEco) {
+                    Text(
+                        text = stringResource(R.string.appstrings_map_compass_follow_hint),
+                        style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.fillMaxWidth().padding(top = sizing.spacing(12.dp))
+                    )
                 }
             } else {
                 // Accès à l'éditeur des filtres carte par défaut — affiché uniquement quand ce panneau
@@ -1456,7 +1489,13 @@ fun MapSettingsSheet(
                     SimpleSwitchCard(stringResource(R.string.appstrings_map_zoom_option), showMapLocation = showZoom, onLocationChange = onZoomChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
                     SimpleSwitchCard(stringResource(R.string.appstrings_map_toolbox_option), showMapLocation = showToolbox, onLocationChange = onToolboxChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
                     if (AppConfig.hasCompass.value) {
-                        SimpleSwitchCard(stringResource(R.string.appstrings_map_compass_option), showMapLocation = showCompass, onLocationChange = onCompassChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
+                        // L'interrupteur ne pilote que l'affichage du bouton ; la roue dentée ouvre
+                        // l'orientation de la carte elle-même (rotation au doigt, suivi du cap).
+                        ConfigurableSwitchCard(stringResource(R.string.appstrings_map_compass_option), showCompass, onCompassChange, { showCompassSettings = true }, shape, border, bubbleColor, useOneUi)
+                    } else {
+                        // Sans capteur de cap, il n'y a ni boussole ni suivi à régler — mais tourner
+                        // la carte au doigt reste possible, et le réglage doit rester atteignable.
+                        SimpleSwitchCard(stringResource(R.string.appstrings_map_compass_rotation_option), showMapLocation = mapRotation, onLocationChange = onMapRotationChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
                     }
                     SimpleSwitchCard(stringResource(R.string.appstrings_show_speedometer), showMapLocation = showSpeedometer, onLocationChange = onSpeedometerChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
                     SimpleSwitchCard(stringResource(R.string.appstrings_map_scale_option), showMapLocation = showScale, onLocationChange = onScaleChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
@@ -1500,6 +1539,10 @@ fun MapSettingsSheet(
                 if (showAzimuthSettings) {
                     onAzimuthsChange(AppConfig.DEFAULT_SHOW_AZIMUTH_LINES)
                     onAzimuthsConeChange(AppConfig.DEFAULT_SHOW_AZIMUTH_CONES)
+                } else if (showCompassSettings) {
+                    onCompassChange(true)
+                    onMapRotationChange(AppConfig.DEFAULT_MAP_ROTATION_ENABLED)
+                    onFollowOrientationChange(AppConfig.DEFAULT_MAP_FOLLOW_ORIENTATION)
                 } else {
                     onLocationChange(true)
                     onLocationMarkerChange(true)
@@ -1508,6 +1551,8 @@ fun MapSettingsSheet(
                     onZoomChange(true)
                     onToolboxChange(true)
                     onCompassChange(true)
+                    onMapRotationChange(AppConfig.DEFAULT_MAP_ROTATION_ENABLED)
+                    onFollowOrientationChange(AppConfig.DEFAULT_MAP_FOLLOW_ORIENTATION)
                     onSpeedometerChange(true)
                     onScaleChange(true)
                     onAttributionChange(true)

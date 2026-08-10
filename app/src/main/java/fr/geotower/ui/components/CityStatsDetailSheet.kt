@@ -64,17 +64,29 @@ fun CityStatsDetailSheet(
     antennas: List<LocalisationEntity>,
     techniques: Map<String, TechniqueEntity>,
     isFrequencyStatusLoading: Boolean,
+    /**
+     * Recentrer sur la commune dominante : filet de sécurité d'une recherche de ville, où la bbox
+     * déborde sur les communes voisines. À passer à false dès que la sélection est volontairement
+     * plus large (département, région), sinon le détail ne porterait que sur une seule commune.
+     */
+    restrictToMainCity: Boolean = true,
     onRequestFrequencyStatus: (Set<String>) -> Unit,
     onDismiss: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val sizing = LocalGeoTowerUiStyle.current.sizing
 
-    val stats by produceState<List<OperatorStat>?>(initialValue = null, antennas, techniques) {
+    val stats by produceState<List<OperatorStat>?>(
+        initialValue = null,
+        antennas,
+        techniques,
+        restrictToMainCity
+    ) {
         value = withContext(Dispatchers.Default) {
             buildCityOperatorStats(
                 antennas = antennas,
-                techniques = techniques
+                techniques = techniques,
+                restrictToMainCity = restrictToMainCity
             )
         }
     }
@@ -209,13 +221,18 @@ fun CityStatsDetailSheet(
 
 private fun buildCityOperatorStats(
     antennas: List<LocalisationEntity>,
-    techniques: Map<String, TechniqueEntity>
+    techniques: Map<String, TechniqueEntity>,
+    restrictToMainCity: Boolean
 ): List<OperatorStat> {
-    val targetInsee = antennas.mapNotNull { normalizeCityStatsInsee(it.codeInsee)?.takeIf { c -> c.isNotBlank() } }
-        .groupingBy { it }
-        .eachCount()
-        .maxByOrNull { it.value }
-        ?.key
+    val targetInsee = if (restrictToMainCity) {
+        antennas.mapNotNull { normalizeCityStatsInsee(it.codeInsee)?.takeIf { c -> c.isNotBlank() } }
+            .groupingBy { it }
+            .eachCount()
+            .maxByOrNull { it.value }
+            ?.key
+    } else {
+        null
+    }
 
     val cityAntennas = if (targetInsee != null) {
         antennas.filter { normalizeCityStatsInsee(it.codeInsee) == targetInsee }

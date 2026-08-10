@@ -127,6 +127,7 @@ fun MapFiltersControls(
     var showAzimuths by AppConfig.showAzimuths
     var showMapLocationMarker by AppConfig.showMapLocationMarker
     var smoothMapLocation by AppConfig.smoothMapLocation
+    var mapLocationZoom by AppConfig.mapLocationZoom
     var showRadioTv by AppConfig.showRadioTv
     var showRadioBroadcast by AppConfig.showRadioBroadcast
     var showRadioPrivateMobile by AppConfig.showRadioPrivateMobile
@@ -362,6 +363,27 @@ fun MapFiltersControls(
             ) {
                 smoothMapLocation = it
                 prefs.edit().putBoolean(AppConfig.PREF_SMOOTH_MAP_LOCATION, it).apply()
+            }
+
+            Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+
+            // Le zoom du recentrage se règle aussi dans Réglages > Cartographie : c'est la même
+            // préférence, posée ici parce que c'est depuis la carte qu'on appuie sur le bouton.
+            Surface(
+                shape = RoundedCornerShape(sizing.component(12.dp)),
+                color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                fr.geotower.ui.components.MapLocationZoomSlider(
+                    zoomLevel = mapLocationZoom,
+                    onZoomLevelChange = {
+                        mapLocationZoom = it
+                        prefs.edit().putInt(AppConfig.PREF_MAP_LOCATION_ZOOM, it).apply()
+                    },
+                    useOneUi = LocalGeoTowerUiStyle.current.useOneUi,
+                    showDescription = false,
+                    modifier = Modifier.padding(sizing.spacing(16.dp))
+                )
             }
 
             if (featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SIGNALQUEST_COVERAGE)) {

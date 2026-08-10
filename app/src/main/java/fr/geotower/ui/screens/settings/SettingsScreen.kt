@@ -138,7 +138,6 @@ import fr.geotower.utils.PageScrollPrefs
 import fr.geotower.utils.PowerProfile
 import fr.geotower.utils.PreferenceStores
 import fr.geotower.data.build.LocalBuildCapability
-import fr.geotower.data.db.EnbDatabaseValidator
 import fr.geotower.data.db.GeoTowerDatabaseValidator
 import fr.geotower.data.db.RadioDatabaseValidator
 import kotlinx.coroutines.Dispatchers
@@ -644,6 +643,8 @@ fun SettingsScreen(
     var showMapZoom by remember { mutableStateOf(prefs.getBoolean("show_map_zoom", true)) }
     var showMapToolbox by remember { mutableStateOf(prefs.getBoolean("show_map_toolbox", true)) }
     var showMapCompass by remember { mutableStateOf(prefs.getBoolean("show_map_compass", true)) }
+    var mapRotationEnabled by AppConfig.mapRotationEnabled
+    var mapFollowOrientation by AppConfig.mapFollowOrientation
 
     var showStatsSettingsSheet by remember { mutableStateOf(false) }
     var showDepartmentStatsSettingsSheet by remember { mutableStateOf(false) }
@@ -931,6 +932,8 @@ fun SettingsScreen(
             // --- Cartographie ---
             entry(context.getString(R.string.settings_section_mapping), "carte map fond fournisseur ign osm maplibre topo provider tuiles", SECTION_MAPPING)
             entry(context.getString(R.string.mapping_style_title), "style carte clair sombre satellite couleur", SECTION_MAPPING)
+            entry(context.getString(R.string.appstrings_map_smooth_location_option), "repere position gps fluide glissement lissage", SECTION_MAPPING)
+            entry(context.getString(R.string.settings_map_location_zoom_title), "zoom niveau localisation position recentrage bouton gps echelle", SECTION_MAPPING)
             entry(context.getString(R.string.appstrings_offline_maps_title), "cartes hors ligne offline maps telechargement tuiles mapsforge", SECTION_MAPPING)
 
             // --- Préférences ---
@@ -1985,6 +1988,14 @@ fun SettingsScreen(
                 onCompassChange = {
                     showMapCompass = it; prefs.edit().putBoolean("show_map_compass", it).apply()
                 },
+                mapRotation = mapRotationEnabled,
+                onMapRotationChange = {
+                    mapRotationEnabled = it; prefs.edit().putBoolean(AppConfig.PREF_MAP_ROTATION_ENABLED, it).apply()
+                },
+                followOrientation = mapFollowOrientation,
+                onFollowOrientationChange = {
+                    mapFollowOrientation = it; prefs.edit().putBoolean(AppConfig.PREF_MAP_FOLLOW_ORIENTATION, it).apply()
+                },
                 // --- NOUVELLES OPTIONS ---
                 showScale = showMapScale,
                 onScaleChange = {
@@ -2852,6 +2863,22 @@ fun SectionCartographie(
         enabled = !PowerProfile.isEco
     )
 
+    // Zoom du recentrage sur la position : même famille que le réglage ci-dessus (comment la carte
+    // se comporte vis-à-vis de « moi »), donc juste en dessous.
+    Spacer(Modifier.height(sizing.spacing(16.dp)))
+    val mapLocationZoom by AppConfig.mapLocationZoom
+    fr.geotower.ui.components.MapLocationZoomCard(
+        zoomLevel = mapLocationZoom,
+        onZoomLevelChange = { newZoom ->
+            AppConfig.mapLocationZoom.intValue = newZoom
+            mappingPrefs.edit().putInt(AppConfig.PREF_MAP_LOCATION_ZOOM, newZoom).apply()
+        },
+        shape = shape,
+        border = border,
+        bubbleColor = bubbleColor,
+        useOneUi = useOneUi
+    )
+
     // Les cartes hors ligne sont un fond de carte téléchargé : elles vivent ici, pas dans la
     // section base de données (qui parle des antennes ANFR).
     Spacer(Modifier.height(sizing.spacing(16.dp)))
@@ -3621,23 +3648,30 @@ fun SectionDatabase(
     val buildEligibility = remember { LocalBuildCapability.evaluate(context) }
     // MAIS, contrairement au tuto, une carte n'est pas qu'une offre : c'est aussi l'inventaire de
     // ce qui occupe le téléphone (version, date, nombre de lignes) et le SEUL endroit d'où
-    // supprimer la base. On ne masque donc que les cartes devenues de vraies impasses : rien à
-    // proposer ET rien d'installé. Une base présente garde sa carte, avec son bouton Supprimer.
+    // supprimer la base. Aux crans intermédiaires on ne masque donc que les cartes devenues de
+    // vraies impasses : rien à proposer ET rien d'installé. Une base présente garde sa carte, avec
+    // son bouton Supprimer.
     // Défaut `true` : tant que le disque n'a pas répondu, on n'escamote rien.
     var mobileInstalled by remember { mutableStateOf(true) }
     var radioInstalled by remember { mutableStateOf(true) }
-    var enbInstalled by remember { mutableStateOf(true) }
     val installedProbeKey = refreshState?.refreshKey ?: 0
     LaunchedEffect(generatesInstead, serverDataCutOff, installedProbeKey) {
         withContext(Dispatchers.IO) {
             mobileInstalled = context.getDatabasePath(GeoTowerDatabaseValidator.DB_NAME).exists()
             radioInstalled = context.getDatabasePath(RadioDatabaseValidator.DB_NAME).exists()
-            enbInstalled = context.getDatabasePath(EnbDatabaseValidator.DB_NAME).exists()
         }
     }
-    val showMobileCard = !generatesInstead || mobileInstalled
-    val showRadioCard = !generatesInstead || radioInstalled
-    val showEnbCard = !serverDataCutOff || enbInstalled
+    // « Autonomie maximale » tranche autrement : plus AUCUNE base ne peut être téléchargée depuis
+    // cette section, l'exception « base installée » y laisserait donc des cartes de téléchargement
+    // qui n'en sont plus. Elles partent toutes, installées ou non. Rien n'est perdu : le fichier
+    // reste sur l'appareil et sa carte — donc son bouton Supprimer — revient dès qu'on quitte ce
+    // cran, ce que dit le texte sous la liste.
+    // Un appareil INÉLIGIBLE à la génération garde mobile + radio même à ce cran : `generatesInstead`
+    // y est faux parce que ses bases continuent d'être téléchargées (cf. AppConfig.blockServerDatabase),
+    // et une carte qui télécharge encore n'a aucune raison de disparaître.
+    val showMobileCard = !generatesInstead || (mobileInstalled && !serverDataCutOff)
+    val showRadioCard = !generatesInstead || (radioInstalled && !serverDataCutOff)
+    val showEnbCard = !serverDataCutOff
 
     // 🚀 LA CARTE DE LA BASE DE DONNÉES (Existante)
     Column(modifier = modifier.fillMaxWidth()) {
@@ -3727,7 +3761,8 @@ fun SectionDatabase(
 
         // Ce que le cran a retiré de cette section : sans cette ligne, une carte manquante passe
         // pour un bug — d'autant qu'ici, contrairement au tuto, l'utilisateur vient souvent
-        // chercher une carte précise.
+        // chercher une carte précise. La carte eNB encore là = on n'est pas au cran maximal : ce
+        // qui manque alors ne peut venir que de la génération locale.
         if (!showMobileCard || !showRadioCard || !showEnbCard) {
             Text(
                 text = if (showEnbCard) {

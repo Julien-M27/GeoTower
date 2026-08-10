@@ -57,28 +57,69 @@ object GeoTowerDataCoverage {
 object NominatimApi {
     private const val TAG = "GeoTowerNominatim"
     private const val SEARCH_URL = "https://nominatim.openstreetmap.org/search"
+
+    /**
+     * Simplification du tracé demandée au serveur, en degrés (~0,004° ≈ 400 m). Un contour
+     * départemental brut pèse plusieurs milliers de points, invisibles à l'échelle où on l'affiche
+     * mais coûteux à transporter puis à redessiner à chaque image.
+     */
+    private const val ADMIN_AREA_POLYGON_THRESHOLD = 0.004
+
     private val userAgent = "GeoTower/${BuildConfig.VERSION_NAME} (Android)"
 
-    fun searchArea(query: String): NominatimArea? {
+    fun searchArea(query: String, polygonThreshold: Double? = null): NominatimArea? {
+        val trimmedQuery = query.trim()
+        if (trimmedQuery.isBlank()) return null
+
+        return execute(polygonThreshold) { builder -> builder.addQueryParameter("q", trimmedQuery) }
+    }
+
+    /**
+     * Contour d'un département ou d'une région, pour l'habillage de la carte.
+     *
+     * La requête est **structurée** (`state` pour une région, `county` pour un département, les
+     * niveaux OSM correspondants) : un `q` libre ferait tomber « Nord » sur un quartier portant ce
+     * nom. Repli sur la recherche libre pour les collectivités que ce découpage ne couvre pas.
+     */
+    fun searchAdminAreaOutline(name: String, isRegion: Boolean): NominatimArea? {
+        val trimmedName = name.trim()
+        if (trimmedName.isBlank()) return null
+
+        val structured = execute(ADMIN_AREA_POLYGON_THRESHOLD) { builder ->
+            builder.addQueryParameter(if (isRegion) "state" else "county", trimmedName)
+        }
+        if (structured != null && structured.polygons.isNotEmpty()) return structured
+
+        return searchArea("$trimmedName, France", polygonThreshold = ADMIN_AREA_POLYGON_THRESHOLD)
+    }
+
+    private fun execute(
+        polygonThreshold: Double?,
+        applyQuery: (okhttp3.HttpUrl.Builder) -> Unit
+    ): NominatimArea? {
         if (
             !RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.MAP_SEARCH_NOMINATIM) ||
             !RemoteFeatureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.SEARCH_NOMINATIM)
         ) {
             return null
         }
-        val trimmedQuery = query.trim()
-        if (trimmedQuery.isBlank()) return null
 
-        val url = SEARCH_URL.toHttpUrl().newBuilder()
-            .addQueryParameter("q", trimmedQuery)
+        val urlBuilder = SEARCH_URL.toHttpUrl().newBuilder()
+        applyQuery(urlBuilder)
+        urlBuilder
             .addQueryParameter("format", "json")
             .addQueryParameter("polygon_geojson", "1")
             .addQueryParameter("countrycodes", GeoTowerDataCoverage.nominatimCountryCodes)
             .addQueryParameter("limit", "10")
-            .build()
+        if (polygonThreshold != null) {
+            urlBuilder.addQueryParameter(
+                "polygon_threshold",
+                String.format(Locale.US, "%.4f", polygonThreshold)
+            )
+        }
 
         val request = Request.Builder()
-            .url(url)
+            .url(urlBuilder.build())
             .header("User-Agent", userAgent)
             .build()
 

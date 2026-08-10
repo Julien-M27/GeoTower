@@ -145,7 +145,7 @@
     <string name="onboarding_offline_desc_local_build">La tua scelta di origine dei dati genera il database su questo dispositivo: qui non c\'è nulla da scaricare.</string>
     <string name="onboarding_database_enb_cut_by_level">Il database eNB / gNB non viene proposto: l\'autonomia massima lo interrompe, non essendo generabile sul dispositivo.</string>
     <string name="settings_database_hidden_by_local_build">Qui i download mobile e radio sono nascosti: la tua scelta di origine dei dati genera quei database sul dispositivo.</string>
-    <string name="settings_database_hidden_by_max_autonomy">Autonomia massima: il database eNB / gNB viene tolto da qui (non è generabile sul dispositivo), insieme agli eventuali download sostituiti dalla generazione locale. Un database ancora installato mantiene la sua scheda, per poterlo eliminare.</string>
+    <string name="settings_database_hidden_by_max_autonomy">Autonomia massima: il database eNB / gNB viene tolto da qui (non è generabile sul dispositivo), insieme agli eventuali download sostituiti dalla generazione locale. I database già installati restano sul dispositivo: scegli un altro livello di provenienza per ritrovare la loro scheda, e il suo pulsante Elimina.</string>
     <string name="onboarding_display_mode_title">Come vuoi usare GeoTower?</string>
     <string name="onboarding_display_mode_desc">Due modi di sfogliare l\'app. Puoi cambiarlo in qualsiasi momento nelle impostazioni.</string>
     <string name="onboarding_display_mode_simple_desc">Consigliato se le antenne sono un argomento nuovo per te: la mappa, l\'essenziale, nient\'altro.</string>
@@ -181,6 +181,13 @@
     <string name="mapping_provider_ign">IGN (Gov)</string>
     <string name="mapping_style_title">Stile mappa</string>
     <string name="mapping_style_satellite">Satellite</string>
+    <string name="settings_map_location_zoom_title">Zoom del pulsante di posizione</string>
+    <string name="settings_map_location_zoom_desc">Livello di zoom applicato quando la mappa si centra sulla tua posizione.</string>
+    <string name="settings_map_location_zoom_scale_region">Regione</string>
+    <string name="settings_map_location_zoom_scale_city">Città</string>
+    <string name="settings_map_location_zoom_scale_district">Quartiere</string>
+    <string name="settings_map_location_zoom_scale_street">Via</string>
+    <string name="settings_map_location_zoom_scale_building">Edificio</string>
     <string name="common_yes">Sì</string>
     <string name="common_no">No</string>
     <string name="settings_reset">Reimposta impostazioni</string>
@@ -280,6 +287,7 @@
     <string name="photo_on_date">il %1$s</string>
     <string name="about_new_for_version">Novità (%1$s)</string>
     <string name="map_site_not_in_area">Il sito %1$s non è nell\'area visualizzata. Sposta prima la mappa verso la sua città.</string>
+    <string name="map_search_area_too_large">%1$s: troppi siti per mostrarli tutti. La mappa si sposta soltanto lì.</string>
     <string name="track_operator_active">Monitoraggio %1$s attivo...</string>
     <string name="signalquest_invalid_site">Sito SignalQuest non valido.</string>
     <string name="signalquest_photo_required">Aggiungi almeno una foto prima dell\'invio.</string>
@@ -700,7 +708,10 @@
     <string name="appstrings_map_azimuth_cones_option">Coni di azimut</string>
     <string name="appstrings_map_azimuth_lines_option">Linee di azimut</string>
     <string name="appstrings_map_azimuths_option">Azimut</string>
+    <string name="appstrings_map_compass_follow_hint">Tieni premuta la bussola della mappa per attivare o disattivare il rilevamento. Anche una rotazione a due dita lo disattiva.</string>
+    <string name="appstrings_map_compass_follow_option">Segui il mio orientamento</string>
     <string name="appstrings_map_compass_option">Bussola della mappa</string>
+    <string name="appstrings_map_compass_rotation_option">Rotazione a due dita</string>
     <string name="appstrings_map_dark">Scuro</string>
     <string name="appstrings_map_delete_warning_desc">Vuoi davvero eliminare questa mappa dal dispositivo?</string>
     <string name="appstrings_map_delete_warning_title">Eliminare la mappa?</string>
@@ -1071,7 +1082,7 @@
     <string name="appstrings_ruler">Righello</string>
     <string name="appstrings_scan_to_open">Scansiona per aprire in</string>
     <string name="appstrings_search">Cerca</string>
-    <string name="appstrings_search_city_or_id">Città, indirizzo, ID sito...</string>
+    <string name="appstrings_search_city_or_id">Città, dipartimento, regione, ID sito...</string>
     <string name="appstrings_search_gps">Ricerca posizione GPS...</string>
     <string name="appstrings_searching">Ricerca...</string>
     <string name="appstrings_select">Seleziona</string>
@@ -1262,14 +1273,32 @@
     <string name="appstrings_share_photos_option">Foto della community</string>
     <string name="appstrings_src_antennas">Dati antenne</string>
     <string name="appstrings_src_antennas_desc">Agenzia nazionale delle frequenze (ANFR).\nDati da Cartoradio (Open Data).</string>
+    <string name="appstrings_src_download_hosts">Hosting dei file (reindirizzamenti)</string>
+    <string name="appstrings_src_geocoding">Ricerca di indirizzi</string>
+    <string name="appstrings_src_geocoding_desc">Ricerca di luoghi e indirizzi, basata sui dati OpenStreetMap.</string>
     <string name="appstrings_src_ign">Mappa base IGN</string>
     <string name="appstrings_src_ign_desc">© IGN - Istituto nazionale dell\'informazione geografica e forestale.</string>
+    <string name="appstrings_src_ign_services">Mappe di base, quota del terreno (RGE ALTI) ed edifici (BD TOPO) tramite la Géoplateforme.</string>
     <string name="appstrings_src_inspo">Ispirazione e fonti esterne</string>
     <!-- CellularFR masqué — voir CellularFrApi.ENABLED. Valeur originale :
          "• © CellularFR sviluppato da Luis Baker\n• © Signal Quest sviluppato da Alexandre Germain\n• © RNC Mobile sviluppato da Cédric\n• © eNB-Analytics sviluppato da Tristan\n• © GeoRadio - L'icona alternativa proviene dall'app GéoRadio per iOS sviluppata da Hugo Martin.\n• Concetto originale basato sull'app GéoRadio\n• Icona fun disegnata da Johan" -->
     <string name="appstrings_src_inspo_desc">• © Signal Quest sviluppato da Alexandre Germain\n• © RNC Mobile sviluppato da Cédric\n• © eNB-Analytics sviluppato da Tristan\n• © GeoRadio - L\'icona alternativa proviene dall\'app GéoRadio per iOS sviluppata da Hugo Martin.\n• Concetto originale basato sull\'app GéoRadio\n• Icona fun disegnata da Johan</string>
+    <string name="appstrings_src_offline_maps_label">Download delle mappe</string>
     <string name="appstrings_src_osm">Mappa base OSM</string>
     <string name="appstrings_src_osm_desc">© contributori OpenStreetMap.</string>
+    <string name="appstrings_src_outages">File dei guasti degli operatori</string>
+    <string name="appstrings_src_outages_desc">Elenchi dei siti fuori servizio pubblicati da ciascun operatore.</string>
+    <string name="appstrings_src_partners">App e servizi di terze parti</string>
+    <string name="appstrings_src_partners_desc">Collegati dalle schede dei siti; i loro dati restano dalla loro parte.</string>
+    <string name="appstrings_src_reference">Dati di riferimento amministrativi</string>
+    <string name="appstrings_src_reference_desc">Nomi dei comuni e dei dipartimenti, popolazione e superficie.</string>
+    <string name="appstrings_src_server">Server GeoTower</string>
+    <string name="appstrings_src_server_desc">Download del database, file dei guasti, database online, foto della community e aggiornamenti dell\'app.</string>
+    <string name="appstrings_src_server_mirror">Server mirror</string>
+    <string name="appstrings_src_server_primary">Server principale</string>
+    <string name="appstrings_src_tiles">Altre mappe di base</string>
+    <string name="appstrings_src_tiles_desc">Server di tile disponibili nelle impostazioni della mappa.</string>
+    <string name="appstrings_src_tiles_label">Tile</string>
     <string name="appstrings_startup_page_settings">Pagina di avvio</string>
     <string name="appstrings_stats2_g_desc">Numero di siti 2G dichiarati per operatore</string>
     <string name="appstrings_stats2_g_title">Siti 2G</string>
@@ -2676,4 +2705,10 @@
     <string name="appstrings_release_v2020_outage_tech_table">Sotto la ripartizione dei guasti, una tabella incrocia operatori e tecnologie fuori servizio; un trattino segnala che un operatore non pubblica questo dettaglio, invece di uno zero fuorviante</string>
     <string name="appstrings_release_v2020_share_history_full">La cronologia non si limita più a siti, tralicci e mappe: registra anche i valori copiati, le foto, le esportazioni della diagnostica e i profili di impostazioni</string>
     <string name="appstrings_release_v2020_share_history_filter">Un filtro aiuta a orientarsi per tipo di voce</string>
+
+    <!-- Note di versione 2.0.21 -->
+    <string name="appstrings_release_v2021_search_admin_areas">La ricerca accetta ora un dipartimento o una regione, per numero o per nome; oltre qualche migliaio di siti, la mappa si sposta soltanto invece di disegnarli tutti</string>
+    <string name="appstrings_release_v2021_location_zoom">Lo zoom applicato dal pulsante di localizzazione è regolabile, dalla regione all\'edificio</string>
+    <string name="appstrings_release_v2021_compass_follow">La bussola può seguire il tuo orientamento: una pressione prolungata lo attiva o lo disattiva, e anche una rotazione a due dita lo disattiva</string>
+    <string name="appstrings_release_v2021_about_sources">«Informazioni» dettaglia tutte le fonti di dati usate: il server GeoTower e il suo mirror, IGN, OpenStreetMap, i file degli operatori e il riferimento amministrativo</string>
 </resources>

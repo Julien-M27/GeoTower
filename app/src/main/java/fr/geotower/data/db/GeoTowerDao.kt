@@ -94,6 +94,18 @@ data class DepartmentOperatorTechRow(
     @ColumnInfo(name = "antennas_active") val antennasActive: Int
 )
 
+/**
+ * Emprise et effectif des stations d'une plage de codes INSEE (un département).
+ * Les bornes sont nulles quand la plage ne contient aucune station.
+ */
+data class InseeRangeBoundsRow(
+    @ColumnInfo(name = "minLat") val minLat: Double?,
+    @ColumnInfo(name = "maxLat") val maxLat: Double?,
+    @ColumnInfo(name = "minLon") val minLon: Double?,
+    @ColumnInfo(name = "maxLon") val maxLon: Double?,
+    @ColumnInfo(name = "count") val count: Int
+)
+
 @Dao
 interface GeoTowerDao {
 
@@ -128,6 +140,57 @@ interface GeoTowerDao {
         AND l.longitude BETWEEN :minLon AND :maxLon
     """)
     suspend fun getLocalisationsInBox(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double): List<LocalisationEntity>
+
+    /**
+     * Emprise d'un département, pour cadrer la carte sur une recherche « 35 » / « Ille-et-Vilaine ».
+     *
+     * Les bornes INSEE viennent de [fr.geotower.utils.FrenchAdminAreas.inseeRange] : c'est une
+     * comparaison de plage et non un `LIKE '35%'`, seule forme qui utilise `idx_localisation_insee`
+     * (SQLite n'indexe LIKE que sur une colonne en collation NOCASE).
+     */
+    @Query("""
+        SELECT
+            MIN(latitude) AS minLat,
+            MAX(latitude) AS maxLat,
+            MIN(longitude) AS minLon,
+            MAX(longitude) AS maxLon,
+            COUNT(*) AS count
+        FROM localisation
+        WHERE code_insee >= :inseeStart AND code_insee < :inseeEnd
+    """)
+    suspend fun getInseeRangeBounds(inseeStart: String, inseeEnd: String): InseeRangeBoundsRow?
+
+    /** Stations d'un département. Même projection que [getLocalisationsInBox], filtre INSEE au lieu de la bbox. */
+    @Query("""
+        SELECT
+            l.id_anfr,
+            COALESCE(o.libelle, 'Inconnu') AS operateur,
+            l.latitude,
+            l.longitude,
+            l.azimuts,
+            l.code_insee,
+            l.azimuts_fh,
+            l.tech_mask,
+            l.band_mask,
+            l.arcep_nidt,
+            l.is_zb,
+            COALESCE(st.libelle, '') AS statut,
+            COALESCE(t.has_active, 0) AS has_active,
+            COALESCE(NULLIF(t.date_service, ''), NULLIF(t.date_implantation, '')) AS date_service,
+            CASE WHEN EXISTS (
+                SELECT 1
+                FROM support underground_support
+                LEFT JOIN ref_nature underground_nature ON underground_support.nat_id = underground_nature.nat_id
+                WHERE underground_support.id_anfr = l.id_anfr
+                AND underground_nature.libelle = 'Intérieur sous-terrain'
+            ) THEN 1 ELSE 0 END AS has_underground_support
+        FROM localisation l
+        LEFT JOIN ref_operateur o ON l.operateur_id = o.id
+        LEFT JOIN technique t ON l.id_anfr = t.id_anfr
+        LEFT JOIN ref_statut st ON t.statut_id = st.id
+        WHERE l.code_insee >= :inseeStart AND l.code_insee < :inseeEnd
+    """)
+    suspend fun getLocalisationsInInseeRange(inseeStart: String, inseeEnd: String): List<LocalisationEntity>
 
     /**
      * Sites « totalement en projet » d'une zone : aucune émission en service.

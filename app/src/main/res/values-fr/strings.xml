@@ -145,7 +145,7 @@
     <string name="onboarding_offline_desc_local_build">Votre choix de provenance génère la base sur cet appareil : rien à télécharger ici.</string>
     <string name="onboarding_database_enb_cut_by_level">La base eNB / gNB n\'est pas proposée : l\'autonomie maximale la coupe, elle n\'est pas générable sur l\'appareil.</string>
     <string name="settings_database_hidden_by_local_build">Les téléchargements mobile et radio sont masqués ici : votre choix de provenance génère ces bases sur l\'appareil.</string>
-    <string name="settings_database_hidden_by_max_autonomy">Autonomie maximale : la base eNB / gNB est retirée d\'ici (elle n\'est pas générable sur l\'appareil), ainsi que, le cas échéant, les téléchargements remplacés par la génération locale. Une base encore installée garde sa carte, pour pouvoir la supprimer.</string>
+    <string name="settings_database_hidden_by_max_autonomy">Autonomie maximale : la base eNB / gNB est retirée d\'ici (elle n\'est pas générable sur l\'appareil), ainsi que, le cas échéant, les téléchargements remplacés par la génération locale. Les bases déjà installées restent sur l\'appareil : revenez à un autre cran de provenance pour retrouver leur carte, et son bouton Supprimer.</string>
     <string name="onboarding_display_mode_title">Comment voulez-vous utiliser GeoTower ?</string>
     <string name="onboarding_display_mode_desc">Deux façons de parcourir l\'application. Vous pouvez en changer à tout moment dans les réglages.</string>
     <string name="onboarding_display_mode_simple_desc">Recommandé si les antennes sont un sujet nouveau pour vous : la carte, l\'essentiel, rien d\'autre.</string>
@@ -181,6 +181,13 @@
     <string name="mapping_provider_ign">IGN (Gouv)</string>
     <string name="mapping_style_title">Style de carte</string>
     <string name="mapping_style_satellite">Satellite</string>
+    <string name="settings_map_location_zoom_title">Zoom du bouton de localisation</string>
+    <string name="settings_map_location_zoom_desc">Niveau de zoom appliqué quand la carte se recentre sur votre position.</string>
+    <string name="settings_map_location_zoom_scale_region">Région</string>
+    <string name="settings_map_location_zoom_scale_city">Ville</string>
+    <string name="settings_map_location_zoom_scale_district">Quartier</string>
+    <string name="settings_map_location_zoom_scale_street">Rue</string>
+    <string name="settings_map_location_zoom_scale_building">Bâtiment</string>
     <string name="common_yes">Oui</string>
     <string name="common_no">Non</string>
     <string name="settings_reset">Réinitialiser les paramètres</string>
@@ -280,6 +287,7 @@
     <string name="photo_on_date">le %1$s</string>
     <string name="about_new_for_version">Nouveautés (%1$s)</string>
     <string name="map_site_not_in_area">Le site %1$s n\'est pas dans la zone affichée. Déplacez la carte vers sa ville d\'abord.</string>
+    <string name="map_search_area_too_large">%1$s : trop de sites pour tous les afficher. La carte s\'y déplace simplement.</string>
     <string name="track_operator_active">Suivi %1$s en cours...</string>
     <string name="signalquest_invalid_site">Site SignalQuest invalide.</string>
     <string name="signalquest_photo_required">Ajoutez au moins une photo avant l\'envoi.</string>
@@ -700,7 +708,10 @@
     <string name="appstrings_map_azimuth_cones_option">Cônes d\'azimut</string>
     <string name="appstrings_map_azimuth_lines_option">Traits d\'azimut</string>
     <string name="appstrings_map_azimuths_option">Azimuts</string>
+    <string name="appstrings_map_compass_follow_hint">Un appui long sur la boussole de la carte active ou coupe le suivi. Une rotation à deux doigts le coupe aussi.</string>
+    <string name="appstrings_map_compass_follow_option">Suivre mon orientation</string>
     <string name="appstrings_map_compass_option">Boussole de la carte</string>
+    <string name="appstrings_map_compass_rotation_option">Rotation à deux doigts</string>
     <string name="appstrings_map_dark">Sombre</string>
     <string name="appstrings_map_delete_warning_desc">Voulez-vous vraiment supprimer cette carte de votre appareil ?</string>
     <string name="appstrings_map_delete_warning_title">Supprimer la carte ?</string>
@@ -1071,7 +1082,7 @@
     <string name="appstrings_ruler">Règle</string>
     <string name="appstrings_scan_to_open">Scannez pour ouvrir dans</string>
     <string name="appstrings_search">Rechercher</string>
-    <string name="appstrings_search_city_or_id">Ville, adresse, ID de site...</string>
+    <string name="appstrings_search_city_or_id">Ville, département, région, ID de site...</string>
     <string name="appstrings_search_gps">Recherche position GPS...</string>
     <string name="appstrings_searching">Recherche...</string>
     <string name="appstrings_select">Sélectionner</string>
@@ -1262,14 +1273,32 @@
     <string name="appstrings_share_photos_option">Photos communautaires</string>
     <string name="appstrings_src_antennas">Données Antennes</string>
     <string name="appstrings_src_antennas_desc">Agence Nationale des Fréquences (ANFR).\nDonnées issues de Cartoradio (Open Data).</string>
+    <string name="appstrings_src_download_hosts">Hébergement des fichiers (redirections)</string>
+    <string name="appstrings_src_geocoding">Recherche d\'adresse</string>
+    <string name="appstrings_src_geocoding_desc">Recherche de lieux et d\'adresses, à partir des données OpenStreetMap.</string>
     <string name="appstrings_src_ign">Fond de carte IGN</string>
     <string name="appstrings_src_ign_desc">© IGN - Institut National de l\'Information Géographique et Forestière.</string>
+    <string name="appstrings_src_ign_services">Fonds de carte, altitude du terrain (RGE ALTI) et bâtiments (BD TOPO) via la Géoplateforme.</string>
     <string name="appstrings_src_inspo">Inspiration &amp; Sources Externes</string>
     <!-- CellularFR masqué — voir CellularFrApi.ENABLED. Valeur originale :
          "• © CellularFR développé par Luis Baker\n• © Signal Quest développé par Alexandre Germain\n• © RNC Mobile développé par Cédric\n• © eNB-Analytics développé par Tristan\n• © GeoRadio - L'icône alternative provient de l'application GéoRadio sur iOS développée par Hugo Martin.\n• Concept original basé sur l'application GéoRadio\n• Icône fun dessinée par Johan" -->
     <string name="appstrings_src_inspo_desc">• © Signal Quest développé par Alexandre Germain\n• © RNC Mobile développé par Cédric\n• © eNB-Analytics développé par Tristan\n• © GeoRadio - L\'icône alternative provient de l\'application GéoRadio sur iOS développée par Hugo Martin.\n• Concept original basé sur l\'application GéoRadio\n• Icône fun dessinée par Johan</string>
+    <string name="appstrings_src_offline_maps_label">Téléchargement des cartes</string>
     <string name="appstrings_src_osm">Fond de carte OSM</string>
     <string name="appstrings_src_osm_desc">© les contributeurs d\'OpenStreetMap.</string>
+    <string name="appstrings_src_outages">Fichiers de pannes des opérateurs</string>
+    <string name="appstrings_src_outages_desc">Listes des sites hors service publiées par chaque opérateur.</string>
+    <string name="appstrings_src_partners">Applications et services tiers</string>
+    <string name="appstrings_src_partners_desc">Liens proposés depuis les fiches de site ; leurs données restent chez eux.</string>
+    <string name="appstrings_src_reference">Référentiel administratif</string>
+    <string name="appstrings_src_reference_desc">Noms des communes et des départements, population et superficie.</string>
+    <string name="appstrings_src_server">Serveur GeoTower</string>
+    <string name="appstrings_src_server_desc">Téléchargement de la base, fichier des sites en panne, base en ligne, photos de la communauté et mises à jour de l\'application.</string>
+    <string name="appstrings_src_server_mirror">Serveur miroir</string>
+    <string name="appstrings_src_server_primary">Serveur principal</string>
+    <string name="appstrings_src_tiles">Autres fonds de carte</string>
+    <string name="appstrings_src_tiles_desc">Serveurs de tuiles proposés dans les réglages de la carte.</string>
+    <string name="appstrings_src_tiles_label">Tuiles</string>
     <string name="appstrings_startup_page_settings">Page de démarrage</string>
     <string name="appstrings_stats2_g_desc">Nombre de sites déclarés en 2G par opérateur</string>
     <string name="appstrings_stats2_g_title">Sites 2G</string>
@@ -2678,4 +2707,10 @@
     <string name="appstrings_release_v2020_outage_tech_table">Sous la répartition des pannes, un tableau croise les opérateurs et les technologies hors service ; un tiret signale qu\'un opérateur ne publie pas ce détail, au lieu d\'un zéro trompeur</string>
     <string name="appstrings_release_v2020_share_history_full">L\'historique ne se limite plus aux sites, supports et cartes : il enregistre aussi les valeurs copiées, les photos, les exports de diagnostic et les profils de réglages</string>
     <string name="appstrings_release_v2020_share_history_filter">Un filtre permet de s\'y retrouver par type d\'enregistrement</string>
+
+    <!-- Notes de version 2.0.21 -->
+    <string name="appstrings_release_v2021_search_admin_areas">La recherche accepte désormais un département ou une région, par numéro ou par nom ; au-delà de quelques milliers de sites, la carte s\'y déplace sans tous les afficher</string>
+    <string name="appstrings_release_v2021_location_zoom">Le zoom appliqué par le bouton de localisation se règle, de la région au bâtiment</string>
+    <string name="appstrings_release_v2021_compass_follow">La boussole peut suivre votre orientation : un appui long l\'active ou la coupe, une rotation à deux doigts la coupe aussi</string>
+    <string name="appstrings_release_v2021_about_sources">« À propos » détaille toutes les sources de données utilisées : serveur GeoTower et son miroir, IGN, OpenStreetMap, fichiers des opérateurs et référentiel administratif</string>
 </resources>

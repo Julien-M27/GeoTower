@@ -904,75 +904,35 @@ fun SectionSources(cardShape: Shape, bubbleColor: Color) {
     // ✅ On initialise le gestionnaire de liens
     val uriHandler = LocalUriHandler.current
 
+    // Le contenu vit dans AboutDataSources.kt : un groupe par usage, dans l'ordre d'affichage.
+    val groups = aboutSourceGroups()
+
     Card(
         colors = CardDefaults.cardColors(containerColor = cardColor),
         shape = cardShape,
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(sizing.spacing(16.dp))) {
-            // 1. ANFR (Données)
-            CreditItem(stringResource(R.string.appstrings_src_antennas), stringResource(R.string.appstrings_src_antennas_desc))
-            Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
-            SourceDataLink(
-                label = stringResource(R.string.appstrings_version_weekly_label).replace('\n', ' '),
-                host = "data.anfr.fr",
-                onClick = { uriHandler.openUri(ANFR_WEEKLY_DATA_URL) }
-            )
-            SourceDataLink(
-                label = stringResource(R.string.appstrings_version_monthly_label).replace('\n', ' '),
-                host = "data.gouv.fr",
-                onClick = { uriHandler.openUri(ANFR_MONTHLY_DATA_URL) }
-            )
-            SourceDataLink(
-                label = stringResource(R.string.appstrings_version_quarterly_label).replace('\n', ' '),
-                host = "data.arcep.fr",
-                onClick = { uriHandler.openUri(ARCEP_QUARTERLY_DATA_URL) }
-            )
-            SourceDataLink(
-                label = stringResource(R.string.appstrings_version_hs_label).replace('\n', ' '),
-                host = "data.gouv.fr",
-                onClick = { uriHandler.openUri(ARCEP_HS_DATA_URL) }
-            )
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = sizing.spacing(12.dp)), color = MaterialTheme.colorScheme.outlineVariant)
-
-            // 2. IGN (Cliquable)
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { uriHandler.openUri("https://geoservices.ign.fr/") }
-            ) {
-                CreditItem(stringResource(R.string.appstrings_src_ign), stringResource(R.string.appstrings_src_ign_desc))
-                Text("geoservices.ign.fr", style = sizing.textStyle(MaterialTheme.typography.labelSmall), color = MaterialTheme.colorScheme.primary)
+            groups.forEachIndexed { index, group ->
+                if (index > 0) {
+                    HorizontalDivider(modifier = Modifier.padding(vertical = sizing.spacing(12.dp)), color = MaterialTheme.colorScheme.outlineVariant)
+                }
+                CreditItem(group.title, group.description)
+                if (group.links.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
+                    group.links.forEach { link ->
+                        SourceDataLink(
+                            label = link.label,
+                            host = link.host,
+                            onClick = link.url?.let { url -> { uriHandler.openUri(url) } }
+                        )
+                    }
+                }
             }
 
             HorizontalDivider(modifier = Modifier.padding(vertical = sizing.spacing(12.dp)), color = MaterialTheme.colorScheme.outlineVariant)
 
-            // 3. OpenStreetMap (Cliquable)
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { uriHandler.openUri("https://www.openstreetmap.org/copyright") }
-            ) {
-                CreditItem(stringResource(R.string.appstrings_src_osm), stringResource(R.string.appstrings_src_osm_desc))
-                Text("www.openstreetmap.org", style = sizing.textStyle(MaterialTheme.typography.labelSmall), color = MaterialTheme.colorScheme.primary)
-            }
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = sizing.spacing(12.dp)), color = MaterialTheme.colorScheme.outlineVariant)
-
-            // 4. MapsForge (Cliquable)
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { uriHandler.openUri("https://mapsforge.org") }
-            ) {
-                CreditItem(stringResource(R.string.appstrings_maps_forges_title), stringResource(R.string.appstrings_maps_forges_desc))
-                Text("www.mapsforge.org", style = sizing.textStyle(MaterialTheme.typography.labelSmall), color = MaterialTheme.colorScheme.primary)
-            }
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = sizing.spacing(12.dp)), color = MaterialTheme.colorScheme.outlineVariant)
-
-            // 5. Inspiration
+            // Crédits : inspirations et emprunts, sans lien réseau associé.
             CreditItem(stringResource(R.string.appstrings_src_inspo), stringResource(R.string.appstrings_src_inspo_desc))
         }
     }
@@ -1007,33 +967,36 @@ private fun CreditItem(title: String, description: String) {
     }
 }
 
+/**
+ * Un hôte de la section « Sources de données ». [label] est optionnel : sans lui, l'hôte se
+ * rattache visuellement au libellé de la ligne précédente (cas des hôtes multiples d'une même
+ * source). [onClick] nul = pas de page à ouvrir : l'hôte reste affiché, mais en gris et sans clic,
+ * pour ne pas promettre un lien qui n'existe pas.
+ */
 @Composable
-private fun SourceDataLink(label: String, host: String, onClick: () -> Unit) {
+private fun SourceDataLink(label: String?, host: String, onClick: (() -> Unit)?) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(vertical = sizing.spacing(4.dp))
     ) {
-        Text(
-            text = label,
-            style = sizing.textStyle(MaterialTheme.typography.bodySmall),
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
+        if (label != null) {
+            Text(
+                text = label,
+                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
         Text(
             text = host,
             style = sizing.textStyle(MaterialTheme.typography.labelSmall),
-            color = MaterialTheme.colorScheme.primary
+            color = if (onClick != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
-
-private const val ANFR_WEEKLY_DATA_URL = "https://data.anfr.fr/explore/dataset/observatoire_2g_3g_4g/"
-private const val ANFR_MONTHLY_DATA_URL = "https://www.data.gouv.fr/datasets/donnees-sur-les-installations-radioelectriques-de-plus-de-5-watts-1/"
-private const val ARCEP_QUARTERLY_DATA_URL = "https://data.arcep.fr/mobile/sites/"
-private const val ARCEP_HS_DATA_URL = "https://www.data.gouv.fr/datasets/sites-indisponibles"
 
 @Composable
 private fun AboutDrawableImage(resId: Int, modifier: Modifier = Modifier, contentDescription: String? = null) {
