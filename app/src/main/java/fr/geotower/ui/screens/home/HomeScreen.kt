@@ -29,6 +29,7 @@ import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Explore
@@ -950,8 +951,16 @@ fun MenuButtonsList(
 
     val showNearby = AppConfig.showNearbyPage.value && featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.NEARBY)
     val showMap = AppConfig.showMapPage.value && featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.MAP)
-    val showCompass = AppConfig.showCompassPage.value && featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.COMPASS)
+    // Lu dans les préférences comme « Trajets » : le miroir d'AppConfig n'est rafraîchi qu'à
+    // l'ouverture des réglages, et la boussole étant désormais éteinte par défaut, ce décalage
+    // afficherait le bouton tant qu'on n'y est pas passé.
+    val showCompass = HomePrefs.showCompassPage.read(prefs) &&
+        featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.COMPASS)
     val showStats = AppConfig.showStatsPage.value && featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.STATS)
+    // Lu directement dans les préférences, comme le lien « À propos » : la liste des trajets est
+    // arrivée après coup et n'a pas de miroir observable dans AppConfig.
+    val showTrips = HomePrefs.showTripsPage.read(prefs) &&
+        featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.TRIPS)
     val showAbout = includeAbout && HomePrefs.showAboutLink.read(prefs) &&
         featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.ABOUT)
 
@@ -960,6 +969,7 @@ fun MenuButtonsList(
     val mapLabel = stringResource(R.string.nav_map)
     val compassLabel = stringResource(R.string.nav_compass)
     val statsLabel = stringResource(R.string.nav_statistics)
+    val tripsLabel = stringResource(R.string.trips_title)
     val settingsLabel = stringResource(R.string.nav_settings)
 
     val buttons = mutableListOf<HomeMenuEntry>()
@@ -1003,6 +1013,22 @@ fun MenuButtonsList(
                             fillWidth = isGrid,
                             compact = compact,
                             onClick = { navController.navigate("stats") }
+                        )
+                    })
+                }
+            }
+            "trips" -> {
+                if (showTrips) {
+                    buttons.add(HomeMenuEntry(pageId) {
+                        MenuButton(
+                            text = tripsLabel,
+                            icon = Icons.Default.Route,
+                            color = buttonBgColor,
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            useOneUi = useOneUi,
+                            fillWidth = isGrid,
+                            compact = compact,
+                            onClick = { navController.navigate("trips") }
                         )
                     })
                 }

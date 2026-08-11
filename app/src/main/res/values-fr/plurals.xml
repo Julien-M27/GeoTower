@@ -71,6 +71,10 @@
         <item quantity="one">%1$d partage enregistré</item>
         <item quantity="other">%1$d partages enregistrés</item>
     </plurals>
+    <plurals name="share_history_trips">
+        <item quantity="one">%1$d trajet</item>
+        <item quantity="other">%1$d trajets</item>
+    </plurals>
     <plurals name="share_history_stations">
         <item quantity="one">%1$d station</item>
         <item quantity="other">%1$d stations</item>
@@ -86,5 +90,9 @@
     <plurals name="emitter_heights">
         <item quantity="one">Émetteur à %1$s</item>
         <item quantity="other">Émetteurs à %1$s</item>
+    </plurals>
+    <plurals name="trips_steps">
+        <item quantity="one">%1$d étape</item>
+        <item quantity="other">%1$d étapes</item>
     </plurals>
 </resources>

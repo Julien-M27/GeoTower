@@ -37,8 +37,15 @@ fun AntennaMapToolBox(
     onToggleTimeSlider: () -> Unit,
     onOpenLayers: () -> Unit,
     onOpenSettings: () -> Unit,
+    // Ouvre la liste des trajets. Ce n'est pas un mode qu'on bascule ici : on part sur un écran,
+    // et c'est depuis cette liste qu'on ouvre un trajet en édition sur la carte.
+    onOpenTrips: () -> Unit = {},
+    // Ouvre la page Boussole. Elle a quitté l'accueil par défaut : c'est désormais son accès.
+    onOpenCompassPage: () -> Unit = {},
     showSearch: Boolean = true,
     showMeasure: Boolean = true,
+    showTrips: Boolean = true,
+    showCompassPage: Boolean = true,
     showTimeSlider: Boolean = true,
     showLayers: Boolean = true,
     showSettings: Boolean = true,
@@ -108,6 +115,26 @@ fun AntennaMapToolBox(
                                     Icons.Default.Straighten,
                                     contentDescription = stringResource(R.string.appstrings_ruler),
                                     tint = if (isMeasuringMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(iconDiameter)
+                                )
+                            }
+                        }
+                        if (showTrips) {
+                            IconButton(onClick = onOpenTrips, modifier = Modifier.size(buttonDiameter)) {
+                                Icon(
+                                    Icons.Default.Route,
+                                    contentDescription = stringResource(R.string.trips_title),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(iconDiameter)
+                                )
+                            }
+                        }
+                        if (showCompassPage) {
+                            IconButton(onClick = onOpenCompassPage, modifier = Modifier.size(buttonDiameter)) {
+                                Icon(
+                                    Icons.Default.Explore,
+                                    contentDescription = stringResource(R.string.appstrings_compass_title),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(iconDiameter)
                                 )
                             }
@@ -207,6 +234,26 @@ fun AntennaMapToolBox(
                                 Icons.Default.Straighten,
                                 contentDescription = stringResource(R.string.appstrings_ruler),
                                 tint = if (isMeasuringMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(iconDiameter)
+                            )
+                        }
+                    }
+                    if (showTrips) {
+                        IconButton(onClick = onOpenTrips, modifier = Modifier.size(buttonDiameter)) {
+                            Icon(
+                                Icons.Default.Route,
+                                contentDescription = stringResource(R.string.trips_title),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(iconDiameter)
+                            )
+                        }
+                    }
+                    if (showCompassPage) {
+                        IconButton(onClick = onOpenCompassPage, modifier = Modifier.size(buttonDiameter)) {
+                            Icon(
+                                Icons.Default.Explore,
+                                contentDescription = stringResource(R.string.appstrings_compass_title),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(iconDiameter)
                             )
                         }

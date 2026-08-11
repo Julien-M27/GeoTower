@@ -42,6 +42,7 @@ import androidx.compose.material.icons.filled.Photo
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Radio
+import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.SettingsInputAntenna
 import androidx.compose.material.icons.filled.Settings
@@ -593,6 +594,7 @@ private val SHARE_HISTORY_FAMILIES: List<List<String>> = listOf(
         ShareHistoryStore.KIND_RADIO_FIELD_COPY
     ),
     listOf(ShareHistoryStore.KIND_PHOTO),
+    listOf(ShareHistoryStore.KIND_TRIP),
     listOf(ShareHistoryStore.KIND_SETTINGS_PROFILE),
     listOf(ShareHistoryStore.KIND_DIAGNOSTIC)
 )
@@ -805,6 +807,13 @@ private fun shareHistoryReference(item: ShareHistoryEntry): String {
                 parts += stringResource(R.string.share_history_map_ref, String.format(Locale.US, "%.1f", it))
             }
         }
+        ShareHistoryStore.KIND_TRIP -> {
+            // Un trajet n'a ni station ni support : son repère, c'est son nom (déjà en sujet) et,
+            // pour un export groupé qui n'en porte aucun, le nombre de trajets envoyés.
+            if (item.itemCount > 1) {
+                parts += pluralStringResource(R.plurals.share_history_trips, item.itemCount, item.itemCount)
+            }
+        }
         ShareHistoryStore.KIND_MOBILE_SUPPORT,
         ShareHistoryStore.KIND_RADIO_SUPPORT,
         ShareHistoryStore.KIND_SUPPORT_FIELD_COPY -> {
@@ -838,6 +847,7 @@ private fun shareHistoryKindLabel(kind: String): String = when (kind) {
     ShareHistoryStore.KIND_RADIO_FIELD_COPY ->
         stringResource(R.string.share_history_kind_field_copy)
     ShareHistoryStore.KIND_PHOTO -> stringResource(R.string.share_history_kind_photo)
+    ShareHistoryStore.KIND_TRIP -> stringResource(R.string.share_history_kind_trip)
     ShareHistoryStore.KIND_SETTINGS_PROFILE -> stringResource(R.string.share_history_kind_settings_profile)
     ShareHistoryStore.KIND_DIAGNOSTIC -> stringResource(R.string.share_history_kind_diagnostic)
     else -> stringResource(R.string.share_history_kind_mobile_site)
@@ -852,6 +862,7 @@ private fun shareHistoryKindIcon(kind: String): ImageVector = when (kind) {
     ShareHistoryStore.KIND_SUPPORT_FIELD_COPY,
     ShareHistoryStore.KIND_RADIO_FIELD_COPY -> Icons.Default.ContentCopy
     ShareHistoryStore.KIND_PHOTO -> Icons.Default.Photo
+    ShareHistoryStore.KIND_TRIP -> Icons.Default.Route
     ShareHistoryStore.KIND_SETTINGS_PROFILE -> Icons.Default.Tune
     ShareHistoryStore.KIND_DIAGNOSTIC -> Icons.Default.BugReport
     else -> Icons.Default.Tag
@@ -889,6 +900,9 @@ private fun shareHistoryContents(item: ShareHistoryEntry): String {
             ShareHistoryStore.CONTENT_ATTRIBUTION -> stringResource(R.string.appstrings_share_map_attribution_option)
             ShareHistoryStore.CONTENT_COVERAGE -> stringResource(R.string.appstrings_coverage_button)
             ShareHistoryStore.CONTENT_OBSTACLES -> stringResource(R.string.appstrings_coverage_obstacles)
+            // Formats d'export d'un trajet : des noms propres, écrits pareil dans les 7 langues.
+            ShareHistoryStore.CONTENT_GPX -> "GPX"
+            ShareHistoryStore.CONTENT_JSON -> "JSON"
             ShareHistoryStore.CONTENT_SUMMARY -> stringResource(R.string.appstrings_radio_share_block_summary)
             ShareHistoryStore.CONTENT_SOURCE -> stringResource(R.string.appstrings_radio_share_block_source)
             ShareHistoryStore.CONTENT_BEARING_HEIGHT -> stringResource(R.string.appstrings_radio_share_block_bearing_height)

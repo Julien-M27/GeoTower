@@ -215,6 +215,7 @@ object RemoteFeatureFlags {
         const val MAP = "map"
         const val COMPASS = "compass"
         const val STATS = "stats"
+        const val TRIPS = "trips"
         const val SETTINGS = "settings"
         const val HELP = "help"
         const val ABOUT = "about"

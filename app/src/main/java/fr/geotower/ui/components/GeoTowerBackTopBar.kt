@@ -74,9 +74,12 @@ fun GeoTowerBackTopBar(
     titleContent: @Composable BoxScope.() -> Unit
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
-    // La largeur reservee aux actions doit suivre l'echelle, sinon le titre se decentre
-    // quand les IconButton grossissent.
-    val scaledActionsWidth = sizing.component(actionsWidth)
+    // Le titre est centre dans l'espace QUI RESTE entre les deux cotes : les deux reserves
+    // doivent donc faire exactement la meme largeur, sinon il tombe a cote du centre de l'ecran.
+    // La reserve ne suit PAS l'echelle de l'interface : un IconButton Material garde sa zone
+    // tactile de 48.dp quel que soit le reglage de taille, donc mettre le seul cote droit a
+    // l'echelle (44.dp a 100 %) decalait le titre vers la droite.
+    val slotWidth = maxOf(actionsWidth, TOP_BAR_SLOT_MIN_WIDTH)
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -84,12 +87,17 @@ fun GeoTowerBackTopBar(
             .padding(vertical = sizing.spacing(2.dp)),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        IconButton(onClick = onBack, enabled = backEnabled) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = stringResource(R.string.appstrings_back),
-                tint = contentColor
-            )
+        Box(
+            modifier = Modifier.width(slotWidth),
+            contentAlignment = Alignment.CenterStart
+        ) {
+            IconButton(onClick = onBack, enabled = backEnabled) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = stringResource(R.string.appstrings_back),
+                    tint = contentColor
+                )
+            }
         }
         Box(
             modifier = Modifier.weight(1f),
@@ -97,10 +105,10 @@ fun GeoTowerBackTopBar(
             content = titleContent
         )
         if (actions == null) {
-            Spacer(Modifier.width(scaledActionsWidth))
+            Spacer(Modifier.width(slotWidth))
         } else {
             Row(
-                modifier = Modifier.width(scaledActionsWidth),
+                modifier = Modifier.width(slotWidth),
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically,
                 content = actions
@@ -108,3 +116,6 @@ fun GeoTowerBackTopBar(
         }
     }
 }
+
+/** Zone tactile d'un IconButton Material : plancher des deux reserves laterales de la barre. */
+private val TOP_BAR_SLOT_MIN_WIDTH = 48.dp

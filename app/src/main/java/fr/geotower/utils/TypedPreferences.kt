@@ -495,11 +495,14 @@ object HomePrefs {
     const val STARTUP_PAGE = "startup_page"
     const val DEFAULT_STARTUP_PAGE = "home"
     const val PAGES_ORDER = "pages_order"
-    const val DEFAULT_PAGES_ORDER = "nearby,map,compass,stats,settings"
+    const val DEFAULT_PAGES_ORDER = "nearby,map,trips,compass,stats,settings"
     val showNearbyPage = BooleanPreference("show_nearby_page", true)
     val showMapPage = BooleanPreference("show_map_page", true)
-    val showCompassPage = BooleanPreference("show_compass_page", true)
+    // Éteinte par défaut : la boussole s'ouvre maintenant depuis la boîte à outils de la carte,
+    // et l'accueil n'a pas à porter les deux entrées.
+    val showCompassPage = BooleanPreference("show_compass_page", false)
     val showStatsPage = BooleanPreference("show_stats_page", true)
+    val showTripsPage = BooleanPreference("show_trips_page", true)
 
     /**
      * Lien « À propos » de l'accueil. C'est un élément de [PAGES_ORDER] comme les autres : il garde
@@ -509,6 +512,13 @@ object HomePrefs {
 
     /** Éléments arrivés après coup : absents des ordres déjà enregistrés, ils prennent la fin. */
     private val lateElements = listOf("settings", "logo", "about")
+
+    /**
+     * « Trajets » est arrivé après coup, mais sa place est **avant la boussole**, pas en fin de
+     * liste comme les autres retardataires : un ordre déjà enregistré doit le recevoir là.
+     */
+    private const val TRIPS_ELEMENT = "trips"
+    private const val TRIPS_ANCHOR = "compass"
 
     fun startupPage(prefs: SharedPreferences): String {
         return prefs.getString(STARTUP_PAGE, DEFAULT_STARTUP_PAGE) ?: DEFAULT_STARTUP_PAGE
@@ -523,6 +533,14 @@ object HomePrefs {
     /** Ordre complet des éléments de l'accueil, tel que la page et les réglages doivent le voir. */
     fun normalizeOrder(order: List<String>): List<String> {
         val normalized = order.filter { it.isNotBlank() }.distinct().toMutableList()
+        if (!normalized.contains(TRIPS_ELEMENT)) {
+            val anchorIndex = normalized.indexOf(TRIPS_ANCHOR)
+            if (anchorIndex >= 0) {
+                normalized.add(anchorIndex, TRIPS_ELEMENT)
+            } else {
+                normalized.add(TRIPS_ELEMENT)
+            }
+        }
         lateElements.forEach { if (!normalized.contains(it)) normalized.add(it) }
         return normalized
     }

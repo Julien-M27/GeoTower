@@ -331,7 +331,8 @@ object AppConfig {
 
     val showNearbyPage = mutableStateOf(true)
     val showMapPage = mutableStateOf(true)
-    val showCompassPage = mutableStateOf(true)
+    // Éteinte par défaut, comme la préférence : la boussole s'ouvre depuis la boîte à outils.
+    val showCompassPage = mutableStateOf(false)
     val showStatsPage = mutableStateOf(true)
 
     // Ordre des éléments de l'accueil (boutons + logo), miroir observable de `pages_order`.

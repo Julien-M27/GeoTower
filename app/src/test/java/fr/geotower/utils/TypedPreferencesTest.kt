@@ -141,10 +141,11 @@ class TypedPreferencesTest {
     fun homePageOrderAppendsElementsAddedAfterTheStoredOrder() {
         val prefs = FakeSharedPreferences(HomePrefs.PAGES_ORDER to "nearby,map,compass,stats")
 
-        // « settings », « logo » puis « about » sont arrivés après : un ordre déjà enregistré ne les
-        // contient pas, et sans reprise l'accueil perdrait purement et simplement ces éléments.
+        // « settings », « logo » et « about » sont arrivés après et prennent la fin. « trips » aussi,
+        // mais sa place voulue est AVANT la boussole : un ordre déjà enregistré doit le recevoir là,
+        // pas en queue de liste.
         assertEquals(
-            listOf("nearby", "map", "compass", "stats", "settings", "logo", "about"),
+            listOf("nearby", "map", "trips", "compass", "stats", "settings", "logo", "about"),
             HomePrefs.normalizedPageOrder(prefs)
         )
     }
@@ -158,7 +159,10 @@ class TypedPreferencesTest {
             visibleOrder = listOf("logo", "nearby", "map", "stats", "settings", "about")
         )
 
-        assertEquals(listOf("logo", "nearby", "map", "compass", "stats", "settings", "about"), merged)
+        assertEquals(
+            listOf("logo", "nearby", "map", "trips", "compass", "stats", "settings", "about"),
+            merged
+        )
     }
 
     @Test

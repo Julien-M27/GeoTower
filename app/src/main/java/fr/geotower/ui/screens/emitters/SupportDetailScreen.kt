@@ -69,12 +69,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.alpha
 import androidx.compose.runtime.collectAsState
-import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import fr.geotower.data.share.ShareHistoryStore
 import fr.geotower.data.workers.SignalQuestUploadScheduler
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
@@ -644,15 +644,18 @@ fun SupportDetailScreen(
         }
     }
 
-    // Opérateurs de CE site ayant déjà un envoi en cours (RUNNING/ENQUEUED) : leur case sera
-    // grisée pour empêcher un second envoi simultané vers la même cible.
+    // Opérateurs de CE site ayant déjà un envoi en cours : leur case sera grisée pour empêcher un
+    // second envoi simultané vers la même cible. Un envoi vers plusieurs opérateurs empile un work
+    // par opérateur dans la même file unique : seul le premier tourne, les suivants attendent en
+    // BLOCKED. On retient donc tout ce qui n'est pas terminé (ENQUEUED/RUNNING/BLOCKED), sinon les
+    // opérateurs de la file repasseraient sélectionnables alors que leurs photos partent déjà.
     val uploadSiteTagId = physique?.idSupport?.takeIf { it.isNotBlank() } ?: siteId
     val activeUploadWorkInfos by remember(uploadSiteTagId) {
         WorkManager.getInstance(context).getWorkInfosByTagFlow("sq_upload_$uploadSiteTagId")
     }.collectAsState(initial = emptyList())
     val uploadingOperatorParams = remember(activeUploadWorkInfos) {
         activeUploadWorkInfos
-            .filter { it.state == WorkInfo.State.RUNNING || it.state == WorkInfo.State.ENQUEUED }
+            .filterNot { it.state.isFinished }
             .mapNotNull { SignalQuestUploadScheduler.operatorParamFromTags(it.tags) }
             .toSet()
     }
@@ -1560,9 +1563,13 @@ private fun SupportSharedPhotoUploadCard(
                             .padding(vertical = sizing.spacing(6.dp)),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        // onCheckedChange DOIT rester non nul : Material ne pose sa taille de cible
+                        // tactile (48 dp) que sur une case cliquable. Avec null, la case rétrécit et
+                        // toute la ligne « envoi en cours » se décale par rapport aux autres. C'est
+                        // `enabled` qui la rend inerte, pas la lambda absente.
                         Checkbox(
                             checked = operator.key in selectedOperatorKeys && !isUploading,
-                            onCheckedChange = if (isUploading) null else { { onToggleOperator(operator.key) } },
+                            onCheckedChange = { onToggleOperator(operator.key) },
                             enabled = !isUploading
                         )
                         Box(
@@ -1571,17 +1578,24 @@ private fun SupportSharedPhotoUploadCard(
                                 .background(Color(OperatorColors.colorArgbForKey(operator.key)), RoundedCornerShape(999.dp))
                         )
                         Spacer(modifier = Modifier.width(sizing.spacing(10.dp)))
+                        // Le nom cede la place au « envoi en cours » plutot que de le renvoyer a la
+                        // ligne : un nom long (interface agrandie) ferait grandir la ligne, et elle
+                        // ne serait plus a la hauteur des autres.
                         Text(
                             text = operator.label,
                             color = MaterialTheme.colorScheme.onSurface,
-                            fontWeight = FontWeight.SemiBold
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
                         )
                         if (isUploading) {
                             Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
                             Text(
                                 text = stringResource(R.string.shared_photo_operator_uploading),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontSize = sizing.text(12.sp)
+                                fontSize = sizing.text(12.sp),
+                                maxLines = 1
                             )
                         }
                     }

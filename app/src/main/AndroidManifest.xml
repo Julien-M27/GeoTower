@@ -177,6 +177,12 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/antenna_map_widget_info" />
         </receiver>
+        <!-- Boutons du rappel de trajet. Non exporté : seules les notifications de l'app le
+             déclenchent, via des PendingIntent qu'elle a elle-même construits. -->
+        <receiver
+            android:name=".data.workers.TripReminderActionReceiver"
+            android:exported="false" />
+
         <service
             android:name="androidx.work.impl.foreground.SystemForegroundService"
             android:foregroundServiceType="dataSync"

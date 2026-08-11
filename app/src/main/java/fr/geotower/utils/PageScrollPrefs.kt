@@ -40,6 +40,7 @@ object PageScrollPrefs {
     const val PHOTO_UPLOAD_HISTORY = "photo_upload_history"
     const val SHARE_HISTORY = "share_history"
     const val DEPARTMENT_STATS = "department_stats"
+    const val TRIPS = "trips"
 
     /** Les trois aides réglables indépendamment (l'ordre est celui affiché dans les réglages). */
     enum class Aid(val keyPrefix: String) {
@@ -79,6 +80,7 @@ object PageScrollPrefs {
         DIAGNOSTIC,
         TERMS,
         PHOTOS_FAVORITES,
+        TRIPS,
         HISTORIES,
         PHOTO_UPLOAD_HISTORY,
         SHARE_HISTORY

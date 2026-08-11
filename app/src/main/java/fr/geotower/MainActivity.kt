@@ -695,9 +695,21 @@ class MainActivity : ComponentActivity() {
 
                             // Carte
                             composable(
-                                route = "map?photoDraftId={photoDraftId}",
+                                route = "map?photoDraftId={photoDraftId}&tripId={tripId}&tripMode={tripMode}",
                                 arguments = listOf(
                                     navArgument("photoDraftId") {
+                                        type = NavType.StringType
+                                        nullable = true
+                                        defaultValue = null
+                                    },
+                                    // Non nul ⇒ la carte s'ouvre en mode planificateur sur ce trajet.
+                                    navArgument("tripId") {
+                                        type = NavType.StringType
+                                        nullable = true
+                                        defaultValue = null
+                                    },
+                                    // « view » (défaut), « edit » ou « follow ». Voir TripMapMode.
+                                    navArgument("tripMode") {
                                         type = NavType.StringType
                                         nullable = true
                                         defaultValue = null
@@ -705,6 +717,8 @@ class MainActivity : ComponentActivity() {
                                 )
                             ) { backStackEntry ->
                                 val photoDraftId = backStackEntry.arguments?.getString("photoDraftId")
+                                val plannedTripId = backStackEntry.arguments?.getString("tripId")
+                                val plannedTripMode = backStackEntry.arguments?.getString("tripMode")
                                 if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.MAP)) {
                                     // Mode simplifié : la carte est la racine, le tiroir remplace
                                     // l'accueil. Il n'enveloppe que cette destination.
@@ -719,6 +733,8 @@ class MainActivity : ComponentActivity() {
                                                 navController = navController,
                                                 viewModel = sharedMapViewModel,
                                                 photoDraftId = photoDraftId,
+                                                plannedTripId = plannedTripId,
+                                                plannedTripMode = plannedTripMode,
                                                 onOpenSimpleModeMenu = {
                                                     drawerScope.launch { drawerState.open() }
                                                 }
@@ -728,11 +744,60 @@ class MainActivity : ComponentActivity() {
                                         MapScreen(
                                             navController = navController,
                                             viewModel = sharedMapViewModel,
-                                            photoDraftId = photoDraftId
+                                            photoDraftId = photoDraftId,
+                                            plannedTripId = plannedTripId,
+                                            plannedTripMode = plannedTripMode
                                         )
                                     }
                                 } else {
                                     DisabledFeatureRoute(navController, txtUnavailable)
+                                }
+                            }
+
+                            // Trajets : la liste des tournées, ouverte depuis la boîte à outils de
+                            // la carte. Créer ou ouvrir un trajet rouvre la carte en mode
+                            // planificateur, parce que c'est elle qui porte les marqueurs, les
+                            // filtres et la recherche dont l'édition a besoin.
+                            composable(
+                                route = "trips",
+                                // Cible du clic sur un rappel de trajet.
+                                deepLinks = listOf(navDeepLink { uriPattern = "geotower://trips" })
+                            ) {
+                                val tripsContext = androidx.compose.ui.platform.LocalContext.current
+                                val tripsLocale = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]
+                                Box(modifier = Modifier.padding(innerPadding)) {
+                                    if (!featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.TRIPS)) {
+                                        DisabledFeatureRoute(navController, txtUnavailable)
+                                        return@Box
+                                    }
+                                    fr.geotower.ui.screens.trips.TripsScreen(
+                                        navController = navController,
+                                        onCreateTrip = {
+                                            val plan = fr.geotower.data.trip.TripPlanStore.newPlan(
+                                                name = fr.geotower.ui.screens.trips.defaultTripName(
+                                                    context = tripsContext,
+                                                    millis = System.currentTimeMillis(),
+                                                    locale = tripsLocale
+                                                )
+                                            )
+                                            fr.geotower.data.trip.TripPlanStore.save(tripsContext, plan)
+                                            // Un trajet qu'on vient de créer est vide : il s'ouvre
+                                            // directement en édition, pas en consultation.
+                                            navController.navigate(
+                                                "map?tripId=${Uri.encode(plan.id)}&tripMode=edit"
+                                            )
+                                        },
+                                        onOpenTrip = { id ->
+                                            // Clic sur une tournée déjà tracée : on la regarde, et
+                                            // deux boutons proposent de la suivre ou de la modifier.
+                                            navController.navigate("map?tripId=${Uri.encode(id)}")
+                                        },
+                                        onFollowTrip = { id ->
+                                            navController.navigate(
+                                                "map?tripId=${Uri.encode(id)}&tripMode=follow"
+                                            )
+                                        }
+                                    )
                                 }
                             }
 

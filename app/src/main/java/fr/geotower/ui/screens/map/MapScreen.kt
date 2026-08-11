@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.DashPathEffect
 import android.graphics.Paint
 import android.graphics.drawable.BitmapDrawable
 import android.hardware.Sensor
@@ -50,6 +51,9 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -164,6 +168,17 @@ import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.RadioMapMarker
 import fr.geotower.data.AdminAreaExtent
 import fr.geotower.data.models.SiteHsEntity
+import fr.geotower.data.trip.TripFollowStatus
+import fr.geotower.data.trip.TripOrderOptimizer
+import fr.geotower.data.trip.TripPlan
+import fr.geotower.data.trip.computeTripFollowStatus
+import fr.geotower.data.trip.tripDirectionArrows
+import fr.geotower.data.workers.TripReminderScheduler
+import fr.geotower.ui.screens.trips.TripScheduleDialog
+import fr.geotower.ui.screens.trips.withSchedule
+import fr.geotower.data.trip.TripPlanStore
+import fr.geotower.data.trip.TripRouteCalculator
+import fr.geotower.data.trip.TripStep
 import fr.geotower.data.models.isDeclaredActive
 import fr.geotower.data.models.physicalSiteKey
 import fr.geotower.ui.components.LiveDatabaseUsageWarningDialog
@@ -695,6 +710,68 @@ private fun measureRouteKey(segment: MeasureSegment, profile: String): String {
         MeasureVertex.CurrentLocation -> String.format(Locale.US, "L%.3f,%.3f", point.latitude, point.longitude)
     }
     return "$profile|${vertexKey(segment.startVertex, segment.start)}>${vertexKey(segment.endVertex, segment.end)}"
+}
+
+/** Longueur réelle d'une suite de points, segment par segment. */
+private fun measurePathLengthMeters(path: List<GeoPoint>): Double {
+    var total = 0.0
+    for (index in 1 until path.size) total += path[index - 1].distanceToAsDouble(path[index])
+    return total
+}
+
+/** Indice du point du tracé le plus proche de [target], à partir de [fromIndex]. */
+private fun measureClosestPointIndex(points: List<GeoPoint>, target: GeoPoint, fromIndex: Int): Int {
+    var bestIndex = fromIndex
+    var bestDistance = Double.MAX_VALUE
+    for (index in fromIndex until points.size) {
+        val distance = points[index].distanceToAsDouble(target)
+        if (distance < bestDistance) {
+            bestDistance = distance
+            bestIndex = index
+        }
+    }
+    return bestIndex
+}
+
+/**
+ * Recale un itinéraire du cache sur les extrémités **vivantes** du trait.
+ *
+ * [measureRouteKey] ramène « ma position » sur une grille d'environ 110 m : entre deux recalculs, le
+ * tracé garde donc l'amorce de réseau d'il y a jusqu'à 110 m. En s'approchant de la cible, ça se
+ * voit deux fois — le trait repart en arrière vers le point de départ, et la distance affichée reste
+ * celle du calcul précédent, figée par paliers au lieu de décompter. On coupe ici la part déjà
+ * parcourue : le point du tracé le plus proche de la position devient la nouvelle amorce, et la
+ * distance est recalculée sur ce qui reste (raccords aux deux pastilles compris). Le décompte
+ * repart ainsi à chaque point GPS, sans une requête de plus.
+ *
+ * Sans sommet mouvant il n'y a rien à recaler : tracé et distance du service sont rendus tels quels.
+ */
+private fun measureRouteAlignedOnSegment(
+    segment: MeasureSegment,
+    route: MeasureRoute.Ready?
+): MeasureRoute.Ready? {
+    if (route == null) return null
+    val liveStart = segment.startVertex == MeasureVertex.CurrentLocation
+    val liveEnd = segment.endVertex == MeasureVertex.CurrentLocation
+    if (!liveStart && !liveEnd) return route
+    val points = route.points
+    if (points.size < 2) return route
+
+    val fromIndex = if (liveStart) measureClosestPointIndex(points, segment.start, 0) else 0
+    // L'arrivée se cherche après le départ : sur un tracé qui repasse près de soi (aller-retour,
+    // boucle), prendre le plus proche dans l'absolu retournerait le trait.
+    val toIndex = if (liveEnd) measureClosestPointIndex(points, segment.end, fromIndex) else points.lastIndex
+    // Plus rien à parcourir : on est arrivé au bout du tracé. Le trait redevient direct — rendre
+    // l'itinéraire complet remettrait justement le trait de retour vers le point de départ.
+    if (toIndex <= fromIndex) return null
+
+    val kept = points.subList(fromIndex, toIndex + 1)
+    val path = buildList {
+        add(segment.start)
+        addAll(kept)
+        add(segment.end)
+    }
+    return MeasureRoute.Ready(points = kept, distanceMeters = measurePathLengthMeters(path))
 }
 
 /**
@@ -1256,6 +1333,10 @@ fun MapScreen(
     navController: NavController,
     viewModel: MapViewModel,
     photoDraftId: String? = null,
+    // Non nul ⇒ la carte s'ouvre en mode planificateur sur ce trajet (depuis la liste des trajets).
+    plannedTripId: String? = null,
+    // Comment on ouvre ce trajet : consultation (défaut), édition ou suivi. Voir [TripMapMode].
+    plannedTripMode: String? = null,
     // Mode simplifié : fourni par l'hôte qui porte le tiroir. Non nul ⇒ le bouton en haut à
     // gauche ouvre le menu au lieu de revenir en arrière (la carte est la racine du backstack).
     onOpenSimpleModeMenu: (() -> Unit)? = null
@@ -1425,6 +1506,10 @@ fun MapScreen(
         featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.MAP_SEARCH_NOMINATIM) &&
             featureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.SEARCH_NOMINATIM)
     val canUseMapMeasure = featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.MAP_MEASURE)
+    val canUseTrips = featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.TRIPS)
+    // Sans magnétomètre, la page Boussole n'a rien à montrer : même garde que l'accueil.
+    val canUseCompassPage = AppConfig.hasCompass.value &&
+        featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.COMPASS)
     val canUseMapLocation = featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.MAP_LOCATION)
     val canUseLayerSelector = listOf(0, 1, 2, 3, 4).any(::isMapProviderEnabled)
 
@@ -1603,6 +1688,194 @@ fun MapScreen(
         }
     }
 
+    // ================= PLANIFICATEUR DE TRAJET =================
+    // Ouvert depuis la liste des trajets : la carte devient l'éditeur de la tournée, avec ses
+    // marqueurs, ses filtres et sa recherche -- c'est tout l'intérêt d'en faire un mode plutôt
+    // qu'un écran à part. Chaque geste écrit dans le trajet : pas de bouton « enregistrer » qu'on
+    // puisse oublier en plein terrain.
+    var plannerPlan by remember { mutableStateOf<TripPlan?>(null) }
+    var plannerBusy by remember { mutableStateOf(false) }
+    // Étape dont le menu d'actions est ouvert, et point d'insertion armé : tant qu'il est posé, le
+    // prochain point atterrit APRÈS cette étape au lieu d'aller en fin de tournée.
+    var plannerStepMenuIndex by remember { mutableStateOf<Int?>(null) }
+    var plannerInsertAfterIndex by remember { mutableStateOf<Int?>(null) }
+    // Consultation, édition ou suivi. Comme `plannerPlan`, c'est un délégué d'état : le lire dans
+    // une lambda mémorisée rend bien la valeur du moment (cf. l'avertissement sur isPlannerMode).
+    // Pas de booléen dérivé (`val following = tripMode == ...`) : il serait figé à la composition
+    // et les lambdas mémorisées le captureraient périmé. On compare `tripMode` sur place.
+    var tripMode by rememberSaveable { mutableStateOf(tripMapModeOrDefault(plannedTripMode)) }
+    var plannerFollowStatus by remember { mutableStateOf<TripFollowStatus?>(null) }
+    // Hauteur réellement mesurée de la barre du trajet : les trois barres (consultation, édition,
+    // suivi) n'ont pas la même, et c'est elle qui dit de combien remonter ce qui vit en bas.
+    var tripBarHeightPx by remember { mutableIntStateOf(0) }
+    // Sortie de l'édition : on propose de dater la tournée avant de partir, sans jamais l'imposer.
+    var plannerAskForDate by remember { mutableStateOf(false) }
+    var plannerScheduling by remember { mutableStateOf(false) }
+    // Le trajet lui-même arrive par une lecture disque (LaunchedEffect), donc une image plus tard.
+    // Faire dépendre l'INTERFACE de `plannerPlan` affichait donc une première image en « carte des
+    // antennes » — bouton de partage présent, boussole à sa place habituelle — avant que tout ne se
+    // reconfigure sous les yeux de l'utilisateur, ce qui se lit comme un bug.
+    //
+    // On décide donc à partir de l'argument de navigation, connu dès la première composition. Si le
+    // trajet s'avère introuvable (supprimé entre-temps), on rend son interface normale à la carte
+    // plutôt que de la laisser amputée sans barre.
+    var plannerPlanMissing by remember { mutableStateOf(false) }
+    val isPlannerMode = !plannedTripId.isNullOrBlank() && !plannerPlanMissing
+
+    // ATTENTION : `isPlannerMode` et `tripMode` conviennent à l'interface, qui se recompose, mais
+    // surtout PAS aux lambdas mémorisées -- calque de tap, écouteurs de marqueurs -- qui
+    // captureraient la valeur de la toute première composition. Là-bas, on lit `plannerPlan` et
+    // `tripMode` directement : ce sont des délégués d'état, donc la lecture rend la valeur du
+    // moment. Ne pas « simplifier » en réutilisant un booléen dérivé dans une lambda.
+    val tripOverlay = remember { FolderOverlay() }
+
+    LaunchedEffect(plannedTripId) {
+        val loaded = plannedTripId?.takeIf { it.isNotBlank() }?.let { id ->
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                TripPlanStore.readOne(context, id)
+            }
+        }
+        plannerPlan = loaded
+        // Identifiant fourni mais trajet absent : on relâche le mode trajet, sinon la carte reste
+        // sans son interface et sans barre.
+        plannerPlanMissing = !plannedTripId.isNullOrBlank() && loaded == null
+        // Les deux modes posent des points : on n'entre pas dans le planificateur en laissant la
+        // mesure active.
+        if (plannerPlan != null) isMeasuringMode = false
+    }
+
+    fun savePlan(next: TripPlan) {
+        plannerPlan = next
+        TripPlanStore.save(context, next)
+    }
+
+    fun addTripStep(
+        latitude: Double,
+        longitude: Double,
+        label: String,
+        kind: String,
+        supportId: String? = null
+    ) {
+        val current = plannerPlan ?: return
+        val step = TripStep(
+            latitude = latitude,
+            longitude = longitude,
+            label = label,
+            kind = kind,
+            supportId = supportId,
+            visitedAtMillis = null,
+            note = null,
+            profileToNext = null
+        )
+        val insertAt = plannerInsertAfterIndex?.let { (it + 1).coerceIn(0, current.steps.size) }
+        plannerInsertAfterIndex = null
+
+        if (insertAt == null) {
+            // Ajout en fin de tournée : les segments déjà calculés gardent leurs indices.
+            savePlan(current.copy(steps = current.steps + step))
+        } else {
+            // Insertion au milieu : tous les indices suivants glissent, les segments enregistrés ne
+            // désignent plus les bonnes étapes. On repart d'un calcul propre.
+            val steps = current.steps.toMutableList().apply { add(insertAt, step) }
+            savePlan(current.copy(steps = steps, legs = emptyList()))
+        }
+    }
+
+    /** Réordonne, supprime ou coche une étape. Tout remaniement d'ordre périme les segments. */
+    fun mutateTripSteps(transform: (MutableList<TripStep>) -> Unit) {
+        val current = plannerPlan ?: return
+        val steps = current.steps.toMutableList().apply(transform)
+        savePlan(current.copy(steps = steps, legs = emptyList()))
+    }
+
+    fun refreshTripLayers(map: MapView) {
+        tripOverlay.items.clear()
+        val plan = plannerPlan
+        if (plan == null) {
+            map.invalidate()
+            return
+        }
+
+        plan.legPairs().forEach { (fromIndex, toIndex) ->
+            val computed = plan.legBetween(fromIndex, toIndex)?.points()?.takeIf { it.size >= 2 }
+            // Segment pas encore calculé : trait direct en pointillés. Dire « je ne connais pas
+            // encore la route » vaut mieux que d'en dessiner une fausse.
+            val legPoints = computed ?: listOf(
+                doubleArrayOf(plan.steps[fromIndex].latitude, plan.steps[fromIndex].longitude),
+                doubleArrayOf(plan.steps[toIndex].latitude, plan.steps[toIndex].longitude)
+            )
+
+            tripOverlay.add(
+                Polyline(map).apply {
+                    outlinePaint.color = TRIP_STEP_COLOR
+                    outlinePaint.strokeWidth = 8f
+                    if (computed == null) {
+                        outlinePaint.pathEffect = DashPathEffect(floatArrayOf(18f, 12f), 0f)
+                    }
+                    setPoints(legPoints.map { GeoPoint(it[0], it[1]) })
+                }
+            )
+
+            // Flèches de sens, posées par-dessus le trait mais sous les pastilles d'étapes.
+            tripDirectionArrows(legPoints).forEach { arrow ->
+                tripOverlay.add(
+                    Marker(map).apply {
+                        position = GeoPoint(arrow.latitude, arrow.longitude)
+                        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                        icon = createTripArrowIcon(context, arrow.bearingDegrees)
+                        // « À plat » : la flèche tourne avec la carte, donc elle continue de
+                        // désigner la bonne direction quand on oriente au cap.
+                        isFlat = true
+                        // `false` = clic non consommé : toucher une flèche doit rester un toucher
+                        // de carte, qui ajoute une étape en édition.
+                        setOnMarkerClickListener { _, _ -> false }
+                    }
+                )
+            }
+        }
+
+        plan.steps.forEachIndexed { index, step ->
+            val marker = Marker(map).apply {
+                position = GeoPoint(step.latitude, step.longitude)
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                icon = createTripStepIcon(context, index + 1, step.visitedAtMillis != null)
+                title = step.label
+                // Toucher une pastille ouvre ses actions (déplacer, insérer, supprimer, cocher),
+                // jamais une bulle osmdroid.
+                setOnMarkerClickListener { _, _ ->
+                    // En consultation on ne propose pas d'actions : ce mode ne modifie rien.
+                    if (tripMode != TRIP_MODE_VIEW) plannerStepMenuIndex = index
+                    true
+                }
+            }
+            tripOverlay.add(marker)
+        }
+        map.invalidate()
+    }
+
+    // Recalcul des segments manquants. La signature ne retient que ce qui invalide un tracé :
+    // les positions des étapes, leur ordre, le profil et la fermeture de la boucle.
+    val tripRouteSignature = plannerPlan?.let { plan ->
+        buildString {
+            append(plan.id).append('|').append(plan.profile).append('|').append(plan.returnToStart)
+            plan.steps.forEach { append('|').append(it.latitude).append(',').append(it.longitude) }
+        }
+    }
+    LaunchedEffect(tripRouteSignature) {
+        val current = plannerPlan ?: return@LaunchedEffect
+        if (current.steps.size < 2) {
+            mapViewRef?.let { refreshTripLayers(it) }
+            return@LaunchedEffect
+        }
+        plannerBusy = true
+        val outcome = runCatching { TripRouteCalculator.computeRoute(current) }.getOrNull()
+        plannerBusy = false
+        if (outcome != null && outcome.plan.legs != current.legs) {
+            savePlan(outcome.plan)
+        }
+        mapViewRef?.let { refreshTripLayers(it) }
+    }
+
     val measureOverlay = remember { FolderOverlay() }
     val searchBoundaryOverlay = remember { FolderOverlay() }
     // ✅ LE CALQUE MACRO POUR LA VUE DÉZOOMÉE
@@ -1724,6 +1997,47 @@ fun MapScreen(
     var myCurrentLoc by remember { mutableStateOf<GeoPoint?>(null) }
     var currentSpeedKmH by remember { mutableIntStateOf(0) }
 
+    // Suivi de tournée : à chaque position reçue, on recalcule où on en est et on coche ce qu'on
+    // vient d'atteindre. Placé ici et non dans le bloc du planificateur, parce que `myCurrentLoc`
+    // n'est déclarée que maintenant.
+    LaunchedEffect(myCurrentLoc, tripMode, plannerPlan?.steps?.size) {
+        val plan = plannerPlan
+        val location = myCurrentLoc
+        if (tripMode != TRIP_MODE_FOLLOW || plan == null || location == null) {
+            plannerFollowStatus = null
+            return@LaunchedEffect
+        }
+
+        val status = computeTripFollowStatus(plan, location.latitude, location.longitude)
+        plannerFollowStatus = status
+
+        if (status.reachedStepIndices.isNotEmpty()) {
+            val reachedAt = System.currentTimeMillis()
+            val steps = plan.steps.mapIndexed { index, step ->
+                if (index in status.reachedStepIndices) step.copy(visitedAtMillis = reachedAt) else step
+            }
+            // Cocher ne change pas l'ordre : les segments calculés restent valables.
+            savePlan(plan.copy(steps = steps))
+            mapViewRef?.let { refreshTripLayers(it) }
+        }
+    }
+
+    // Écran maintenu allumé pendant le suivi : une tournée se fait la carte sous les yeux, et un
+    // écran qui s'éteint toutes les trente secondes rend le suivi inutilisable.
+    val currentView = androidx.compose.ui.platform.LocalView.current
+    DisposableEffect(tripMode) {
+        val following = tripMode == TRIP_MODE_FOLLOW
+        currentView.keepScreenOn = following
+        // Cap en haut pendant le suivi -- puis on rend son réglage à l'utilisateur : suivre une
+        // tournée une fois ne doit pas changer durablement sa carte.
+        val hadFollowOrientation = AppConfig.mapFollowOrientation.value
+        if (following && !hadFollowOrientation) setFollowOrientation(true)
+        onDispose {
+            currentView.keepScreenOn = false
+            if (following && !hadFollowOrientation) setFollowOrientation(false)
+        }
+    }
+
     // --- Déplacement continu du repère de position -------------------------------------------
     // Le GPS ne donne qu'un point par seconde : sans lissage le repère se téléporte. Le moteur
     // interpole, extrapole sur la vitesse et le cap du dernier relevé, et laisse l'estime piétonne
@@ -1745,6 +2059,30 @@ fun MapScreen(
     var timeSliderThreshold by rememberSaveable { mutableStateOf<Int?>(null) }
     var timeSliderStats by remember { mutableStateOf(TimeSliderStats(emptyMap(), 0)) }
     val timeSliderLift = if (isTimeSliderVisible) sizing.component(104.dp) else 0.dp
+
+    // La barre du trajet occupe le bas de l'écran : sans ce relèvement, la colonne d'infos et les
+    // boutons de zoom sont dessinés par-dessus, puisqu'ils viennent après dans le Box.
+    //
+    // Le calcul part de la hauteur mesurée de la barre, moins ce que ces éléments s'appliquent déjà
+    // eux-mêmes (barre système + 32 dp), plus un jeu de 8 dp. Résultat : ils se posent JUSTE
+    // au-dessus de la barre, quelle que soit celle des trois qui est affichée -- au lieu de flotter
+    // très haut avec une constante taillée pour la plus grande.
+    val plannerLift = when {
+        !isPlannerMode -> 0.dp
+
+        tripBarHeightPx > 0 -> {
+            val barHeight = with(androidx.compose.ui.platform.LocalDensity.current) {
+                tripBarHeightPx.toDp()
+            }
+            val systemBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+            (barHeight - systemBottom - sizing.spacing(32.dp) + sizing.spacing(8.dp))
+                .coerceAtLeast(0.dp)
+        }
+
+        // Barre pas encore mesurée (première image) : on part d'une hauteur plausible plutôt que de
+        // zéro, sinon les crédits et les boutons de zoom sautent visiblement à son apparition.
+        else -> sizing.component(96.dp)
+    }
     val todayDateInt = remember {
         val c = java.util.Calendar.getInstance()
         c.get(java.util.Calendar.YEAR) * 10000 + (c.get(java.util.Calendar.MONTH) + 1) * 100 + c.get(java.util.Calendar.DAY_OF_MONTH)
@@ -1776,10 +2114,27 @@ fun MapScreen(
     }
 
     // ✅ CORRECTION : Gère le geste "Retour" physique du téléphone
+    /**
+     * Quitter l'édition d'une tournée. Une tournée tracée mais sans date part rarement d'un oubli
+     * volontaire : on propose de la dater — et « Pas maintenant » sort sans insister.
+     */
+    val leaveTripEditing: () -> Unit = {
+        val plan = plannerPlan
+        if (tripMode == TRIP_MODE_EDIT && plan != null &&
+            plan.steps.isNotEmpty() && plan.plannedAtMillis == null
+        ) {
+            plannerAskForDate = true
+        } else {
+            safeBackNavigation.navigateBack()
+        }
+    }
+
     androidx.activity.compose.BackHandler {
         if (isMeasuringMode) {
             isMeasuringMode = false
             clearMeasureSelections()
+        } else if (tripMode == TRIP_MODE_EDIT && plannerPlan != null) {
+            leaveTripEditing()
         } else if (isSharedPhotoSelectionMode) {
             cancelSharedPhotoSelection()
         } else {
@@ -1976,6 +2331,7 @@ fun MapScreen(
     }
 
     val txtMapTitle = stringResource(R.string.appstrings_map_title)
+    val txtTripMapTitle = stringResource(R.string.trips_map_header)
     val txtSearchCityOrId = stringResource(R.string.appstrings_search_city_or_id)
     val txtLocationNotFound = stringResource(R.string.appstrings_location_not_found)
     val txtNetworkErrorSearch = stringResource(R.string.appstrings_network_error_search)
@@ -2457,9 +2813,12 @@ fun MapScreen(
             loopClosed = measuredLoopClosed,
             myLocation = myLoc
         ).forEach { segment ->
-            val route = routeProfile
-                ?.let { profile -> measureRoutes[measureRouteKey(segment, profile)] }
-                ?.let { it as? MeasureRoute.Ready }
+            val route = measureRouteAlignedOnSegment(
+                segment,
+                routeProfile
+                    ?.let { profile -> measureRoutes[measureRouteKey(segment, profile)] }
+                    ?.let { it as? MeasureRoute.Ready }
+            )
             addMeasureSegment(segment.start, segment.end, route) {
                 if (segment.toIndex >= 0) deleteMeasureSegment(segment.toIndex) else measuredLoopClosed = false
             }
@@ -2536,6 +2895,16 @@ fun MapScreen(
     val measureTapOverlay = remember {
         MapEventsOverlay(object : MapEventsReceiver {
             override fun singleTapConfirmedHelper(p: GeoPoint): Boolean {
+                // Le planificateur passe avant la mesure : les deux posent des points, mais on
+                // n'entre pas dans l'un en laissant l'autre actif.
+                // En suivi, toucher la carte ne pose plus rien : la tournée est arrêtée, on la
+                // parcourt.
+                if (plannerPlan != null && tripMode == TRIP_MODE_EDIT) {
+                    val map = mapViewRef ?: return true
+                    addTripStep(p.latitude, p.longitude, "", TripStep.KIND_MANUAL)
+                    refreshTripLayers(map)
+                    return true
+                }
                 if (!isMeasuringMode) return false
                 val map = mapViewRef ?: return true
 
@@ -2729,7 +3098,15 @@ fun MapScreen(
                 title = item.title(context)
                 snippet = item.subtitle(context)
                 setOnMarkerClickListener { clickedMarker, mapView ->
-                    if (isMeasuringMode) {
+                    if (plannerPlan != null && tripMode == TRIP_MODE_EDIT) {
+                        addTripStep(
+                            latitude = item.latitude,
+                            longitude = item.longitude,
+                            label = item.title(context),
+                            kind = TripStep.KIND_SITE
+                        )
+                        refreshTripLayers(map)
+                    } else if (isMeasuringMode) {
                         addMeasureVertex(MeasureVertex.Fixed(GeoPoint(item.latitude, item.longitude)))
                         refreshMeasureLayers(map)
                     } else if (item.isCluster) {
@@ -2874,7 +3251,15 @@ fun MapScreen(
                         }
 
                         setOnMarkerClickListener { _, _ ->
-                            if (isMeasuringMode) {
+                            if (plannerPlan != null && tripMode == TRIP_MODE_EDIT) {
+                                addTripStep(
+                                    latitude = mainAntenna.latitude,
+                                    longitude = mainAntenna.longitude,
+                                    label = mainAntenna.operateur.orEmpty(),
+                                    kind = TripStep.KIND_SITE
+                                )
+                                refreshTripLayers(map)
+                            } else if (isMeasuringMode) {
                                 addMeasureVertex(MeasureVertex.Fixed(GeoPoint(mainAntenna.latitude, mainAntenna.longitude)))
                                 refreshMeasureLayers(map)
                             } else {
@@ -2996,7 +3381,15 @@ fun MapScreen(
 
                         // L'action de clic reste unique et propre !
                         setOnMarkerClickListener { _, _ ->
-                            if (isMeasuringMode) {
+                            if (plannerPlan != null && tripMode == TRIP_MODE_EDIT) {
+                                addTripStep(
+                                    latitude = mainAntenna.latitude,
+                                    longitude = mainAntenna.longitude,
+                                    label = mainAntenna.operateur.orEmpty(),
+                                    kind = TripStep.KIND_SITE
+                                )
+                                refreshTripLayers(map)
+                            } else if (isMeasuringMode) {
                                 addMeasureVertex(MeasureVertex.Fixed(GeoPoint(mainAntenna.latitude, mainAntenna.longitude)))
                                 refreshMeasureLayers(map)
                             } else {
@@ -3477,6 +3870,7 @@ fun MapScreen(
                     // ✅ ORDONNANCEMENT DES CALQUES
                     overlays.add(measureTapOverlay)
                     overlays.add(measureOverlay)
+                    overlays.add(tripOverlay)
                     overlays.add(searchBoundaryOverlay)
                     overlays.add(macroOverlay) // <-- Calque macro au fond
                     overlays.add(signalQuestCoverageOverlay)
@@ -4083,6 +4477,12 @@ fun MapScreen(
         // En paysage court, la barre est en bas avec la toolbox, la liste s'ouvre alors avec elle.
         val hideMapControlsForSuggestions = showSearchSuggestions && !toolboxExpandsLeft
 
+        // En mode planificateur, l'interface de la carte des antennes s'efface au profit de celle
+        // du trajet : ne restent que le zoom, le dézoom et le recentrage, plus la barre du bas.
+        // L'attribution du fond de carte, elle, reste — c'est une obligation de licence, pas un
+        // élément d'interface qu'on peut retirer par confort.
+        val hideMapChrome = hideMapControlsForSuggestions || isPlannerMode
+
         AnimatedVisibility(
             visible = hideMapControlsForSuggestions,
             enter = fadeIn() + expandVertically(expandFrom = Alignment.Top),
@@ -4114,7 +4514,8 @@ fun MapScreen(
             label = "toolsAnim"
         )
         val useCompactCompassPlacement = configuration.screenHeightDp < 600
-        val showCompassInMapHeader = showCompass && AppConfig.hasCompass.value && isLandscapeLayout
+        val showCompassInMapHeader = showCompass && AppConfig.hasCompass.value &&
+            isLandscapeLayout && !isPlannerMode
         val compassEndPadding by animateDpAsState(
             targetValue = if (isLandscapeLayout && !useCompactCompassPlacement) {
                 (maxWidth * 0.12f).coerceIn(sizing.spacing(144.dp), sizing.spacing(320.dp))
@@ -4124,11 +4525,20 @@ fun MapScreen(
             label = "compassEndAnim"
         )
         val showCompactCompass = showCompass && AppConfig.hasCompass.value &&
-            useCompactCompassPlacement && !showCompassInMapHeader
+            useCompactCompassPlacement && !showCompassInMapHeader && !isPlannerMode
+
+        /**
+         * Écran trajet : la boussole quitte ses trois emplacements habituels — bandeau en paysage,
+         * flottant en haut à droite, compact au-dessus de la boîte à outils — pour se ranger sous
+         * le bouton retour, dans le créneau que le bouton de partage y laisse libre.
+         */
+        val showCompassUnderBackButton = isPlannerMode && showCompass && AppConfig.hasCompass.value
         val zoomControlsHeight = if (showZoomBtns) sizing.component(117.dp) else 0.dp
         val defaultOp by AppConfig.defaultOperator
-        val trackingButtonHeight = if (isLandscapeLayout) mapControlButtonDiameter else sizing.component(40.dp)
-        val trackingButtonSpacing = if (isLandscapeLayout) 1.dp else sizing.spacing(8.dp)
+        // Mêmes pilules en portrait et en paysage : la hauteur ne suit plus celle des boutons
+        // ronds de la carte, sinon le tiroir de suivi grossit d'un coup en tournant l'écran.
+        val trackingButtonHeight = sizing.component(40.dp)
+        val trackingButtonSpacing = sizing.spacing(8.dp)
         // Lignes du tiroir de mesure : suivi global, suivi de l'opérateur préféré, forme des traits.
         val trackingRowCount = 1 +
             (if (defaultOp != "Aucun") 1 else 0) +
@@ -4220,9 +4630,28 @@ fun MapScreen(
             label = "measureDrawerDropAnim"
         )
 
+        // La boussole de l'écran trajet, à la place que le partage occupe le reste du temps.
+        if (showCompassUnderBackButton) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(start = sizing.spacing(16.dp), top = compassTopPadding)
+            ) {
+                MapCompassButton(
+                    azimuth = azimuth,
+                    mapOrientation = mapOrientationState.floatValue,
+                    followActive = followOrientation,
+                    onToggleFollow = if (PowerProfile.isEco) null else toggleFollowOrientation,
+                    modifier = Modifier.size(mapControlButtonDiameter)
+                ) {
+                    safeClick { resetMapOrientation() }
+                }
+            }
+        }
+
         // ✅ NOUVEAU : Bouton de Partage positionné sous le bouton Retour avec animation
         AnimatedVisibility(
-            visible = !hideMapControlsForSuggestions,
+            visible = !hideMapChrome,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier
@@ -4280,7 +4709,7 @@ fun MapScreen(
 
         AnimatedVisibility(
             visible = showCompass && AppConfig.hasCompass.value && !useCompactCompassPlacement &&
-                !showCompassInMapHeader && !hideMapControlsForSuggestions,
+                !showCompassInMapHeader && !hideMapChrome,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier
@@ -4530,7 +4959,14 @@ fun MapScreen(
                     }
                 }
                 Surface(modifier = Modifier.align(Alignment.Center), shape = RoundedCornerShape(32.dp), color = MaterialTheme.colorScheme.surface, shadowElevation = 4.dp, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
-                    Text(txtMapTitle, style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = sizing.spacing(24.dp), vertical = sizing.spacing(12.dp)))
+                    // Avec un trajet ouvert, la carte n'est plus « la carte des antennes » : elle
+                    // sert la tournée, et son en-tête doit le dire.
+                    Text(
+                        text = if (isPlannerMode) txtTripMapTitle else txtMapTitle,
+                        style = sizing.textStyle(MaterialTheme.typography.titleMedium),
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(horizontal = sizing.spacing(24.dp), vertical = sizing.spacing(12.dp))
+                    )
                 }
 
                 Row(
@@ -4552,15 +4988,25 @@ fun MapScreen(
 
                     // « Réglages/filtres » : icône Tune et non Menu, sinon deux hamburgers
                     // identiques encadrent la barre en mode simplifié.
-                    SmallFloatingButton(
-                        icon = Icons.Default.Tune,
-                        desc = txtFilter
-                    ) { safeClick { showSettingsSheet = true } }
+                    //
+                    // Avec un trajet ouvert, le bouton ne survit qu'en ÉDITION : c'est là qu'on
+                    // clique des marqueurs d'antennes pour poser des étapes, donc là que choisir
+                    // lesquelles voir a un sens. En consultation et en suivi, on ne clique plus
+                    // d'antennes et le panneau n'aurait rien à régler d'utile.
+                    if (!isPlannerMode || tripMode == TRIP_MODE_EDIT) {
+                        SmallFloatingButton(
+                            icon = Icons.Default.Tune,
+                            desc = txtFilter
+                        ) { safeClick { showSettingsSheet = true } }
+                    }
                 }
             }
 
             AnimatedVisibility(
-                visible = activeMapFilterSummary != null && !isSearchActive && !isSharedPhotoSelectionMode,
+                // Même règle que le bouton Filtres : annoncer des filtres actifs là où on ne peut
+                // pas les régler serait une impasse.
+                visible = activeMapFilterSummary != null && !isSearchActive &&
+                    !isSharedPhotoSelectionMode && (!isPlannerMode || tripMode == TRIP_MODE_EDIT),
                 enter = fadeIn() + expandVertically(expandFrom = Alignment.Top),
                 exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top)
             ) {
@@ -4582,9 +5028,13 @@ fun MapScreen(
             // quand il est arrivé, à vol d'oiseau sinon). Les traits de suivi vers le site le plus
             // proche n'y entrent pas : ils mesurent une portée radio, pas un parcours.
             val measureTotalDistanceMeters = currentMeasureSegments.sumOf { segment ->
-                val route = measureRouteProfileValue
-                    ?.let { profile -> measureRoutes[measureRouteKey(segment, profile)] }
-                    ?.let { it as? MeasureRoute.Ready }
+                // Même recalage que le tracé, sinon le total et les étiquettes se contrediraient.
+                val route = measureRouteAlignedOnSegment(
+                    segment,
+                    measureRouteProfileValue
+                        ?.let { profile -> measureRoutes[measureRouteKey(segment, profile)] }
+                        ?.let { it as? MeasureRoute.Ready }
+                )
                 route?.distanceMeters ?: segment.start.distanceToAsDouble(segment.end)
             }
             // Itinéraires encore attendus : la clé n'est pas dans le cache. Le total affiché est
@@ -4741,7 +5191,9 @@ fun MapScreen(
         Column(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(bottom = sizing.spacing(32.dp), end = sizing.spacing(16.dp))
+                // Même raison que la colonne d'infos : la barre du planificateur tient toute la
+                // largeur du bas, ces boutons passeraient dessous.
+                .padding(bottom = sizing.spacing(32.dp) + plannerLift, end = sizing.spacing(16.dp))
                 .navigationBarsPadding(),
             horizontalAlignment = Alignment.End,
             verticalArrangement = Arrangement.spacedBy(sizing.spacing(16.dp))
@@ -4758,7 +5210,7 @@ fun MapScreen(
                 }
             }
 
-            if (showToolbox) {
+            if (showToolbox && !isPlannerMode) {
                 val toolboxContent: @Composable () -> Unit = {
                 AntennaMapToolBox(
                     isToolboxExpanded = isToolboxExpanded,
@@ -4813,52 +5265,61 @@ fun MapScreen(
                     },
                     onOpenLayers = { safeClick { if (canUseLayerSelector) showLayerSheet = true } },
                     onOpenSettings = { safeClick { showMapPageSettingsSheet = true } },
+                    onOpenTrips = { safeClick { if (canUseTrips) navController.navigate("trips") } },
+                    onOpenCompassPage = { safeClick { if (canUseCompassPage) navController.navigate("compass") } },
                     showSearch = canUseMapSearch,
-                    showMeasure = canUseMapMeasure,
-                    showTimeSlider = timeSliderAvailable,
+                    // La mesure disparaît pendant l'édition d'un trajet : les deux posent des
+                    // points, et le planificateur passe devant dans le gestionnaire de tap. Laisser
+                    // le bouton donnerait un mode qui s'allume sans rien faire.
+                    showMeasure = canUseMapMeasure && !isPlannerMode,
+                    showTrips = canUseTrips,
+                    showCompassPage = canUseCompassPage,
+                    showTimeSlider = timeSliderAvailable && !isPlannerMode,
                     showLayers = canUseLayerSelector,
                     expandLeft = toolboxExpandsLeft
                 )
                 }
 
                 if (toolboxExpandsLeft && isSearchActive) {
-                    // Paysage court : la barre est en bas, la liste s'ouvre donc AU-DESSUS d'elle.
-                    // La colonne est ancrée en bas, il suffit de la poser avant la ligne.
-                    AnimatedVisibility(
-                        visible = showSearchSuggestions,
-                        enter = fadeIn() + expandVertically(expandFrom = Alignment.Bottom),
-                        exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Bottom),
-                        modifier = Modifier.padding(
-                            start = sizing.spacing(16.dp),
-                            bottom = sizing.spacing(8.dp)
-                        )
-                    ) {
-                        MapSearchSuggestionList(
-                            suggestions = searchSuggestions.take(MAP_SEARCH_SUGGESTION_COMPACT_COUNT),
-                            onSelect = { suggestion -> safeClick { applySearchSuggestion(suggestion) } },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
+                    // Paysage court : la barre vit en bas, mais la liste s'ouvre SOUS elle comme
+                    // partout ailleurs. Les deux tiennent dans une colonne à elles, sans
+                    // espacement propre et avec l'écart porté par la liste : une fois celle-ci
+                    // repliée, plus rien ne décolle la barre du bas de l'écran.
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = sizing.spacing(16.dp)),
+                            horizontalArrangement = Arrangement.End,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            MapSearchBar(
+                                query = searchQuery,
+                                placeholder = txtSearchCityOrId,
+                                onQueryChange = { searchQuery = it },
+                                onSearch = {
+                                    performSearch(searchQuery)
+                                    focusManager.clearFocus()
+                                },
+                                modifier = Modifier.weight(1f)
+                            )
+                            Spacer(modifier = Modifier.width(sizing.spacing(10.dp)))
+                            toolboxContent()
+                        }
 
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(start = sizing.spacing(16.dp)),
-                        horizontalArrangement = Arrangement.End,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        MapSearchBar(
-                            query = searchQuery,
-                            placeholder = txtSearchCityOrId,
-                            onQueryChange = { searchQuery = it },
-                            onSearch = {
-                                performSearch(searchQuery)
-                                focusManager.clearFocus()
-                            },
-                            modifier = Modifier.weight(1f)
-                        )
-                        Spacer(modifier = Modifier.width(sizing.spacing(10.dp)))
-                        toolboxContent()
+                        AnimatedVisibility(
+                            visible = showSearchSuggestions,
+                            enter = fadeIn() + expandVertically(expandFrom = Alignment.Top),
+                            exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top)
+                        ) {
+                            MapSearchSuggestionList(
+                                suggestions = searchSuggestions.take(MAP_SEARCH_SUGGESTION_COMPACT_COUNT),
+                                onSelect = { suggestion -> safeClick { applySearchSuggestion(suggestion) } },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = sizing.spacing(16.dp), top = sizing.spacing(8.dp))
+                            )
+                        }
                     }
                 } else {
                     toolboxContent()
@@ -5012,7 +5473,9 @@ fun MapScreen(
             }
         }
 
-        if (isTimeSliderVisible) {
+        // Le slider temporel s'efface pendant l'édition d'un trajet : les deux barres occupent le
+        // même bas d'écran, et le planificateur est un mode focalisé.
+        if (isTimeSliderVisible && !isPlannerMode) {
             MapTimeSliderBar(
                 oldestDateInt = oldestServiceDate?.toIntOrNull()?.coerceAtLeast(19910101) ?: 19910101,
                 newestDateInt = todayDateInt,
@@ -5025,6 +5488,183 @@ fun MapScreen(
                     .padding(start = sizing.spacing(12.dp), end = mapControlButtonDiameter + sizing.spacing(24.dp))
                     .navigationBarsPadding()
             )
+        }
+
+        plannerPlan?.let { plan ->
+            when (tripMode) {
+                TRIP_MODE_FOLLOW -> TripFollowBar(
+                    plan = plan,
+                    status = plannerFollowStatus,
+                    distanceUnit = AppConfig.distanceUnit.intValue,
+                    onCheckNext = {
+                        val index = plannerFollowStatus?.nextStepIndex
+                        if (index != null && index in plan.steps.indices) {
+                            savePlan(
+                                plan.copy(
+                                    steps = plan.steps.toMutableList().apply {
+                                        set(index, this[index].copy(visitedAtMillis = System.currentTimeMillis()))
+                                    }
+                                )
+                            )
+                            mapViewRef?.let { refreshTripLayers(it) }
+                        }
+                    },
+                    // Arrêter le suivi ramène à la consultation, pas à l'édition : on vient de
+                    // parcourir la tournée, pas de vouloir la redessiner.
+                    onStop = { tripMode = TRIP_MODE_VIEW },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .onGloballyPositioned { tripBarHeightPx = it.size.height }
+                )
+
+                TRIP_MODE_VIEW -> TripViewBar(
+                    plan = plan,
+                    distanceUnit = AppConfig.distanceUnit.intValue,
+                    onFollow = { tripMode = TRIP_MODE_FOLLOW },
+                    onEdit = { tripMode = TRIP_MODE_EDIT },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .onGloballyPositioned { tripBarHeightPx = it.size.height }
+                )
+
+                else -> TripPlannerBar(
+                plan = plan,
+                busy = plannerBusy,
+                distanceUnit = AppConfig.distanceUnit.intValue,
+                onToggleProfile = {
+                    val next = if (plan.profile == RouteApi.PROFILE_PEDESTRIAN) {
+                        RouteApi.PROFILE_CAR
+                    } else {
+                        RouteApi.PROFILE_PEDESTRIAN
+                    }
+                    // Changer de profil périme TOUS les segments : un tracé voiture ne vaut rien
+                    // pour un trajet à pied, et l'inverse encore moins.
+                    savePlan(plan.copy(profile = next, legs = emptyList()))
+                },
+                onToggleReturnToStart = { savePlan(plan.copy(returnToStart = !plan.returnToStart)) },
+                onOptimize = {
+                    val outcome = TripOrderOptimizer.optimize(plan)
+                    if (outcome.changed) savePlan(outcome.plan)
+                    mapViewRef?.let { refreshTripLayers(it) }
+                },
+                onUndo = {
+                    val remaining = plan.steps.dropLast(1)
+                    savePlan(
+                        plan.copy(
+                            steps = remaining,
+                            legs = plan.legs.filter { it.isWithin(remaining.size) }
+                        )
+                    )
+                    mapViewRef?.let { refreshTripLayers(it) }
+                },
+                onFinish = leaveTripEditing,
+                insertAfterNumber = plannerInsertAfterIndex?.plus(2),
+                // Pas de `navigationBarsPadding` ici : la surface doit descendre jusqu'au bord de
+                // l'écran, sans bande de carte visible dessous. C'est le contenu de la barre qui
+                // s'écarte de la barre système, à l'intérieur.
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .onGloballyPositioned { tripBarHeightPx = it.size.height }
+            )
+            }
+
+            if (plannerAskForDate) {
+                AlertDialog(
+                    onDismissRequest = { plannerAskForDate = false },
+                    title = { Text(stringResource(R.string.trips_schedule_prompt_title)) },
+                    text = { Text(stringResource(R.string.trips_schedule_prompt_message)) },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            plannerAskForDate = false
+                            plannerScheduling = true
+                        }) {
+                            Text(stringResource(R.string.trips_schedule_prompt_set))
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = {
+                            // Partir sans date est un choix légitime : on n'y revient pas.
+                            plannerAskForDate = false
+                            safeBackNavigation.navigateBack()
+                        }) {
+                            Text(stringResource(R.string.trips_schedule_prompt_later))
+                        }
+                    }
+                )
+            }
+
+            if (plannerScheduling) {
+                TripScheduleDialog(
+                    plan = plan,
+                    onDismiss = { plannerScheduling = false },
+                    onConfirm = { plannedAtMillis, reminderOffsets, stopMinutes ->
+                        val next = plan.withSchedule(
+                            context = context,
+                            plannedAtMillis = plannedAtMillis,
+                            reminderOffsetsMinutes = reminderOffsets,
+                            stopDurationMinutes = stopMinutes,
+                            locale = configuration.locales[0]
+                        )
+                        savePlan(next)
+                        TripReminderScheduler.reschedule(context, next)
+                        plannerScheduling = false
+                        safeBackNavigation.navigateBack()
+                    }
+                )
+            }
+
+            plannerStepMenuIndex?.let { index ->
+                val step = plan.steps.getOrNull(index)
+                if (step == null) {
+                    plannerStepMenuIndex = null
+                } else {
+                    TripStepActionsDialog(
+                        stepNumber = index + 1,
+                        label = step.label,
+                        visited = step.visitedAtMillis != null,
+                        canMoveUp = index > 0,
+                        canMoveDown = index < plan.steps.lastIndex,
+                        onMoveUp = {
+                            mutateTripSteps { it.add(index - 1, it.removeAt(index)) }
+                            plannerStepMenuIndex = null
+                            mapViewRef?.let { refreshTripLayers(it) }
+                        },
+                        onMoveDown = {
+                            mutateTripSteps { it.add(index + 1, it.removeAt(index)) }
+                            plannerStepMenuIndex = null
+                            mapViewRef?.let { refreshTripLayers(it) }
+                        },
+                        onInsertAfter = {
+                            plannerInsertAfterIndex = index
+                            plannerStepMenuIndex = null
+                        },
+                        onToggleVisited = {
+                            val visitedAt = if (step.visitedAtMillis == null) {
+                                System.currentTimeMillis()
+                            } else {
+                                null
+                            }
+                            // Cocher ne change pas l'ordre : les segments restent valables, on ne
+                            // passe donc pas par mutateTripSteps.
+                            savePlan(
+                                plan.copy(
+                                    steps = plan.steps.toMutableList().apply {
+                                        set(index, step.copy(visitedAtMillis = visitedAt))
+                                    }
+                                )
+                            )
+                            plannerStepMenuIndex = null
+                            mapViewRef?.let { refreshTripLayers(it) }
+                        },
+                        onDelete = {
+                            mutateTripSteps { it.removeAt(index) }
+                            plannerStepMenuIndex = null
+                            mapViewRef?.let { refreshTripLayers(it) }
+                        },
+                        onDismiss = { plannerStepMenuIndex = null }
+                    )
+                }
+            }
         }
 
         // En paysage, la colonne d'infos (vitesse / échelle / attribution) est
@@ -5040,18 +5680,21 @@ fun MapScreen(
         Column(
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(start = sizing.spacing(16.dp), bottom = sizing.spacing(32.dp) + timeSliderLift)
+                .padding(
+                    start = sizing.spacing(16.dp),
+                    bottom = sizing.spacing(32.dp) + timeSliderLift + plannerLift
+                )
                 .navigationBarsPadding()
                 .onGloballyPositioned { infoColumnTopPx = it.positionInRoot().y }
                 .alpha(if (infoColumnMasksShare) 0f else 1f),
             horizontalAlignment = Alignment.Start,
             verticalArrangement = Arrangement.spacedBy(sizing.spacing(4.dp))
         ) {
-            if (AppConfig.showSpeedometer.value) {
+            if (AppConfig.showSpeedometer.value && !isPlannerMode) {
                 fr.geotower.ui.components.MapSpeedometer(speedKmH = currentSpeedKmH)
             }
 
-            if (showScale) {
+            if (showScale && !isPlannerMode) {
                 MapScaleBar(zoom = currentZoom, latitude = currentLat)
             }
 

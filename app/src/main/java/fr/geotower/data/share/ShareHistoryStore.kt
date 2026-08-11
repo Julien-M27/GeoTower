@@ -65,6 +65,9 @@ object ShareHistoryStore {
     /** Photo copiée, enregistrée dans la galerie ou partagée. */
     const val KIND_PHOTO = "photo"
 
+    /** Export d'un trajet, ou de tous : `itemCount` porte le nombre de trajets envoyés. */
+    const val KIND_TRIP = "trip"
+
     /** Exports de l'app, sans cible à rouvrir. */
     const val KIND_SETTINGS_PROFILE = "settings_profile"
     const val KIND_DIAGNOSTIC = "diagnostic"
@@ -100,6 +103,10 @@ object ShareHistoryStore {
     const val CONTENT_ATTRIBUTION = "attribution"
     const val CONTENT_COVERAGE = "coverage"
     const val CONTENT_OBSTACLES = "obstacles"
+
+    // Format d'un export de trajet, plutôt qu'un bloc d'image : c'est bien le contenu de l'entrée.
+    const val CONTENT_GPX = "gpx"
+    const val CONTENT_JSON = "json"
 
     // Blocs propres aux partages radio (mêmes identifiants que RADIO_SHARE_* côté menu).
     const val CONTENT_SUMMARY = "summary"

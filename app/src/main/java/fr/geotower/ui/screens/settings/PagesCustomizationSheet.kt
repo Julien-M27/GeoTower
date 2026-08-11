@@ -718,6 +718,7 @@ fun HomeSettingsSheet(
     var showLogo by remember { mutableStateOf(prefs.getBoolean("show_home_logo", true)) }
     var showHelpButton by remember { mutableStateOf(prefs.getBoolean("show_home_help", true)) }
     var showAboutLink by remember { mutableStateOf(HomePrefs.showAboutLink.read(prefs)) }
+    var showTripsPage by remember { mutableStateOf(HomePrefs.showTripsPage.read(prefs)) }
     val longPressReorder by AppConfig.homeLongPressReorder
     // Partagé avec l'accueil, qui déplace aussi ce bouton par appui long : l'un doit voir l'autre.
     val helpButtonPosition by AppConfig.homeHelpPosition
@@ -854,6 +855,17 @@ fun HomeSettingsSheet(
                                 }
                             }
                             "stats" -> DraggableSwitchCard(stringResource(R.string.appstrings_stats_group_title), showStats, onStatsChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+
+                            // Trajets : la liste reste atteignable depuis la boîte à outils de la
+                            // carte même masquée ici, comme les autres pages.
+                            "trips" -> DraggableSwitchCard(
+                                stringResource(R.string.trips_title), showTripsPage,
+                                {
+                                    showTripsPage = it
+                                    HomePrefs.showTripsPage.write(prefs.edit(), it).apply()
+                                },
+                                shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight
+                            )
 
                             // --- NOUVEAU : AJOUT DE LA CARTE PARAMÈTRES ---
                             "settings" -> DraggableSwitchCard(stringResource(R.string.appstrings_settings_title), true, {}, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight, hideSwitch = true)

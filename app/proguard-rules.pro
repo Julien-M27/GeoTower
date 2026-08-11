@@ -43,6 +43,15 @@
 -keep class fr.geotower.data.upload.SignalQuestUploadManifest { *; }
 -keep class fr.geotower.data.upload.SignalQuestUploadFile { *; }
 
+# Trajets enregistres : TripPlan porte `steps`, `legs` et `reminderOffsetsMinutes`, donc la regle
+# est obligatoire (voir plus haut). Poser cette regle des la premiere version qui ecrit le fichier :
+# la garder fige les noms de champs, et l'ajouter apres coup rendrait illisibles les trajets deja
+# enregistres sur les telephones.
+-keep class fr.geotower.data.trip.TripPlan { *; }
+-keep class fr.geotower.data.trip.TripStep { *; }
+-keep class fr.geotower.data.trip.TripLeg { *; }
+-keep class fr.geotower.data.trip.TripManeuver { *; }
+
 # Room entities and generated database glue.
 -keep @androidx.room.Entity class * { *; }
 -keep class * extends androidx.room.RoomDatabase { *; }

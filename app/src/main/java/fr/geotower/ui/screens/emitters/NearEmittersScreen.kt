@@ -791,7 +791,13 @@ fun NearEmittersScreen(
                                         maxItemsToShow = 100
                                     },
                                     modifier = Modifier.fillMaxWidth().padding(horizontal = sizing.spacing(16.dp)),
-                                    placeholder = { Text(stringResource(R.string.appstrings_search_city_or_id)) },
+                                    placeholder = {
+                                        Text(
+                                            text = stringResource(R.string.appstrings_search_city_or_id),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    },
                                     leadingIcon = { Icon(Icons.Default.Search, null) },
                                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                                         imeAction = androidx.compose.ui.text.input.ImeAction.Search

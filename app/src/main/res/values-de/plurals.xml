@@ -71,6 +71,10 @@
         <item quantity="one">%1$d Freigabe gespeichert</item>
         <item quantity="other">%1$d Freigaben gespeichert</item>
     </plurals>
+    <plurals name="share_history_trips">
+        <item quantity="one">%1$d Route</item>
+        <item quantity="other">%1$d Routen</item>
+    </plurals>
     <plurals name="share_history_stations">
         <item quantity="one">%1$d Station</item>
         <item quantity="other">%1$d Stationen</item>
@@ -86,5 +90,9 @@
     <plurals name="emitter_heights">
         <item quantity="one">Sendeantenne in %1$s Höhe</item>
         <item quantity="other">Sendeantennen in %1$s Höhe</item>
+    </plurals>
+    <plurals name="trips_steps">
+        <item quantity="one">%1$d Etappe</item>
+        <item quantity="other">%1$d Etappen</item>
     </plurals>
 </resources>

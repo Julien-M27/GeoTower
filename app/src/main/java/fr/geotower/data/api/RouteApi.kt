@@ -20,6 +20,33 @@ data class RoutePathResult(
 )
 
 /**
+ * L'itinéraire entre deux points **demandés** consécutifs, quand la requête porte des étapes
+ * intermédiaires : le service rend une portion par segment.
+ */
+data class RoutePortionResult(
+    /** Géométrie de cette portion seule, en `[latitude, longitude]`. */
+    val points: List<DoubleArray>,
+    val distanceMeters: Double,
+    val durationSeconds: Double,
+    val maneuvers: List<RouteManeuver>
+)
+
+/**
+ * Une manœuvre du guidage, telle que le service la rend : des **codes anglais** façon OSRM, et un
+ * nom de voie brut, abrégé et en majuscules façon BD TOPO (`QU DE L'HORLOGE`). La mise en phrase
+ * appartient à l'app — reprendre le libellé du serveur le figerait en une seule langue.
+ */
+data class RouteManeuver(
+    /** `depart`, `turn`, `new name`, `end of road`, `roundabout`, `fork`, `merge`, `arrive`… */
+    val type: String,
+    /** `left`, `right`, `slight left`, `sharp right`, `straight`, `uturn`… */
+    val modifier: String?,
+    val roadName: String?,
+    val distanceMeters: Double,
+    val durationSeconds: Double
+)
+
+/**
  * Calcul d'itinéraire « qui suit les routes » via le service navigation de la Géoplateforme IGN
  * (moteur OSRM sur BD TOPO) : même famille de services que [ElevationProfileApi], simple GET sans
  * clé. Couverture France (métropole + DROM) — ailleurs le service échoue, et l'appelant retombe
@@ -104,9 +131,94 @@ object RouteApi {
         fromLongitude: Double,
         toLatitude: Double,
         toLongitude: Double
+    ): Boolean = isPathAnchoredOnRequest(route.points, fromLatitude, fromLongitude, toLatitude, toLongitude)
+
+    /** Plafond du paramètre `intermediates`, imposé par le service : à 16, il répond `400 … max is 15`. */
+    const val MAX_INTERMEDIATES = 15
+
+    /** Départ + intermédiaires + arrivée dans une seule requête. */
+    const val MAX_POINTS_PER_ROUTE_REQUEST = MAX_INTERMEDIATES + 2
+
+    /**
+     * Itinéraire passant par des étapes intermédiaires : le service rend **une portion par
+     * segment**, avec sa distance, sa durée et ses manœuvres.
+     *
+     * `getSteps=true` n'est pas un confort mais une nécessité ici. Sans lui, une portion ne porte
+     * **aucune géométrie** — ses clés se réduisent à `start, end, distance, duration, bbox, steps`,
+     * et `steps` est vide ; seule la racine rend le tracé, d'un bloc et sans indice de découpe. La
+     * géométrie d'une portion se reconstitue donc en recollant celles de ses steps. Contrepartie
+     * mesurée sur 3 km : 18,7 Ko de réponse contre 5,8 Ko, d'où le `getSteps=false` conservé dans
+     * [getRoute], qui n'a besoin que d'une longueur.
+     *
+     * @param points étapes en `[latitude, longitude]`, départ et arrivée compris.
+     */
+    fun getRoutePortions(points: List<DoubleArray>, profile: String): List<RoutePortionResult> {
+        if (!RemoteFeatureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.ROUTING_IGN)) {
+            error("Routing provider disabled")
+        }
+        if (points.size < 2) error("A route needs at least two points")
+        if (points.size > MAX_POINTS_PER_ROUTE_REQUEST) {
+            error("Too many points: ${points.size} > $MAX_POINTS_PER_ROUTE_REQUEST")
+        }
+
+        val builder = ROUTE_URL.toHttpUrl().newBuilder()
+            .addQueryParameter("resource", RESOURCE)
+            .addQueryParameter("start", formatPoint(points.first()))
+            .addQueryParameter("end", formatPoint(points.last()))
+            .addQueryParameter("profile", profile)
+            .addQueryParameter("optimization", "fastest")
+            .addQueryParameter("geometryFormat", "geojson")
+            .addQueryParameter("getSteps", "true")
+            .addQueryParameter("getBbox", "false")
+            .addQueryParameter("distanceUnit", "meter")
+            .addQueryParameter("timeUnit", "second")
+            .addQueryParameter("crs", "EPSG:4326")
+        if (points.size > 2) {
+            builder.addQueryParameter(
+                "intermediates",
+                points.subList(1, points.lastIndex).joinToString("|") { formatPoint(it) }
+            )
+        }
+
+        val request = Request.Builder()
+            .url(builder.build())
+            .get()
+            .build()
+
+        return RetrofitClient.currentClient.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) error("HTTP ${response.code}")
+            val body = response.body?.string() ?: error("Empty response")
+            val portions = parseRoutePortions(body)
+            if (portions.size != points.size - 1) {
+                error("Expected ${points.size - 1} portions, got ${portions.size}")
+            }
+            // Même piège que dans getRoute, mais à vérifier portion par portion : une seule étape
+            // hors couverture suffit à faire répondre un tracé absurde, et les extrémités du trajet
+            // complet, elles, resteraient parfaitement ancrées.
+            portions.forEachIndexed { index, portion ->
+                val from = points[index]
+                val to = points[index + 1]
+                if (!isPathAnchoredOnRequest(portion.points, from[0], from[1], to[0], to[1])) {
+                    error("Portion $index snapped outside the requested area")
+                }
+            }
+            portions
+        }
+    }
+
+    /** `longitude,latitude` — l'ordre attendu par le service, l'inverse de celui des géométries. */
+    private fun formatPoint(point: DoubleArray): String =
+        "${formatCoordinate(point[1])},${formatCoordinate(point[0])}"
+
+    internal fun isPathAnchoredOnRequest(
+        pathPoints: List<DoubleArray>,
+        fromLatitude: Double,
+        fromLongitude: Double,
+        toLatitude: Double,
+        toLongitude: Double
     ): Boolean {
-        val first = route.points.firstOrNull() ?: return false
-        val last = route.points.lastOrNull() ?: return false
+        val first = pathPoints.firstOrNull() ?: return false
+        val last = pathPoints.lastOrNull() ?: return false
         val requested = routeDistanceMeters(fromLatitude, fromLongitude, toLatitude, toLongitude)
         val tolerance = maxOf(SNAP_TOLERANCE_METERS, requested * 0.05)
         val startGap = routeDistanceMeters(fromLatitude, fromLongitude, first[0], first[1])
@@ -139,6 +251,77 @@ internal fun parseRoutePath(json: String): RoutePathResult {
     val announced = root.get("distance").asRouteDoubleOrNull()
     val distance = if (announced != null && announced > 0.0) announced else routeLengthMeters(points)
     return RoutePathResult(points = points, distanceMeters = distance)
+}
+
+/**
+ * Lit la réponse d'une requête à étapes intermédiaires : une entrée par `portions[]`. La géométrie
+ * d'une portion n'existe pas telle quelle et se recolle depuis ses `steps[].geometry` — voir
+ * [RouteApi.getRoutePortions].
+ */
+internal fun parseRoutePortions(json: String): List<RoutePortionResult> {
+    val root = JsonParser.parseString(json).asRouteObjectOrNull() ?: error("No route data")
+    val portions = root.get("portions")?.takeIf { it.isJsonArray }?.asJsonArray
+        ?: error("No route portions")
+
+    val results = ArrayList<RoutePortionResult>(portions.size())
+    for (index in 0 until portions.size()) {
+        val portion = portions[index].asRouteObjectOrNull() ?: error("Malformed portion $index")
+        val steps = portion.get("steps")?.takeIf { it.isJsonArray }?.asJsonArray
+            ?: error("Portion $index has no steps")
+
+        val points = ArrayList<DoubleArray>()
+        val maneuvers = ArrayList<RouteManeuver>()
+        for (stepIndex in 0 until steps.size()) {
+            val step = steps[stepIndex].asRouteObjectOrNull() ?: continue
+            appendStepGeometry(step, points)
+            parseManeuver(step)?.let { maneuvers += it }
+        }
+        if (points.size < 2) error("Portion $index has no geometry")
+
+        val announced = portion.get("distance").asRouteDoubleOrNull()
+        results += RoutePortionResult(
+            points = points,
+            distanceMeters = if (announced != null && announced > 0.0) announced else routeLengthMeters(points),
+            durationSeconds = portion.get("duration").asRouteDoubleOrNull() ?: 0.0,
+            maneuvers = maneuvers
+        )
+    }
+    return results
+}
+
+/**
+ * Ajoute la géométrie d'un step à la suite de la portion. Le premier point d'un step répète le
+ * dernier du précédent : on l'écarte, sinon le tracé porterait un point en double à chaque manœuvre.
+ */
+private fun appendStepGeometry(step: JsonObject, into: MutableList<DoubleArray>) {
+    val coordinates = step.get("geometry").asRouteObjectOrNull()
+        ?.get("coordinates")?.takeIf { it.isJsonArray }?.asJsonArray
+        ?: return
+    for (index in 0 until coordinates.size()) {
+        val pair = coordinates[index].takeIf { it.isJsonArray }?.asJsonArray ?: continue
+        if (pair.size() < 2) continue
+        val longitude = runCatching { pair[0].asDouble }.getOrNull() ?: continue
+        val latitude = runCatching { pair[1].asDouble }.getOrNull() ?: continue
+        val previous = into.lastOrNull()
+        if (previous != null && previous[0] == latitude && previous[1] == longitude) continue
+        into += doubleArrayOf(latitude, longitude)
+    }
+}
+
+private fun parseManeuver(step: JsonObject): RouteManeuver? {
+    val instruction = step.get("instruction").asRouteObjectOrNull() ?: return null
+    val type = instruction.get("type").asRouteStringOrNull() ?: return null
+    return RouteManeuver(
+        type = type,
+        modifier = instruction.get("modifier").asRouteStringOrNull(),
+        // `nom_1_gauche` et `nom_1_droite` portent le même nom hors voies séparées ; la gauche
+        // suffit, et une chaîne vide (voie sans nom) doit ressortir absente, pas vide.
+        roadName = step.get("attributes").asRouteObjectOrNull()
+            ?.get("name").asRouteObjectOrNull()
+            ?.get("nom_1_gauche").asRouteStringOrNull(),
+        distanceMeters = step.get("distance").asRouteDoubleOrNull() ?: 0.0,
+        durationSeconds = step.get("duration").asRouteDoubleOrNull() ?: 0.0
+    )
 }
 
 private fun routeLengthMeters(points: List<DoubleArray>): Double {
@@ -175,6 +358,10 @@ private fun formatCoordinate(value: Double): String = String.format(Locale.US, "
 
 private fun JsonElement?.asRouteObjectOrNull(): JsonObject? =
     this?.takeIf { it.isJsonObject }?.asJsonObject
+
+/** Chaîne non vide, ou `null` : une voie sans nom revient en `""` et ne doit pas rester telle quelle. */
+private fun JsonElement?.asRouteStringOrNull(): String? =
+    this?.takeIf { it.isJsonPrimitive }?.asString?.trim()?.takeIf { it.isNotEmpty() }
 
 /** Le service renvoie parfois les nombres sous forme de chaîne ("1234.5"). */
 private fun JsonElement?.asRouteDoubleOrNull(): Double? {
