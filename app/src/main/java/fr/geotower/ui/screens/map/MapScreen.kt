@@ -22,6 +22,7 @@ import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.expandVertically
@@ -60,9 +61,12 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CellTower
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.Flag
+import androidx.compose.material.icons.filled.LocationCity
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Straighten
 import androidx.compose.material.icons.filled.Timeline
@@ -139,6 +143,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import fr.geotower.ui.theme.LocalGeoTowerUiSizing
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -153,6 +158,7 @@ import fr.geotower.data.api.GeoTowerDataCoverage
 import fr.geotower.data.api.NominatimApi
 import fr.geotower.data.api.RouteApi
 import fr.geotower.data.config.RemoteFeatureFlags
+import fr.geotower.data.db.CommuneNameRow
 import fr.geotower.ui.components.SecureScreenEffect
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.RadioMapMarker
@@ -168,6 +174,7 @@ import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.PowerProfile
 import fr.geotower.utils.AppLogger
+import fr.geotower.utils.CommuneNameMatching
 import fr.geotower.utils.FrenchAdminAreas
 import fr.geotower.utils.FrequencyFilterSelection
 import fr.geotower.utils.MapFilterDefaults
@@ -179,6 +186,7 @@ import fr.geotower.utils.rememberLocationReadinessState
 import fr.geotower.utils.MapDisplayPrefs
 import fr.geotower.utils.MapUtils
 import fr.geotower.ui.screens.emitters.OperatorGrid
+import fr.geotower.utils.OperatorColorSpec
 import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.filteredAzimuthsForFrequencySelection
 import fr.geotower.utils.formatSiteDistanceMeters
@@ -242,12 +250,6 @@ private const val MAP_RELOAD_MIN_VIEWPORT_SHIFT_RATIO = 0.10
 private const val MAP_MARKER_REDRAW_DEBOUNCE_MS = 40L
 private const val MAP_COMPASS_UPDATE_INTERVAL_MS = 80L
 private const val MAP_ACTIVE_FILTER_LIST_LIMIT = 3
-/**
- * Au-delà de ce nombre de stations, une recherche de département / région se contente de cadrer la
- * carte : le filtrage par zone désactive le regroupement, et poser d'un coup les marqueurs d'une
- * grande région (Auvergne-Rhône-Alpes en compte plus de 18 000) fige l'affichage.
- */
-private const val ADMIN_AREA_DETAIL_LIMIT = 8000
 /** Repos de la boucle de rendu fluide quand il n'y a rien à animer (immobile ou sans position). */
 private const val SMOOTH_LOCATION_IDLE_POLL_MS = 50L
 
@@ -816,6 +818,130 @@ private fun parseOperatorSearchKeys(query: String): List<String> {
         .distinct()
 }
 
+/** Nombre de suggestions ouvertes sous la barre de recherche. */
+private const val MAP_SEARCH_SUGGESTION_COUNT = 3
+
+/**
+ * En paysage court, la barre est en bas et la liste s'ouvre au-dessus d'elle : trois lignes
+ * arrivent à ras du bord haut de l'écran, et débordent sur un téléphone plus petit.
+ */
+private const val MAP_SEARCH_SUGGESTION_COMPACT_COUNT = 2
+
+/** Repli du seuil de déclenchement quand le serveur ne dit rien (`mapSearchMinQueryLength`). */
+private const val MAP_SEARCH_SUGGESTION_MIN_QUERY_LENGTH = 2
+
+/** Temporisation entre la frappe et l'interrogation de la base. */
+private const val MAP_SEARCH_SUGGESTION_DEBOUNCE_MS = 220L
+
+/**
+ * Une ligne de la liste ouverte sous la barre de recherche de la carte.
+ *
+ * Les quatre formes couvrent ce que la barre sait déjà résoudre à la validation : la suggestion
+ * n'ouvre pas un chemin à part, elle donne juste le résultat à l'avance et sans ambiguïté.
+ */
+private sealed interface MapSearchSuggestion {
+
+    /**
+     * Commune du référentiel local. [name] est le nom présentable, pas celui stocké en majuscules ;
+     * [departmentName] est le nom nu du département, pour lever l'ambiguïté des homonymes auprès du
+     * géocodeur — l'affichage y ajoute le code.
+     */
+    data class Commune(
+        val codeInsee: String,
+        val name: String,
+        val departmentCode: String?,
+        val departmentName: String?
+    ) : MapSearchSuggestion
+
+    data class AdminArea(val area: FrenchAdminAreas.Area) : MapSearchSuggestion
+
+    data class Site(val site: LocalisationEntity) : MapSearchSuggestion
+
+    data class Operator(val spec: OperatorColorSpec) : MapSearchSuggestion
+}
+
+/**
+ * Opérateurs dont un alias commence par la saisie, sans exiger le préfixe `op:`.
+ *
+ * [exactOnly] ne garde que la correspondance pleine : c'est ce qui décide si l'opérateur passe
+ * devant les communes. Taper « orange » vise sans doute l'opérateur ; « ora » peut encore être le
+ * début d'une commune, l'opérateur attend alors son tour.
+ */
+private fun matchOperatorSuggestions(query: String, exactOnly: Boolean): List<OperatorColorSpec> {
+    val normalizedQuery = normalizeOperatorSearchToken(query)
+    if (normalizedQuery.length < 2) return emptyList()
+
+    return OperatorColors.all.filter { spec ->
+        (listOf(spec.key, spec.label) + spec.aliases).any { rawAlias ->
+            val alias = normalizeOperatorSearchToken(rawAlias)
+            if (exactOnly) alias == normalizedQuery else alias.startsWith(normalizedQuery)
+        }
+    }
+}
+
+/**
+ * Suggestions d'une saisie, dans l'ordre où [performSearch] les résoudrait à la validation : appuyer
+ * sur une ligne doit donner exactement ce que la touche Entrée aurait donné, en levant juste
+ * l'ambiguïté (quelle commune, quelle station) que la validation aurait tranchée toute seule.
+ *
+ * Tout est local — référentiel des communes en base, départements figés dans l'app — sauf le
+ * cadrage final d'une commune, qui reste au géocodeur comme aujourd'hui.
+ */
+private suspend fun buildMapSearchSuggestions(
+    viewModel: MapViewModel,
+    query: String
+): List<MapSearchSuggestion> {
+    // Recherche explicite « op: … » : la barre filtre alors la carte au lieu de la déplacer, il n'y
+    // a rien d'autre à proposer.
+    val explicitOperatorKeys = parseOperatorSearchKeys(query)
+    if (explicitOperatorKeys.isNotEmpty()) {
+        return explicitOperatorKeys
+            .mapNotNull(OperatorColors::specForKey)
+            .map(MapSearchSuggestion::Operator)
+            .take(MAP_SEARCH_SUGGESTION_COUNT)
+    }
+
+    val exactOperators = matchOperatorSuggestions(query, exactOnly = true)
+        .map(MapSearchSuggestion::Operator)
+    val adminAreas = FrenchAdminAreas.suggest(query, limit = 2)
+        .map(MapSearchSuggestion::AdminArea)
+
+    // Même garde que la recherche d'identifiant à la validation : sans chiffre, aucune station ne
+    // peut correspondre, et on s'épargne un balayage de la table.
+    val sites = if (query.any { it.isDigit() } && query.length >= 3) {
+        viewModel.searchSiteSuggestions(query, limit = 2).map(MapSearchSuggestion::Site)
+    } else {
+        emptyList()
+    }
+
+    val communes = viewModel
+        .searchCommuneSuggestions(query, limit = MAP_SEARCH_SUGGESTION_COUNT)
+        .map(::toCommuneSuggestion)
+    val looseOperators = matchOperatorSuggestions(query, exactOnly = false)
+        .map(MapSearchSuggestion::Operator)
+
+    return (exactOperators + adminAreas + sites + communes + looseOperators)
+        .distinctBy { suggestion ->
+            when (suggestion) {
+                is MapSearchSuggestion.Commune -> "commune:${suggestion.codeInsee}"
+                is MapSearchSuggestion.AdminArea -> "area:${suggestion.area.kind}:${suggestion.area.code}"
+                is MapSearchSuggestion.Site -> "site:${suggestion.site.idAnfr}"
+                is MapSearchSuggestion.Operator -> "operator:${suggestion.spec.key}"
+            }
+        }
+        .take(MAP_SEARCH_SUGGESTION_COUNT)
+}
+
+private fun toCommuneSuggestion(row: CommuneNameRow): MapSearchSuggestion.Commune {
+    val departmentCode = FrenchAdminAreas.departmentCodeForInsee(row.codeInsee)
+    return MapSearchSuggestion.Commune(
+        codeInsee = row.codeInsee,
+        name = CommuneNameMatching.displayName(row.nom),
+        departmentCode = departmentCode,
+        departmentName = departmentCode?.let(FrenchAdminAreas::departmentName)
+    )
+}
+
 private fun buildHsOperatorMap(sitesHs: List<SiteHsEntity>): Map<String, Set<String>> {
     val result = mutableMapOf<String, MutableSet<String>>()
 
@@ -1186,6 +1312,8 @@ fun MapScreen(
     val cityStatsTechniques by viewModel.cityStatsTechniques.collectAsState()
     val isCityStatsTechniquesLoading by viewModel.isCityStatsTechniquesLoading.collectAsState()
     val adminAreaOutline by viewModel.adminAreaOutline.collectAsState()
+    val adminAreaStatsAntennas by viewModel.adminAreaStatsAntennas.collectAsState()
+    val isAdminAreaStatsLoading by viewModel.isAdminAreaStatsLoading.collectAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
     val featureFlags by RemoteFeatureFlags.config
     val canUseSignalQuestCoverage by androidx.compose.runtime.rememberUpdatedState(
@@ -1246,20 +1374,27 @@ fun MapScreen(
         )
     }
 
-    fun loadCurrentAdminAreaSearchIfNeeded(force: Boolean = false) {
-        val area = currentAdminArea ?: return
-        val bounds = currentSearchAreaBounds ?: return
-        val searchKey = "${currentAdminAreaCode.orEmpty()}|${currentSearchAreaBoundsEncoded.orEmpty()}"
-        if (!force && loadedAdminAreaKey == searchKey) return
+    /**
+     * (Ré)applique le filtre de zone au chargement de la carte. Appelé aussi quand le contour
+     * arrive du réseau : c'est lui qui permet de trier les regroupements, que le code INSEE ne
+     * peut pas atteindre.
+     */
+    fun applyCurrentAdminAreaFilter(outlinePolygons: List<List<GeoPoint>>?): Boolean {
+        val area = currentAdminArea
+        val areaCode = currentAdminAreaCode
+        if (area == null || areaCode == null) {
+            viewModel.clearAdminAreaFilter()
+            loadedAdminAreaKey = null
+            return false
+        }
 
-        loadedAdminAreaKey = searchKey
-        viewModel.loadAntennasForAdminArea(
-            departmentCodes = area.departmentCodes,
-            latNorth = bounds.latNorth,
-            lonEast = bounds.lonEast,
-            latSouth = bounds.latSouth,
-            lonWest = bounds.lonWest
-        )
+        val filterKey = "$areaCode|${outlinePolygons?.size ?: 0}"
+        if (loadedAdminAreaKey == filterKey) return false
+        loadedAdminAreaKey = filterKey
+
+        viewModel.setAdminAreaFilter(area.departmentCodes, outlinePolygons)
+        viewModel.loadAdminAreaStats(areaCode, area.departmentCodes)
+        return true
     }
 
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
@@ -1754,6 +1889,36 @@ fun MapScreen(
 
     var isSearchActive by rememberSaveable { mutableStateOf(false) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
+
+    // Suggestions ouvertes sous la barre pendant la frappe. `submittedSearchQuery` retient la
+    // dernière saisie déjà lancée : sans elle, la liste se rouvrirait aussitôt sur le texte resté
+    // dans la barre après une recherche, et masquerait le résultat qu'on vient de cadrer.
+    var searchSuggestions by remember { mutableStateOf<List<MapSearchSuggestion>>(emptyList()) }
+    var submittedSearchQuery by rememberSaveable { mutableStateOf<String?>(null) }
+    val showSearchSuggestions = isSearchActive &&
+        searchSuggestions.isNotEmpty() &&
+        searchQuery.trim() != submittedSearchQuery
+
+    val searchSuggestionMinLength = featureFlags.limitOrDefault(
+        RemoteFeatureFlags.Limits.MAP_SEARCH_MIN_QUERY_LENGTH,
+        MAP_SEARCH_SUGGESTION_MIN_QUERY_LENGTH
+    )
+    LaunchedEffect(searchQuery, isSearchActive, canUseMapSearch, searchSuggestionMinLength) {
+        val cleanQuery = searchQuery.trim()
+        if (!isSearchActive || !canUseMapSearch || cleanQuery.length < searchSuggestionMinLength) {
+            searchSuggestions = emptyList()
+            return@LaunchedEffect
+        }
+        // Saisie déjà lancée : la barre porte l'intitulé du résultat affiché, rien à proposer
+        // dessus. Sans cette garde, choisir une suggestion relancerait aussitôt la recherche
+        // complète pour une liste qui resterait fermée.
+        if (cleanQuery == submittedSearchQuery) return@LaunchedEffect
+        // Une frappe fait repartir cet effet : la temporisation évite d'interroger la base à chaque
+        // lettre, et l'annulation de la coroutine se charge d'abandonner la requête précédente.
+        delay(MAP_SEARCH_SUGGESTION_DEBOUNCE_MS)
+        searchSuggestions = buildMapSearchSuggestions(viewModel, cleanQuery)
+    }
+
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
     var showCityStatsPopup by rememberSaveable { mutableStateOf(false) }
     var showCityStatsDetail by rememberSaveable { mutableStateOf(false) }
@@ -2040,6 +2205,7 @@ fun MapScreen(
 
     // ✅ 1. On déclare la liste filtrée comme une variable d'état
     var filteredAntennas by remember { mutableStateOf<List<LocalisationEntity>>(emptyList()) }
+    var filteredAdminAreaAntennas by remember { mutableStateOf<List<LocalisationEntity>>(emptyList()) }
 
     // ✅ 2. LaunchedEffect pour calculer en arrière-plan
     LaunchedEffect(
@@ -2050,7 +2216,7 @@ fun MapScreen(
         AppConfig.f5G_700.value, AppConfig.f5G_1400.value, AppConfig.f5G_2100.value, AppConfig.f5G_3500.value, AppConfig.f5G_4200.value, AppConfig.f5G_26000.value,
         AppConfig.showSitesInService.value, AppConfig.showSitesOutOfService.value, AppConfig.hideUndergroundSites.value, AppConfig.showOnlyZbSites.value,
         AppConfig.showProjectSites.value, sitesHs, currentCityPolygons,
-        isTimeSliderVisible, timeSliderThreshold
+        isTimeSliderVisible, timeSliderThreshold, adminAreaStatsAntennas
     ) {
         val computed = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
             val selectedOperators = AppConfig.selectedOperatorKeys.value
@@ -2062,7 +2228,7 @@ fun MapScreen(
             val frequencyFilter = FrequencyFilterSelection.fromMapConfig()
             val hsOperatorMap = buildHsOperatorMap(sitesHs)
 
-            val base = antennas.filter { antenna ->
+            fun applyDisplayFilters(source: List<LocalisationEntity>) = source.filter { antenna ->
                 val visibleOperators = visibleOperatorKeysForAntenna(
                     antenna = antenna,
                     hsOperatorMap = hsOperatorMap,
@@ -2090,10 +2256,15 @@ fun MapScreen(
                 visibleOperators.isNotEmpty() && matchesUndergroundFilter && matchesZbFilter && isInCityBounds && matchTechno
             }
 
+            val base = applyDisplayFilters(antennas)
+            // Les compteurs d'une zone administrative portent sur toute la zone, pas sur ce qui est
+            // à l'écran : mêmes filtres d'affichage, autre source.
+            val areaStats = applyDisplayFilters(adminAreaStatsAntennas)
+
             // Slider temporel : on ne garde que les sites mis en service avant le seuil choisi,
             // et on compte les sites visibles par operateur (+ ceux sans date exploitable).
             if (!isTimeSliderVisible) {
-                base to null
+                Triple(base, null, areaStats)
             } else {
                 val threshold = timeSliderThreshold
                 val counts = HashMap<String, Int>()
@@ -2122,11 +2293,12 @@ fun MapScreen(
                 // Aucune date exploitable dans la zone (typiquement la base live qui ne renvoie pas
                 // les dates) : on n'efface pas la carte, le slider reste sans effet ici.
                 val finalVisible = if (datedTotal == 0) base else visible
-                finalVisible to TimeSliderStats(counts, undated)
+                Triple(finalVisible, TimeSliderStats(counts, undated), areaStats)
             }
         }
         filteredAntennas = computed.first
         computed.second?.let { timeSliderStats = it }
+        filteredAdminAreaAntennas = computed.third
     }
 
     fun createDistanceLabel(text: String): BitmapDrawable {
@@ -2924,6 +3096,11 @@ fun MapScreen(
     val searchBoundaryPolygons = currentCityPolygons
         ?: adminAreaOutline?.takeIf { it.areaCode == currentAdminAreaCode }?.polygons
 
+    // Les compteurs d'une zone administrative ne peuvent pas venir de la carte : à cette échelle
+    // elle n'affiche que des regroupements, qui ne se comptent pas.
+    val statsAntennas = if (currentAdminArea != null) filteredAdminAreaAntennas else filteredAntennas
+    val statsLoading = if (currentAdminArea != null) isAdminAreaStatsLoading else isLoading
+
     LaunchedEffect(currentAdminAreaCode) {
         val area = currentAdminArea
         val areaCode = currentAdminAreaCode
@@ -2948,7 +3125,12 @@ fun MapScreen(
         mapViewRef?.let { map ->
             refreshSearchBoundaryOverlay(map, searchBoundaryPolygons)
             loadCurrentCitySearchIfNeeded()
-            loadCurrentAdminAreaSearchIfNeeded()
+        }
+        val areaFilterChanged = applyCurrentAdminAreaFilter(
+            adminAreaOutline?.takeIf { it.areaCode == currentAdminAreaCode }?.polygons
+        )
+        if (areaFilterChanged) {
+            mapViewRef?.loadVisibleAntennas(viewModel)
         }
     }
 
@@ -3045,11 +3227,11 @@ fun MapScreen(
         currentMeasureSegments.forEach { segment ->
             val key = measureRouteKey(segment, profile)
             if (measureRoutes.containsKey(key)) return@forEach
-            if (segment.start.distanceToAsDouble(segment.end) > RouteApi.MAX_ROUTABLE_DISTANCE_METERS) {
-                measureRoutes[key] = MeasureRoute.Unavailable
-                return@forEach
-            }
-            val route = try {
+            // Trait hors de portée d'un réseau routier commun : inutile d'appeler le service, mais
+            // le trait direct qui subsiste est annoncé comme les autres échecs (toast plus bas).
+            val tooFarToRoute =
+                segment.start.distanceToAsDouble(segment.end) > RouteApi.MAX_ROUTABLE_DISTANCE_METERS
+            val route = if (tooFarToRoute) null else try {
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                     RouteApi.getRoute(
                         fromLatitude = segment.start.latitude,
@@ -3586,35 +3768,25 @@ fun MapScreen(
         }
 
         /**
-         * Cadre la carte sur un département / une région, et n'y affiche que ses stations tant
-         * qu'elle tient dans un affichage détaillé. Au-delà, on se contente du déplacement : le
-         * chargement normal (avec regroupement) reprend la main au premier mouvement.
+         * Cadre la carte sur un département / une région et n'y laisse que ses sites. Le filtre
+         * lui-même est posé par [applyCurrentAdminAreaFilter], que le changement d'état déclenche —
+         * de la plus petite collectivité à la plus grande région, sans plafond : c'est le
+         * chargement par zone visible qui borne le travail, plus la taille de la zone.
          */
         fun applyAdminAreaSearch(area: FrenchAdminAreas.Area, extent: AdminAreaExtent) {
             val map = mapViewRef ?: return
             searchBoundaryOverlay.items.clear()
 
-            if (extent.siteCount <= ADMIN_AREA_DETAIL_LIMIT) {
-                setCurrentAdminAreaSearch(
-                    area,
-                    SearchAreaBounds(
-                        latNorth = extent.latNorth,
-                        lonEast = extent.lonEast,
-                        latSouth = extent.latSouth,
-                        lonWest = extent.lonWest
-                    )
+            setCurrentAdminAreaSearch(
+                area,
+                SearchAreaBounds(
+                    latNorth = extent.latNorth,
+                    lonEast = extent.lonEast,
+                    latSouth = extent.latSouth,
+                    lonWest = extent.lonWest
                 )
-                loadCurrentAdminAreaSearchIfNeeded(force = true)
-                showCityStatsPopup = true
-            } else {
-                setCurrentCitySearch(null, null)
-                viewModel.resetCityLock()
-                Toast.makeText(
-                    context,
-                    resources.getString(R.string.map_search_area_too_large, area.name),
-                    Toast.LENGTH_LONG
-                ).show()
-            }
+            )
+            showCityStatsPopup = true
 
             releaseLocationFollowForSearch()
             map.zoomToBoundingBox(
@@ -3630,8 +3802,114 @@ fun MapScreen(
             map.invalidate()
         }
 
+        /**
+         * Cadre la carte sur une zone géocodée (ville, adresse, département nommé) et pose son
+         * contour, comme la validation au clavier l'a toujours fait.
+         *
+         * [fallbackInseeCode] est le repli d'une suggestion de commune : quand le géocodeur ne
+         * répond pas — pas de réseau, fournisseur coupé — on cadre sur l'emprise de ses stations,
+         * connue en base. Sans contour, donc sans découpe des sites ni encart de statistiques, mais
+         * la carte va au bon endroit au lieu de ne rien faire.
+         */
+        suspend fun frameGeocodedArea(locationQuery: String, fallbackInseeCode: String? = null) {
+            val nominatimArea = NominatimApi.searchArea(locationQuery)
+            if (nominatimArea != null) {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    mapViewRef?.let { map ->
+                        val searchBounds = SearchAreaBounds(
+                            latNorth = nominatimArea.latNorth,
+                            lonEast = nominatimArea.lonEast,
+                            latSouth = nominatimArea.latSouth,
+                            lonWest = nominatimArea.lonWest
+                        )
+                        val searchPolygons = nominatimArea.polygons.map { polygon ->
+                            polygon.map { point -> GeoPoint(point.latitude, point.longitude) }
+                        }
+
+                        if (searchPolygons.isNotEmpty()) {
+                            setCurrentCitySearch(searchBounds, searchPolygons)
+                            refreshSearchBoundaryOverlay(map, searchPolygons)
+                            loadCurrentCitySearchIfNeeded(force = true)
+                            showCityStatsPopup = true
+                        } else {
+                            setCurrentCitySearch(null, null)
+                            refreshSearchBoundaryOverlay(map, null)
+                        }
+
+                        val cityBounds = org.osmdroid.util.BoundingBox(
+                            nominatimArea.latNorth,
+                            nominatimArea.lonEast,
+                            nominatimArea.latSouth,
+                            nominatimArea.lonWest
+                        )
+                        releaseLocationFollowForSearch()
+                        map.zoomToBoundingBox(cityBounds, true, 100)
+                        map.invalidate()
+                    }
+                }
+                return
+            }
+
+            val communeExtent = fallbackInseeCode?.let { viewModel.findCommuneExtent(it) }
+            if (communeExtent != null) {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    mapViewRef?.let { map ->
+                        setCurrentCitySearch(null, null)
+                        refreshSearchBoundaryOverlay(map, null)
+                        releaseLocationFollowForSearch()
+                        map.zoomToBoundingBox(
+                            org.osmdroid.util.BoundingBox(
+                                communeExtent.latNorth,
+                                communeExtent.lonEast,
+                                communeExtent.latSouth,
+                                communeExtent.lonWest
+                            ),
+                            true,
+                            100
+                        )
+                        map.invalidate()
+                    }
+                }
+                return
+            }
+
+            try {
+                val geocoder = android.location.Geocoder(context)
+                @Suppress("DEPRECATION")
+                val results = geocoder.getFromLocationName(locationQuery, 1)
+
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    if (!results.isNullOrEmpty()) {
+                        val addr = results[0]
+                        if (GeoTowerDataCoverage.isKnownUnsupportedCountryCode(addr.countryCode)) {
+                            Toast.makeText(context, txtSearchDataUnavailable, Toast.LENGTH_LONG).show()
+                            return@withContext
+                        }
+                        mapViewRef?.let { map ->
+                            setCurrentCitySearch(null, null)
+                            searchBoundaryOverlay.items.clear()
+                            releaseLocationFollowForSearch()
+                            map.controller.setZoom(15.0)
+                            map.controller.setCenter(GeoPoint(addr.latitude, addr.longitude))
+                            map.invalidate()
+                        }
+                    } else {
+                        Toast.makeText(context, txtLocationNotFound, Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } catch (e: Exception) {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    Toast.makeText(context, txtNetworkErrorSearch, Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+
         fun performSearch(query: String) {
             val cleanQuery = query.trim()
+            // Saisie validée : la liste de suggestions se referme et ne se rouvrira pas sur ce
+            // texte, sans quoi elle recouvrirait le résultat qu'on vient de cadrer.
+            submittedSearchQuery = cleanQuery
+            searchSuggestions = emptyList()
             if (cleanQuery.isBlank()) {
                 restoreOperatorSearchSelection()
                 return
@@ -3696,72 +3974,72 @@ fun MapScreen(
                     }
                 }
 
-                // 4. Recherche de Ville / Adresse via internet (Nominatim)
-                val nominatimArea = NominatimApi.searchArea(locationQuery)
-                if (nominatimArea != null) {
-                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                        mapViewRef?.let { map ->
-                            val searchBounds = SearchAreaBounds(
-                                latNorth = nominatimArea.latNorth,
-                                lonEast = nominatimArea.lonEast,
-                                latSouth = nominatimArea.latSouth,
-                                lonWest = nominatimArea.lonWest
-                            )
-                            val searchPolygons = nominatimArea.polygons.map { polygon ->
-                                polygon.map { point -> GeoPoint(point.latitude, point.longitude) }
-                            }
+                // 4. Recherche de Ville / Adresse via internet (Nominatim), puis géocodeur système.
+                frameGeocodedArea(locationQuery)
+            }
+        }
 
-                            if (searchPolygons.isNotEmpty()) {
-                                setCurrentCitySearch(searchBounds, searchPolygons)
-                                refreshSearchBoundaryOverlay(map, searchPolygons)
-                                loadCurrentCitySearchIfNeeded(force = true)
-                                showCityStatsPopup = true
-                            } else {
-                                setCurrentCitySearch(null, null)
-                                refreshSearchBoundaryOverlay(map, null)
-                            }
+        /**
+         * Applique une suggestion choisie sous la barre de recherche.
+         *
+         * Chaque forme rejoue exactement ce que [performSearch] aurait fait de cette saisie — le
+         * gain est de sauter l'ambiguïté, pas d'ouvrir un autre chemin. La barre est mise à jour
+         * avec l'intitulé retenu, et cette valeur est retenue comme « déjà cherchée » pour que la
+         * liste ne se rouvre pas par-dessus le résultat.
+         */
+        fun applySearchSuggestion(suggestion: MapSearchSuggestion) {
+            focusManager.clearFocus()
+            searchSuggestions = emptyList()
 
-                            val cityBounds = org.osmdroid.util.BoundingBox(
-                                nominatimArea.latNorth,
-                                nominatimArea.lonEast,
-                                nominatimArea.latSouth,
-                                nominatimArea.lonWest
-                            )
-                            releaseLocationFollowForSearch()
-                            map.zoomToBoundingBox(cityBounds, true, 100)
-                            map.invalidate()
-                        }
-                    }
-                    return@launch
+            fun submit(query: String) {
+                searchQuery = query
+                submittedSearchQuery = query
+            }
+
+            when (suggestion) {
+                is MapSearchSuggestion.Operator -> {
+                    submit(suggestion.spec.label)
+                    applyOperatorSearchSelection(setOf(suggestion.spec.key))
                 }
 
-                try {
-                    val geocoder = android.location.Geocoder(context)
-                    @Suppress("DEPRECATION")
-                    val results = geocoder.getFromLocationName(locationQuery, 1)
+                is MapSearchSuggestion.Site -> {
+                    submit(suggestion.site.idAnfr)
+                    restoreOperatorSearchSelection()
+                    releaseLocationFollowForSearch()
+                    mapViewRef?.controller?.setZoom(18.0)
+                    mapViewRef?.controller?.setCenter(
+                        GeoPoint(suggestion.site.latitude, suggestion.site.longitude)
+                    )
+                }
 
-                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                        if (!results.isNullOrEmpty()) {
-                            val addr = results[0]
-                            if (GeoTowerDataCoverage.isKnownUnsupportedCountryCode(addr.countryCode)) {
-                                Toast.makeText(context, txtSearchDataUnavailable, Toast.LENGTH_LONG).show()
-                                return@withContext
-                            }
-                            mapViewRef?.let { map ->
-                                setCurrentCitySearch(null, null)
-                                searchBoundaryOverlay.items.clear()
-                                releaseLocationFollowForSearch()
-                                map.controller.setZoom(15.0)
-                                map.controller.setCenter(GeoPoint(addr.latitude, addr.longitude))
-                                map.invalidate()
+                is MapSearchSuggestion.AdminArea -> {
+                    submit(suggestion.area.name)
+                    restoreOperatorSearchSelection()
+                    scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                        val extent = viewModel.findAdminAreaExtent(suggestion.area.departmentCodes)
+                        if (extent != null) {
+                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                applyAdminAreaSearch(suggestion.area, extent)
                             }
                         } else {
-                            Toast.makeText(context, txtLocationNotFound, Toast.LENGTH_SHORT).show()
+                            // Sans base locale (repli API live), la zone reste cadrable en ligne.
+                            frameGeocodedArea("${suggestion.area.name}, France")
                         }
                     }
-                } catch (e: Exception) {
-                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                        Toast.makeText(context, txtNetworkErrorSearch, Toast.LENGTH_SHORT).show()
+                }
+
+                is MapSearchSuggestion.Commune -> {
+                    submit(suggestion.name)
+                    restoreOperatorSearchSelection()
+                    // Le département lève l'ambiguïté des homonymes, nombreux en France : sans lui,
+                    // le géocodeur choisirait pour nous une autre commune que celle proposée.
+                    val locationQuery = listOfNotNull(
+                        suggestion.name,
+                        suggestion.departmentName,
+                        "France"
+                    ).joinToString(", ")
+                    scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                        frameGeocodedArea(locationQuery, fallbackInseeCode = suggestion.codeInsee)
                     }
                 }
             }
@@ -3796,6 +4074,33 @@ fun MapScreen(
                     performSearch(searchQuery)
                     focusManager.clearFocus()
                 },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        // La liste descend sous la barre, pile là où vivent la boussole, le bouton de partage et le
+        // tiroir de mesure : on les efface tant qu'elle est ouverte plutôt que de passer devant eux.
+        // En paysage court, la barre est en bas avec la toolbox, la liste s'ouvre alors avec elle.
+        val hideMapControlsForSuggestions = showSearchSuggestions && !toolboxExpandsLeft
+
+        AnimatedVisibility(
+            visible = hideMapControlsForSuggestions,
+            enter = fadeIn() + expandVertically(expandFrom = Alignment.Top),
+            exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top),
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                // Au-dessus du reste des calques de la carte : la liste est déclarée avant eux, et
+                // la boussole passerait devant sans ça, même effacée en cours d'animation.
+                .zIndex(2f)
+                .padding(
+                    start = sizing.spacing(16.dp),
+                    end = sizing.spacing(16.dp),
+                    top = sizing.spacing(110.dp) + mapSearchBarHeight + sizing.spacing(8.dp)
+                )
+        ) {
+            MapSearchSuggestionList(
+                suggestions = searchSuggestions,
+                onSelect = { suggestion -> safeClick { applySearchSuggestion(suggestion) } },
                 modifier = Modifier.fillMaxWidth()
             )
         }
@@ -3916,7 +4221,10 @@ fun MapScreen(
         )
 
         // ✅ NOUVEAU : Bouton de Partage positionné sous le bouton Retour avec animation
-        Box(
+        AnimatedVisibility(
+            visible = !hideMapControlsForSuggestions,
+            enter = fadeIn(),
+            exit = fadeOut(),
             modifier = Modifier
                 .align(Alignment.TopStart)
                 .padding(start = sizing.spacing(16.dp), top = compassTopPadding)
@@ -3970,16 +4278,21 @@ fun MapScreen(
             )
         }
 
-        if (showCompass && AppConfig.hasCompass.value && !useCompactCompassPlacement && !showCompassInMapHeader) {
+        AnimatedVisibility(
+            visible = showCompass && AppConfig.hasCompass.value && !useCompactCompassPlacement &&
+                !showCompassInMapHeader && !hideMapControlsForSuggestions,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(end = compassEndPadding, top = compassTopPadding)
+        ) {
             MapCompassButton(
                 azimuth = azimuth,
                 mapOrientation = mapOrientationState.floatValue,
                 followActive = followOrientation,
                 onToggleFollow = if (PowerProfile.isEco) null else toggleFollowOrientation,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(end = compassEndPadding, top = compassTopPadding)
-                    .size(mapControlButtonDiameter)
+                modifier = Modifier.size(mapControlButtonDiameter)
             ) {
                 safeClick { resetMapOrientation() }
             }
@@ -4002,7 +4315,9 @@ fun MapScreen(
             }
         )
         AnimatedVisibility(
-            visible = isMeasuringMode,
+            // Le tiroir occupe le haut de l'écran, sous la boussole : la liste de suggestions
+            // l'efface avec le reste des contrôles le temps de la frappe.
+            visible = isMeasuringMode && !hideMapControlsForSuggestions,
             enter = fadeIn() + slideInHorizontally(initialOffsetX = { if (measureDrawerOnLeft) -it else it }),
             exit = fadeOut() + slideOutHorizontally(targetOffsetX = { if (measureDrawerOnLeft) -it else it }),
             modifier = measureDrawerModifier
@@ -4272,8 +4587,8 @@ fun MapScreen(
                     ?.let { it as? MeasureRoute.Ready }
                 route?.distanceMeters ?: segment.start.distanceToAsDouble(segment.end)
             }
-            // Itinéraires encore attendus : la clé n'est pas dans le cache. On le dit par des points
-            // de suspension, le total affiché étant encore celui des traits directs.
+            // Itinéraires encore attendus : la clé n'est pas dans le cache. Le total affiché est
+            // alors encore celui des traits directs, et la pilule le dit (animation + ligne d'état).
             val measureRoutesPending = measureRouteProfileValue?.let { profile ->
                 currentMeasureSegments.any { !measureRoutes.containsKey(measureRouteKey(it, profile)) }
             } == true
@@ -4303,33 +4618,53 @@ fun MapScreen(
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                     ) {
                         Row(
-                            modifier = Modifier.padding(
-                                horizontal = sizing.spacing(16.dp),
-                                vertical = sizing.spacing(10.dp)
-                            ),
+                            modifier = Modifier
+                                .animateContentSize()
+                                .padding(
+                                    horizontal = sizing.spacing(16.dp),
+                                    vertical = sizing.spacing(10.dp)
+                                ),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // L'icône suit ce qui est réellement tracé (et non le réglage) : si le
-                            // service d'itinéraire est coupé, les traits restent directs.
-                            Icon(
-                                when (measureRouteProfileValue) {
-                                    RouteApi.PROFILE_CAR -> Icons.Default.DirectionsCar
-                                    RouteApi.PROFILE_PEDESTRIAN -> Icons.AutoMirrored.Filled.DirectionsWalk
-                                    else -> Icons.Default.Straighten
-                                },
-                                null,
-                                tint = measureLineColor,
-                                modifier = Modifier.size(sizing.component(18.dp))
-                            )
+                            // Pendant le calcul, l'icône du mode cède la place à l'animation
+                            // d'attente : le total affiché n'est pas encore le bon. Sinon l'icône
+                            // suit ce qui est réellement tracé (et non le réglage) : si le service
+                            // d'itinéraire est coupé, les traits restent directs.
+                            if (measureRoutesPending) {
+                                LoadingIndicator(
+                                    modifier = Modifier.size(sizing.component(18.dp)),
+                                    color = measureLineColor
+                                )
+                            } else {
+                                Icon(
+                                    when (measureRouteProfileValue) {
+                                        RouteApi.PROFILE_CAR -> Icons.Default.DirectionsCar
+                                        RouteApi.PROFILE_PEDESTRIAN -> Icons.AutoMirrored.Filled.DirectionsWalk
+                                        else -> Icons.Default.Straighten
+                                    },
+                                    null,
+                                    tint = measureLineColor,
+                                    modifier = Modifier.size(sizing.component(18.dp))
+                                )
+                            }
                             Spacer(Modifier.width(sizing.spacing(8.dp)))
-                            Text(
-                                text = stringResource(
-                                    R.string.appstrings_measure_total_distance,
-                                    formatSiteDistanceMeters(measureTotalDistanceMeters)
-                                ) + if (measureRoutesPending) "…" else "",
-                                fontSize = sizing.text(13.sp),
-                                fontWeight = FontWeight.Bold
-                            )
+                            Column {
+                                Text(
+                                    text = stringResource(
+                                        R.string.appstrings_measure_total_distance,
+                                        formatSiteDistanceMeters(measureTotalDistanceMeters)
+                                    ),
+                                    fontSize = sizing.text(13.sp),
+                                    fontWeight = FontWeight.Bold
+                                )
+                                if (measureRoutesPending) {
+                                    Text(
+                                        text = stringResource(R.string.appstrings_measure_route_searching),
+                                        fontSize = sizing.text(11.sp),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -4487,6 +4822,24 @@ fun MapScreen(
                 }
 
                 if (toolboxExpandsLeft && isSearchActive) {
+                    // Paysage court : la barre est en bas, la liste s'ouvre donc AU-DESSUS d'elle.
+                    // La colonne est ancrée en bas, il suffit de la poser avant la ligne.
+                    AnimatedVisibility(
+                        visible = showSearchSuggestions,
+                        enter = fadeIn() + expandVertically(expandFrom = Alignment.Bottom),
+                        exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Bottom),
+                        modifier = Modifier.padding(
+                            start = sizing.spacing(16.dp),
+                            bottom = sizing.spacing(8.dp)
+                        )
+                    ) {
+                        MapSearchSuggestionList(
+                            suggestions = searchSuggestions.take(MAP_SEARCH_SUGGESTION_COMPACT_COUNT),
+                            onSelect = { suggestion -> safeClick { applySearchSuggestion(suggestion) } },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -5009,7 +5362,7 @@ fun MapScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(sizing.spacing(16.dp))
                 ) {
-                    val cityStats = if (isLoading) null else declaredSiteStats(filteredAntennas)
+                    val cityStats = if (statsLoading) null else declaredSiteStats(statsAntennas)
 
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -5064,7 +5417,7 @@ fun MapScreen(
 
                             Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
 
-                            if (isLoading) {
+                            if (statsLoading) {
                                 LoadingIndicator(
                                     modifier = Modifier.size(sizing.component(48.dp)),
                                     color = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -5126,7 +5479,7 @@ fun MapScreen(
     }
     if (showCityStatsDetail) {
         fr.geotower.ui.components.CityStatsDetailSheet(
-            antennas = filteredAntennas,
+            antennas = statsAntennas,
             techniques = cityStatsTechniques,
             isFrequencyStatusLoading = isCityStatsTechniquesLoading,
             // Un département couvre des centaines de communes : garder la commune dominante
@@ -5246,6 +5599,120 @@ private fun MapSearchBar(
                     contentDescription = stringResource(R.string.appstrings_search),
                     tint = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier.size(sizing.component(26.dp))
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Liste des suggestions, ouverte sous la barre de recherche.
+ *
+ * Volontairement courte : elle se pose sur la boussole, le bouton de partage et le tiroir de mesure,
+ * que la carte efface le temps qu'elle est ouverte plutôt que de les laisser derrière.
+ */
+@Composable
+private fun MapSearchSuggestionList(
+    suggestions: List<MapSearchSuggestion>,
+    onSelect: (MapSearchSuggestion) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val sizing = LocalGeoTowerUiSizing.current
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(sizing.component(20.dp)),
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 8.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Column(modifier = Modifier.padding(vertical = sizing.spacing(6.dp))) {
+            suggestions.forEachIndexed { index, suggestion ->
+                if (index > 0) {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(horizontal = sizing.spacing(16.dp)),
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+                        thickness = sizing.component(0.5.dp)
+                    )
+                }
+                MapSearchSuggestionRow(suggestion = suggestion) { onSelect(suggestion) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MapSearchSuggestionRow(suggestion: MapSearchSuggestion, onClick: () -> Unit) {
+    val sizing = LocalGeoTowerUiSizing.current
+
+    val title = when (suggestion) {
+        is MapSearchSuggestion.Commune -> suggestion.name
+        is MapSearchSuggestion.AdminArea -> suggestion.area.name
+        is MapSearchSuggestion.Site -> suggestion.site.idAnfr
+        is MapSearchSuggestion.Operator -> suggestion.spec.label
+    }
+    val subtitle = when (suggestion) {
+        is MapSearchSuggestion.Commune -> when {
+            suggestion.departmentName == null -> null
+            suggestion.departmentCode == null -> suggestion.departmentName
+            else -> "${suggestion.departmentName} (${suggestion.departmentCode})"
+        }
+        is MapSearchSuggestion.AdminArea -> stringResource(
+            when (suggestion.area.kind) {
+                FrenchAdminAreas.Kind.DEPARTMENT -> R.string.map_search_suggestion_department
+                FrenchAdminAreas.Kind.REGION -> R.string.map_search_suggestion_region
+            }
+        )
+        is MapSearchSuggestion.Site -> suggestion.site.operateur
+        is MapSearchSuggestion.Operator -> stringResource(R.string.map_search_suggestion_operator)
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(10.dp)),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        val iconSize = sizing.component(22.dp)
+        if (suggestion is MapSearchSuggestion.Operator) {
+            // Pastille aux couleurs de l'opérateur, comme partout ailleurs dans l'app : c'est le
+            // repère le plus lisible, une icône générique ne dirait pas lequel.
+            Box(
+                modifier = Modifier
+                    .size(iconSize)
+                    .background(Color(suggestion.spec.colorArgb), CircleShape)
+            )
+        } else {
+            Icon(
+                imageVector = when (suggestion) {
+                    is MapSearchSuggestion.Commune -> Icons.Default.LocationCity
+                    is MapSearchSuggestion.AdminArea -> Icons.Default.Flag
+                    else -> Icons.Default.CellTower
+                },
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(iconSize)
+            )
+        }
+
+        Spacer(modifier = Modifier.width(sizing.spacing(14.dp)))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontSize = sizing.text(15.sp),
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (!subtitle.isNullOrBlank()) {
+                Text(
+                    text = subtitle,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = sizing.text(12.sp),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }

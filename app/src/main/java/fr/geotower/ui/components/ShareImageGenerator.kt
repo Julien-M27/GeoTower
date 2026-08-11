@@ -3248,53 +3248,29 @@ private fun GeoTowerPdfStatusCard(
     val projectTechs = listOf(is2gProject, is3gProject, is4gProject, is5gProject).count { it }
     val isEntirelyProject = totalTechs > 0 && totalTechs == projectTechs
 
-    fun serviceStatus(hasTech: Boolean, rawStatus: String?): Boolean? {
-        return serviceAvailabilityFromOutageCode(
-            hasTechnology = hasTech,
-            outageCode = rawStatus,
-            isOutage = isOutage
-        )
-    }
-
-    fun isOutageStatusCode(rawStatus: String?): Boolean {
-        val code = rawStatus?.trim()?.uppercase(Locale.ROOT)
-        return code == "HS" || code == "DE"
-    }
-
-    val is5gVoiceProject = is5gProject || isOutageStatusCode(hsEntity?.voix5g)
-    val is5gDataProject = is5gProject || (!has5G && isOutageStatusCode(hsEntity?.data5g))
-    val realTechStatus = mapOf(
-        "2G" to ServiceStatus(
-            isVoixOk = serviceStatus(has2G, hsEntity?.voix2g),
-            isInternetOk = serviceStatus(has2G, hsEntity?.data2g),
-            isProject = is2gProject
-        ),
-        "3G" to ServiceStatus(
-            isVoixOk = serviceStatus(has3G, hsEntity?.voix3g),
-            isInternetOk = serviceStatus(has3G, hsEntity?.data3g),
-            isProject = is3gProject
-        ),
-        "4G" to ServiceStatus(
-            isVoixOk = serviceStatus(has4G, hsEntity?.voix4g),
-            isInternetOk = serviceStatus(has4G, hsEntity?.data4g),
-            isProject = is4gProject
-        ),
-        "5G" to ServiceStatus(
-            isVoixOk = serviceStatus(has5G, hsEntity?.voix5g),
-            isInternetOk = serviceStatus(has5G, hsEntity?.data5g),
-            isProject = is5gProject,
-            isVoixProject = is5gVoiceProject,
-            isInternetProject = is5gDataProject
-        )
+    val realTechStatus = siteServiceStatusGrid(
+        hsEntity = hsEntity,
+        has2G = has2G,
+        has3G = has3G,
+        has4G = has4G,
+        has5G = has5G,
+        is2gProject = is2gProject,
+        is3gProject = is3gProject,
+        is4gProject = is4gProject,
+        is5gProject = is5gProject
     )
 
     val colorOk = Color(0xFF4CAF50)
     val colorKo = Color(0xFFE53935)
     val colorProject = Color(0xFFFFA000)
     val colorNeutral = Color.Gray.copy(alpha = 0.55f)
+    // Les cases « ? » comptent comme la fiche site : une panne déclarée sans détail par génération
+    // reste une panne, sinon l'en-tête du rapport dirait « fonctionnel ».
     val displayIsOutage = isOutage && realTechStatus.values.any {
         (it.isVoixOk == false && !it.isProject && !it.isVoixProject) ||
-            (it.isInternetOk == false && !it.isProject && !it.isInternetProject)
+            (it.isInternetOk == false && !it.isProject && !it.isInternetProject) ||
+            (it.isVoixUncertain && !it.isProject && !it.isVoixProject) ||
+            (it.isInternetUncertain && !it.isProject && !it.isInternetProject)
     }
     val globalStatusText = when {
         isEntirelyProject -> stringResource(R.string.appstrings_status_project)
@@ -3358,6 +3334,7 @@ private fun GeoTowerPdfStatusCard(
                 techStatus = realTechStatus,
                 statusSelector = { _, status -> status.isVoixOk },
                 projectSelector = { _, status -> status.isProject || status.isVoixProject },
+                uncertainSelector = { _, status -> status.isVoixUncertain },
                 colorOk = colorOk,
                 colorKo = colorKo,
                 colorProject = colorProject,
@@ -3369,6 +3346,7 @@ private fun GeoTowerPdfStatusCard(
                 techStatus = realTechStatus,
                 statusSelector = { tech, status -> if (tech == "2G") null else status.isInternetOk },
                 projectSelector = { tech, status -> tech != "2G" && (status.isProject || status.isInternetProject) },
+                uncertainSelector = { tech, status -> tech != "2G" && status.isInternetUncertain },
                 colorOk = colorOk,
                 colorKo = colorKo,
                 colorProject = colorProject,
@@ -3403,6 +3381,7 @@ private fun GeoTowerPdfServiceStatusRow(
     techStatus: Map<String, ServiceStatus>,
     statusSelector: (String, ServiceStatus) -> Boolean?,
     projectSelector: (String, ServiceStatus) -> Boolean,
+    uncertainSelector: (String, ServiceStatus) -> Boolean,
     colorOk: Color,
     colorKo: Color,
     colorProject: Color,
@@ -3422,11 +3401,14 @@ private fun GeoTowerPdfServiceStatusRow(
             val status = techStatus[tech]
             val value = status?.let { statusSelector(tech, it) }
             val isProject = status?.let { projectSelector(tech, it) } == true
+            val isUncertain = status?.let { uncertainSelector(tech, it) } == true
             Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                 when {
                     isProject -> Text("~", color = colorProject, fontWeight = FontWeight.Bold, fontSize = 12.sp, lineHeight = 12.sp)
                     value == true -> Icon(Icons.Default.Check, contentDescription = null, tint = colorOk, modifier = Modifier.size(10.dp))
                     value == false -> Icon(Icons.Default.Close, contentDescription = null, tint = colorKo, modifier = Modifier.size(10.dp))
+                    // Même lecture que la fiche site : panne déclarée, service non détaillé.
+                    isUncertain -> Text("?", color = colorKo, fontWeight = FontWeight.Bold, fontSize = 10.sp, lineHeight = 11.sp)
                     else -> Icon(Icons.Default.Remove, contentDescription = null, tint = colorNeutral, modifier = Modifier.size(10.dp))
                 }
             }
@@ -4672,45 +4654,16 @@ fun shareFullAntennaCapture(
                                             val isEntirelyProject =
                                                 totalTechs > 0 && totalTechs == projectTechs
 
-                                            fun serviceStatus(hasTech: Boolean, rawStatus: String?): Boolean? {
-                                                return serviceAvailabilityFromOutageCode(
-                                                    hasTechnology = hasTech,
-                                                    outageCode = rawStatus,
-                                                    isOutage = isOutage
-                                                )
-                                            }
-
-                                            fun isOutageStatusCode(rawStatus: String?): Boolean {
-                                                val code = rawStatus
-                                                    ?.trim()
-                                                    ?.uppercase(Locale.ROOT)
-                                                return code == "HS" || code == "DE"
-                                            }
-
-                                            val is5gVoiceProject =
-                                                is5gProject || isOutageStatusCode(hsEntity?.voix5g)
-                                            val is5gDataProject =
-                                                is5gProject || (!has5G && isOutageStatusCode(hsEntity?.data5g))
-
-                                            val realTechStatus = mapOf(
-                                                "2G" to ServiceStatus(
-                                                    isVoixOk = serviceStatus(has2G, hsEntity?.voix2g),
-                                                    isInternetOk = serviceStatus(has2G, hsEntity?.data2g),
-                                                    isProject = is2gProject),
-                                                "3G" to ServiceStatus(
-                                                    isVoixOk = serviceStatus(has3G, hsEntity?.voix3g),
-                                                    isInternetOk = serviceStatus(has3G, hsEntity?.data3g),
-                                                    isProject = is3gProject),
-                                                "4G" to ServiceStatus(
-                                                    isVoixOk = serviceStatus(has4G, hsEntity?.voix4g),
-                                                    isInternetOk = serviceStatus(has4G, hsEntity?.data4g),
-                                                    isProject = is4gProject),
-                                                "5G" to ServiceStatus(
-                                                    isVoixOk = serviceStatus(has5G, hsEntity?.voix5g),
-                                                    isInternetOk = serviceStatus(has5G, hsEntity?.data5g),
-                                                    isProject = is5gProject,
-                                                    isVoixProject = is5gVoiceProject,
-                                                    isInternetProject = is5gDataProject)
+                                            val realTechStatus = siteServiceStatusGrid(
+                                                hsEntity = hsEntity,
+                                                has2G = has2G,
+                                                has3G = has3G,
+                                                has4G = has4G,
+                                                has5G = has5G,
+                                                is2gProject = is2gProject,
+                                                is3gProject = is3gProject,
+                                                is4gProject = is4gProject,
+                                                is5gProject = is5gProject
                                             )
 
                                             SiteStatusCard(

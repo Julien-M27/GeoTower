@@ -7,6 +7,7 @@ import fr.geotower.data.AdminAreaExtent
 import fr.geotower.data.AnfrRepository
 import fr.geotower.data.RadioRepository
 import fr.geotower.data.config.RemoteFeatureFlags
+import fr.geotower.data.db.CommuneNameRow
 import fr.geotower.data.api.NominatimApi
 import fr.geotower.data.api.SignalQuestClient
 import fr.geotower.data.api.SignalQuestOperators
@@ -25,6 +26,7 @@ import org.osmdroid.util.GeoPoint
 import fr.geotower.data.models.SiteHsEntity
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
+import fr.geotower.utils.DepartmentCodes
 import fr.geotower.utils.FrequencyFilterSelection
 import fr.geotower.utils.OperatorColors
 
@@ -32,6 +34,12 @@ import fr.geotower.utils.OperatorColors
 data class AdminAreaOutline(
     val areaCode: String,
     val polygons: List<List<GeoPoint>>
+)
+
+/** Zone administrative retenue par la recherche : codes INSEE de tri, et contour pour les regroupements. */
+private data class AdminAreaFilter(
+    val departmentCodes: Set<String>,
+    val polygons: List<List<GeoPoint>>?
 )
 
 data class SignalQuestCoveragePoint(
@@ -103,8 +111,17 @@ class MapViewModel(
     private val _adminAreaOutline = MutableStateFlow<AdminAreaOutline?>(null)
     val adminAreaOutline = _adminAreaOutline.asStateFlow()
 
+    private val _adminAreaStatsAntennas = MutableStateFlow<List<LocalisationEntity>>(emptyList())
+    val adminAreaStatsAntennas = _adminAreaStatsAntennas.asStateFlow()
+
+    private val _isAdminAreaStatsLoading = MutableStateFlow(false)
+    val isAdminAreaStatsLoading = _isAdminAreaStatsLoading.asStateFlow()
+
     private var searchJob: Job? = null
     private var adminAreaOutlineJob: Job? = null
+    private var adminAreaStatsJob: Job? = null
+    private var loadedAdminAreaStatsKey: String? = null
+    private var adminAreaFilter: AdminAreaFilter? = null
     private var signalQuestCoverageJob: Job? = null
     private var lastSignalQuestCoverageRequestKey: String? = null
     private var cityStatsTechniquesJob: Job? = null
@@ -146,44 +163,72 @@ class MapViewModel(
     }
 
     /**
-     * Recherche par département ou région : le tri se fait sur le code INSEE en SQL, il n'y a donc
-     * pas de polygone à découper comme pour une commune — la carte n'affiche que les stations de la
-     * zone, jamais celles des voisins pris dans la même emprise.
+     * Recherche par département ou région.
      *
-     * Les émetteurs radio, eux, n'ont pas de code commune exploitable ici : ils restent chargés sur
-     * l'emprise, à quelques unités près en bordure.
+     * Contrairement au verrou de commune, ce filtre **n'immobilise pas la carte** : une région
+     * compte jusqu'à 10 000 emplacements, bien au-delà de [fr.geotower.utils.PowerProfile.mapMarkerCap],
+     * et un chargement figé en aurait laissé un tiers invisible pour toujours. Il s'applique donc au
+     * chargement normal, qui reste borné par ce qu'on regarde : regroupements quand on est loin,
+     * sites détaillés quand on zoome.
      */
-    fun loadAntennasForAdminArea(
-        departmentCodes: List<String>,
-        latNorth: Double,
-        lonEast: Double,
-        latSouth: Double,
-        lonWest: Double
-    ) {
-        searchJob?.cancel()
-        cityPolygons = null
-        isCityLocked = true // ✅ ON VERROUILLE LE CHARGEMENT AUTOMATIQUE
+    fun setAdminAreaFilter(departmentCodes: List<String>, polygons: List<List<GeoPoint>>?) {
+        adminAreaFilter = AdminAreaFilter(
+            departmentCodes = departmentCodes.toSet(),
+            polygons = polygons?.takeIf { it.isNotEmpty() }
+        )
+    }
 
-        searchJob = viewModelScope.launch {
-            _isLoading.value = true
+    fun clearAdminAreaFilter() {
+        if (adminAreaFilter == null && loadedAdminAreaStatsKey == null) return
+        adminAreaFilter = null
+        adminAreaStatsJob?.cancel()
+        loadedAdminAreaStatsKey = null
+        _adminAreaStatsAntennas.value = emptyList()
+        _isAdminAreaStatsLoading.value = false
+    }
+
+    /**
+     * Charge toute la zone **hors carte**, uniquement pour les compteurs de la fiche de zone.
+     *
+     * La carte, elle, ne voit que ce qui est à l'écran : à l'échelle d'un département elle affiche
+     * des regroupements, dont on ne peut rien compter de fiable.
+     */
+    fun loadAdminAreaStats(areaKey: String, departmentCodes: List<String>) {
+        if (loadedAdminAreaStatsKey == areaKey) return
+
+        loadedAdminAreaStatsKey = areaKey
+        adminAreaStatsJob?.cancel()
+        // Dispatchers.IO explicite : l'enrichissement des bandes 5G reparse les détails de fréquence
+        // ligne par ligne, et une région en compte jusqu'à 18 000 — hors de question sur le thread UI.
+        adminAreaStatsJob = viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            _isAdminAreaStatsLoading.value = true
             try {
-                val frequencyFilter = FrequencyFilterSelection.fromMapConfig()
-                val markers = repository.getAntennasInAdminArea(
-                    departmentCodes,
-                    detailBackedBandMask = frequencyFilter.detailBackedBandMaskForEnrichment()
-                )
-
-                _antennas.value = markers
-                _radioMarkers.value = loadRadioMarkers(13.0, latNorth, lonEast, latSouth, lonWest)
-                AppLogger.d(TAG, "Admin area markers=${markers.size} depts=${departmentCodes.joinToString(",")}")
+                _adminAreaStatsAntennas.value = repository.getAntennasInAdminArea(departmentCodes)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                AppLogger.w(TAG, "Admin area map request failed", e)
+                AppLogger.w(TAG, "Admin area stats request failed", e)
+                _adminAreaStatsAntennas.value = emptyList()
             } finally {
-                _isLoading.value = false
+                _isAdminAreaStatsLoading.value = false
             }
         }
+    }
+
+    /** Tri exact, sur le code INSEE : c'est la même définition de département que partout ailleurs. */
+    private fun filterDetailedToAdminArea(antennas: List<LocalisationEntity>): List<LocalisationEntity> {
+        val codes = adminAreaFilter?.departmentCodes ?: return antennas
+        return antennas.filter { DepartmentCodes.fromInsee(it.codeInsee) in codes }
+    }
+
+    /**
+     * Les regroupements sont pré-agrégés en base et ne portent pas de code commune : on les trie sur
+     * le contour de la zone, à défaut. Une cellule de regroupement couvre quelques kilomètres, donc
+     * un compte peut déborder de la frontière — sans contour (hors réseau), on n'en trie aucun.
+     */
+    private fun filterClustersToAdminArea(clusters: List<LocalisationEntity>): List<LocalisationEntity> {
+        val polygons = adminAreaFilter?.polygons ?: return clusters
+        return clusters.filter { isPointInPolygon(it.latitude, it.longitude, polygons) }
     }
 
     fun loadAntennasInBox(zoom: Double, latNorth: Double, lonEast: Double, latSouth: Double, lonWest: Double) {
@@ -245,7 +290,7 @@ class MapViewModel(
                             hasActive = 1
                         )
                     }
-                    _antennas.value = fakeAntennas
+                    _antennas.value = filterClustersToAdminArea(fakeAntennas)
                 } else {
                     // Si on a zoomé, on charge les vraies antennes détaillées de la zone
                     val detailBackedBandMask = frequencyFilter.detailBackedBandMaskForEnrichment()
@@ -294,11 +339,13 @@ class MapViewModel(
                         )
                     }
 
+                    val areaAntennas = filterDetailedToAdminArea(rawAntennas)
+
                     // ✅ 3. SI UNE VILLE EST CIBLÉE, ON LA GARDE STRICTEMENT FILTRÉE !
                     if (cityPolygons != null) {
-                        _antennas.value = rawAntennas.filter { isPointInPolygon(it.latitude, it.longitude, cityPolygons!!) }
+                        _antennas.value = areaAntennas.filter { isPointInPolygon(it.latitude, it.longitude, cityPolygons!!) }
                     } else {
-                        _antennas.value = rawAntennas
+                        _antennas.value = areaAntennas
                     }
                 }
                 _radioMarkers.value = loadRadioMarkers(zoom, latNorth, lonEast, latSouth, lonWest)
@@ -567,6 +614,7 @@ class MapViewModel(
     fun clearCityFilterAndReload(zoom: Double, latNorth: Double, lonEast: Double, latSouth: Double, lonWest: Double) {
         isCityLocked = false // ✅ ON DÉVERROUILLE
         cityPolygons = null
+        clearAdminAreaFilter()
         _antennas.value = emptyList()
         _radioMarkers.value = emptyList()
         loadAntennasInBox(zoom, latNorth, lonEast, latSouth, lonWest)
@@ -578,6 +626,7 @@ class MapViewModel(
         clearSignalQuestCoveragePoints()
         isCityLocked = false // ✅ ON DÉVERROUILLE
         cityPolygons = null
+        clearAdminAreaFilter()
         _antennas.value = emptyList()
         _radioMarkers.value = emptyList()
     }
@@ -639,6 +688,48 @@ class MapViewModel(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Stations proposées pendant la frappe : mêmes résultats que [searchSiteById], mais dédoublonnés
+     * par identifiant ANFR — une station porte une ligne par opérateur, et la liste de suggestions
+     * n'a pas à les répéter.
+     */
+    suspend fun searchSiteSuggestions(query: String, limit: Int): List<LocalisationEntity> {
+        if (limit <= 0) return emptyList()
+        return try {
+            repository.searchAntennasById(query)
+                .distinctBy { it.idAnfr }
+                .take(limit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    /** Communes proposées pendant la frappe, depuis le référentiel embarqué dans la base. */
+    suspend fun searchCommuneSuggestions(query: String, limit: Int): List<CommuneNameRow> {
+        return try {
+            repository.searchCommunesByName(query, limit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLogger.w(TAG, "Commune suggestions failed", e)
+            emptyList()
+        }
+    }
+
+    /** Emprise d'une commune, ou null si la base locale n'y connaît aucune station. */
+    suspend fun findCommuneExtent(codeInsee: String): AdminAreaExtent? {
+        return try {
+            repository.getCommuneExtent(codeInsee)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLogger.w(TAG, "Commune extent failed", e)
             null
         }
     }

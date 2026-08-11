@@ -287,7 +287,9 @@
     <string name="photo_on_date">le %1$s</string>
     <string name="about_new_for_version">Nouveautés (%1$s)</string>
     <string name="map_site_not_in_area">Le site %1$s n\'est pas dans la zone affichée. Déplacez la carte vers sa ville d\'abord.</string>
-    <string name="map_search_area_too_large">%1$s : trop de sites pour tous les afficher. La carte s\'y déplace simplement.</string>
+    <string name="map_search_suggestion_department">Département</string>
+    <string name="map_search_suggestion_region">Région</string>
+    <string name="map_search_suggestion_operator">Afficher seulement cet opérateur</string>
     <string name="track_operator_active">Suivi %1$s en cours...</string>
     <string name="signalquest_invalid_site">Site SignalQuest invalide.</string>
     <string name="signalquest_photo_required">Ajoutez au moins une photo avant l\'envoi.</string>
@@ -1320,6 +1322,7 @@
     <string name="appstrings_status_legend_project">Technologie déclarée en projet.</string>
     <string name="appstrings_status_legend_title">Légende du tableau</string>
     <string name="appstrings_status_legend_unavailable">Technologie absente, non déclarée ou information non communiquée.</string>
+    <string name="appstrings_status_legend_uncertain">Service non déclaré pour cette génération, alors que la panne signalée peut le toucher.</string>
     <string name="appstrings_status_outage">En panne</string>
     <string name="appstrings_status_project">En projet</string>
     <string name="appstrings_status_title">Statut du site</string>
@@ -2339,6 +2342,7 @@
     <string name="appstrings_measure_follow_roads_car">Par la route</string>
     <string name="appstrings_measure_follow_roads_walk">Par les chemins</string>
     <string name="appstrings_measure_route_unavailable">Aucun itinéraire trouvé : trait direct conservé.</string>
+    <string name="appstrings_measure_route_searching">Recherche de l\'itinéraire…</string>
     <!-- Photos favorites (Réglages > Préférences) -->
     <string name="photos_favorites_title">Photos favorites</string>
     <string name="photos_favorites_desc">Retrouvez et gérez les photos de site mises en favori.</string>
@@ -2729,4 +2733,11 @@
     <string name="appstrings_release_v2023_measure_drawer">Le tiroir de mesure ne passe plus devant le total ni le bouton de suppression des tracés</string>
     <string name="appstrings_release_v2023_route_icon">L\'icône du suivi des routes reflète ce qui est réellement tracé : si le service d\'itinéraire est indisponible, elle indique le trait direct</string>
     <string name="appstrings_release_v2023_area_mask">La limite d\'une zone recherchée est tracée en trait plein, les pointillés laissant croire à un contour approximatif</string>
+
+    <!-- Notes de version 2.0.24 -->
+    <string name="appstrings_release_v2024_search_suggestions">Des suggestions apparaissent sous la barre de recherche dès deux caractères : communes, départements, régions et opérateurs</string>
+    <string name="appstrings_release_v2024_search_accents">Les communes se trouvent sans se soucier des accents ni des tirets : « saint-e » suffit pour « SAINT-ÉTIENNE »</string>
+    <string name="appstrings_release_v2024_admin_area_no_limit">Un département ou une région très fournis affichent désormais leurs sites, au lieu d\'être seulement cadrés</string>
+    <string name="appstrings_release_v2024_route_searching">La recherche d\'itinéraire annonce qu\'elle travaille</string>
+    <string name="appstrings_release_v2024_status_uncertain">Un « ? » remplace le tiret dans la grille des services quand une panne est déclarée sans que l\'opérateur précise si cette génération est touchée</string>
 </resources>

@@ -9,6 +9,8 @@ import fr.geotower.data.api.LiveSitesClient
 import fr.geotower.data.api.SitesHsRebuildDto
 import androidx.sqlite.db.SimpleSQLiteQuery
 import fr.geotower.data.db.AppDatabase
+import fr.geotower.data.db.CommuneNameRow
+import fr.geotower.data.db.CommuneSiteCountRow
 import fr.geotower.data.db.DepartmentOperatorTechRow
 import fr.geotower.data.db.DepartmentStatRow
 import fr.geotower.data.db.GeoTowerDatabaseValidator
@@ -50,6 +52,7 @@ import fr.geotower.data.outages.parseSitesHsRebuildBody
 import fr.geotower.data.outages.toRebuildStatus
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
+import fr.geotower.utils.CommuneNameMatching
 import fr.geotower.utils.DepartmentCodes
 import fr.geotower.utils.FrenchAdminAreas
 import fr.geotower.utils.FrequencyFilterSelection
@@ -85,15 +88,13 @@ data class ActiveSupportRadioCounts(
 /**
  * Emprise d'une zone administrative (département ou région), déduite des stations qui y sont
  * déclarées : la base ne porte aucun contour administratif, l'enveloppe des sites est donc le
- * meilleur cadrage disponible. [siteCount] sert à décider si la zone tient dans un affichage
- * détaillé ou s'il faut se contenter d'y déplacer la carte.
+ * meilleur cadrage disponible.
  */
 data class AdminAreaExtent(
     val latNorth: Double,
     val lonEast: Double,
     val latSouth: Double,
-    val lonWest: Double,
-    val siteCount: Int
+    val lonWest: Double
 )
 
 private data class ActiveRadioKeys(
@@ -949,8 +950,60 @@ class AnfrRepository(
             latNorth = rows.mapNotNull { it.maxLat }.maxOrNull() ?: return null,
             lonEast = rows.mapNotNull { it.maxLon }.maxOrNull() ?: return null,
             latSouth = rows.mapNotNull { it.minLat }.minOrNull() ?: return null,
-            lonWest = rows.mapNotNull { it.minLon }.minOrNull() ?: return null,
-            siteCount = rows.sumOf { it.count }
+            lonWest = rows.mapNotNull { it.minLon }.minOrNull() ?: return null
+        )
+    }
+
+    /**
+     * Communes proposées pendant la frappe dans la barre de recherche de la carte.
+     *
+     * Tout est local : `ref_commune` est embarquée dans la base, la liste sort donc sans réseau et
+     * sans dépendre d'un géocodeur. Liste vide quand il n'y a pas de base installée (repli API
+     * live) — l'appelant garde alors les autres suggestions.
+     *
+     * Les candidats sont ratissés large puis reclassés par nombre de stations : les noms de communes
+     * n'ont ni population ni rang dans la base, et sans ce tri « renn » proposerait Renno avant
+     * Rennes, le classement SQL ne pouvant que départager sur la longueur du nom.
+     */
+    suspend fun searchCommunesByName(query: String, limit: Int): List<CommuneNameRow> {
+        if (limit <= 0) return emptyList()
+        val containsPattern = CommuneNameMatching.containsPattern(query) ?: return emptyList()
+        val startsWithPattern = CommuneNameMatching.startsWithPattern(query) ?: return emptyList()
+
+        val candidates = queryLocalDatabase(emptyList<CommuneNameRow>()) {
+            searchCommunes(containsPattern, startsWithPattern, COMMUNE_SUGGESTION_CANDIDATES)
+        }
+        if (candidates.size <= 1) return candidates
+
+        val siteCounts = queryLocalDatabase(emptyList<CommuneSiteCountRow>()) {
+            countSitesByCommune(candidates.map { it.codeInsee })
+        }.associate { it.codeInsee to it.count }
+
+        return candidates
+            .sortedWith(
+                compareByDescending<CommuneNameRow> { it.startsWith }
+                    .thenByDescending { siteCounts[it.codeInsee] ?: 0 }
+                    .thenBy { it.nom.length }
+                    .thenBy { it.nom }
+            )
+            .take(limit)
+    }
+
+    /**
+     * Emprise d'une commune, déduite de ses stations. Sert de repli au contour Nominatim : hors
+     * réseau, une suggestion de commune cadre quand même la carte au bon endroit.
+     */
+    suspend fun getCommuneExtent(codeInsee: String): AdminAreaExtent? {
+        val bounds = queryLocalDatabase<InseeRangeBoundsRow?>(null) {
+            getCommuneBounds(codeInsee)
+        } ?: return null
+        if (bounds.count == 0) return null
+
+        return AdminAreaExtent(
+            latNorth = bounds.maxLat ?: return null,
+            lonEast = bounds.maxLon ?: return null,
+            latSouth = bounds.minLat ?: return null,
+            lonWest = bounds.minLon ?: return null
         )
     }
 
@@ -1946,6 +1999,13 @@ class AnfrRepository(
     private companion object {
         const val TAG_DB = "GeoTowerDb"
         const val TAG_MAP = "GeoTowerMap"
+
+        /**
+         * Communes ramenées de la base avant reclassement par nombre de stations. Assez large pour
+         * que la bonne y soit (« saint » en touche des centaines), assez court pour que le comptage
+         * qui suit tienne en une requête indexée.
+         */
+        const val COMMUNE_SUGGESTION_CANDIDATES = 40
 
         /**
          * Durée de vie du cache mémoire des pannes. Volontairement court : les pannes bougent, mais

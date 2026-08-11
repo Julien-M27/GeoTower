@@ -106,6 +106,24 @@ data class InseeRangeBoundsRow(
     @ColumnInfo(name = "count") val count: Int
 )
 
+/**
+ * Commune du referentiel `ref_commune`, pour les suggestions de la barre de recherche.
+ *
+ * [startsWith] dit si le nom **commence** par la saisie ou s'il la contient seulement : c'est le
+ * critere de tri principal, et seul SQL peut le calculer, la comparaison etant un motif GLOB.
+ */
+data class CommuneNameRow(
+    @ColumnInfo(name = "code_insee") val codeInsee: String,
+    @ColumnInfo(name = "nom") val nom: String,
+    @ColumnInfo(name = "starts_with") val startsWith: Boolean
+)
+
+/** Effectif des stations d'une commune, qui sert a classer les suggestions homonymes. */
+data class CommuneSiteCountRow(
+    @ColumnInfo(name = "code_insee") val codeInsee: String,
+    @ColumnInfo(name = "count") val count: Int
+)
+
 @Dao
 interface GeoTowerDao {
 
@@ -159,6 +177,66 @@ interface GeoTowerDao {
         WHERE code_insee >= :inseeStart AND code_insee < :inseeEnd
     """)
     suspend fun getInseeRangeBounds(inseeStart: String, inseeEnd: String): InseeRangeBoundsRow?
+
+    /**
+     * Emprise des stations d'une seule commune, pour cadrer la carte sur une suggestion de recherche
+     * sans réseau. Même projection que [getInseeRangeBounds], mais sur un code INSEE exact — égalité
+     * et non plage, sinon `idx_localisation_insee` ne servirait à rien.
+     */
+    @Query("""
+        SELECT
+            MIN(latitude) AS minLat,
+            MAX(latitude) AS maxLat,
+            MIN(longitude) AS minLon,
+            MAX(longitude) AS maxLon,
+            COUNT(*) AS count
+        FROM localisation
+        WHERE code_insee = :codeInsee
+    """)
+    suspend fun getCommuneBounds(codeInsee: String): InseeRangeBoundsRow?
+
+    /**
+     * Communes dont le nom colle à la saisie, pour les suggestions de la barre de recherche.
+     *
+     * GLOB et non LIKE : `ref_commune.nom` est stocké en majuscules **accentuées**, que SQLite ne
+     * sait pas ignorer. Les deux motifs sont construits par
+     * [fr.geotower.utils.CommuneNameMatching], qui déplie chaque lettre de la saisie en la classe de
+     * ses variantes ; `startsWithPattern` distingue « commence par » de « contient », pour que
+     * « renn » sorte Rennes avant Saint-Renan. Balayage complet à chaque frappe assumé : la table
+     * fait quelques dizaines de milliers de lignes de deux colonnes, et aucun index ne s'applique à
+     * un motif. Le classement final revient à l'appelant, qui y ajoute la taille des communes.
+     */
+    @Query("""
+        SELECT
+            code_insee,
+            nom,
+            CASE WHEN nom GLOB :startsWithPattern THEN 1 ELSE 0 END AS starts_with
+        FROM ref_commune
+        WHERE nom GLOB :containsPattern
+        ORDER BY starts_with DESC, LENGTH(nom), nom
+        LIMIT :limit
+    """)
+    suspend fun searchCommunes(
+        containsPattern: String,
+        startsWithPattern: String,
+        limit: Int
+    ): List<CommuneNameRow>
+
+    /**
+     * Nombre de stations de chaque commune d'une courte liste, pour classer les suggestions.
+     *
+     * Sans ce comptage, « renn » sortirait Renno (Corse-du-Sud, 132 habitants) avant Rennes : à
+     * défaut de population, la table ne porte que des noms, et le nombre de stations est le meilleur
+     * indicateur de taille dont on dispose — accessoirement le plus pertinent ici. La liste passée
+     * est celle des candidats déjà retenus, donc courte, et `code_insee` est indexé.
+     */
+    @Query("""
+        SELECT code_insee, COUNT(*) AS count
+        FROM localisation
+        WHERE code_insee IN (:codesInsee)
+        GROUP BY code_insee
+    """)
+    suspend fun countSitesByCommune(codesInsee: List<String>): List<CommuneSiteCountRow>
 
     /** Stations d'un département. Même projection que [getLocalisationsInBox], filtre INSEE au lieu de la bbox. */
     @Query("""

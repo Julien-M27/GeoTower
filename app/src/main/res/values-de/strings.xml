@@ -287,7 +287,9 @@
     <string name="photo_on_date">am %1$s</string>
     <string name="about_new_for_version">Neuigkeiten (%1$s)</string>
     <string name="map_site_not_in_area">Standort %1$s liegt nicht im angezeigten Bereich. Verschiebe die Karte zuerst zu seiner Stadt.</string>
-    <string name="map_search_area_too_large">%1$s: zu viele Standorte, um alle anzuzeigen. Die Karte springt nur dorthin.</string>
+    <string name="map_search_suggestion_department">Departement</string>
+    <string name="map_search_suggestion_region">Region</string>
+    <string name="map_search_suggestion_operator">Nur diesen Betreiber anzeigen</string>
     <string name="track_operator_active">%1$s-Tracking aktiv...</string>
     <string name="signalquest_invalid_site">Ungültiger SignalQuest-Standort.</string>
     <string name="signalquest_photo_required">Füge vor dem Upload mindestens ein Foto hinzu.</string>
@@ -1323,6 +1325,7 @@
     <string name="appstrings_status_legend_project">Technologie als geplant deklariert.</string>
     <string name="appstrings_status_legend_title">Tabellenlegende</string>
     <string name="appstrings_status_legend_unavailable">Technologie nicht vorhanden, nicht deklariert oder Information nicht verfügbar.</string>
+    <string name="appstrings_status_legend_uncertain">Dienst für diese Generation nicht deklariert, obwohl die gemeldete Störung ihn betreffen kann.</string>
     <string name="appstrings_support_detail_title">Supportdetail</string>
     <string name="appstrings_support_details_option">Supportdetails</string>
     <string name="appstrings_support_details_title">Supportdetails</string>
@@ -2339,6 +2342,7 @@
     <string name="appstrings_measure_follow_roads_car">Entlang der Straßen</string>
     <string name="appstrings_measure_follow_roads_walk">Entlang der Wege</string>
     <string name="appstrings_measure_route_unavailable">Keine Route gefunden: Luftlinie bleibt.</string>
+    <string name="appstrings_measure_route_searching">Route wird gesucht…</string>
     <!-- Lieblingsfotos (Einstellungen > Präferenzen) -->
     <string name="photos_favorites_title">Lieblingsfotos</string>
     <string name="photos_favorites_desc">Finde und verwalte die als Favorit markierten Standortfotos.</string>
@@ -2727,4 +2731,11 @@
     <string name="appstrings_release_v2023_measure_drawer">Die Mess-Leiste verdeckt nicht mehr die Gesamtlänge und die Schaltfläche zum Löschen der Strecken</string>
     <string name="appstrings_release_v2023_route_icon">Das Symbol der Straßenführung zeigt, was tatsächlich gezeichnet wird: Ist der Routendienst nicht verfügbar, steht es auf Luftlinie</string>
     <string name="appstrings_release_v2023_area_mask">Die Grenze eines gesuchten Gebiets wird durchgezogen gezeichnet; die Strichelung ließ auf einen ungefähren Umriss schließen</string>
+
+    <!-- Versionshinweise 2.0.24 -->
+    <string name="appstrings_release_v2024_search_suggestions">Ab zwei Zeichen erscheinen Vorschläge unter der Suchleiste: Gemeinden, Departements, Regionen und Betreiber</string>
+    <string name="appstrings_release_v2024_search_accents">Gemeinden werden unabhängig von Akzenten und Bindestrichen gefunden: „saint-e“ genügt für „SAINT-ÉTIENNE“</string>
+    <string name="appstrings_release_v2024_admin_area_no_limit">Ein dicht besetztes Departement oder eine Region zeigt jetzt ihre Standorte, statt nur angefahren zu werden</string>
+    <string name="appstrings_release_v2024_route_searching">Die Routensuche meldet, dass sie arbeitet</string>
+    <string name="appstrings_release_v2024_status_uncertain">Ein „?“ ersetzt den Strich im Dienste-Raster, wenn eine Störung gemeldet ist, ohne dass der Betreiber angibt, ob diese Generation betroffen ist</string>
 </resources>

@@ -42,7 +42,11 @@ data class ServiceStatus(
     val isInternetOk: Boolean? = null,
     val isProject: Boolean = false,
     val isVoixProject: Boolean = false,
-    val isInternetProject: Boolean = false
+    val isInternetProject: Boolean = false,
+    /** Voix non publiée pour cette génération alors que la panne déclarée peut l'emporter. */
+    val isVoixUncertain: Boolean = false,
+    /** Data non publiée pour cette génération alors que la panne déclarée peut l'emporter. */
+    val isInternetUncertain: Boolean = false
 )
 
 fun serviceAvailabilityFromOutageCode(
@@ -60,6 +64,106 @@ fun serviceAvailabilityFromOutageCode(
         OutageStatusCodes.isDown(outageCode) -> false
         else -> null
     }
+}
+
+/**
+ * Vrai quand l'opérateur ne publie AUCUN code pour ce service à cette génération alors que la panne
+ * qu'il déclare peut l'emporter : la case ne vaut alors ni vert ni rouge, mais « incertain ».
+ *
+ * Les relevés sont souvent partiels — une panne déclarée « Data : HS » sans détail par génération, ou
+ * une data 4G HS avec la voix 4G laissée vide. Le tiret « rien de publié » y était trompeur : il se
+ * lit comme une absence de technologie alors que l'en-tête de la carte annonce déjà une panne.
+ *
+ * Deux déclencheurs, du plus fort au plus faible :
+ * - le code global du MÊME service est hors service (« Data : HS », générations non détaillées) ;
+ * - l'autre service de la MÊME génération est hors service (data 4G HS, voix 4G non publiée).
+ *
+ * Un code global explicitement en service (« Voix : OK ») ferme l'incertitude : l'opérateur a répondu
+ * pour ce service, on ne lui prête pas un doute qu'il n'a pas.
+ */
+fun serviceUncertaintyFromOutageCode(
+    hasTechnology: Boolean,
+    outageCode: String?,
+    serviceGlobalCode: String?,
+    siblingOutageCode: String?,
+    isOutage: Boolean
+): Boolean {
+    if (!hasTechnology || !isOutage) return false
+    // Un code publié se suffit : il vaut vert ou rouge, jamais un doute.
+    if (OutageStatusCodes.clean(outageCode) != null) return false
+    if (OutageStatusCodes.isUp(serviceGlobalCode)) return false
+    return OutageStatusCodes.isDown(serviceGlobalCode) || OutageStatusCodes.isDown(siblingOutageCode)
+}
+
+/**
+ * Construit les quatre colonnes de la grille voix/data à partir du relevé de panne de l'opérateur
+ * ([hsEntity], null quand aucune panne n'est déclarée).
+ *
+ * Partagée par la fiche site, le partage image et le rapport PDF : les trois recopiaient la même
+ * lecture, et la case « incertaine » ([serviceUncertaintyFromOutageCode]) doit y apparaître à
+ * l'identique. Les `has*` disent quelles générations sont physiquement sur l'antenne et les
+ * `is*Project` lesquelles ne sont qu'un projet : cette part vient de la base ANFR
+ * (`details_frequences`), donc de l'appelant, pas du relevé de panne.
+ */
+fun siteServiceStatusGrid(
+    hsEntity: SiteHsEntity?,
+    has2G: Boolean,
+    has3G: Boolean,
+    has4G: Boolean,
+    has5G: Boolean,
+    is2gProject: Boolean,
+    is3gProject: Boolean,
+    is4gProject: Boolean,
+    is5gProject: Boolean
+): Map<String, ServiceStatus> {
+    val isOutage = hsEntity != null
+
+    fun availability(hasTech: Boolean, outageCode: String?): Boolean? =
+        serviceAvailabilityFromOutageCode(hasTech, outageCode, isOutage)
+
+    fun voiceUncertain(hasTech: Boolean, voiceCode: String?, dataCode: String?): Boolean =
+        serviceUncertaintyFromOutageCode(hasTech, voiceCode, hsEntity?.voixGlobal, dataCode, isOutage)
+
+    fun dataUncertain(hasTech: Boolean, dataCode: String?, voiceCode: String?): Boolean =
+        serviceUncertaintyFromOutageCode(hasTech, dataCode, hsEntity?.dataGlobal, voiceCode, isOutage)
+
+    // La voix sur 5G (VoNR) n'est pas déployée : un « HS » déclaré dessus est présenté comme un projet
+    // plutôt que comme une panne, tout comme une data 5G HS sur un site sans 5G en base.
+    val is5gVoiceProject = is5gProject || OutageStatusCodes.isDown(hsEntity?.voix5g)
+    val is5gDataProject = is5gProject || (!has5G && OutageStatusCodes.isDown(hsEntity?.data5g))
+
+    return mapOf(
+        "2G" to ServiceStatus(
+            isVoixOk = availability(has2G, hsEntity?.voix2g),
+            isInternetOk = availability(has2G, hsEntity?.data2g),
+            isProject = is2gProject,
+            isVoixUncertain = voiceUncertain(has2G, hsEntity?.voix2g, hsEntity?.data2g),
+            isInternetUncertain = dataUncertain(has2G, hsEntity?.data2g, hsEntity?.voix2g)
+        ),
+        "3G" to ServiceStatus(
+            isVoixOk = availability(has3G, hsEntity?.voix3g),
+            isInternetOk = availability(has3G, hsEntity?.data3g),
+            isProject = is3gProject,
+            isVoixUncertain = voiceUncertain(has3G, hsEntity?.voix3g, hsEntity?.data3g),
+            isInternetUncertain = dataUncertain(has3G, hsEntity?.data3g, hsEntity?.voix3g)
+        ),
+        "4G" to ServiceStatus(
+            isVoixOk = availability(has4G, hsEntity?.voix4g),
+            isInternetOk = availability(has4G, hsEntity?.data4g),
+            isProject = is4gProject,
+            isVoixUncertain = voiceUncertain(has4G, hsEntity?.voix4g, hsEntity?.data4g),
+            isInternetUncertain = dataUncertain(has4G, hsEntity?.data4g, hsEntity?.voix4g)
+        ),
+        "5G" to ServiceStatus(
+            isVoixOk = availability(has5G, hsEntity?.voix5g),
+            isInternetOk = availability(has5G, hsEntity?.data5g),
+            isProject = is5gProject,
+            isVoixProject = is5gVoiceProject,
+            isInternetProject = is5gDataProject,
+            isVoixUncertain = voiceUncertain(has5G, hsEntity?.voix5g, hsEntity?.data5g),
+            isInternetUncertain = dataUncertain(has5G, hsEntity?.data5g, hsEntity?.voix5g)
+        )
+    )
 }
 
 @Composable
@@ -87,9 +191,16 @@ fun SiteStatusCard(
         (it.isVoixOk == false && !it.isProject && !it.isVoixProject) ||
             (it.isInternetOk == false && !it.isProject && !it.isInternetProject)
     }
+    // Un relevé qui ne détaille aucune génération (« Data : HS » seul) ne noircit aucune case : sans
+    // ce test, la carte se dirait « fonctionnelle » là où la grille affiche des « ? ».
+    val hasUncertainOutage = techStatus.values.any {
+        (it.isVoixUncertain && !it.isProject && !it.isVoixProject) ||
+            (it.isInternetUncertain && !it.isProject && !it.isInternetProject)
+    }
     // Panne déduite (propagation zone blanche) : même rouge que le HS confirmé, libellé différent.
     val isPotentialOutage = outageDetails?.isPotential == true
-    val displayIsOutage = isOutage && (isPotentialOutage || !hasKnownServiceState || hasNonProjectOutage)
+    val displayIsOutage = isOutage &&
+        (isPotentialOutage || !hasKnownServiceState || hasNonProjectOutage || hasUncertainOutage)
 
     if (showLegendDialog) {
         StatusLegendDialog(onDismiss = { showLegendDialog = false })
@@ -257,7 +368,8 @@ fun SiteStatusCard(
                 technologies = technologies,
                 techStatus = techStatus,
                 statusSelector = { _, it -> it.isVoixOk },
-                projectSelector = { _, it -> it.isProject || it.isVoixProject }
+                projectSelector = { _, it -> it.isProject || it.isVoixProject },
+                uncertainSelector = { _, it -> it.isVoixUncertain }
             )
             Spacer(modifier = Modifier.height(sizing.spacing(10.dp)))
             ServiceRow(
@@ -265,7 +377,8 @@ fun SiteStatusCard(
                 technologies = technologies,
                 techStatus = techStatus,
                 statusSelector = { tech, it -> if (tech == "2G") null else it.isInternetOk },
-                projectSelector = { tech, it -> tech != "2G" && (it.isProject || it.isInternetProject) }
+                projectSelector = { tech, it -> tech != "2G" && (it.isProject || it.isInternetProject) },
+                uncertainSelector = { tech, it -> tech != "2G" && it.isInternetUncertain }
             )
 
             Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
@@ -330,6 +443,12 @@ private fun StatusLegendDialog(onDismiss: () -> Unit) {
                         Icon(Icons.Default.Close, null, tint = colorKo, modifier = Modifier.size(sizing.component(20.dp)))
                     },
                     text = stringResource(R.string.appstrings_status_legend_outage)
+                )
+                StatusLegendRow(
+                    symbol = {
+                        Text("?", color = colorKo, fontWeight = FontWeight.Bold, fontSize = sizing.text(18.sp))
+                    },
+                    text = stringResource(R.string.appstrings_status_legend_uncertain)
                 )
                 StatusLegendRow(
                     symbol = {
@@ -610,7 +729,8 @@ private fun ServiceRow(
     technologies: List<String>,
     techStatus: Map<String, ServiceStatus>,
     statusSelector: (String, ServiceStatus) -> Boolean?,
-    projectSelector: (String, ServiceStatus) -> Boolean
+    projectSelector: (String, ServiceStatus) -> Boolean,
+    uncertainSelector: (String, ServiceStatus) -> Boolean
 ) {
     val sizing = LocalGeoTowerUiSizing.current
     val colorOk = Color(0xFF4CAF50)
@@ -634,6 +754,7 @@ private fun ServiceRow(
             val techItem = techStatus[tech]
             val status = techItem?.let { statusSelector(tech, it) }
             val isProj = techItem?.let { projectSelector(tech, it) } == true
+            val isUncertain = techItem?.let { uncertainSelector(tech, it) } == true
 
             Box(
                 modifier = Modifier.weight(1f),
@@ -644,6 +765,8 @@ private fun ServiceRow(
                     isProj -> Text("~", color = colorProject, fontWeight = FontWeight.Bold, fontSize = sizing.text(22.sp))
                     status == true -> Icon(Icons.Default.Check, null, tint = colorOk, modifier = Modifier.size(sizing.component(20.dp)))
                     status == false -> Icon(Icons.Default.Close, null, tint = colorKo, modifier = Modifier.size(sizing.component(20.dp)))
+                    // Panne déclarée mais service non détaillé : « ? » plutôt qu'un tiret qui se lirait « pas de techno ».
+                    isUncertain -> Text("?", color = colorKo, fontWeight = FontWeight.Bold, fontSize = sizing.text(16.sp))
                     else -> Icon(Icons.Default.Remove, null, tint = colorNeutral, modifier = Modifier.size(sizing.component(20.dp)))
                 }
             }

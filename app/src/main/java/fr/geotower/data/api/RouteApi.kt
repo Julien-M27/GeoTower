@@ -36,10 +36,13 @@ object RouteApi {
     const val PROFILE_PEDESTRIAN = "pedestrian"
 
     /**
-     * Au-delà, on ne sollicite pas le service : un trait de plusieurs centaines de kilomètres sort
-     * de l'usage de l'outil de mesure et coûterait une longue attente pour un tracé illisible.
+     * Au-delà, on ne sollicite pas le service : deux points aussi éloignés ne peuvent pas partager
+     * un réseau routier (autre continent, métropole ↔ outre-mer), la réponse serait forcément un
+     * rabattement absurde. Le plafond couvre largement la France : la plus longue diagonale
+     * métropolitaine (Ouessant ↔ Menton) fait ~1 100 km à vol d'oiseau. Le service encaisse sans
+     * peine ces longueurs — un Brest → Nice revient en moins d'une seconde.
      */
-    const val MAX_ROUTABLE_DISTANCE_METERS = 400_000.0
+    const val MAX_ROUTABLE_DISTANCE_METERS = 1_500_000.0
 
     /**
      * Distance tolérée entre un point demandé et le point du réseau sur lequel le service le rabat.

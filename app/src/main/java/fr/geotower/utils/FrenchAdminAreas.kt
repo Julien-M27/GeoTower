@@ -299,6 +299,65 @@ object FrenchAdminAreas {
     fun departmentName(code: String): String? = departmentByCode[code]?.name
 
     /**
+     * Département d'un code INSEE communal : « 35238 » → « 35 », « 2A004 » → « 2A », « 97411 » →
+     * « 974 ». L'outre-mer se code sur trois chiffres, on essaie donc cette longueur d'abord — sans
+     * quoi « 974 » serait lu « 97 », qui n'est pas un département.
+     */
+    fun departmentCodeForInsee(codeInsee: String): String? {
+        val raw = codeInsee.trim().uppercase(Locale.ROOT)
+        if (raw.length < 2) return null
+        return raw.take(3).takeIf(departmentByCode::containsKey)
+            ?: raw.take(2).takeIf(departmentByCode::containsKey)
+    }
+
+    /**
+     * Zones proposées sous la barre de recherche pendant la frappe.
+     *
+     * Contrairement à [match], qui exige une saisie complète, on répond ici dès les premières
+     * lettres : d'abord ce que [match] reconnaîtrait tel quel (« 35 » → Ille-et-Vilaine), puis les
+     * noms qui commencent par la saisie, puis ceux qui la contiennent (« vilaine » doit sortir
+     * Ille-et-Vilaine). Départements avant régions à pertinence égale : c'est la maille que l'on
+     * cherche le plus souvent.
+     */
+    fun suggest(query: String, limit: Int): List<Area> {
+        if (limit <= 0) return emptyList()
+        val normalized = normalize(query)
+        if (normalized.isBlank()) return emptyList()
+
+        val results = LinkedHashMap<String, Area>()
+        fun keep(area: Area) {
+            val key = "${area.kind}:${area.code}"
+            if (key !in results) results[key] = area
+        }
+
+        match(query)?.let(::keep)
+
+        suggestionLabels.filter { (_, labels) -> labels.any { it.startsWith(normalized) } }
+            .forEach { (area, _) -> keep(area) }
+        // Codes : départements seulement. Les codes de région recouvrent ceux des départements
+        // (« 11 » est l'Aude autant qu'Île-de-France), c'est déjà pourquoi [match] les ignore nus.
+        departments.filter { it.code.startsWith(normalized) }
+            .forEach { keep(departmentArea(it)) }
+        suggestionLabels.filter { (_, labels) -> labels.any { it.contains(normalized) } }
+            .forEach { (area, _) -> keep(area) }
+
+        return results.values.take(limit)
+    }
+
+    /**
+     * Libellés normalisés de chaque zone, préparés une fois pour toutes : [suggest] tourne à chaque
+     * frappe et ne peut pas se permettre de renormaliser cent quarante intitulés à chaque fois.
+     * Départements avant régions — l'ordre de cette liste est celui des suggestions.
+     */
+    private val suggestionLabels: List<Pair<Area, List<String>>> by lazy {
+        departments.map { spec ->
+            departmentArea(spec) to (listOf(spec.name) + spec.aliases).map(::normalize)
+        } + regions.map { spec ->
+            regionArea(spec) to (listOf(spec.name) + spec.aliases).map(::normalize)
+        }
+    }
+
+    /**
      * Bornes `[début, fin[` des codes INSEE communaux du département, à comparer telles quelles en SQL.
      *
      * C'est volontairement une **plage** et non un `LIKE '35%'` : SQLite n'utilise un index avec LIKE

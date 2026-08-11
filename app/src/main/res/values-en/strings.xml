@@ -287,7 +287,9 @@
     <string name="photo_on_date">on %1$s</string>
     <string name="about_new_for_version">What\'s new (%1$s)</string>
     <string name="map_site_not_in_area">Site %1$s is not in the displayed area. Move the map to its city first.</string>
-    <string name="map_search_area_too_large">%1$s: too many sites to show them all. The map just moves there.</string>
+    <string name="map_search_suggestion_department">Department</string>
+    <string name="map_search_suggestion_region">Region</string>
+    <string name="map_search_suggestion_operator">Show only this operator</string>
     <string name="track_operator_active">%1$s tracking active...</string>
     <string name="signalquest_invalid_site">Invalid SignalQuest site.</string>
     <string name="signalquest_photo_required">Add at least one photo before uploading.</string>
@@ -1323,6 +1325,7 @@
     <string name="appstrings_status_legend_project">Technology declared planned.</string>
     <string name="appstrings_status_legend_title">Table legend</string>
     <string name="appstrings_status_legend_unavailable">Technology absent, not declared, or information unavailable.</string>
+    <string name="appstrings_status_legend_uncertain">Service not declared for this generation, while a reported outage may affect it.</string>
     <string name="appstrings_support_detail_title">Support Detail</string>
     <string name="appstrings_support_details_option">Support details</string>
     <string name="appstrings_support_details_title">Support details</string>
@@ -2339,6 +2342,7 @@
     <string name="appstrings_measure_follow_roads_car">Along roads</string>
     <string name="appstrings_measure_follow_roads_walk">Along paths</string>
     <string name="appstrings_measure_route_unavailable">No route found: straight line kept.</string>
+    <string name="appstrings_measure_route_searching">Finding the route…</string>
     <!-- Favorite photos page (Settings > Preferences) -->
     <string name="photos_favorites_title">Favorite photos</string>
     <string name="photos_favorites_desc">Find and manage the site photos you starred.</string>
@@ -2727,4 +2731,11 @@
     <string name="appstrings_release_v2023_measure_drawer">The measuring drawer no longer covers the total or the clear-paths button</string>
     <string name="appstrings_release_v2023_route_icon">The road-following icon reflects what is actually drawn: if the routing service is unavailable, it shows the straight line</string>
     <string name="appstrings_release_v2023_area_mask">The boundary of a searched area is drawn as a solid line; the dashes suggested an approximate outline</string>
+
+    <!-- Release notes 2.0.24 -->
+    <string name="appstrings_release_v2024_search_suggestions">Suggestions appear under the search bar from two characters: towns, departments, regions and operators</string>
+    <string name="appstrings_release_v2024_search_accents">Towns are found regardless of accents and hyphens: “saint-e” is enough for “SAINT-ÉTIENNE”</string>
+    <string name="appstrings_release_v2024_admin_area_no_limit">A busy department or region now draws its sites, instead of only being framed</string>
+    <string name="appstrings_release_v2024_route_searching">Route lookup now says it is working</string>
+    <string name="appstrings_release_v2024_status_uncertain">A “?” replaces the dash in the service grid when an outage is declared without the operator saying whether that generation is affected</string>
 </resources>
