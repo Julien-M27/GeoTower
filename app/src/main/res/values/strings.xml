@@ -2744,4 +2744,11 @@
     <!-- Release notes 2.0.22 -->
     <string name="appstrings_release_v2022_measure_total">The measuring tool shows the total distance of the path</string>
     <string name="appstrings_release_v2022_measure_follow_roads">Measurements can follow roads or trails instead of a straight line, using Géoplateforme routing; when no route is found, the straight line is kept</string>
+
+    <!-- Release notes 2.0.23 -->
+    <string name="appstrings_release_v2023_compass_recenter">Turning on heading follow with a long press now also recentres the map on your position, at the location button\'s zoom</string>
+    <string name="appstrings_release_v2023_search_releases_tracking">Searching for a town or a department is no longer immediately undone by position tracking</string>
+    <string name="appstrings_release_v2023_measure_drawer">The measuring drawer no longer covers the total or the clear-paths button</string>
+    <string name="appstrings_release_v2023_route_icon">The road-following icon reflects what is actually drawn: if the routing service is unavailable, it shows the straight line</string>
+    <string name="appstrings_release_v2023_area_mask">The boundary of a searched area is drawn as a solid line; the dashes suggested an approximate outline</string>
 </resources>

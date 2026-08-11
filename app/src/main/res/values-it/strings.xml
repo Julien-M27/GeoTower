@@ -2720,4 +2720,11 @@
     <!-- Note di versione 2.0.22 -->
     <string name="appstrings_release_v2022_measure_total">Lo strumento di misura mostra la distanza totale del tracciato</string>
     <string name="appstrings_release_v2022_measure_follow_roads">La misura può seguire strade o sentieri invece della linea retta, tramite gli itinerari della Géoplateforme; se non si trova alcun percorso, la linea retta viene mantenuta</string>
+
+    <!-- Note di versione 2.0.23 -->
+    <string name="appstrings_release_v2023_compass_recenter">Attivare il seguimento dell\'orientamento con una pressione prolungata ricentra ora anche la mappa sulla tua posizione, allo zoom del pulsante di localizzazione</string>
+    <string name="appstrings_release_v2023_search_releases_tracking">La ricerca di una città o di un dipartimento non viene più annullata subito dal seguimento della posizione</string>
+    <string name="appstrings_release_v2023_measure_drawer">Il pannello di misura non copre più il totale né il pulsante per cancellare i tracciati</string>
+    <string name="appstrings_release_v2023_route_icon">L\'icona del seguimento delle strade riflette ciò che viene realmente tracciato: se il servizio di itinerari non è disponibile, indica la linea retta</string>
+    <string name="appstrings_release_v2023_area_mask">Il confine di una zona cercata è tracciato con linea continua; il tratteggio faceva pensare a un contorno approssimativo</string>
 </resources>

@@ -267,7 +267,7 @@ private const val MAP_ROTATION_GESTURE_INTERVAL_MS = 25L
  * pas. Écarter deux doigts pour zoomer fait toujours pivoter un peu la main — sans ce seuil, un
  * simple zoom fait tourner la carte de plusieurs dizaines de degrés sans qu'on l'ait demandé.
  */
-private const val MAP_ROTATION_GESTURE_THRESHOLD_DEG = 12f
+private const val MAP_ROTATION_GESTURE_THRESHOLD_DEG = 18f
 
 private val hsBadgeDrawableCache = android.util.LruCache<Int, BitmapDrawable>(4)
 private val hsMarkerIconCache = android.util.LruCache<String, BitmapDrawable>(500)
@@ -1533,7 +1533,11 @@ fun MapScreen(
                 setPoints(polygon)
                 outlinePaint.color = android.graphics.Color.RED
                 outlinePaint.strokeWidth = 4f
-                outlinePaint.pathEffect = android.graphics.DashPathEffect(floatArrayOf(15f, 15f), 0f)
+                // Trait plein : l'extérieur est déjà assombri par le masque, donc les pointillés
+                // n'apportaient rien et faisaient passer une limite exacte pour un tracé approximatif.
+                outlinePaint.pathEffect = null
+                outlinePaint.strokeJoin = android.graphics.Paint.Join.ROUND
+                outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
             }
             outlinesOverlay.add(outline)
         }
@@ -1580,9 +1584,6 @@ fun MapScreen(
             map.invalidate()
         }
         mapOrientationState.floatValue = 0f
-    }
-    val toggleFollowOrientation: () -> Unit = {
-        setFollowOrientation(!AppConfig.mapFollowOrientation.value)
     }
 
     var myCurrentLoc by remember { mutableStateOf<GeoPoint?>(null) }
@@ -1758,6 +1759,56 @@ fun MapScreen(
     var showCityStatsDetail by rememberSaveable { mutableStateOf(false) }
     var isTrackingActive by rememberSaveable { mutableStateOf(false) }
     var hasCenteredOnLocation by rememberSaveable { mutableStateOf(false) }
+
+    // Appui long sur la rose des vents. Aligner la carte sur son cap depuis l'autre bout de la
+    // France n'aurait aucun sens : en allumant le suivi, on ramène la carte sur la position, au
+    // même cadrage que le bouton de localisation (zoom du réglage « Zoom du bouton GPS »).
+    val applyFollowOrientation: (Boolean) -> Unit = { enabled ->
+        setFollowOrientation(enabled)
+        val map = mapViewRef
+        if (enabled && map != null && isLocationReady && canUseMapLocation) {
+            val locationOverlay = locationOverlayRef
+
+            fun centerOn(location: GeoPoint) {
+                val zoom = preferredLocationZoom()
+                map.controller.stopAnimation(false)
+                map.controller.setZoom(zoom)
+                map.controller.setCenter(location)
+                currentZoom = zoom
+                currentLat = location.latitude
+                hasCenteredOnLocation = true
+            }
+
+            val known = locationOverlay?.myLocation ?: myCurrentLoc
+            if (known != null) {
+                centerOn(known)
+            } else if (locationOverlay != null) {
+                // Pas encore de relevé : on recentre au premier qui tombe plutôt que de ne rien faire.
+                locationOverlay.enableMyLocation()
+                locationOverlay.runOnFirstFix {
+                    locationOverlay.myLocation?.let { first -> map.post { centerOn(first) } }
+                }
+            }
+        }
+    }
+    val toggleFollowOrientation: () -> Unit = {
+        applyFollowOrientation(!AppConfig.mapFollowOrientation.value)
+    }
+
+    /**
+     * À appeler avant de cadrer la carte sur un résultat de recherche.
+     *
+     * La poursuite GPS recentre la carte à chaque image et avale le glissement à un doigt : sans
+     * cette main levée, la ville ou le département cherché serait cadré puis aussitôt ramené sur la
+     * position, et la recherche paraîtrait sans effet.
+     */
+    val releaseLocationFollowForSearch: () -> Unit = {
+        if (isTrackingActive) {
+            isTrackingActive = false
+            hasCenteredOnLocation = false
+            locationOverlayRef?.disableFollowLocation()
+        }
+    }
 
     val txtMapTitle = stringResource(R.string.appstrings_map_title)
     val txtSearchCityOrId = stringResource(R.string.appstrings_search_city_or_id)
@@ -3565,6 +3616,7 @@ fun MapScreen(
                 ).show()
             }
 
+            releaseLocationFollowForSearch()
             map.zoomToBoundingBox(
                 org.osmdroid.util.BoundingBox(
                     extent.latNorth,
@@ -3595,6 +3647,7 @@ fun MapScreen(
             // 1. Recherche Rapide Locale (si l'antenne est déjà affichée à l'écran)
             val foundSite = antennas.find { it.idAnfr == cleanQuery }
             if (foundSite != null) {
+                releaseLocationFollowForSearch()
                 mapViewRef?.controller?.setZoom(18.0)
                 mapViewRef?.controller?.setCenter(GeoPoint(foundSite.latitude, foundSite.longitude))
                 return
@@ -3627,6 +3680,7 @@ fun MapScreen(
                     if (globalSite != null) {
                         // On a trouvé le site ! On déplace la caméra.
                         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                            releaseLocationFollowForSearch()
                             mapViewRef?.controller?.setZoom(18.0)
                             mapViewRef?.controller?.setCenter(GeoPoint(globalSite.latitude, globalSite.longitude))
                         }
@@ -3673,6 +3727,7 @@ fun MapScreen(
                                 nominatimArea.latSouth,
                                 nominatimArea.lonWest
                             )
+                            releaseLocationFollowForSearch()
                             map.zoomToBoundingBox(cityBounds, true, 100)
                             map.invalidate()
                         }
@@ -3695,6 +3750,7 @@ fun MapScreen(
                             mapViewRef?.let { map ->
                                 setCurrentCitySearch(null, null)
                                 searchBoundaryOverlay.items.clear()
+                                releaseLocationFollowForSearch()
                                 map.controller.setZoom(15.0)
                                 map.controller.setCenter(GeoPoint(addr.latitude, addr.longitude))
                                 map.invalidate()
@@ -3768,7 +3824,10 @@ fun MapScreen(
         val defaultOp by AppConfig.defaultOperator
         val trackingButtonHeight = if (isLandscapeLayout) mapControlButtonDiameter else sizing.component(40.dp)
         val trackingButtonSpacing = if (isLandscapeLayout) 1.dp else sizing.spacing(8.dp)
-        val trackingRowCount = if (defaultOp != "Aucun") 2 else 1
+        // Lignes du tiroir de mesure : suivi global, suivi de l'opérateur préféré, forme des traits.
+        val trackingRowCount = 1 +
+            (if (defaultOp != "Aucun") 1 else 0) +
+            (if (canUseMeasureRouting) 1 else 0)
         val trackingDrawerHeight = (trackingButtonHeight * trackingRowCount.toFloat()) +
             (trackingButtonSpacing * (trackingRowCount - 1).toFloat())
         val zoomBottomPadding = sizing.spacing(32.dp) +
@@ -3822,11 +3881,39 @@ fun MapScreen(
                 .align(Alignment.TopEnd)
                 .padding(end = sizing.spacing(16.dp), top = toolsTopPadding)
         }
+        // Seul le tiroir compact en paysage est ancré EN BAS : ailleurs il occupe le haut de l'écran,
+        // là où s'affichent le total et le bouton « supprimer les tracés ».
+        val measureDrawerAnchoredTop = measureDrawerOnLeft ||
+            !(useCompactCompassPlacement && isLandscapeLayout && showZoomBtns)
 
         // Positions mesurées (px, repère racine) du bas du bouton partage et du haut
         // de la colonne d'infos, pour détecter en paysage un vrai chevauchement.
         var shareButtonBottomPx by remember { mutableFloatStateOf(0f) }
         var infoColumnTopPx by remember { mutableFloatStateOf(0f) }
+        // Place naturelle du tiroir de mesure et emprise du bloc « total + supprimer les tracés » :
+        // de quoi faire descendre le tiroir sous ce bloc quand il lui passe devant (cf. plus bas).
+        var measureDrawerAnchorTopPx by remember { mutableFloatStateOf(0f) }
+        var measureDrawerLeftPx by remember { mutableFloatStateOf(0f) }
+        var measureDrawerRightPx by remember { mutableFloatStateOf(0f) }
+        var measureInfoBottomPx by remember { mutableFloatStateOf(0f) }
+        var measureInfoLeftPx by remember { mutableFloatStateOf(0f) }
+        var measureInfoRightPx by remember { mutableFloatStateOf(0f) }
+
+        // Le tiroir descend juste sous le total et le bouton de suppression quand les deux blocs se
+        // croisent vraiment (emprises comparées, pas de seuil deviné). Les positions mesurées ici ne
+        // dépendent pas de ce décalage — le repère du tiroir est son conteneur, qui ne bouge pas —
+        // donc pas de mesure qui se mord la queue.
+        val measureDrawerDrop by animateDpAsState(
+            targetValue = run {
+                if (!measureDrawerAnchoredTop) return@run 0.dp
+                val crossesInfo = measureDrawerLeftPx < measureInfoRightPx &&
+                    measureDrawerRightPx > measureInfoLeftPx
+                if (!crossesInfo) return@run 0.dp
+                val overlapPx = measureInfoBottomPx - measureDrawerAnchorTopPx
+                if (overlapPx <= 0f) 0.dp else with(density) { overlapPx.toDp() } + sizing.spacing(12.dp)
+            },
+            label = "measureDrawerDropAnim"
+        )
 
         // ✅ NOUVEAU : Bouton de Partage positionné sous le bouton Retour avec animation
         Box(
@@ -3907,11 +3994,24 @@ fun MapScreen(
 
         // --- LES BOUTONS DE SUIVI (MODE MESURE) ---
         // --- LES BOUTONS DE SUIVI "A TIROIR" (MODE MESURE) ---
+        // Repère invisible (taille nulle) posé à la place naturelle du tiroir : il donne l'origine du
+        // décalage et ne bouge jamais, puisque le décalage n'est appliqué qu'au tiroir lui-même.
+        Box(
+            modifier = measureDrawerModifier.onGloballyPositioned {
+                measureDrawerAnchorTopPx = it.positionInRoot().y
+            }
+        )
         AnimatedVisibility(
             visible = isMeasuringMode,
             enter = fadeIn() + slideInHorizontally(initialOffsetX = { if (measureDrawerOnLeft) -it else it }),
             exit = fadeOut() + slideOutHorizontally(targetOffsetX = { if (measureDrawerOnLeft) -it else it }),
             modifier = measureDrawerModifier
+                .padding(top = measureDrawerDrop)
+                .onGloballyPositioned {
+                    val position = it.positionInRoot()
+                    measureDrawerLeftPx = position.x
+                    measureDrawerRightPx = position.x + it.size.width
+                }
         ) {
             Column(
                 horizontalAlignment = if (measureDrawerOnLeft) Alignment.Start else Alignment.End,
@@ -4178,70 +4278,83 @@ fun MapScreen(
                 currentMeasureSegments.any { !measureRoutes.containsKey(measureRouteKey(it, profile)) }
             } == true
 
-            AnimatedVisibility(
-                visible = currentMeasureSegments.isNotEmpty(),
-                enter = fadeIn(),
-                exit = fadeOut()
+            // Total et suppression restent à leur place ; c'est le tiroir de mesure qui s'écarte.
+            // Ce bloc mesure donc son emprise (largeur réelle et base) pour lui dire jusqu'où
+            // descendre : quand rien n'est affiché, il est vide et le tiroir remonte tout seul.
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.onGloballyPositioned {
+                    val position = it.positionInRoot()
+                    measureInfoLeftPx = position.x
+                    measureInfoRightPx = position.x + it.size.width
+                    measureInfoBottomPx = position.y + it.size.height
+                }
             ) {
-                Surface(
-                    modifier = Modifier.padding(bottom = sizing.spacing(10.dp)),
-                    shape = RoundedCornerShape(32.dp),
-                    color = MaterialTheme.colorScheme.surface,
-                    shadowElevation = 4.dp,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                AnimatedVisibility(
+                    visible = currentMeasureSegments.isNotEmpty(),
+                    enter = fadeIn(),
+                    exit = fadeOut()
                 ) {
-                    Row(
-                        modifier = Modifier.padding(
-                            horizontal = sizing.spacing(16.dp),
-                            vertical = sizing.spacing(10.dp)
-                        ),
-                        verticalAlignment = Alignment.CenterVertically
+                    Surface(
+                        modifier = Modifier.padding(bottom = sizing.spacing(10.dp)),
+                        shape = RoundedCornerShape(32.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        shadowElevation = 4.dp,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                     ) {
-                        // L'icône suit ce qui est réellement tracé (et non le réglage) : si le
-                        // service d'itinéraire est coupé, les traits restent directs.
-                        Icon(
-                            when (measureRouteProfileValue) {
-                                RouteApi.PROFILE_CAR -> Icons.Default.DirectionsCar
-                                RouteApi.PROFILE_PEDESTRIAN -> Icons.AutoMirrored.Filled.DirectionsWalk
-                                else -> Icons.Default.Straighten
-                            },
-                            null,
-                            tint = measureLineColor,
-                            modifier = Modifier.size(sizing.component(18.dp))
-                        )
-                        Spacer(Modifier.width(sizing.spacing(8.dp)))
-                        Text(
-                            text = stringResource(
-                                R.string.appstrings_measure_total_distance,
-                                formatSiteDistanceMeters(measureTotalDistanceMeters)
-                            ) + if (measureRoutesPending) "…" else "",
-                            fontSize = sizing.text(13.sp),
-                            fontWeight = FontWeight.Bold
-                        )
+                        Row(
+                            modifier = Modifier.padding(
+                                horizontal = sizing.spacing(16.dp),
+                                vertical = sizing.spacing(10.dp)
+                            ),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // L'icône suit ce qui est réellement tracé (et non le réglage) : si le
+                            // service d'itinéraire est coupé, les traits restent directs.
+                            Icon(
+                                when (measureRouteProfileValue) {
+                                    RouteApi.PROFILE_CAR -> Icons.Default.DirectionsCar
+                                    RouteApi.PROFILE_PEDESTRIAN -> Icons.AutoMirrored.Filled.DirectionsWalk
+                                    else -> Icons.Default.Straighten
+                                },
+                                null,
+                                tint = measureLineColor,
+                                modifier = Modifier.size(sizing.component(18.dp))
+                            )
+                            Spacer(Modifier.width(sizing.spacing(8.dp)))
+                            Text(
+                                text = stringResource(
+                                    R.string.appstrings_measure_total_distance,
+                                    formatSiteDistanceMeters(measureTotalDistanceMeters)
+                                ) + if (measureRoutesPending) "…" else "",
+                                fontSize = sizing.text(13.sp),
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
-            }
 
-            AnimatedVisibility(
-                visible = measuredSites.isNotEmpty() || measuredVertices.isNotEmpty(),
-                enter = fadeIn(),
-                exit = fadeOut()
-            ) {
-                Button(
-                    onClick = {
-                        // ✅ CORRECTION : On coupe tout !
-                        trackNearestAll = false
-                        trackNearestFav = false
-                        clearMeasureSelections()
-                        mapViewRef?.let { refreshMeasureLayers(it) }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                    shape = RoundedCornerShape(32.dp),
-                    modifier = Modifier.height(sizing.component(44.dp))
+                AnimatedVisibility(
+                    visible = measuredSites.isNotEmpty() || measuredVertices.isNotEmpty(),
+                    enter = fadeIn(),
+                    exit = fadeOut()
                 ) {
-                    Icon(Icons.Default.DeleteSweep, null, modifier = Modifier.size(sizing.component(18.dp)))
-                    Spacer(Modifier.width(sizing.spacing(8.dp)))
-                    Text(txtDeleteTraces, fontSize = sizing.text(13.sp), fontWeight = FontWeight.Bold)
+                    Button(
+                        onClick = {
+                            // ✅ CORRECTION : On coupe tout !
+                            trackNearestAll = false
+                            trackNearestFav = false
+                            clearMeasureSelections()
+                            mapViewRef?.let { refreshMeasureLayers(it) }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                        shape = RoundedCornerShape(32.dp),
+                        modifier = Modifier.height(sizing.component(44.dp))
+                    ) {
+                        Icon(Icons.Default.DeleteSweep, null, modifier = Modifier.size(sizing.component(18.dp)))
+                        Spacer(Modifier.width(sizing.spacing(8.dp)))
+                        Text(txtDeleteTraces, fontSize = sizing.text(13.sp), fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
@@ -4793,7 +4906,7 @@ fun MapScreen(
                     prefs.edit().putBoolean(AppConfig.PREF_MAP_ROTATION_ENABLED, it).apply()
                 },
                 followOrientation = AppConfig.mapFollowOrientation.value,
-                onFollowOrientationChange = setFollowOrientation,
+                onFollowOrientationChange = applyFollowOrientation,
                 showScale = showScale,
                 onScaleChange = {
                     showScale = it

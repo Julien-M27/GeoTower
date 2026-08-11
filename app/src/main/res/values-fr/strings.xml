@@ -2722,4 +2722,11 @@
     <!-- Notes de version 2.0.22 -->
     <string name="appstrings_release_v2022_measure_total">L\'outil de mesure affiche la distance totale du tracé</string>
     <string name="appstrings_release_v2022_measure_follow_roads">La mesure peut suivre les routes ou les chemins au lieu du trait direct, via les itinéraires de la Géoplateforme ; sans itinéraire trouvé, le trait direct est conservé</string>
+
+    <!-- Notes de version 2.0.23 -->
+    <string name="appstrings_release_v2023_compass_recenter">Activer le suivi de l\'orientation par appui long recentre aussi la carte sur votre position, au zoom du bouton de localisation</string>
+    <string name="appstrings_release_v2023_search_releases_tracking">Chercher une ville ou un département n\'est plus aussitôt annulé par la poursuite de votre position</string>
+    <string name="appstrings_release_v2023_measure_drawer">Le tiroir de mesure ne passe plus devant le total ni le bouton de suppression des tracés</string>
+    <string name="appstrings_release_v2023_route_icon">L\'icône du suivi des routes reflète ce qui est réellement tracé : si le service d\'itinéraire est indisponible, elle indique le trait direct</string>
+    <string name="appstrings_release_v2023_area_mask">La limite d\'une zone recherchée est tracée en trait plein, les pointillés laissant croire à un contour approximatif</string>
 </resources>

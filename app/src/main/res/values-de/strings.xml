@@ -2720,4 +2720,11 @@
     <!-- Versionshinweise 2.0.22 -->
     <string name="appstrings_release_v2022_measure_total">Das Messwerkzeug zeigt die Gesamtlänge der Strecke</string>
     <string name="appstrings_release_v2022_measure_follow_roads">Die Messung kann Straßen oder Wegen folgen statt der Luftlinie, über die Routen der Géoplateforme; wird keine Route gefunden, bleibt die Luftlinie erhalten</string>
+
+    <!-- Versionshinweise 2.0.23 -->
+    <string name="appstrings_release_v2023_compass_recenter">Das Einschalten der Ausrichtungsverfolgung per langem Druck zentriert die Karte jetzt auch auf deine Position, im Zoom der Standort-Schaltfläche</string>
+    <string name="appstrings_release_v2023_search_releases_tracking">Die Suche nach einer Stadt oder einem Departement wird nicht mehr sofort von der Positionsverfolgung überschrieben</string>
+    <string name="appstrings_release_v2023_measure_drawer">Die Mess-Leiste verdeckt nicht mehr die Gesamtlänge und die Schaltfläche zum Löschen der Strecken</string>
+    <string name="appstrings_release_v2023_route_icon">Das Symbol der Straßenführung zeigt, was tatsächlich gezeichnet wird: Ist der Routendienst nicht verfügbar, steht es auf Luftlinie</string>
+    <string name="appstrings_release_v2023_area_mask">Die Grenze eines gesuchten Gebiets wird durchgezogen gezeichnet; die Strichelung ließ auf einen ungefähren Umriss schließen</string>
 </resources>
