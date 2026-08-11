@@ -1302,6 +1302,8 @@
     <string name="appstrings_src_tiles_desc">Tile servers offered in the map settings.</string>
     <string name="appstrings_src_tiles_label">Tiles</string>
     <string name="appstrings_startup_page_settings">Startup page</string>
+    <string name="appstrings_station_weekly_only_title">Site just declared</string>
+    <string name="appstrings_station_weekly_only_desc">This site has just appeared in ANFR weekly data. The monthly data, the only source publishing frequency bands, antennas, dates and the support, does not include it yet: those details will show up with the next monthly release.</string>
     <string name="appstrings_stats2_g_desc">Number of declared 2G sites per operator</string>
     <string name="appstrings_stats2_g_title">2G Sites</string>
     <string name="appstrings_stats3_g_desc">Number of declared 3G sites per operator</string>
@@ -2738,4 +2740,8 @@
     <string name="appstrings_release_v2024_admin_area_no_limit">A busy department or region now draws its sites, instead of only being framed</string>
     <string name="appstrings_release_v2024_route_searching">Route lookup now says it is working</string>
     <string name="appstrings_release_v2024_status_uncertain">A “?” replaces the dash in the service grid when an outage is declared without the operator saying whether that generation is affected</string>
+
+    <!-- Release notes 2.0.25 -->
+    <string name="appstrings_release_v2025_announced_banner">A banner explains that a freshly declared site does not have its bands, antennas, dates or mast yet: ANFR\'s weekly data runs ahead of the monthly data, which alone publishes them</string>
+    <string name="appstrings_release_v2025_announced_frequencies">Announced systems still show up in the frequencies, without band or azimuth until the detail is published</string>
 </resources>

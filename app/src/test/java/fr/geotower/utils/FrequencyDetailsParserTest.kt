@@ -86,6 +86,49 @@ class FrequencyDetailsParserTest {
     }
 
     @Test
+    fun marksAsWeeklyOnlyAStationWhoseEveryLineIsAnnounced() {
+        // Station absente de l'export mensuel : le builder n'a que les lignes du CSV hebdomadaire.
+        // C'est ce cas, et lui seul, que le bandeau de tete de fiche doit annoncer.
+        assertTrue(
+            isAnnouncedOnlyStation(
+                "5G NR 2100 :  | Projet approuve |  | Azimut non specifie\n" +
+                    "LTE 700 :  | Projet approuve |  | Azimut non specifie",
+            ),
+        )
+    }
+
+    @Test
+    fun doesNotMarkAsWeeklyOnlyAStationThatHasAtLeastOnePublishedSystem() {
+        assertFalse(
+            isAnnouncedOnlyStation(
+                "5G NR 2100 :  | Projet approuve |  | Azimut non specifie\n" +
+                    "LTE 800 : 852-862 MHz | En service | 25/03/2019 | Panneau : 185° (28,7m) [AER_ID: AE1]",
+            ),
+        )
+    }
+
+    @Test
+    fun doesNotMarkAsWeeklyOnlyAStationWithoutAnyDetailLine() {
+        // Details vides : ni l'observatoire ni l'export ne disent quoi que ce soit, on ne conclut rien.
+        assertFalse(isAnnouncedOnlyStation(null))
+        assertFalse(isAnnouncedOnlyStation(""))
+        assertFalse(isAnnouncedOnlyStation("   \n  "))
+    }
+
+    @Test
+    fun detectsAWeeklyOnlyStationWhateverTheDisplayedTechnologies() {
+        // Le bandeau se decide sur les details BRUTS : masquer une techno dans les reglages ne doit
+        // pas le faire apparaitre ni disparaitre, donc aucun filtre d'affichage n'intervient ici.
+        val details = "GSM 900 :  | En service |  | Azimut non specifie"
+        AppConfig.siteShowTechno2G.value = false
+        try {
+            assertTrue(isAnnouncedOnlyStation(details))
+        } finally {
+            AppConfig.siteShowTechno2G.value = true
+        }
+    }
+
+    @Test
     fun readsTheMountingHeightsOfTheEmittersWithoutDuplicates() {
         // Trois panneaux, deux hauteurs : la carte operateur du support en fait une seule ligne.
         val heights = emitterHeightsMeters(

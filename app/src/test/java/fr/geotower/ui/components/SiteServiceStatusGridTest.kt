@@ -82,13 +82,36 @@ class SiteServiceStatusGridTest {
     }
 
     @Test
-    fun aServiceDeclaredUpGloballyKeepsNoDoubt() {
-        // « Voix : OK, Data : HS » : l'opérateur a répondu pour la voix, on ne lui prête pas un doute.
-        val grid = gridOf(site(voixGlobal = "OK", dataGlobal = "HS", data4g = "HS"))
+    fun aGlobalOkDoesNotCloseTheDoubtBecauseItOnlyAggregatesWhatIsReported() {
+        // Cas réel Orange : 2G/3G décommissionnées (« NE »), aucune colonne voix 4G, donc un
+        // « voix : OK » de façade — alors que la data 4G est HS, donc la VoLTE avec elle.
+        val grid = gridOf(
+            site(
+                voix2g = "NE",
+                voix3g = "NE",
+                voixGlobal = "OK",
+                data3g = "NE",
+                data4g = "HS",
+                data5g = "HS",
+                dataGlobal = "HS",
+            ),
+            has5G = true,
+        )
 
-        assertFalse(grid.getValue("4G").isVoixUncertain)
+        assertTrue(grid.getValue("4G").isVoixUncertain)
+        assertTrue(grid.getValue("5G").isVoixUncertain)
+        // La 2G et la 3G ont, elles, une réponse (« NE ») : tiret, pas de doute.
+        assertFalse(grid.getValue("2G").isVoixUncertain)
         assertFalse(grid.getValue("3G").isVoixUncertain)
-        assertTrue(grid.getValue("3G").isInternetUncertain)
+    }
+
+    @Test
+    fun aNotEquippedCodeIsAnAnswerNotADoubt() {
+        // « NE » = non équipé : l'opérateur a répondu, la case reste un tiret neutre.
+        val grid = gridOf(site(voix3g = "NE", data3g = "HS", dataGlobal = "HS"))
+
+        assertNull(grid.getValue("3G").isVoixOk)
+        assertFalse(grid.getValue("3G").isVoixUncertain)
     }
 
     @Test

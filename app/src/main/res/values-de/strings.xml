@@ -1302,6 +1302,8 @@
     <string name="appstrings_src_tiles_desc">Kachelserver, die in den Karteneinstellungen zur Auswahl stehen.</string>
     <string name="appstrings_src_tiles_label">Kacheln</string>
     <string name="appstrings_startup_page_settings">Startseite beim Öffnen</string>
+    <string name="appstrings_station_weekly_only_title">Standort gerade erst gemeldet</string>
+    <string name="appstrings_station_weekly_only_desc">Dieser Standort ist gerade erst in den Wochendaten der ANFR aufgetaucht. Die Monatsdaten, die einzige Quelle für Frequenzbänder, Antennen, Datumsangaben und Trägerstruktur, enthalten ihn noch nicht: Diese Angaben erscheinen mit der nächsten monatlichen Veröffentlichung.</string>
     <string name="appstrings_stats2_g_desc">Anzahl deklarierter 2G-Standorte pro Betreiber</string>
     <string name="appstrings_stats2_g_title">2G-Standorte</string>
     <string name="appstrings_stats3_g_desc">Anzahl deklarierter 3G-Standorte pro Betreiber</string>
@@ -2738,4 +2740,8 @@
     <string name="appstrings_release_v2024_admin_area_no_limit">Ein dicht besetztes Departement oder eine Region zeigt jetzt ihre Standorte, statt nur angefahren zu werden</string>
     <string name="appstrings_release_v2024_route_searching">Die Routensuche meldet, dass sie arbeitet</string>
     <string name="appstrings_release_v2024_status_uncertain">Ein „?“ ersetzt den Strich im Dienste-Raster, wenn eine Störung gemeldet ist, ohne dass der Betreiber angibt, ob diese Generation betroffen ist</string>
+
+    <!-- Versionshinweise 2.0.25 -->
+    <string name="appstrings_release_v2025_announced_banner">Ein Hinweis erklärt, dass ein gerade erst gemeldeter Standort seine Bänder, Antennen, Daten und seinen Mast noch nicht hat: Die Wochendaten der ANFR laufen den Monatsdaten voraus, die diese Angaben allein veröffentlichen</string>
+    <string name="appstrings_release_v2025_announced_frequencies">Angekündigte Systeme erscheinen dennoch in den Frequenzen, ohne Band und Azimut, bis das Detail veröffentlicht wird</string>
 </resources>

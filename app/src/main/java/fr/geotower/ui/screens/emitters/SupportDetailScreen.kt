@@ -122,6 +122,7 @@ import fr.geotower.utils.combineOperatorKeyFilters
 import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.PageScrollPrefs
 import fr.geotower.utils.SupportPagePrefs
+import fr.geotower.utils.isAnnouncedOnlyStation
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -1016,6 +1017,25 @@ fun SupportDetailScreen(
                     // CustomizableBlock, pour qu'un bloc masqué ne laisse aucun trou.
                     verticalArrangement = Arrangement.Top
                 ) {
+                    // Pylône dont AUCUNE station n'est encore dans l'export mensuel de l'ANFR : la
+                    // page n'a ni bandes, ni azimuts, ni hauteur, ni nature de support à montrer.
+                    // Si une seule station l'est, le pylône garde ses détails et c'est la fiche de
+                    // l'opérateur concerné qui porte le bandeau.
+                    val isWeeklyOnlySupport = remember(antennas, techniquesMap) {
+                        antennas.isNotEmpty() && antennas.all { antenna ->
+                            isAnnouncedOnlyStation(techniquesMap[antenna.idAnfr]?.detailsFrequences ?: antenna.frequences)
+                        }
+                    }
+                    if (isWeeklyOnlySupport) {
+                        fr.geotower.ui.components.AnnouncedOnlyStationBanner(
+                            blockShape = blockShape,
+                            modifier = Modifier.padding(horizontal = sizing.spacing(16.dp))
+                        )
+                        // Hors de la boucle : le bandeau porte lui-même l'écart qui le sépare du
+                        // bloc suivant, que les CustomizableBlock posent sous eux.
+                        Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
+                    }
+
                     if (pendingPhotoDraftId != null && pendingSharedPhotoUris.isNotEmpty() && canUseSharedPhotoUpload) {
                         SupportSharedPhotoUploadCard(
                             photoCount = pendingSharedPhotoUris.size,
@@ -1192,7 +1212,10 @@ fun SupportDetailScreen(
                                                 repository = repository,
                                                 antennaId = antenna.idAnfr,
                                                 applyMapFilters = applyMapFilters,
-                                                embedded = true
+                                                embedded = true,
+                                                // Le pylône entier est déjà annoncé en tête de page :
+                                                // inutile de répéter le bandeau sous chaque opérateur.
+                                                showWeeklyOnlyBanner = !isWeeklyOnlySupport
                                             )
                                         },
                                         onAntennaClick = { idAnfr ->

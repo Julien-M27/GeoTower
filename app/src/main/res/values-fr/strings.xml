@@ -1302,6 +1302,8 @@
     <string name="appstrings_src_tiles_desc">Serveurs de tuiles proposés dans les réglages de la carte.</string>
     <string name="appstrings_src_tiles_label">Tuiles</string>
     <string name="appstrings_startup_page_settings">Page de démarrage</string>
+    <string name="appstrings_station_weekly_only_title">Site tout juste déclaré</string>
+    <string name="appstrings_station_weekly_only_desc">Ce site vient d\'apparaître dans les données hebdomadaires de l\'ANFR. Les données mensuelles, les seules à publier les bandes de fréquences, les antennes, les dates et le support, ne le contiennent pas encore : ces détails s\'afficheront à la prochaine publication mensuelle.</string>
     <string name="appstrings_stats2_g_desc">Nombre de sites déclarés en 2G par opérateur</string>
     <string name="appstrings_stats2_g_title">Sites 2G</string>
     <string name="appstrings_stats3_g_desc">Nombre de sites déclarés en 3G par opérateur</string>
@@ -2740,4 +2742,8 @@
     <string name="appstrings_release_v2024_admin_area_no_limit">Un département ou une région très fournis affichent désormais leurs sites, au lieu d\'être seulement cadrés</string>
     <string name="appstrings_release_v2024_route_searching">La recherche d\'itinéraire annonce qu\'elle travaille</string>
     <string name="appstrings_release_v2024_status_uncertain">Un « ? » remplace le tiret dans la grille des services quand une panne est déclarée sans que l\'opérateur précise si cette génération est touchée</string>
+
+    <!-- Notes de version 2.0.25 -->
+    <string name="appstrings_release_v2025_announced_banner">Un bandeau explique qu\'un site tout juste déclaré n\'a pas encore ses bandes, antennes, dates ni support : les données hebdomadaires de l\'ANFR devancent les mensuelles, seules à les publier</string>
+    <string name="appstrings_release_v2025_announced_frequencies">Les systèmes annoncés apparaissent quand même dans les fréquences, sans bande ni azimut tant que le détail n\'est pas publié</string>
 </resources>

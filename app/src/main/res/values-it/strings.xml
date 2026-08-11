@@ -1302,6 +1302,8 @@
     <string name="appstrings_src_tiles_desc">Server di tile disponibili nelle impostazioni della mappa.</string>
     <string name="appstrings_src_tiles_label">Tile</string>
     <string name="appstrings_startup_page_settings">Pagina di avvio</string>
+    <string name="appstrings_station_weekly_only_title">Sito appena dichiarato</string>
+    <string name="appstrings_station_weekly_only_desc">Questo sito è appena comparso nei dati settimanali dell\'ANFR. I dati mensili, l\'unica fonte a pubblicare le bande di frequenza, le antenne, le date e il supporto, non lo contengono ancora: questi dettagli compariranno con la prossima pubblicazione mensile.</string>
     <string name="appstrings_stats2_g_desc">Numero di siti 2G dichiarati per operatore</string>
     <string name="appstrings_stats2_g_title">Siti 2G</string>
     <string name="appstrings_stats3_g_desc">Numero di siti 3G dichiarati per operatore</string>
@@ -2738,4 +2740,8 @@
     <string name="appstrings_release_v2024_admin_area_no_limit">Un dipartimento o una regione molto popolati mostrano ora i loro siti, invece di essere solo inquadrati</string>
     <string name="appstrings_release_v2024_route_searching">La ricerca dell\'itinerario segnala che sta lavorando</string>
     <string name="appstrings_release_v2024_status_uncertain">Un «?» sostituisce il trattino nella griglia dei servizi quando un guasto è dichiarato senza che l\'operatore precisi se quella generazione è interessata</string>
+
+    <!-- Note di versione 2.0.25 -->
+    <string name="appstrings_release_v2025_announced_banner">Un avviso spiega che un sito appena dichiarato non ha ancora bande, antenne, date né traliccio: i dati settimanali dell\'ANFR precedono quelli mensili, gli unici a pubblicarli</string>
+    <string name="appstrings_release_v2025_announced_frequencies">I sistemi annunciati compaiono comunque nelle frequenze, senza banda né azimut finché il dettaglio non è pubblicato</string>
 </resources>

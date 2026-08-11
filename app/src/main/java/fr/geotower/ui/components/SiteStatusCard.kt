@@ -71,15 +71,21 @@ fun serviceAvailabilityFromOutageCode(
  * qu'il déclare peut l'emporter : la case ne vaut alors ni vert ni rouge, mais « incertain ».
  *
  * Les relevés sont souvent partiels — une panne déclarée « Data : HS » sans détail par génération, ou
- * une data 4G HS avec la voix 4G laissée vide. Le tiret « rien de publié » y était trompeur : il se
- * lit comme une absence de technologie alors que l'en-tête de la carte annonce déjà une panne.
+ * une data 4G HS avec la voix 4G laissée vide (aucun des quatre opérateurs ne publie de colonne voix
+ * 5G, et Orange n'en publie pas pour la 4G). Le tiret « rien de publié » y était trompeur : il se lit
+ * comme une absence de technologie alors que l'en-tête de la carte annonce déjà une panne.
  *
- * Deux déclencheurs, du plus fort au plus faible :
+ * Deux déclencheurs :
  * - le code global du MÊME service est hors service (« Data : HS », générations non détaillées) ;
  * - l'autre service de la MÊME génération est hors service (data 4G HS, voix 4G non publiée).
  *
- * Un code global explicitement en service (« Voix : OK ») ferme l'incertitude : l'opérateur a répondu
- * pour ce service, on ne lui prête pas un doute qu'il n'a pas.
+ * Un code global à `OK` ne referme PAS ce doute : il n'agrège que les générations que l'opérateur
+ * renseigne vraiment. Cas réel massif chez Orange — 2G et 3G décommissionnées donc déclarées `NE`,
+ * pas de colonne voix 4G, d'où un « voix : OK » de façade sur un site dont la data 4G est HS, c'est-à-
+ * dire dont la VoLTE (seule voix possible) est nécessairement tombée avec elle.
+ *
+ * En revanche un code publié pour la case, `NE` (non équipé) compris, ferme le doute : l'opérateur a
+ * répondu pour cette case précise.
  */
 fun serviceUncertaintyFromOutageCode(
     hasTechnology: Boolean,
@@ -89,9 +95,8 @@ fun serviceUncertaintyFromOutageCode(
     isOutage: Boolean
 ): Boolean {
     if (!hasTechnology || !isOutage) return false
-    // Un code publié se suffit : il vaut vert ou rouge, jamais un doute.
+    // Un code publié se suffit : il vaut vert, rouge ou tiret (« NE »), jamais un doute.
     if (OutageStatusCodes.clean(outageCode) != null) return false
-    if (OutageStatusCodes.isUp(serviceGlobalCode)) return false
     return OutageStatusCodes.isDown(serviceGlobalCode) || OutageStatusCodes.isDown(siblingOutageCode)
 }
 

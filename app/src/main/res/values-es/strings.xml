@@ -1302,6 +1302,8 @@
     <string name="appstrings_src_tiles_desc">Servidores de teselas disponibles en los ajustes del mapa.</string>
     <string name="appstrings_src_tiles_label">Teselas</string>
     <string name="appstrings_startup_page_settings">Página de inicio</string>
+    <string name="appstrings_station_weekly_only_title">Emplazamiento recién declarado</string>
+    <string name="appstrings_station_weekly_only_desc">Este emplazamiento acaba de aparecer en los datos semanales de la ANFR. Los datos mensuales, la única fuente que publica las bandas de frecuencia, las antenas, las fechas y el soporte, todavía no lo incluyen: estos detalles se mostrarán en la próxima publicación mensual.</string>
     <string name="appstrings_stats2_g_desc">Número de sitios 2G declarados por operador</string>
     <string name="appstrings_stats2_g_title">Sitios 2G</string>
     <string name="appstrings_stats3_g_desc">Número de sitios 3G declarados por operador</string>
@@ -2738,4 +2740,8 @@
     <string name="appstrings_release_v2024_admin_area_no_limit">Un departamento o una región muy poblados muestran ahora sus sitios, en lugar de solo encuadrarse</string>
     <string name="appstrings_release_v2024_route_searching">La búsqueda de itinerario avisa de que está trabajando</string>
     <string name="appstrings_release_v2024_status_uncertain">Un «?» sustituye al guion en la cuadrícula de servicios cuando se declara una avería sin que el operador precise si esa generación está afectada</string>
+
+    <!-- Notas de la versión 2.0.25 -->
+    <string name="appstrings_release_v2025_announced_banner">Un aviso explica que un sitio recién declarado aún no tiene sus bandas, antenas, fechas ni soporte: los datos semanales de la ANFR se adelantan a los mensuales, los únicos que los publican</string>
+    <string name="appstrings_release_v2025_announced_frequencies">Los sistemas anunciados aparecen igualmente en las frecuencias, sin banda ni acimut hasta que se publique el detalle</string>
 </resources>

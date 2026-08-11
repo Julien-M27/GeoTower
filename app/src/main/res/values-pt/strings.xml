@@ -1302,6 +1302,8 @@
     <string name="appstrings_src_tiles_desc">Servidores de mosaicos disponíveis nas definições do mapa.</string>
     <string name="appstrings_src_tiles_label">Mosaicos</string>
     <string name="appstrings_startup_page_settings">Página de inicialização</string>
+    <string name="appstrings_station_weekly_only_title">Site acabado de declarar</string>
+    <string name="appstrings_station_weekly_only_desc">Este site acaba de surgir nos dados semanais da ANFR. Os dados mensais, a única fonte que publica as bandas de frequência, as antenas, as datas e o suporte, ainda não o incluem: estes detalhes aparecerão na próxima publicação mensal.</string>
     <string name="appstrings_stats2_g_desc">Número de locais 2G declarados por operadora</string>
     <string name="appstrings_stats2_g_title">Locais 2G</string>
     <string name="appstrings_stats3_g_desc">Número de locais 3G declarados por operadora</string>
@@ -2738,4 +2740,8 @@
     <string name="appstrings_release_v2024_admin_area_no_limit">Um departamento ou uma região muito povoados mostram agora os seus sites, em vez de serem apenas enquadrados</string>
     <string name="appstrings_release_v2024_route_searching">A procura de itinerário indica que está a trabalhar</string>
     <string name="appstrings_release_v2024_status_uncertain">Um «?» substitui o travessão na grelha de serviços quando é declarada uma falha sem que a operadora precise se essa geração é afetada</string>
+
+    <!-- Notas da versão 2.0.25 -->
+    <string name="appstrings_release_v2025_announced_banner">Um aviso explica que um site acabado de declarar ainda não tem as suas bandas, antenas, datas nem poste: os dados semanais da ANFR antecedem os mensais, os únicos que os publicam</string>
+    <string name="appstrings_release_v2025_announced_frequencies">Os sistemas anunciados aparecem na mesma nas frequências, sem banda nem azimute até que o detalhe seja publicado</string>
 </resources>

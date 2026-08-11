@@ -112,6 +112,24 @@ private fun isAzimuthPlaceholder(phys: String, localized: String): Boolean {
 fun FreqBand.isAnnouncedOnly(): Boolean = spectrumLines.isEmpty() && physDetails.isEmpty()
 
 /**
+ * Station que seul le releve hebdomadaire de l'ANFR connait : l'observatoire a declare ses systemes,
+ * mais l'export mensuel — la seule source a porter les bandes, les antennes, les dates et le support
+ * — ne la contient pas encore. Toutes ses lignes de detail sont alors « seulement annoncees », et la
+ * fiche n'a ni spectre, ni azimut, ni hauteur, ni type de support a montrer : c'est ce quasi-vide
+ * qu'un bandeau doit expliquer, plutot que de laisser croire a une station mal declaree.
+ *
+ * La detection se fait sur les details BRUTS et jamais sur la liste filtree affichee : masquer la 5G
+ * dans les reglages ne doit ni faire apparaitre ni faire disparaitre le bandeau. Elle passe par le
+ * meme parseur que le tableau des emetteurs, pour que les deux ne puissent pas diverger.
+ *
+ * Details vides = station inconnue des deux sources ou base incomplete : on ne conclut rien.
+ */
+fun isAnnouncedOnlyStation(freqStr: String?): Boolean {
+    val bands = parseAndSortFrequencies(freqStr, "", "")
+    return bands.isNotEmpty() && bands.all { it.isAnnouncedOnly() }
+}
+
+/**
  * Hauteurs de fixation (metres, ordre croissant, sans doublon) des antennes qui portent les
  * emetteurs de la station, lues dans la partie « physique » de `details_frequences` :
  * `"LTE 1800 : 1860-1880 MHz | En service | 2016-03-14 | Panneau : 20° (8,1m) [AER_ID: 148839] [DIM: 0,2m]"`.

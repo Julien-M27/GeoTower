@@ -169,6 +169,7 @@ import fr.geotower.utils.PageScrollPrefs
 import fr.geotower.utils.SitePagePrefs
 import fr.geotower.utils.formatTechnologies
 import fr.geotower.utils.formatSiteDistanceMeters
+import fr.geotower.utils.isAnnouncedOnlyStation
 import java.util.Locale
 import java.util.UUID
 import kotlin.math.roundToInt
@@ -284,7 +285,10 @@ fun SiteDetailScreen(
     // deux défilements verticaux imbriqués font mesurer le contenu avec une hauteur infinie.
     // Les blocs de niveau support (adresse, GPS, propriétaire…) sont aussi retirés : la fiche
     // support les affiche déjà une fois au-dessus, les répéter par opérateur n'a pas de sens.
-    embedded: Boolean = false
+    embedded: Boolean = false,
+    // Coupé par la fiche support quand elle porte déjà le bandeau « site tout juste déclaré » pour
+    // le pylône entier : sinon il se répéterait sous chaque section opérateur.
+    showWeeklyOnlyBanner: Boolean = true
 ) {
     SecureScreenEffect(RemoteFeatureFlags.SecureScreens.SITE_DETAIL)
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -1413,6 +1417,20 @@ fun SiteDetailScreen(
                 // tous deux affichés : la carte du cap rend alors les deux (voir le bloc « bearing »).
                 val bearingHeightPaired = showBearing && showHeight &&
                     pageSiteOrder.indexOf("height") == pageSiteOrder.indexOf("bearing") + 1
+
+                // Station connue du seul relevé hebdomadaire de l'ANFR : presque tous les blocs qui
+                // suivent sont vides, faute d'export mensuel. Le bandeau l'annonce avant qu'on les
+                // lise, plutôt que de laisser croire à une station mal déclarée.
+                // Clé sur la chaîne ENCODÉE : `detailsFrequences` décode à chaque lecture.
+                val isWeeklyOnlyStation = remember(technique?.encodedDetailsFrequences, info.frequences) {
+                    isAnnouncedOnlyStation(technique?.detailsFrequences ?: info.frequences)
+                }
+                if (isWeeklyOnlyStation && showWeeklyOnlyBanner) {
+                    fr.geotower.ui.components.AnnouncedOnlyStationBanner(blockShape = blockShape)
+                    // Hors de la boucle : le bandeau porte lui-même l'écart qui le sépare du premier
+                    // bloc, que les CustomizableBlock posent sous eux.
+                    Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
+                }
 
                 pageSiteOrder.forEach { block ->
                     // Inséré : on saute les blocs déjà rendus une fois par la fiche support.
