@@ -315,6 +315,7 @@ object RemoteFeatureFlags {
         const val COMPASS_REVERSE_GEOCODING = "compass.reverseGeocoding"
         const val SIGNALQUEST_PHOTOS = "signalQuest.photos"
         const val SIGNALQUEST_UPLOAD = "signalQuest.upload"
+        const val SIGNALQUEST_PHOTO_REPORT = "signalQuest.photoReport"
         const val SIGNALQUEST_SPEEDTESTS = "signalQuest.speedtests"
         const val SIGNALQUEST_COVERAGE = "signalQuest.coverage"
         const val SIGNALQUEST_EXTERNAL_LINKS = "signalQuest.externalLinks"
@@ -478,6 +479,7 @@ object RemoteFeatureFlags {
             Features.COMPASS_REVERSE_GEOCODING to true,
             Features.SIGNALQUEST_PHOTOS to true,
             Features.SIGNALQUEST_UPLOAD to true,
+            Features.SIGNALQUEST_PHOTO_REPORT to true,
             Features.SIGNALQUEST_SPEEDTESTS to true,
             Features.SIGNALQUEST_COVERAGE to true,
             Features.SIGNALQUEST_EXTERNAL_LINKS to true,

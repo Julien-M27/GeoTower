@@ -51,11 +51,20 @@ fun TripPlan.withSchedule(
     plannedAtMillis: Long?,
     reminderOffsetsMinutes: List<Int>,
     stopDurationMinutes: Int,
-    locale: Locale
-): TripPlan = copy(
-    name = tripNameAfterScheduling(context, this, plannedAtMillis, locale),
-    plannedAtMillis = plannedAtMillis,
-    reminderOffsetsMinutes = reminderOffsetsMinutes,
-    stopDurationMinutes = stopDurationMinutes,
-    status = statusAfterScheduling(plannedAtMillis)
-)
+    locale: Locale,
+    /** Nom saisi dans la boîte d'enregistrement, s'il y en a une. */
+    editedName: String? = null
+): TripPlan {
+    // Un nom réellement changé coupe le suivi automatique de la date : à partir de là, c'est le
+    // titre de l'utilisateur. Retaper le même nom ne compte pas comme un choix.
+    val renamed = editedName?.trim()?.takeIf { it.isNotBlank() && it != name }
+    val base = if (renamed != null) copy(name = renamed, autoNamed = false) else this
+
+    return base.copy(
+        name = tripNameAfterScheduling(context, base, plannedAtMillis, locale),
+        plannedAtMillis = plannedAtMillis,
+        reminderOffsetsMinutes = reminderOffsetsMinutes,
+        stopDurationMinutes = stopDurationMinutes,
+        status = base.statusAfterScheduling(plannedAtMillis)
+    )
+}

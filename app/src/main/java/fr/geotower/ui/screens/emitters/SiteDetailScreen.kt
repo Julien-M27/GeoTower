@@ -1652,7 +1652,9 @@ fun SiteDetailScreen(
                                         null
                                     },
                                     favoriteScopeId = physique?.idSupport ?: info.idAnfr,
-                                    favoriteSelectionEnabled = true
+                                    favoriteSelectionEnabled = true,
+                                    // Même identifiant que celui ayant servi à charger les photos.
+                                    signalQuestSiteId = physique?.idSupport ?: info.idAnfr
                                 )
                             }
                         }

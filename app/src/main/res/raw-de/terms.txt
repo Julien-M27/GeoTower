@@ -64,12 +64,9 @@ Sobald ein Foto hochgeladen ist, wird es **ausschließlich von SignalQuest gehos
 
 Alle von GeoTower hochgeladenen Fotos werden bei SignalQuest **unter dem Sammelnamen „GeoTower"** veröffentlicht und nicht unter einem individuellen Konto – anders als bei Nutzern, die ein eigenes SignalQuest-Konto haben. Es gibt daher **keinen schnelleren Weg**, gezielt Ihre Uploads aufzufinden.
 
-Um ein Foto entfernen zu lassen, müssen Sie:
-1. SignalQuest aufrufen (App oder Website), im Tab **Karte**;
-2. das betreffende Foto suchen;
-3. es **melden** und um seine Entfernung bitten.
+Um die Entfernung eines Fotos zu beantragen, öffnen Sie es in GeoTower und tippen Sie auf **Melden**: GeoTower übermittelt Ihre Anfrage mit dem gewählten Grund und Ihren Erläuterungen an SignalQuest.
 
-Sie können SignalQuest auch unter **support@signalquest.fr** kontaktieren. GeoTower kann ein von SignalQuest gehostetes Foto nicht in Ihrem Namen löschen oder ändern.
+Diese Meldung **führt nicht zur Entfernung des Fotos**: SignalQuest nimmt sie in die Moderationswarteschlange auf und entscheidet allein über das Weitere. Sie können sich auch direkt an SignalQuest wenden (App oder Website) oder an **support@signalquest.fr** schreiben. GeoTower kann ein von SignalQuest gehostetes Foto nicht in Ihrem Namen löschen oder ändern.
 
 ## 4.3 Lokaler Verlauf
 

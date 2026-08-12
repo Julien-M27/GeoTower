@@ -64,12 +64,9 @@ Assim que uma foto é enviada, fica **alojada e gerida exclusivamente pelo Signa
 
 Todas as fotos enviadas a partir da GeoTower são publicadas no SignalQuest **sob o nome coletivo «GeoTower»**, e não sob uma conta individual — ao contrário dos utilizadores que dispõem da sua própria conta SignalQuest. Não existe, portanto, **qualquer forma mais rápida** de localizar especificamente os seus envios.
 
-Para mandar remover uma foto, deve:
-1. aceder ao SignalQuest (aplicação ou sítio web), no separador **Mapa**;
-2. localizar a foto em causa;
-3. **denunciá-la**, solicitando a sua remoção.
+Para pedir a remoção de uma foto, abra-a na GeoTower e toque no botão **Denunciar**: a GeoTower transmite o seu pedido ao SignalQuest, com o motivo escolhido e os detalhes que acrescentar.
 
-Pode também contactar o SignalQuest através de **support@signalquest.fr**. A GeoTower não pode eliminar nem modificar em seu nome uma foto alojada pelo SignalQuest.
+Esta denúncia **não remove a foto**: o SignalQuest coloca-a na sua fila de moderação e decide sozinho o que fazer. Pode também aceder diretamente ao SignalQuest (aplicação ou sítio web) ou escrever para **support@signalquest.fr**. A GeoTower não pode eliminar nem modificar em seu nome uma foto alojada pelo SignalQuest.
 
 ## 4.3 Histórico local
 

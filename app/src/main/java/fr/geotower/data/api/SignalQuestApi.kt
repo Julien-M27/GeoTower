@@ -4,6 +4,7 @@ import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.Multipart
@@ -46,6 +47,45 @@ data class SqPhotoUploadData(
     val uploadedAt: String?,
     val approved: Boolean?
 )
+
+/**
+ * Signalement d'une photo. `reason` doit valoir une des constantes de [SignalQuestPhotoReportReasons] :
+ * SignalQuest refuse tout autre motif en 400.
+ */
+data class SqPhotoReportRequest(
+    val reason: String,
+    val description: String? = null
+)
+
+data class SqPhotoReportResponse(
+    val data: SqPhotoReportData? = null,
+    val requestId: String? = null
+)
+
+data class SqPhotoReportData(
+    val reportId: String? = null,
+    val photoId: String? = null,
+    val siteId: String? = null,
+    val reason: String? = null,
+    val description: String? = null,
+    val status: String? = null,
+    val createdAt: String? = null
+)
+
+/** Motifs acceptés par SignalQuest, dans l'ordre d'affichage retenu pour la feuille de signalement. */
+object SignalQuestPhotoReportReasons {
+    const val WRONG_LOCATION = "wrong-location"
+    const val QUALITY = "quality"
+    const val INAPPROPRIATE = "inappropriate"
+    const val COPYRIGHT = "copyright"
+    const val SPAM = "spam"
+    const val OTHER = "other"
+
+    /** Longueur maximale du champ libre, imposée par l'API. */
+    const val MAX_DESCRIPTION_LENGTH = 2000
+
+    val ordered = listOf(WRONG_LOCATION, QUALITY, INAPPROPRIATE, COPYRIGHT, SPAM, OTHER)
+}
 
 data class SqSpeedtestsResponse(
     val data: List<SqSpeedtestData> = emptyList(),
@@ -154,6 +194,12 @@ interface SignalQuestApiService {
         @Part("stripExifBeforeUpload") stripExifBeforeUpload: RequestBody,
         @Part("exifMetadata") exifMetadata: RequestBody?
     ): retrofit2.Response<SqPhotoUploadResponse>
+
+    @POST("api/v2/signalquest/photos/{photoId}/report")
+    suspend fun reportSitePhoto(
+        @Path("photoId") photoId: String,
+        @Body body: SqPhotoReportRequest
+    ): retrofit2.Response<SqPhotoReportResponse>
 
     @POST("api/v2/signalquest/upload-token")
     suspend fun createUploadToken(

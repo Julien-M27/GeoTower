@@ -13,15 +13,21 @@ object DownloadNotificationCenter {
     const val RADIO_DB_DOWNLOAD_RESULT_NOTIFICATION_ID = 2112
     const val ENB_DB_DOWNLOAD_PROGRESS_NOTIFICATION_ID = 2121
     const val ENB_DB_DOWNLOAD_RESULT_NOTIFICATION_ID = 2122
+    const val PHOTO_REPORT_SENT_NOTIFICATION_ID = 2131
     const val MAP_DOWNLOAD_CHANNEL_ID = "map_download_channel"
 
     private const val PREFS_NAME = "GeoTowerPrefs"
     private const val KEY_MAP_DOWNLOAD_NOTIFICATION_IDS = "map_download_notification_ids"
     private const val KEY_MAP_DOWNLOAD_NOTIFICATION_FILENAMES = "map_download_notification_filenames"
     private const val MAP_DOWNLOAD_RESULT_ID_MASK = 0x4D415000
+    private const val PHOTO_REPORT_REMOVED_ID_MASK = 0x50520000
 
     fun mapDownloadNotificationId(mapFilename: String): Int = mapFilename.hashCode()
     fun mapDownloadResultNotificationId(mapFilename: String): Int = mapFilename.hashCode() xor MAP_DOWNLOAD_RESULT_ID_MASK
+
+    /** Un identifiant par photo : plusieurs retraits peuvent être annoncés en même temps. */
+    fun photoReportRemovedNotificationId(photoId: String): Int =
+        photoId.hashCode() xor PHOTO_REPORT_REMOVED_ID_MASK
 
     fun rememberMapDownloadNotification(context: Context, mapFilename: String) {
         rememberMapDownloadNotification(context, mapDownloadNotificationId(mapFilename))

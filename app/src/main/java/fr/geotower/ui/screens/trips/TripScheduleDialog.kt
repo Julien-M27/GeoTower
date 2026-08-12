@@ -26,6 +26,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -74,11 +75,22 @@ private const val DEFAULT_DEPARTURE_HOUR = 9
 fun TripScheduleDialog(
     plan: TripPlan,
     onDismiss: () -> Unit,
-    onConfirm: (plannedAtMillis: Long?, reminderOffsetsMinutes: List<Int>, stopMinutes: Int) -> Unit
+    /**
+     * Ajoute le champ « nom » en tête et intitule la boîte « Enregistrer » : c'est la forme
+     * utilisée en quittant l'édition, où l'on nomme et date la tournée d'un seul geste.
+     */
+    editableName: Boolean = false,
+    onConfirm: (
+        name: String,
+        plannedAtMillis: Long?,
+        reminderOffsetsMinutes: List<Int>,
+        stopMinutes: Int
+    ) -> Unit
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
     val locale = LocalConfiguration.current.locales[0]
 
+    var name by remember { mutableStateOf(plan.name) }
     var plannedAt by remember { mutableStateOf(plan.plannedAtMillis) }
     var reminders by remember { mutableStateOf(plan.reminderOffsetsMinutes.toSet()) }
     var stopMinutes by remember { mutableStateOf(plan.stopDurationMinutes) }
@@ -94,9 +106,26 @@ fun TripScheduleDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.trips_schedule_title)) },
+        title = {
+            Text(
+                stringResource(
+                    if (editableName) R.string.trips_save_dialog_title else R.string.trips_schedule_title
+                )
+            )
+        },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                if (editableName) {
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it.take(80) },
+                        label = { Text(stringResource(R.string.trips_rename_title)) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+                }
+
                 ScheduleRow(
                     icon = Icons.Default.CalendarMonth,
                     label = stringResource(R.string.trips_schedule_date),
@@ -186,7 +215,7 @@ fun TripScheduleDialog(
             TextButton(onClick = {
                 // Sans date, les délais de rappel n'ont rien à quoi se rattacher.
                 val keptReminders = if (plannedAt == null) emptyList() else reminders.sortedDescending()
-                onConfirm(plannedAt, keptReminders, stopMinutes)
+                onConfirm(name, plannedAt, keptReminders, stopMinutes)
             }) {
                 Text(stringResource(R.string.appstrings_validate))
             }

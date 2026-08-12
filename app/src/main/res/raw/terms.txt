@@ -64,12 +64,9 @@ As soon as a photo is uploaded, it is **hosted and managed exclusively by Signal
 
 All photos uploaded from GeoTower are published on SignalQuest **under the collective name "GeoTower"**, and not under an individual account — unlike users who have their own SignalQuest account. There is therefore **no faster way** to specifically locate your uploads.
 
-To have a photo removed, you must:
-1. go to SignalQuest (app or website), in the **Map** tab;
-2. find the photo concerned;
-3. **report** it, asking for its removal.
+To request the removal of a photo, open it in GeoTower and tap the **Report** button: GeoTower forwards your request to SignalQuest, along with the reason you picked and any details you add.
 
-You may also contact SignalQuest at **support@signalquest.fr**. GeoTower cannot delete or modify on your behalf a photo hosted by SignalQuest.
+This report **does not remove the photo**: SignalQuest places it in its moderation queue and alone decides what happens next. You may also go to SignalQuest directly (app or website), or write to **support@signalquest.fr**. GeoTower cannot delete or modify on your behalf a photo hosted by SignalQuest.
 
 ## 4.3 Local history
 

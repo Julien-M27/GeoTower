@@ -99,7 +99,7 @@
     <string name="onboarding_location_nearby_title">Por perto num toque</string>
     <string name="onboarding_location_nearby_desc">A sua posição serve para ordenar as antenas à sua volta e abrir diretamente a zona certa.</string>
     <string name="onboarding_location_map_title">Mapa mais preciso</string>
-    <string name="onboarding_location_map_desc">O botão de localização poderá centrar o mapa e depois seguir os seus movimentos quando o ativar.</string>
+    <string name="onboarding_location_map_desc">O botão de localização centra o mapa na sua posição e segue os seus movimentos; arraste o mapa para parar o seguimento.</string>
     <string name="onboarding_location_privacy_title">Mantém o controlo</string>
     <string name="onboarding_location_privacy_desc">Pode continuar sem autorização e alterá-la mais tarde nas definições do Android.</string>
     <string name="onboarding_notifications_title">Notificações</string>
@@ -494,6 +494,41 @@
     <string name="appstrings_photo_copied_to_clipboard">Imagem copiada para a área de transferência</string>
     <string name="appstrings_photo_saved_to_gallery">Imagem guardada na galeria</string>
     <string name="appstrings_photo_export_failed">Não foi possível exportar a imagem</string>
+    <string name="appstrings_photo_report_action">Denunciar a foto</string>
+    <string name="appstrings_photo_report_title">Denunciar esta foto</string>
+    <string name="appstrings_photo_report_intro">A denúncia é enviada à SignalQuest, que aloja a foto e decide o que fazer. A GeoTower não pode alterá-la nem removê-la.</string>
+    <string name="appstrings_photo_report_reason_wrong_location">Não é este local</string>
+    <string name="appstrings_photo_report_reason_wrong_location_desc">A foto mostra outra torre ou outro sítio.</string>
+    <string name="appstrings_photo_report_reason_quality">Foto inutilizável</string>
+    <string name="appstrings_photo_report_reason_quality_desc">Desfocada, demasiado escura ou sem relação com uma antena.</string>
+    <string name="appstrings_photo_report_reason_inappropriate">Conteúdo inadequado</string>
+    <string name="appstrings_photo_report_reason_inappropriate_desc">Imagem chocante ou pessoa reconhecível.</string>
+    <string name="appstrings_photo_report_reason_copyright">Direitos de autor</string>
+    <string name="appstrings_photo_report_reason_copyright_desc">Publicada sem autorização do autor.</string>
+    <string name="appstrings_photo_report_reason_spam">Publicidade ou spam</string>
+    <string name="appstrings_photo_report_reason_spam_desc">Mensagem comercial ou conteúdo alheio.</string>
+    <string name="appstrings_photo_report_reason_other">Outro motivo</string>
+    <string name="appstrings_photo_report_reason_other_desc">A indicar abaixo.</string>
+    <string name="appstrings_photo_report_description_label">Detalhes (opcional)</string>
+    <string name="appstrings_photo_report_submit">Enviar</string>
+    <string name="appstrings_photo_report_sent">Denúncia enviada à SignalQuest</string>
+    <string name="appstrings_photo_report_rate_limited">Demasiadas denúncias enviadas recentemente. Tente mais tarde.</string>
+    <string name="appstrings_photo_report_not_found">Esta foto já não está online</string>
+    <string name="appstrings_photo_report_unavailable">A denúncia não está disponível</string>
+    <string name="appstrings_photo_report_failed">Não foi possível enviar a denúncia</string>
+    <string name="photo_reports_title">As minhas denúncias</string>
+    <string name="photo_reports_intro">O SignalQuest não publica o desfecho de uma denúncia. A GeoTower só pode confirmar que foi enviada e avisá-lo se a foto acabar por desaparecer.</string>
+    <string name="photo_reports_empty">Ainda não denunciou nenhuma foto.</string>
+    <string name="photo_reports_status_sent">Enviada — a aguardar moderação</string>
+    <string name="photo_reports_status_removed">Foto removida</string>
+    <string name="photo_reports_delete_title">Eliminar esta denúncia</string>
+    <string name="photo_reports_delete_message">Isto apaga apenas o registo no seu dispositivo. A denúncia já enviada ao SignalQuest não é anulada.</string>
+    <string name="photo_reports_delete_confirm">Eliminar</string>
+    <string name="notification_photo_report_channel_name">Denúncias de fotos</string>
+    <string name="notification_photo_report_sent_title">Denúncia enviada</string>
+    <string name="notification_photo_report_sent_desc">O SignalQuest decide o que fazer. Será avisado se a foto for removida.</string>
+    <string name="notification_photo_report_removed_title">Foto denunciada removida</string>
+    <string name="notification_photo_report_removed_desc">A foto que denunciou no local %1$s já não está publicada.</string>
     <string name="appstrings_currently_downloaded_database">Base atualmente transferida:\u0020</string>
     <string name="appstrings_dark_mode_desc">Ideal para redes sociais (Twitter, Discord)</string>
     <string name="appstrings_database">Base de dados</string>
@@ -1466,6 +1501,7 @@
     <string name="appstrings_upload_sq_title">Enviar para Signal Quest</string>
     <string name="shared_photo_map_title">Fotos compartilhadas</string>
     <string name="shared_photo_support_title">Fotos compartilhadas pendentes</string>
+    <string name="support_photo_upload_title">Fotos para enviar</string>
     <string name="shared_photo_support_no_operator">Nenhuma operadora compatível neste suporte.</string>
     <string name="shared_photo_support_select_one">Selecione pelo menos uma operadora.</string>
     <string name="shared_photo_operator_uploading">envio em curso</string>
@@ -2818,10 +2854,11 @@
     <string name="trips_view_follow">Seguir</string>
     <string name="trips_view_edit">Modificar</string>
     <string name="trips_map_header">Percurso</string>
-    <string name="trips_schedule_prompt_title">Definir uma data para este percurso?</string>
-    <string name="trips_schedule_prompt_message">Poderá receber um lembrete antes da partida. O percurso é guardado de qualquer forma.</string>
-    <string name="trips_schedule_prompt_set">Escolher uma data</string>
-    <string name="trips_schedule_prompt_later">Agora não</string>
+    <string name="trips_save_prompt_title">Guardar este percurso?</string>
+    <string name="trips_save_prompt_message">Sem guardar, as alterações feitas a este percurso serão perdidas.</string>
+    <string name="trips_save_prompt_save">Guardar</string>
+    <string name="trips_save_prompt_discard">Não guardar</string>
+    <string name="trips_save_dialog_title">Guardar o percurso</string>
 
     <!-- Notas da versão 2.0.26 -->
     <string name="appstrings_release_v2026_trip_planner">Nova página «Trajetos»: prepare uma ronda de levantamentos colocando as etapas no mapa; a app calcula o itinerário, a pé ou de carro, e pode otimizar a ordem ou fechar o circuito no ponto de partida</string>
@@ -2829,4 +2866,10 @@
     <string name="appstrings_release_v2026_trip_follow">Um modo de seguimento anuncia a etapa seguinte e a distância restante, e avisa se sair do traçado</string>
     <string name="appstrings_release_v2026_trip_reminders">Um trajeto pode ter uma data de partida e lembretes: na véspera, 3 horas ou 1 hora antes</string>
     <string name="appstrings_release_v2026_trip_export">Os trajetos exportam-se em GPX ou JSON, um a um ou todos juntos</string>
+
+    <!-- Notas da versão 2.0.27 -->
+    <string name="appstrings_release_v2027_photo_report">Um botão «Denunciar a foto» encaminha uma imagem para o SignalQuest, com seis motivos e detalhes facultativos</string>
+    <string name="appstrings_release_v2027_photo_report_honest">O ecrã diz claramente o que acontece: o SignalQuest aloja a foto e decide sozinho o seguimento; o GeoTower não a pode alterar nem retirar</string>
+    <string name="appstrings_release_v2027_photo_reports_page">Uma página «As minhas denúncias» acompanha os seus envios, e uma notificação avisa-o se a foto acabar por desaparecer</string>
+    <string name="appstrings_release_v2027_trip_save_prompt">Sair de um trajeto modificado sem o guardar passa a pedir confirmação</string>
 </resources>

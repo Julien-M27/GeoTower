@@ -145,6 +145,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.SimCard
@@ -1035,6 +1036,11 @@ fun SettingsScreen(
                 "photos favorites galerie images preferees",
                 Icons.Default.PhotoLibrary
             ) { navController.navigate("photos_favorites") }
+            directEntry(
+                context.getString(R.string.photo_reports_title),
+                "signalements signaler photos signalquest moderation retrait",
+                Icons.Default.Flag
+            ) { navController.navigate("photo_reports") }
             // Les deux journaux locaux sont derrière un bouton commun : la recherche garde leurs
             // deux vocabulaires, mais mène à la page qui les regroupe.
             directEntry(

@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
@@ -90,6 +91,9 @@ import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.ui.screens.emitters.CommunityPhoto
 import fr.geotower.ui.screens.emitters.PhotoExifDialog
 import fr.geotower.ui.screens.emitters.PhotoViewerActionButton
+import fr.geotower.ui.screens.emitters.signalQuestPhotoIdOrNull
+import fr.geotower.ui.components.PhotoReportDialog
+import fr.geotower.data.community.SignalQuestPhotoReporter
 import fr.geotower.ui.screens.emitters.copyCommunityPhotoToClipboard
 import fr.geotower.ui.screens.emitters.formatPhotoDate
 import fr.geotower.ui.screens.emitters.saveCommunityPhotoToGallery
@@ -482,6 +486,7 @@ private fun FavoritePhotoViewer(
     var scale by remember { mutableFloatStateOf(VIEWER_MIN_SCALE) }
     var offset by remember { mutableStateOf(Offset.Zero) }
     var exifPhoto by remember { mutableStateOf<CommunityPhoto?>(null) }
+    var reportPhoto by remember { mutableStateOf<CommunityPhoto?>(null) }
 
     // Réinitialise le zoom au changement de photo.
     LaunchedEffect(pagerState.currentPage) {
@@ -625,6 +630,18 @@ private fun FavoritePhotoViewer(
                         }
                     }
                 )
+                // Seules les photos SignalQuest se signalent : CellularFR n'a pas d'API pour ça.
+                val reportablePhotoId = currentPhoto.signalQuestPhotoIdOrNull()
+                if (reportablePhotoId != null && SignalQuestPhotoReporter.canReport()) {
+                    PhotoViewerActionButton(
+                        imageVector = Icons.Default.Flag,
+                        contentDescription = stringResource(R.string.appstrings_photo_report_action),
+                        backgroundColor = overlayButtonBg,
+                        contentColor = overlayContent,
+                        enabled = true,
+                        onClick = { reportPhoto = currentPhoto }
+                    )
+                }
             }
 
             // Flèche précédente.
@@ -701,6 +718,19 @@ private fun FavoritePhotoViewer(
 
     exifPhoto?.let { photo ->
         PhotoExifDialog(photo = photo, onDismiss = { exifPhoto = null })
+    }
+
+    reportPhoto?.let { photo ->
+        photo.signalQuestPhotoIdOrNull()?.let { photoId ->
+            PhotoReportDialog(
+                photoId = photoId,
+                siteId = siteId,
+                photoUrl = photo.url,
+                operatorLabel = photo.operatorLabel,
+                onDismiss = { reportPhoto = null },
+                onReported = { message -> Toast.makeText(context, message, Toast.LENGTH_LONG).show() }
+            )
+        }
     }
 }
 

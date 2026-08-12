@@ -93,6 +93,17 @@ data class TripPlan(
     fun isEmptyDraft(): Boolean = steps.isEmpty() && status == STATUS_DRAFT
 
     /**
+     * Même tournée, au sens de ce que l'édition sur la carte peut changer : les étapes, le profil
+     * et la fermeture de la boucle.
+     *
+     * Volontairement **pas** l'égalité de la classe : `updatedAtMillis` change à chaque
+     * enregistrement, et les segments ne font que découler des trois champs comparés ici. Sert à
+     * savoir s'il y a quelque chose à proposer d'enregistrer en quittant l'édition.
+     */
+    fun hasSameContentAs(other: TripPlan): Boolean =
+        steps == other.steps && profile == other.profile && returnToStart == other.returnToStart
+
+    /**
      * Le statut que prend le trajet quand on lui fixe ou lui retire une date.
      *
      * C'est le statut qui alimente le filtre « à venir » : une tournée datée restée « brouillon »

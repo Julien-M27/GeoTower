@@ -294,7 +294,7 @@ fun TripsScreen(
         TripScheduleDialog(
             plan = target,
             onDismiss = { scheduling = null },
-            onConfirm = { plannedAtMillis, reminderOffsets, stopMinutes ->
+            onConfirm = { _, plannedAtMillis, reminderOffsets, stopMinutes ->
                 val next = target.withSchedule(
                     context = context,
                     plannedAtMillis = plannedAtMillis,

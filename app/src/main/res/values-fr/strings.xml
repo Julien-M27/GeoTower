@@ -99,7 +99,7 @@
     <string name="onboarding_location_nearby_title">À proximité en un geste</string>
     <string name="onboarding_location_nearby_desc">Votre position sert à trier les antennes autour de vous et à ouvrir directement la bonne zone.</string>
     <string name="onboarding_location_map_title">Carte plus précise</string>
-    <string name="onboarding_location_map_desc">Le bouton de localisation pourra centrer la carte, puis suivre vos déplacements si vous l\'activez.</string>
+    <string name="onboarding_location_map_desc">Le bouton de localisation centre la carte sur votre position et suit vos déplacements ; faites glisser la carte pour arrêter le suivi.</string>
     <string name="onboarding_location_privacy_title">Vous gardez le contrôle</string>
     <string name="onboarding_location_privacy_desc">Vous pourrez continuer sans autorisation et la modifier plus tard depuis les réglages Android.</string>
     <string name="onboarding_notifications_title">Notifications</string>
@@ -494,6 +494,41 @@
     <string name="appstrings_photo_copied_to_clipboard">Image copiée dans le presse-papiers</string>
     <string name="appstrings_photo_saved_to_gallery">Image enregistrée dans la galerie</string>
     <string name="appstrings_photo_export_failed">Impossible d\'exporter l\'image</string>
+    <string name="appstrings_photo_report_action">Signaler la photo</string>
+    <string name="appstrings_photo_report_title">Signaler cette photo</string>
+    <string name="appstrings_photo_report_intro">Le signalement part chez SignalQuest, qui héberge la photo et décide de la suite. GeoTower ne peut ni la modifier ni la retirer.</string>
+    <string name="appstrings_photo_report_reason_wrong_location">Ce n\'est pas ce site</string>
+    <string name="appstrings_photo_report_reason_wrong_location_desc">La photo montre un autre pylône ou un autre lieu.</string>
+    <string name="appstrings_photo_report_reason_quality">Photo inexploitable</string>
+    <string name="appstrings_photo_report_reason_quality_desc">Floue, trop sombre, ou sans rapport avec une antenne.</string>
+    <string name="appstrings_photo_report_reason_inappropriate">Contenu déplacé</string>
+    <string name="appstrings_photo_report_reason_inappropriate_desc">Image choquante, ou personne reconnaissable.</string>
+    <string name="appstrings_photo_report_reason_copyright">Droits d\'auteur</string>
+    <string name="appstrings_photo_report_reason_copyright_desc">Publiée sans l\'accord de son auteur.</string>
+    <string name="appstrings_photo_report_reason_spam">Publicité ou spam</string>
+    <string name="appstrings_photo_report_reason_spam_desc">Message commercial ou contenu parasite.</string>
+    <string name="appstrings_photo_report_reason_other">Autre motif</string>
+    <string name="appstrings_photo_report_reason_other_desc">À préciser ci-dessous.</string>
+    <string name="appstrings_photo_report_description_label">Précisions (facultatif)</string>
+    <string name="appstrings_photo_report_submit">Envoyer</string>
+    <string name="appstrings_photo_report_sent">Signalement transmis à SignalQuest</string>
+    <string name="appstrings_photo_report_rate_limited">Trop de signalements envoyés récemment. Réessayez plus tard.</string>
+    <string name="appstrings_photo_report_not_found">Cette photo n\'est plus en ligne</string>
+    <string name="appstrings_photo_report_unavailable">Le signalement est indisponible</string>
+    <string name="appstrings_photo_report_failed">Le signalement n\'a pas pu être transmis</string>
+    <string name="photo_reports_title">Mes signalements</string>
+    <string name="photo_reports_intro">SignalQuest ne publie pas la suite donnée à un signalement. GeoTower peut seulement vous dire qu\'il est parti, et vous prévenir si la photo finit par disparaître.</string>
+    <string name="photo_reports_empty">Vous n\'avez encore signalé aucune photo.</string>
+    <string name="photo_reports_status_sent">Transmis — en attente de modération</string>
+    <string name="photo_reports_status_removed">Photo retirée</string>
+    <string name="photo_reports_delete_title">Supprimer ce signalement</string>
+    <string name="photo_reports_delete_message">Cela efface seulement la trace sur votre appareil. Le signalement déjà transmis à SignalQuest n\'est pas annulé.</string>
+    <string name="photo_reports_delete_confirm">Supprimer</string>
+    <string name="notification_photo_report_channel_name">Signalements de photos</string>
+    <string name="notification_photo_report_sent_title">Signalement transmis</string>
+    <string name="notification_photo_report_sent_desc">SignalQuest décide de la suite. Vous serez prévenu si la photo est retirée.</string>
+    <string name="notification_photo_report_removed_title">Photo signalée retirée</string>
+    <string name="notification_photo_report_removed_desc">La photo que vous avez signalée sur le site %1$s n\'est plus publiée.</string>
     <string name="appstrings_currently_downloaded_database">Base actuellement téléchargée :\u0020</string>
     <string name="appstrings_dark_mode_desc">Idéal pour les réseaux sociaux (Twitter, Discord)</string>
     <string name="appstrings_database">Base de données</string>
@@ -1466,6 +1501,7 @@
     <string name="appstrings_upload_sq_title">Envoi vers Signal Quest</string>
     <string name="shared_photo_map_title">Photos partagées</string>
     <string name="shared_photo_support_title">Photos partagées en attente</string>
+    <string name="support_photo_upload_title">Photos à envoyer</string>
     <string name="shared_photo_support_no_operator">Aucun opérateur compatible sur ce support.</string>
     <string name="shared_photo_support_select_one">Sélectionnez au moins un opérateur.</string>
     <string name="shared_photo_operator_uploading">envoi en cours</string>
@@ -2820,10 +2856,11 @@
     <string name="trips_view_follow">Suivre</string>
     <string name="trips_view_edit">Modifier</string>
     <string name="trips_map_header">Trajet</string>
-    <string name="trips_schedule_prompt_title">Fixer une date pour ce trajet ?</string>
-    <string name="trips_schedule_prompt_message">Vous pourrez être rappelé avant le départ. Le trajet est enregistré dans tous les cas.</string>
-    <string name="trips_schedule_prompt_set">Choisir une date</string>
-    <string name="trips_schedule_prompt_later">Pas maintenant</string>
+    <string name="trips_save_prompt_title">Enregistrer ce trajet ?</string>
+    <string name="trips_save_prompt_message">Sans enregistrer, les modifications apportées à cette tournée seront perdues.</string>
+    <string name="trips_save_prompt_save">Enregistrer</string>
+    <string name="trips_save_prompt_discard">Ne pas enregistrer</string>
+    <string name="trips_save_dialog_title">Enregistrer le trajet</string>
 
     <!-- Notes de version 2.0.26 -->
     <string name="appstrings_release_v2026_trip_planner">Nouvelle page « Trajets » : préparez une tournée de relevés en posant vos étapes sur la carte, l\'app calcule l\'itinéraire, à pied ou en voiture, et peut optimiser l\'ordre ou boucler au point de départ</string>
@@ -2831,4 +2868,10 @@
     <string name="appstrings_release_v2026_trip_follow">Un mode suivi annonce la prochaine étape, la distance restante, et vous prévient si vous vous écartez du tracé</string>
     <string name="appstrings_release_v2026_trip_reminders">Un trajet peut porter une date de départ et des rappels : la veille, 3 heures ou 1 heure avant</string>
     <string name="appstrings_release_v2026_trip_export">Les trajets s\'exportent en GPX ou en JSON, un par un ou tous ensemble</string>
+
+    <!-- Notes de version 2.0.27 -->
+    <string name="appstrings_release_v2027_photo_report">Un bouton « Signaler la photo » permet de remonter une image à SignalQuest, avec six motifs et des précisions facultatives</string>
+    <string name="appstrings_release_v2027_photo_report_honest">L\'écran dit franchement ce qui se passe : SignalQuest héberge la photo et décide seul de la suite, GeoTower ne peut ni la modifier ni la retirer</string>
+    <string name="appstrings_release_v2027_photo_reports_page">Une page « Mes signalements » suit vos envois, et une notification vous prévient si la photo finit par disparaître</string>
+    <string name="appstrings_release_v2027_trip_save_prompt">Quitter un trajet modifié sans l\'enregistrer demande désormais confirmation</string>
 </resources>

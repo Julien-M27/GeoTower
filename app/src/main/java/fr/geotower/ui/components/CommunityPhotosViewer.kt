@@ -59,6 +59,7 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Outbox
 import androidx.compose.material.icons.filled.PhotoCamera
@@ -103,8 +104,10 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import fr.geotower.data.community.CommunityDataPreferences
+import fr.geotower.data.community.SignalQuestPhotoReporter
 import fr.geotower.data.api.RetrofitClient
 import fr.geotower.ui.components.PhotoAsyncImage
+import fr.geotower.ui.components.PhotoReportDialog
 import fr.geotower.ui.components.SharedMiniMapCard
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
@@ -175,6 +178,17 @@ private fun photoViewerBottomScrimBrush(baseColor: Color) = Brush.verticalGradie
 
 private fun CommunityPhoto.resolvedSourceId(): String? {
     return sourceId ?: CommunityDataPreferences.sourceIdForCommunityName(communityName)
+}
+
+/**
+ * Identifiant SignalQuest de la photo, seul utilisable pour un signalement.
+ *
+ * `stableId` retombe sur l'URL quand le serveur n'a pas renvoyé d'identifiant : dans ce cas, et
+ * pour toutes les autres sources (CellularFR, schéma embarqué), il n'y a rien à signaler.
+ */
+internal fun CommunityPhoto.signalQuestPhotoIdOrNull(): String? {
+    if (resolvedSourceId() != CommunityDataPreferences.SOURCE_SIGNALQUEST) return null
+    return stableId.takeIf { it.isNotBlank() && it != url }
 }
 
 private fun CommunityPhoto.favoriteBucketId(): String? {
@@ -938,7 +952,10 @@ fun CommunityPhotosSectionShared(
     shape: Shape,
     onAddPhotoClick: (() -> Unit)? = null,
     favoriteScopeId: String? = null,
-    favoriteSelectionEnabled: Boolean = false
+    favoriteSelectionEnabled: Boolean = false,
+    // Identifiant de site SignalQuest : sans lui un signalement part quand même, mais on ne saura
+    // pas re-lister les photos du site pour détecter le retrait de celle qui a été signalée.
+    signalQuestSiteId: String? = null
 ) {
     val context = LocalContext.current
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
@@ -1104,9 +1121,14 @@ fun CommunityPhotosSectionShared(
 
     // --- SÉCURITÉ : On vérifie bien la liste FILTRÉE ---
     // --- NOUVEAU : On vérifie si l'opérateur est supporté par SignalQuest ---
-    val canUpload = SignalQuestOperators.supports(operatorName) &&
-            featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SIGNALQUEST_UPLOAD) &&
-            CommunityDataPreferences.isSignalQuestPhotosEnabled(prefs, operatorName)
+    // Fiche pylône : `operatorName` est nul et ce sont les opérateurs du support (`operatorNames`)
+    // qui décident. Il suffit qu'un seul accepte SignalQuest pour offrir l'envoi — c'est la carte
+    // de choix des opérateurs, côté écran, qui désignera ensuite la ou les cibles.
+    val canUpload = featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SIGNALQUEST_UPLOAD) &&
+            dataOperators.any {
+                SignalQuestOperators.supports(it) &&
+                    CommunityDataPreferences.isSignalQuestPhotosEnabled(prefs, it)
+            }
 
     // ✅ NOUVEAU : On vérifie si on est en ligne en réutilisant ta fonction MapScreen
     val isOnline = isNetworkAvailable(context)
@@ -1147,6 +1169,7 @@ fun CommunityPhotosSectionShared(
     var selectedPhotoIndex by remember { mutableStateOf<Int?>(null) }
     var selectedPhotosSnapshot by remember { mutableStateOf<List<CommunityPhoto>>(emptyList()) }
     var exifDialogPhoto by remember { mutableStateOf<CommunityPhoto?>(null) }
+    var reportDialogPhoto by remember { mutableStateOf<CommunityPhoto?>(null) }
     val showPhotoExif = AppConfig.siteShowPhotoExif.value
     LaunchedEffect(showPhotoExif) {
         if (!showPhotoExif) exifDialogPhoto = null
@@ -1174,6 +1197,8 @@ fun CommunityPhotosSectionShared(
     val txtPhotoCopiedToClipboard = stringResource(R.string.appstrings_photo_copied_to_clipboard)
     val txtPhotoSavedToGallery = stringResource(R.string.appstrings_photo_saved_to_gallery)
     val txtPhotoExportFailed = stringResource(R.string.appstrings_photo_export_failed)
+    val txtPhotoReport = stringResource(R.string.appstrings_photo_report_action)
+    val canReportPhotos = SignalQuestPhotoReporter.canReport()
     var photoExportInProgress by remember { mutableStateOf(false) }
     val sizing = LocalGeoTowerUiSizing.current
 
@@ -1843,6 +1868,19 @@ fun CommunityPhotosSectionShared(
                                     }
                                 }
                             )
+                            // Seules les photos SignalQuest sont signalables : c'est la seule source
+                            // dont l'API accepte un signalement, et le seul identifiant exploitable.
+                            val reportablePhotoId = currentPhoto.signalQuestPhotoIdOrNull()
+                            if (reportablePhotoId != null && canReportPhotos) {
+                                PhotoViewerActionButton(
+                                    imageVector = Icons.Default.Flag,
+                                    contentDescription = txtPhotoReport,
+                                    backgroundColor = chromeButtonBg,
+                                    contentColor = chromeContentColor,
+                                    enabled = true,
+                                    onClick = { reportDialogPhoto = currentPhoto }
+                                )
+                            }
                         }
                         if (hasCurrentPhotoCaption) {
                             Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
@@ -1939,6 +1977,19 @@ fun CommunityPhotosSectionShared(
             photo = photo,
             onDismiss = { exifDialogPhoto = null }
         )
+    }
+
+    reportDialogPhoto?.let { photo ->
+        photo.signalQuestPhotoIdOrNull()?.let { photoId ->
+            PhotoReportDialog(
+                photoId = photoId,
+                siteId = signalQuestSiteId,
+                photoUrl = photo.url,
+                operatorLabel = photo.operatorDisplayLabel(),
+                onDismiss = { reportDialogPhoto = null },
+                onReported = { message -> Toast.makeText(context, message, Toast.LENGTH_LONG).show() }
+            )
+        }
     }
 }
 

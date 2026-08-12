@@ -174,7 +174,7 @@
     <string name="onboarding_location_nearby_title">Nearby in one tap</string>
     <string name="onboarding_location_nearby_desc">Your position is used to sort antennas around you and open the right area immediately.</string>
     <string name="onboarding_location_map_title">More precise map</string>
-    <string name="onboarding_location_map_desc">The location button can center the map, then follow your movement when you enable it.</string>
+    <string name="onboarding_location_map_desc">The location button centers the map on your position and follows your movement; drag the map to stop following.</string>
     <string name="onboarding_location_privacy_title">You stay in control</string>
     <string name="onboarding_location_privacy_desc">You can continue without permission and change it later from Android settings.</string>
     <string name="onboarding_notifications_title">Notifications</string>
@@ -571,6 +571,41 @@
     <string name="appstrings_photo_copied_to_clipboard">Image copied to clipboard</string>
     <string name="appstrings_photo_saved_to_gallery">Image saved to gallery</string>
     <string name="appstrings_photo_export_failed">Unable to export image</string>
+    <string name="appstrings_photo_report_action">Report photo</string>
+    <string name="appstrings_photo_report_title">Report this photo</string>
+    <string name="appstrings_photo_report_intro">The report goes to SignalQuest, which hosts the photo and decides what happens next. GeoTower can neither edit nor remove it.</string>
+    <string name="appstrings_photo_report_reason_wrong_location">Not this site</string>
+    <string name="appstrings_photo_report_reason_wrong_location_desc">The photo shows another mast or another place.</string>
+    <string name="appstrings_photo_report_reason_quality">Unusable photo</string>
+    <string name="appstrings_photo_report_reason_quality_desc">Blurry, too dark, or unrelated to an antenna.</string>
+    <string name="appstrings_photo_report_reason_inappropriate">Inappropriate content</string>
+    <string name="appstrings_photo_report_reason_inappropriate_desc">Disturbing image, or an identifiable person.</string>
+    <string name="appstrings_photo_report_reason_copyright">Copyright</string>
+    <string name="appstrings_photo_report_reason_copyright_desc">Published without the author\'s permission.</string>
+    <string name="appstrings_photo_report_reason_spam">Advertising or spam</string>
+    <string name="appstrings_photo_report_reason_spam_desc">Commercial message or unrelated content.</string>
+    <string name="appstrings_photo_report_reason_other">Other reason</string>
+    <string name="appstrings_photo_report_reason_other_desc">Please explain below.</string>
+    <string name="appstrings_photo_report_description_label">Details (optional)</string>
+    <string name="appstrings_photo_report_submit">Send</string>
+    <string name="appstrings_photo_report_sent">Report sent to SignalQuest</string>
+    <string name="appstrings_photo_report_rate_limited">Too many reports sent recently. Try again later.</string>
+    <string name="appstrings_photo_report_not_found">This photo is no longer online</string>
+    <string name="appstrings_photo_report_unavailable">Reporting is unavailable</string>
+    <string name="appstrings_photo_report_failed">The report could not be sent</string>
+    <string name="photo_reports_title">My reports</string>
+    <string name="photo_reports_intro">SignalQuest does not publish the outcome of a report. GeoTower can only tell you that it was sent, and let you know if the photo eventually disappears.</string>
+    <string name="photo_reports_empty">You have not reported any photo yet.</string>
+    <string name="photo_reports_status_sent">Sent — awaiting moderation</string>
+    <string name="photo_reports_status_removed">Photo no longer published</string>
+    <string name="photo_reports_delete_title">Delete this report</string>
+    <string name="photo_reports_delete_message">This only clears the entry from your device. The report already sent to SignalQuest is unaffected.</string>
+    <string name="photo_reports_delete_confirm">Delete</string>
+    <string name="notification_photo_report_channel_name">Photo reports</string>
+    <string name="notification_photo_report_sent_title">Report sent</string>
+    <string name="notification_photo_report_sent_desc">SignalQuest decides what happens next. You will be notified if the photo is taken down.</string>
+    <string name="notification_photo_report_removed_title">Reported photo taken down</string>
+    <string name="notification_photo_report_removed_desc">The photo you reported on site %1$s is no longer published.</string>
     <string name="appstrings_currently_downloaded_database">Currently downloaded:\u0020</string>
     <string name="appstrings_dark_mode_desc">Ideal for social media (Twitter, Discord)</string>
     <string name="appstrings_database">Database</string>
@@ -1548,6 +1583,7 @@
     <string name="appstrings_upload_sq_title">Send to Signal Quest</string>
     <string name="shared_photo_map_title">Shared photos</string>
     <string name="shared_photo_support_title">Shared photos pending</string>
+    <string name="support_photo_upload_title">Photos to upload</string>
     <string name="shared_photo_support_no_operator">No compatible operator on this support.</string>
     <string name="shared_photo_support_select_one">Select at least one operator.</string>
     <string name="shared_photo_operator_uploading">upload in progress</string>
@@ -2842,10 +2878,11 @@
     <string name="trips_view_follow">Follow</string>
     <string name="trips_view_edit">Edit</string>
     <string name="trips_map_header">Trip</string>
-    <string name="trips_schedule_prompt_title">Set a date for this trip?</string>
-    <string name="trips_schedule_prompt_message">You can be reminded before departure. The trip is saved either way.</string>
-    <string name="trips_schedule_prompt_set">Pick a date</string>
-    <string name="trips_schedule_prompt_later">Not now</string>
+    <string name="trips_save_prompt_title">Save this trip?</string>
+    <string name="trips_save_prompt_message">Without saving, the changes made to this tour will be lost.</string>
+    <string name="trips_save_prompt_save">Save</string>
+    <string name="trips_save_prompt_discard">Don\'t save</string>
+    <string name="trips_save_dialog_title">Save the trip</string>
 
     <!-- Release notes 2.0.26 -->
     <string name="appstrings_release_v2026_trip_planner">New “Trips” page: plan a survey round by placing your stops on the map — the app works out the route, on foot or by car, and can optimise the order or loop back to the start</string>
@@ -2853,4 +2890,10 @@
     <string name="appstrings_release_v2026_trip_follow">A follow mode announces the next stop and the remaining distance, and warns you when you drift off the route</string>
     <string name="appstrings_release_v2026_trip_reminders">A trip can carry a departure date and reminders: the day before, 3 hours or 1 hour ahead</string>
     <string name="appstrings_release_v2026_trip_export">Trips export to GPX or JSON, one at a time or all together</string>
+
+    <!-- Release notes 2.0.27 -->
+    <string name="appstrings_release_v2027_photo_report">A “Report photo” button raises an image with SignalQuest, with six reasons and optional details</string>
+    <string name="appstrings_release_v2027_photo_report_honest">The screen states plainly what happens: SignalQuest hosts the photo and alone decides what follows; GeoTower can neither edit nor remove it</string>
+    <string name="appstrings_release_v2027_photo_reports_page">A “My reports” page tracks what you sent, and a notification tells you if the photo eventually disappears</string>
+    <string name="appstrings_release_v2027_trip_save_prompt">Leaving a modified trip without saving now asks for confirmation</string>
 </resources>

@@ -64,12 +64,9 @@ Dès qu'une photo est envoyée, elle est **hébergée et gérée exclusivement p
 
 Toutes les photos envoyées depuis GeoTower sont publiées chez SignalQuest **sous le nom collectif « GeoTower »**, et non sous un compte individuel — contrairement aux utilisateurs disposant de leur propre compte SignalQuest. Il n'existe donc **aucun moyen plus rapide** de retrouver spécifiquement vos envois.
 
-Pour faire retirer une photo, vous devez :
-1. vous rendre sur SignalQuest (application ou site web), dans l'onglet **Carte** ;
-2. localiser la photo concernée ;
-3. la **signaler** en demandant son retrait.
+Pour demander le retrait d'une photo, ouvrez-la dans GeoTower et touchez le bouton **Signaler** : GeoTower transmet votre demande à SignalQuest, avec le motif choisi et vos éventuelles précisions.
 
-Vous pouvez également contacter SignalQuest à l'adresse **support@signalquest.fr**. GeoTower ne peut pas supprimer ni modifier à votre place une photo hébergée par SignalQuest.
+Ce signalement **n'entraîne pas le retrait de la photo** : SignalQuest le place dans sa file de modération et décide seul de la suite. Vous pouvez aussi vous rendre directement sur SignalQuest (application ou site web), ou écrire à **support@signalquest.fr**. GeoTower ne peut pas supprimer ni modifier à votre place une photo hébergée par SignalQuest.
 
 ## 4.3 Historique local
 

@@ -10,8 +10,12 @@ import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationManager
 import android.net.Uri
+import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -32,16 +36,20 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Navigation
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.VerticalAlignTop
 import androidx.compose.material.icons.filled.WifiTethering
 import androidx.compose.material.icons.outlined.ViewAgenda
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
@@ -52,6 +60,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -62,6 +71,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -69,6 +79,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.alpha
 import androidx.compose.runtime.collectAsState
+import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import fr.geotower.data.share.ShareHistoryStore
 import fr.geotower.data.workers.SignalQuestUploadScheduler
@@ -78,6 +89,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
 import fr.geotower.data.AnfrRepository
 import fr.geotower.data.RadioRepository
@@ -91,6 +103,7 @@ import fr.geotower.data.models.PhysiqueEntity
 import fr.geotower.data.models.RadioMapMarker
 import fr.geotower.data.models.TechniqueEntity
 import fr.geotower.data.upload.SignalQuestUploadDraftStore
+import fr.geotower.data.upload.SignalQuestUploadQueue
 import fr.geotower.data.upload.SignalQuestUploadTarget
 import fr.geotower.data.upload.SignalQuestUploadTargets
 import fr.geotower.ui.components.GeoTowerBackTopBar
@@ -124,6 +137,7 @@ import fr.geotower.utils.PageScrollPrefs
 import fr.geotower.utils.SupportPagePrefs
 import fr.geotower.utils.isAnnouncedOnlyStation
 import java.util.Locale
+import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -387,69 +401,18 @@ fun SupportDetailScreen(
         }
 
         // 3️⃣ CHARGEMENT RÉSEAU DES PHOTOS (En arrière-plan, ne bloque pas l'écran)
-        launch(Dispatchers.IO) {
+        launch {
             if (!canUseSupportPhotos) {
                 communityPhotos = emptyList()
                 isRefreshing = false
                 return@launch
             }
-            try {
-                val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
-                val photosTemp = mutableListOf<CommunityPhoto>()
-                val hasCellularFrPhotos = antennas.any { CommunityDataPreferences.isCellularFrPhotosEnabled(prefs, it.operateur) }
-                val hasSignalQuestPhotos = antennas.any { CommunityDataPreferences.isSignalQuestPhotosEnabled(prefs, it.operateur) }
-                val trueSupportId = physique?.idSupport ?: antennas.firstOrNull()?.idAnfr
-
-                if (!trueSupportId.isNullOrBlank()) {
-                    // CellularFR masqué — voir CellularFrApi.ENABLED
-                    if (hasCellularFrPhotos) {
-                        CellularFrApi.getCellularFrPhotos(trueSupportId).forEach { photo ->
-                            photosTemp.add(
-                                CommunityPhoto(
-                                    url = photo.url,
-                                    communityName = "CellularFR",
-                                    author = photo.author,
-                                    date = photo.uploadedAt,
-                                    sourceId = CommunityDataPreferences.SOURCE_CELLULARFR,
-                                    stableId = photo.url
-                                )
-                            )
-                        }
-                    }
-
-                    if (hasSignalQuestPhotos) {
-                        try {
-                            val response = fr.geotower.data.api.SignalQuestClient.api.getSitePhotos(
-                                siteId = trueSupportId
-                            )
-                            if (response.isSuccessful) {
-                                response.body()?.data?.forEach { photo ->
-                                    val photoOperatorKey = OperatorColors.keyFor(photo.operator)
-                                    val photoOperatorLabel = OperatorColors.specForKey(photoOperatorKey)?.label
-                                    photosTemp.add(
-                                        CommunityPhoto(
-                                            url = photo.imageUrl,
-                                            communityName = "Signal Quest",
-                                            author = photo.authorName,
-                                            date = photo.uploadedAt,
-                                            exifMetadata = photo.publicMetadata,
-                                            sourceId = CommunityDataPreferences.SOURCE_SIGNALQUEST,
-                                            stableId = photo.id ?: photo.imageUrl,
-                                            operatorKey = photoOperatorKey,
-                                            operatorLabel = photoOperatorLabel ?: photo.operator
-                                        )
-                                    )
-                                }
-                            }
-                        } catch (e: Exception) { AppLogger.w(TAG_SUPPORT_DETAIL, "SignalQuest photos request failed", e) }
-                    }
-                }
-                communityPhotos = photosTemp
-            } catch (e: Exception) {
-                AppLogger.w(TAG_SUPPORT_DETAIL, "Support photos refresh failed", e)
-            } finally {
-                isRefreshing = false
-            }
+            loadSupportCommunityPhotos(
+                context = context,
+                antennas = antennas,
+                supportId = physique?.idSupport ?: antennas.firstOrNull()?.idAnfr
+            )?.let { communityPhotos = it }
+            isRefreshing = false
         }
     }
 
@@ -549,7 +512,14 @@ fun SupportDetailScreen(
     val txtInitError = stringResource(R.string.appstrings_init_error)
 
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
-    val pendingPhotoDraftId = photoDraftId?.takeIf { it.isNotBlank() }
+    val sharedPhotoDraftId = photoDraftId?.takeIf { it.isNotBlank() }
+    // Photos prises depuis CETTE fiche (appareil photo, galerie, fichiers) : elles n'arrivent pas
+    // par la route, mais elles rejoignent le même brouillon et la même carte de choix des
+    // opérateurs que le partage d'une image vers GeoTower.
+    // rememberSaveable : l'écran est détruit le temps de l'aller-retour vers l'écran d'envoi, et
+    // sans lui la carte disparaîtrait au retour — impossible d'enchaîner un second opérateur.
+    var localPhotoDraftId by rememberSaveable(siteId) { mutableStateOf<String?>(null) }
+    val pendingPhotoDraftId = localPhotoDraftId ?: sharedPhotoDraftId
     val pendingSharedPhotoUris = remember(pendingPhotoDraftId) {
         pendingPhotoDraftId?.let { SignalQuestUploadDraftStore.peek(it) } ?: emptyList()
     }
@@ -565,7 +535,9 @@ fun SupportDetailScreen(
             .putFloat("last_map_lon", longitude.toFloat())
             .putFloat("last_map_zoom", 18f)
             .apply()
-        val route = pendingPhotoDraftId
+        // Seul le brouillon venu du partage suit l'utilisateur sur la carte : il y cherche encore
+        // son pylône. Des photos ajoutées ici visent CE pylône, déjà choisi.
+        val route = sharedPhotoDraftId
             ?.let { "map?photoDraftId=${Uri.encode(it)}" }
             ?: "map"
         navController.navigate(route)
@@ -632,6 +604,10 @@ fun SupportDetailScreen(
             featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SIGNALQUEST_UPLOAD) &&
             featureFlags.isActionEnabled(RemoteFeatureFlags.Actions.START_SIGNALQUEST_UPLOAD) &&
             featureFlags.isWorkerEnabled(RemoteFeatureFlags.Workers.SIGNALQUEST_UPLOAD)
+    // Le « + » du bloc photos n'a de sens que si au moins un opérateur du pylône accepte l'envoi :
+    // sinon la carte de choix qui suit n'aurait aucune case à cocher.
+    val canUploadSupportPhotos =
+        canUseSupportPhotos && canUseSharedPhotoUpload && sharedPhotoUploadOperators.isNotEmpty()
 
     LaunchedEffect(
         pendingPhotoDraftId,
@@ -665,6 +641,104 @@ fun SupportDetailScreen(
             selectedSharedPhotoOperatorKeys = selectedSharedPhotoOperatorKeys.filterNot { key ->
                 sharedPhotoUploadOperators.firstOrNull { it.key == key }?.uploadOperator in uploadingOperatorParams
             }.toSet()
+        }
+    }
+
+    // Une photo qui vient de partir doit apparaître dans le bloc sans quitter la page. On ne
+    // relance QUE les photos : repasser par `refreshTrigger` rechargerait tout le pylône et
+    // rallumerait son écran de chargement. Le second passage laisse au serveur le temps de la
+    // publier — c'est au mieux, l'utilisateur garde le tirer-pour-rafraîchir.
+    // On ne réagit qu'aux envois vus tourner DEPUIS CETTE PAGE : WorkManager garde les travaux
+    // terminés un moment, et s'y fier ferait refaire un tour de réseau à chaque ouverture de fiche.
+    val watchedUploadWorkIds = remember { mutableSetOf<UUID>() }
+    LaunchedEffect(activeUploadWorkInfos) {
+        val justFinished = activeUploadWorkInfos
+            .filter { it.state == WorkInfo.State.SUCCEEDED }
+            .count { watchedUploadWorkIds.remove(it.id) } > 0
+        activeUploadWorkInfos
+            .filterNot { it.state.isFinished }
+            .forEach { watchedUploadWorkIds.add(it.id) }
+        if (!justFinished || !canUseSupportPhotos) return@LaunchedEffect
+
+        val photoSupportId = physique?.idSupport ?: antennas.firstOrNull()?.idAnfr
+        loadSupportCommunityPhotos(context, antennas, photoSupportId)?.let { communityPhotos = it }
+        kotlinx.coroutines.delay(1500L)
+        loadSupportCommunityPhotos(context, antennas, photoSupportId)?.let { communityPhotos = it }
+    }
+
+    // --- AJOUT DE PHOTOS DEPUIS LA FICHE DU PYLÔNE ---
+    // Même enchaînement que la fiche site : on demande d'abord d'où viennent les photos, puis la
+    // carte ci-dessous fait choisir le ou les opérateurs vers qui les envoyer.
+    var showImageSourceDialog by remember { mutableStateOf(false) }
+    var currentCameraUriString by rememberSaveable { mutableStateOf<String?>(null) }
+
+    fun startLocalPhotoDraft(uris: List<Uri>) {
+        if (!canUploadSupportPhotos || uris.isEmpty()) return
+        // Une seule série à la fois : le brouillon précédent n'a plus de carte pour le porter.
+        // Un envoi déjà lancé, lui, ne dépend plus du brouillon (le worker a sa propre copie).
+        localPhotoDraftId?.let { SignalQuestUploadDraftStore.discard(it) }
+        localPhotoDraftId = SignalQuestUploadDraftStore.put(uris.map { it.toString() })
+    }
+
+    val photoPickerLauncher = rememberLauncherForActivityResult<PickVisualMediaRequest, List<Uri>>(
+        contract = ActivityResultContracts.PickMultipleVisualMedia(),
+        onResult = { uris -> startLocalPhotoDraft(uris) }
+    )
+
+    val documentPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenMultipleDocuments(),
+        onResult = { uris -> startLocalPhotoDraft(uris) }
+    )
+
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        val capturedUri = currentCameraUriString?.let(Uri::parse)
+        if (capturedUri != null) {
+            SignalQuestUploadQueue.completeCameraCapture(context, capturedUri, success)
+            if (success) {
+                startLocalPhotoDraft(listOf(capturedUri))
+            }
+        }
+        currentCameraUriString = null
+    }
+
+    fun launchCameraCapture() {
+        if (!featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SITE_PHOTO_CAMERA)) return
+        val uri = SignalQuestUploadQueue.createCameraUri(context)
+        currentCameraUriString = uri.toString()
+        cameraLauncher.launch(uri)
+    }
+
+    val legacyCameraStoragePermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            launchCameraCapture()
+        }
+    }
+
+    fun launchCameraCaptureWithStorageCheck() {
+        if (!featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SITE_PHOTO_CAMERA)) return
+        val needsLegacyStoragePermission = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
+        if (needsLegacyStoragePermission) {
+            legacyCameraStoragePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        } else {
+            launchCameraCapture()
+        }
+    }
+
+    fun discardLocalPhotoDraft() {
+        localPhotoDraftId?.let { SignalQuestUploadDraftStore.discard(it) }
+        localPhotoDraftId = null
+    }
+
+    // La carte de choix des opérateurs s'ouvre tout en haut de la page : sans ce retour au début,
+    // un ajout lancé depuis un bloc « Photos » placé plus bas ne montrerait rien à l'écran.
+    LaunchedEffect(localPhotoDraftId) {
+        if (localPhotoDraftId != null) {
+            scrollState.animateScrollTo(0)
         }
     }
 
@@ -1041,6 +1115,11 @@ fun SupportDetailScreen(
 
                     if (pendingPhotoDraftId != null && pendingSharedPhotoUris.isNotEmpty() && canUseSharedPhotoUpload) {
                         SupportSharedPhotoUploadCard(
+                            title = if (localPhotoDraftId != null) {
+                                stringResource(R.string.support_photo_upload_title)
+                            } else {
+                                stringResource(R.string.shared_photo_support_title)
+                            },
                             photoCount = pendingSharedPhotoUris.size,
                             operators = sharedPhotoUploadOperators,
                             selectedOperatorKeys = selectedSharedPhotoOperatorKeys,
@@ -1053,6 +1132,13 @@ fun SupportDetailScreen(
                                 }
                             },
                             onUpload = { safeClick { openSharedPhotoUpload() } },
+                            // Photos ajoutées ici : rien dans la route ne les retiendra, il faut
+                            // donc de quoi renoncer. Le partage, lui, se referme en quittant.
+                            onDismiss = if (localPhotoDraftId != null) {
+                                { safeClick { discardLocalPhotoDraft() } }
+                            } else {
+                                null
+                            },
                             cardBgColor = cardBgColor,
                             blockShape = blockShape,
                             buttonShape = buttonShape
@@ -1116,9 +1202,15 @@ fun SupportDetailScreen(
                                             supportOwner = physique?.proprietaire,
                                             bgColor = cardBgColor,
                                             shape = blockShape,
-                                            onAddPhotoClick = null,
+                                            onAddPhotoClick = if (canUploadSupportPhotos) {
+                                                { safeClick { showImageSourceDialog = true } }
+                                            } else {
+                                                null
+                                            },
                                             favoriteScopeId = physique?.idSupport ?: mainInfo.idAnfr,
-                                            favoriteSelectionEnabled = true
+                                            favoriteSelectionEnabled = true,
+                                            // Même identifiant que celui ayant servi à charger les photos.
+                                            signalQuestSiteId = physique?.idSupport ?: mainInfo.idAnfr
                                         )
                                     }
                                 }
@@ -1399,6 +1491,78 @@ fun SupportDetailScreen(
             )
         }
 
+        if (showImageSourceDialog && canUploadSupportPhotos) {
+            val dialogBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
+            AlertDialog(
+                onDismissRequest = { showImageSourceDialog = false },
+                shape = blockShape,
+                containerColor = dialogBgColor,
+                title = {
+                    Text(
+                        stringResource(R.string.appstrings_add_photos),
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                },
+                text = {
+                    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(sizing.spacing(16.dp))) {
+                        if (featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SITE_PHOTO_CAMERA)) {
+                            Button(
+                                onClick = {
+                                    safeClick {
+                                        showImageSourceDialog = false
+                                        launchCameraCaptureWithStorageCheck()
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth().height(sizing.component(56.dp)),
+                                shape = buttonShape,
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                            ) {
+                                Icon(Icons.Default.PhotoCamera, null)
+                                Spacer(Modifier.width(sizing.spacing(8.dp)))
+                                Text(stringResource(R.string.appstrings_camera), fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        if (featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SITE_PHOTO_GALLERY)) {
+                            OutlinedButton(
+                                onClick = {
+                                    safeClick {
+                                        showImageSourceDialog = false
+                                        photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth().height(sizing.component(56.dp)),
+                                shape = buttonShape,
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+                            ) {
+                                Icon(Icons.Default.PhotoLibrary, null)
+                                Spacer(Modifier.width(sizing.spacing(8.dp)))
+                                Text(stringResource(R.string.appstrings_gallery), fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                safeClick {
+                                    showImageSourceDialog = false
+                                    documentPickerLauncher.launch(arrayOf("image/*"))
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth().height(sizing.component(56.dp)),
+                            shape = buttonShape,
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+                        ) {
+                            Icon(Icons.Default.FolderOpen, null)
+                            Spacer(Modifier.width(sizing.spacing(8.dp)))
+                            Text(stringResource(R.string.appstrings_external_photo_files), fontWeight = FontWeight.Bold)
+                        }
+                    }
+                },
+                confirmButton = {}
+            )
+        }
+
         // Les blocs des sections opérateur dépliées : le même panneau que leur pied de section,
         // atteignable sans avoir à en déplier une.
         if (showEmbeddedSiteSettingsSheet) {
@@ -1410,6 +1574,73 @@ fun SupportDetailScreen(
                 bubbleColor = uiStyle.bubbleColor
             )
         }
+    }
+}
+
+/**
+ * Photos communautaires du pylône, toutes sources confondues. Renvoie `null` si la collecte a
+ * échoué : l'appelant garde alors ce qu'il affiche déjà plutôt que de vider le bloc sur un simple
+ * incident réseau.
+ */
+private suspend fun loadSupportCommunityPhotos(
+    context: Context,
+    antennas: List<LocalisationEntity>,
+    supportId: String?
+): List<CommunityPhoto>? = withContext(Dispatchers.IO) {
+    try {
+        val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+        val photosTemp = mutableListOf<CommunityPhoto>()
+        val hasCellularFrPhotos = antennas.any { CommunityDataPreferences.isCellularFrPhotosEnabled(prefs, it.operateur) }
+        val hasSignalQuestPhotos = antennas.any { CommunityDataPreferences.isSignalQuestPhotosEnabled(prefs, it.operateur) }
+
+        if (!supportId.isNullOrBlank()) {
+            // CellularFR masqué — voir CellularFrApi.ENABLED
+            if (hasCellularFrPhotos) {
+                CellularFrApi.getCellularFrPhotos(supportId).forEach { photo ->
+                    photosTemp.add(
+                        CommunityPhoto(
+                            url = photo.url,
+                            communityName = "CellularFR",
+                            author = photo.author,
+                            date = photo.uploadedAt,
+                            sourceId = CommunityDataPreferences.SOURCE_CELLULARFR,
+                            stableId = photo.url
+                        )
+                    )
+                }
+            }
+
+            if (hasSignalQuestPhotos) {
+                try {
+                    val response = fr.geotower.data.api.SignalQuestClient.api.getSitePhotos(
+                        siteId = supportId
+                    )
+                    if (response.isSuccessful) {
+                        response.body()?.data?.forEach { photo ->
+                            val photoOperatorKey = OperatorColors.keyFor(photo.operator)
+                            val photoOperatorLabel = OperatorColors.specForKey(photoOperatorKey)?.label
+                            photosTemp.add(
+                                CommunityPhoto(
+                                    url = photo.imageUrl,
+                                    communityName = "Signal Quest",
+                                    author = photo.authorName,
+                                    date = photo.uploadedAt,
+                                    exifMetadata = photo.publicMetadata,
+                                    sourceId = CommunityDataPreferences.SOURCE_SIGNALQUEST,
+                                    stableId = photo.id ?: photo.imageUrl,
+                                    operatorKey = photoOperatorKey,
+                                    operatorLabel = photoOperatorLabel ?: photo.operator
+                                )
+                            )
+                        }
+                    }
+                } catch (e: Exception) { AppLogger.w(TAG_SUPPORT_DETAIL, "SignalQuest photos request failed", e) }
+            }
+        }
+        photosTemp
+    } catch (e: Exception) {
+        AppLogger.w(TAG_SUPPORT_DETAIL, "Support photos refresh failed", e)
+        null
     }
 }
 
@@ -1501,12 +1732,14 @@ private fun String.matchesSupportRouteId(other: String): Boolean {
 
 @Composable
 private fun SupportSharedPhotoUploadCard(
+    title: String,
     photoCount: Int,
     operators: List<SupportSharedPhotoUploadOperator>,
     selectedOperatorKeys: Set<String>,
     uploadingOperatorParams: Set<String>,
     onToggleOperator: (String) -> Unit,
     onUpload: () -> Unit,
+    onDismiss: (() -> Unit)?,
     cardBgColor: Color,
     blockShape: RoundedCornerShape,
     buttonShape: androidx.compose.ui.graphics.Shape
@@ -1529,7 +1762,7 @@ private fun SupportSharedPhotoUploadCard(
                 Spacer(modifier = Modifier.width(sizing.spacing(12.dp)))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = stringResource(R.string.shared_photo_support_title),
+                        text = title,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
@@ -1538,6 +1771,16 @@ private fun SupportSharedPhotoUploadCard(
                         fontSize = sizing.text(13.sp),
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+                if (onDismiss != null) {
+                    IconButton(onClick = onDismiss) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = stringResource(R.string.appstrings_cancel),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(sizing.component(20.dp))
+                        )
+                    }
                 }
             }
 

@@ -443,6 +443,9 @@ class MainActivity : ComponentActivity() {
         // Vérification quotidienne de mise à jour de la base autour de 20 h.
         UpdateCheckScheduler.reconcile(applicationContext)
 
+        // Suivi des photos signalées : ne planifie rien s'il n'y a aucun signalement en cours.
+        fr.geotower.data.workers.PhotoReportCheckScheduler.reconcile(applicationContext)
+
         val widgetSiteId = intent.getStringExtra("widget_site_id")
 
         // 🌟 3. LECTURE DE L'ID SI L'APP ÉTAIT TOTALEMENT FERMÉE
@@ -940,6 +943,19 @@ class MainActivity : ComponentActivity() {
                                     } else {
                                         DisabledFeatureRoute(navController, txtUnavailable)
                                     }
+                                }
+                            }
+
+                            // Mes signalements (ouvert depuis Réglages ▸ Préférences, et cible du
+                            // clic sur les notifications de signalement).
+                            composable(
+                                route = "photo_reports",
+                                deepLinks = listOf(navDeepLink { uriPattern = "geotower://photo_reports" })
+                            ) {
+                                Box(modifier = Modifier.padding(innerPadding)) {
+                                    fr.geotower.ui.screens.settings.PhotoReportsScreen(
+                                        navController = navController
+                                    )
                                 }
                             }
 

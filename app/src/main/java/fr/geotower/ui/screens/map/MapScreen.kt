@@ -134,11 +134,14 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
@@ -700,16 +703,58 @@ private sealed interface MeasureRoute {
 }
 
 /**
- * Clé de cache de l'itinéraire d'un trait. Un point posé garde toute sa précision (deux taps
- * voisins doivent donner deux itinéraires distincts), tandis que « ma position » est ramenée sur
- * une grille d'environ 110 m : sans cet arrondi, chaque point GPS relancerait une requête.
+ * Deux clés, deux rôles.
+ *
+ * Celle-ci identifie le **trait** : les points posés à pleine précision (deux taps voisins doivent
+ * donner deux itinéraires distincts), et « ma position » réduite à un simple marqueur, sans
+ * coordonnées. C'est le casier du *dernier itinéraire connu* pour ce trait, et on ne le vide jamais :
+ * un recalcul qui échoue — réseau perdu en route, ce qui est la règle sur le terrain — laisse donc le
+ * tracé en place au lieu de rendre le trait à la ligne droite. [measureRouteAlignedOnSegment] le
+ * recale sur la position du moment.
  */
-private fun measureRouteKey(segment: MeasureSegment, profile: String): String {
+private fun measureRouteCacheKey(segment: MeasureSegment, profile: String): String {
     fun vertexKey(vertex: MeasureVertex, point: GeoPoint): String = when (vertex) {
         is MeasureVertex.Fixed -> String.format(Locale.US, "%.6f,%.6f", point.latitude, point.longitude)
-        MeasureVertex.CurrentLocation -> String.format(Locale.US, "L%.3f,%.3f", point.latitude, point.longitude)
+        MeasureVertex.CurrentLocation -> "L"
     }
     return "$profile|${vertexKey(segment.startVertex, segment.start)}>${vertexKey(segment.endVertex, segment.end)}"
+}
+
+/**
+ * L'autre clé : la précédente plus « ma position » ramenée sur une grille d'environ 110 m. Elle ne
+ * dit pas ce qu'on affiche mais ce qu'on a **déjà demandé** — c'est la cadence de rafraîchissement.
+ * Sans cet arrondi, chaque point GPS relancerait une requête.
+ */
+private fun measureRouteRequestKey(segment: MeasureSegment, profile: String): String {
+    fun gridKey(vertex: MeasureVertex, point: GeoPoint): String = when (vertex) {
+        is MeasureVertex.Fixed -> ""
+        MeasureVertex.CurrentLocation -> String.format(Locale.US, "@%.3f,%.3f", point.latitude, point.longitude)
+    }
+    return measureRouteCacheKey(segment, profile) +
+        gridKey(segment.startVertex, segment.start) +
+        gridKey(segment.endVertex, segment.end)
+}
+
+/**
+ * Nombre de points au-delà duquel un tracé est dessiné en plusieurs morceaux. Confortablement bas :
+ * le coût d'un calque de plus est négligeable devant un trait qui manque.
+ */
+private const val MEASURE_MAX_POINTS_PER_LINE = 2_000
+
+/**
+ * Découpe un tracé en morceaux dessinables. Chaque morceau **reprend le dernier point du précédent**,
+ * sans quoi il resterait un vide à chaque jonction.
+ */
+private fun measurePathChunks(path: List<GeoPoint>): List<List<GeoPoint>> {
+    if (path.size <= MEASURE_MAX_POINTS_PER_LINE) return listOf(path)
+    val chunks = mutableListOf<List<GeoPoint>>()
+    var start = 0
+    while (start < path.size - 1) {
+        val end = minOf(start + MEASURE_MAX_POINTS_PER_LINE - 1, path.size - 1)
+        chunks += path.subList(start, end + 1)
+        start = end
+    }
+    return chunks
 }
 
 /** Longueur réelle d'une suite de points, segment par segment. */
@@ -719,30 +764,68 @@ private fun measurePathLengthMeters(path: List<GeoPoint>): Double {
     return total
 }
 
-/** Indice du point du tracé le plus proche de [target], à partir de [fromIndex]. */
-private fun measureClosestPointIndex(points: List<GeoPoint>, target: GeoPoint, fromIndex: Int): Int {
-    var bestIndex = fromIndex
-    var bestDistance = Double.MAX_VALUE
-    for (index in fromIndex until points.size) {
-        val distance = points[index].distanceToAsDouble(target)
-        if (distance < bestDistance) {
-            bestDistance = distance
-            bestIndex = index
+/**
+ * Où une position tombe sur un tracé : [index] = arête concernée (`points[index]` → `points[index+1]`),
+ * [point] = la projection sur cette arête, [gapMeters] = la distance qui les sépare.
+ */
+private data class MeasureRouteAnchor(val index: Int, val point: GeoPoint, val gapMeters: Double)
+
+/**
+ * Projette [target] sur le tracé, en ne considérant que les arêtes à partir de [fromIndex].
+ *
+ * On projette sur l'arête, et non sur le sommet le plus proche : un sommet fait partir le raccord de
+ * biais — un coude net dès que les sommets sont espacés, ce qu'ils sont sur une ligne droite de
+ * plusieurs centaines de mètres — et fait avancer la distance restante par paliers d'un sommet.
+ */
+private fun measureProjectOnRoute(
+    points: List<GeoPoint>,
+    target: GeoPoint,
+    fromIndex: Int
+): MeasureRouteAnchor {
+    var best = MeasureRouteAnchor(fromIndex, points[fromIndex], Double.MAX_VALUE)
+    // Repère local en degrés, un degré de longitude valant cos(latitude) degré de latitude : de quoi
+    // projeter juste sur quelques dizaines de mètres, sans trigonométrie par arête.
+    val longitudeScale = cos(Math.toRadians(target.latitude))
+    for (index in fromIndex until points.size - 1) {
+        val from = points[index]
+        val to = points[index + 1]
+        val fromX = (from.longitude - target.longitude) * longitudeScale
+        val fromY = from.latitude - target.latitude
+        val deltaX = (to.longitude - from.longitude) * longitudeScale
+        val deltaY = to.latitude - from.latitude
+        val lengthSquared = deltaX * deltaX + deltaY * deltaY
+        val ratio = if (lengthSquared <= 0.0) {
+            0.0
+        } else {
+            (-(fromX * deltaX + fromY * deltaY) / lengthSquared).coerceIn(0.0, 1.0)
         }
+        val projected = GeoPoint(
+            from.latitude + (to.latitude - from.latitude) * ratio,
+            from.longitude + (to.longitude - from.longitude) * ratio
+        )
+        val gap = projected.distanceToAsDouble(target)
+        if (gap < best.gapMeters) best = MeasureRouteAnchor(index, projected, gap)
     }
-    return bestIndex
+    return best
 }
+
+/**
+ * Au-delà, l'itinéraire gardé en mémoire ne décrit plus le trajet en cours : on a roulé loin sans
+ * qu'aucun recalcul n'aboutisse, ou on a changé de route pour de bon. Le trait direct est alors plus
+ * honnête qu'un tracé d'ailleurs raccordé par une longue barre.
+ */
+private const val MEASURE_ROUTE_REUSE_MAX_GAP_METERS = 20_000.0
 
 /**
  * Recale un itinéraire du cache sur les extrémités **vivantes** du trait.
  *
- * [measureRouteKey] ramène « ma position » sur une grille d'environ 110 m : entre deux recalculs, le
- * tracé garde donc l'amorce de réseau d'il y a jusqu'à 110 m. En s'approchant de la cible, ça se
- * voit deux fois — le trait repart en arrière vers le point de départ, et la distance affichée reste
- * celle du calcul précédent, figée par paliers au lieu de décompter. On coupe ici la part déjà
- * parcourue : le point du tracé le plus proche de la position devient la nouvelle amorce, et la
- * distance est recalculée sur ce qui reste (raccords aux deux pastilles compris). Le décompte
- * repart ainsi à chaque point GPS, sans une requête de plus.
+ * Le tracé en cache a été calculé depuis une position d'il y a jusqu'à 110 m ([measureRouteRequestKey]),
+ * et bien davantage si le réseau est tombé depuis. Rendu tel quel, ça se voit deux fois : le trait
+ * repart en arrière vers le point de départ, et la distance affichée reste celle du calcul précédent,
+ * figée par paliers au lieu de décompter. On coupe donc la part déjà parcourue — la projection de la
+ * position sur le tracé devient la nouvelle amorce — et la distance est recalculée sur ce qui reste,
+ * raccords aux deux pastilles compris. Le décompte repart ainsi à chaque point GPS, sans une requête
+ * de plus, et sans réseau.
  *
  * Sans sommet mouvant il n'y a rien à recaler : tracé et distance du service sont rendus tels quels.
  */
@@ -757,15 +840,24 @@ private fun measureRouteAlignedOnSegment(
     val points = route.points
     if (points.size < 2) return route
 
-    val fromIndex = if (liveStart) measureClosestPointIndex(points, segment.start, 0) else 0
+    val head = if (liveStart) measureProjectOnRoute(points, segment.start, 0) else null
     // L'arrivée se cherche après le départ : sur un tracé qui repasse près de soi (aller-retour,
     // boucle), prendre le plus proche dans l'absolu retournerait le trait.
-    val toIndex = if (liveEnd) measureClosestPointIndex(points, segment.end, fromIndex) else points.lastIndex
-    // Plus rien à parcourir : on est arrivé au bout du tracé. Le trait redevient direct — rendre
-    // l'itinéraire complet remettrait justement le trait de retour vers le point de départ.
-    if (toIndex <= fromIndex) return null
+    val tail = if (liveEnd) measureProjectOnRoute(points, segment.end, head?.index ?: 0) else null
+    if (maxOf(head?.gapMeters ?: 0.0, tail?.gapMeters ?: 0.0) > MEASURE_ROUTE_REUSE_MAX_GAP_METERS) {
+        return null
+    }
 
-    val kept = points.subList(fromIndex, toIndex + 1)
+    // Sommets conservés entre les deux projections, celles-ci prises en pinces.
+    val firstKept = head?.let { it.index + 1 } ?: 0
+    val lastKept = tail?.index ?: points.lastIndex
+    val kept = buildList {
+        head?.let { add(it.point) }
+        if (firstKept <= lastKept) addAll(points.subList(firstKept, lastKept + 1))
+        tail?.let { add(it.point) }
+    }
+    if (kept.size < 2) return null
+
     val path = buildList {
         add(segment.start)
         addAll(kept)
@@ -1564,10 +1656,16 @@ fun MapScreen(
     var isClosestFavSiteExpanded by rememberSaveable { mutableStateOf(true) }
     var isMeasureRouteExpanded by rememberSaveable { mutableStateOf(true) }
 
-    // « Suivre les routes » : itinéraires déjà calculés, un par trait (clé = profil + extrémités).
-    // Une clé absente = itinéraire encore à demander ; les échecs sont mémorisés (Unavailable) pour
-    // ne pas relancer sans fin une requête qui ne passera pas (hors couverture BD TOPO).
+    // « Suivre les routes » : le dernier itinéraire connu de chaque trait (clé = measureRouteCacheKey).
+    // Il n'est remplacé que par un calcul qui aboutit — jamais effacé par un échec, sans quoi la
+    // moindre coupure réseau rendrait le trait à la ligne droite. Une clé absente = rien de calculé
+    // encore ; Unavailable = rien n'a jamais abouti (hors couverture BD TOPO, service coupé), le trait
+    // reste alors direct — jusqu'à un calcul qui passe, qui prend la place.
     val measureRoutes = remember { mutableStateMapOf<String, MeasureRoute>() }
+    // Requêtes déjà lancées (clé = measureRouteRequestKey, qui grille « ma position » à ~110 m) : de
+    // quoi ne pas redemander le même itinéraire à chaque point GPS. Pas un état observable — rien ne
+    // s'affiche à partir de là, et un échec s'y retire pour laisser une seconde chance.
+    val measureRouteRequests = remember { mutableSetOf<String>() }
     // Le service itinéraire IGN peut être coupé à distance ; le trait direct, lui, reste toujours
     // disponible puisqu'il ne demande rien au réseau.
     val canUseMeasureRouting = canUseMapMeasure &&
@@ -1595,6 +1693,7 @@ fun MapScreen(
         // Les itinéraires gardés en cache peuvent peser plusieurs centaines de points chacun : plus
         // de traits, plus de raison de les garder.
         measureRoutes.clear()
+        measureRouteRequests.clear()
         saveMeasureSelections()
     }
 
@@ -1708,9 +1807,20 @@ fun MapScreen(
     // Hauteur réellement mesurée de la barre du trajet : les trois barres (consultation, édition,
     // suivi) n'ont pas la même, et c'est elle qui dit de combien remonter ce qui vit en bas.
     var tripBarHeightPx by remember { mutableIntStateOf(0) }
-    // Sortie de l'édition : on propose de dater la tournée avant de partir, sans jamais l'imposer.
-    var plannerAskForDate by remember { mutableStateOf(false) }
-    var plannerScheduling by remember { mutableStateOf(false) }
+    // Sortie de l'édition : on demande s'il faut enregistrer, et on nomme/date la tournée si oui.
+    var plannerAskToSave by remember { mutableStateOf(false) }
+    var plannerSaving by remember { mutableStateOf(false) }
+
+    /**
+     * La tournée telle qu'elle était en entrant en édition.
+     *
+     * L'édition écrit au fil des gestes — il le faut, ne serait-ce que pour garder les segments
+     * calculés et survivre à une rotation d'écran. Répondre « ne pas enregistrer » consiste donc à
+     * **réécrire cet instantané**, pas à s'abstenir d'écrire. Pour une tournée qui vient d'être
+     * créée, l'instantané est le brouillon vide : le restaurer revient bien à ne rien garder,
+     * puisque la liste écarte les brouillons sans étape.
+     */
+    var plannerEditSnapshot by remember { mutableStateOf<TripPlan?>(null) }
     // Le trajet lui-même arrive par une lecture disque (LaunchedEffect), donc une image plus tard.
     // Faire dépendre l'INTERFACE de `plannerPlan` affichait donc une première image en « carte des
     // antennes » — bouton de partage présent, boussole à sa place habituelle — avant que tout ne se
@@ -1742,6 +1852,15 @@ fun MapScreen(
         // Les deux modes posent des points : on n'entre pas dans le planificateur en laissant la
         // mesure active.
         if (plannerPlan != null) isMeasuringMode = false
+    }
+
+    // Capture l'état d'avant dès qu'on entre en édition, et le relâche en sortant.
+    LaunchedEffect(tripMode, plannerPlan?.id) {
+        if (tripMode == TRIP_MODE_EDIT) {
+            if (plannerEditSnapshot == null) plannerEditSnapshot = plannerPlan
+        } else {
+            plannerEditSnapshot = null
+        }
     }
 
     fun savePlan(next: TripPlan) {
@@ -2115,18 +2234,30 @@ fun MapScreen(
 
     // ✅ CORRECTION : Gère le geste "Retour" physique du téléphone
     /**
-     * Quitter l'édition d'une tournée. Une tournée tracée mais sans date part rarement d'un oubli
-     * volontaire : on propose de la dater — et « Pas maintenant » sort sans insister.
+     * Quitter l'édition d'une tournée : on demande s'il faut l'enregistrer.
+     *
+     * La question ne se pose que si quelque chose a bougé depuis l'entrée en édition — sinon on
+     * sort directement, plutôt que de faire confirmer un travail qui n'a pas eu lieu.
      */
     val leaveTripEditing: () -> Unit = {
         val plan = plannerPlan
-        if (tripMode == TRIP_MODE_EDIT && plan != null &&
-            plan.steps.isNotEmpty() && plan.plannedAtMillis == null
-        ) {
-            plannerAskForDate = true
+        val snapshot = plannerEditSnapshot
+        val changed = plan != null && (snapshot == null || !plan.hasSameContentAs(snapshot))
+        if (tripMode == TRIP_MODE_EDIT && changed) {
+            plannerAskToSave = true
         } else {
             safeBackNavigation.navigateBack()
         }
+    }
+
+    /** Renonce aux modifications : on repose l'état d'avant, puis on sort. */
+    val discardTripEditing: () -> Unit = {
+        plannerEditSnapshot?.let { snapshot ->
+            TripPlanStore.save(context, snapshot)
+            plannerPlan = snapshot
+        }
+        plannerAskToSave = false
+        safeBackNavigation.navigateBack()
     }
 
     androidx.activity.compose.BackHandler {
@@ -2245,6 +2376,11 @@ fun MapScreen(
     var isSearchActive by rememberSaveable { mutableStateOf(false) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
 
+    // Ouverture de la barre en attente de focus. Volontairement `remember` et non
+    // `rememberSaveable` : après une rotation la barre est toujours ouverte, mais relever le
+    // clavier tout seul serait intrusif — on ne le lève qu'à l'appui sur le bouton.
+    var searchAutoFocusPending by remember { mutableStateOf(false) }
+
     // Suggestions ouvertes sous la barre pendant la frappe. `submittedSearchQuery` retient la
     // dernière saisie déjà lancée : sans elle, la liste se rouvrirait aussitôt sur le texte resté
     // dans la barre après une recherche, et masquerait le résultat qu'on vient de cadrer.
@@ -2278,7 +2414,6 @@ fun MapScreen(
     var showCityStatsPopup by rememberSaveable { mutableStateOf(false) }
     var showCityStatsDetail by rememberSaveable { mutableStateOf(false) }
     var isTrackingActive by rememberSaveable { mutableStateOf(false) }
-    var hasCenteredOnLocation by rememberSaveable { mutableStateOf(false) }
 
     // Appui long sur la rose des vents. Aligner la carte sur son cap depuis l'autre bout de la
     // France n'aurait aucun sens : en allumant le suivi, on ramène la carte sur la position, au
@@ -2296,7 +2431,6 @@ fun MapScreen(
                 map.controller.setCenter(location)
                 currentZoom = zoom
                 currentLat = location.latitude
-                hasCenteredOnLocation = true
             }
 
             val known = locationOverlay?.myLocation ?: myCurrentLoc
@@ -2325,7 +2459,6 @@ fun MapScreen(
     val releaseLocationFollowForSearch: () -> Unit = {
         if (isTrackingActive) {
             isTrackingActive = false
-            hasCenteredOnLocation = false
             locationOverlayRef?.disableFollowLocation()
         }
     }
@@ -2753,17 +2886,31 @@ fun MapScreen(
             } else {
                 listOf(startPoint, endPoint)
             }
-            val line = Polyline(map).apply {
-                setPoints(path)
-                outlinePaint.color = android.graphics.Color.parseColor("#3B5998")
-                outlinePaint.strokeWidth = 10f
+            // Un itinéraire long compte des dizaines de milliers de points, et un chemin aussi
+            // complexe finit par être rogné au dessin (le rendu matériel abandonne au-delà d'une
+            // certaine taille) : c'est le trait qui manque par endroits. On le découpe donc en
+            // tronçons qui se partagent leur point de jonction — raccord invisible, les bouts étant
+            // ronds — pour que chaque chemin dessiné reste simple.
+            measurePathChunks(path).forEach { chunk ->
+                val line = Polyline(map).apply {
+                    setPoints(chunk)
+                    outlinePaint.color = android.graphics.Color.parseColor("#3B5998")
+                    outlinePaint.strokeWidth = 10f
+                    // Un itinéraire enchaîne des centaines de courts segments, et osmdroid ne touche
+                    // ni aux jointures ni aux bouts de son Paint : restent les valeurs par défaut,
+                    // jointure en pointe et bout coupé net. Passé la limite d'onglet, une pointe est
+                    // rabattue en biseau — d'où ces angles coupés et ces creux dans les virages
+                    // serrés. En rond, les segments se raccordent sans manque et la courbe est lisse.
+                    outlinePaint.strokeJoin = android.graphics.Paint.Join.ROUND
+                    outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
+                }
+                line.setOnClickListener { _, _, _ ->
+                    onRemove()
+                    refreshMeasureLayers(map)
+                    true
+                }
+                measureOverlay.add(line)
             }
-            line.setOnClickListener { _, _, _ ->
-                onRemove()
-                refreshMeasureLayers(map)
-                true
-            }
-            measureOverlay.add(line)
 
             val labelMarker = Marker(map).apply {
                 position = measureLabelPosition(path)
@@ -2816,7 +2963,7 @@ fun MapScreen(
             val route = measureRouteAlignedOnSegment(
                 segment,
                 routeProfile
-                    ?.let { profile -> measureRoutes[measureRouteKey(segment, profile)] }
+                    ?.let { profile -> measureRoutes[measureRouteCacheKey(segment, profile)] }
                     ?.let { it as? MeasureRoute.Ready }
             )
             addMeasureSegment(segment.start, segment.end, route) {
@@ -2849,6 +2996,9 @@ fun MapScreen(
                 setPoints(listOf(myLoc, antLoc))
                 outlinePaint.color = android.graphics.Color.parseColor("#3B5998")
                 outlinePaint.strokeWidth = 10f
+                // Même finition que les traits de la chaîne, pour que les deux se ressemblent.
+                outlinePaint.strokeJoin = android.graphics.Paint.Join.ROUND
+                outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
             }
             line.setOnClickListener { _, _, _ ->
                 measuredSites.remove(antenna.idAnfr)
@@ -3587,10 +3737,10 @@ fun MapScreen(
     }
     val measureRouteProfileValue = measureRouteProfile()
     // Signature des itinéraires à obtenir. On relance les requêtes là-dessus et non sur les segments
-    // eux-mêmes : la clé arrondit « ma position » (cf. measureRouteKey), donc marcher quelques
+    // eux-mêmes : la clé arrondit « ma position » (cf. measureRouteRequestKey), donc marcher quelques
     // mètres ne repart pas de zéro et n'interrompt pas un calcul en cours.
     val measureRouteSignature = measureRouteProfileValue?.let { profile ->
-        currentMeasureSegments.joinToString("|") { measureRouteKey(it, profile) }
+        currentMeasureSegments.joinToString("|") { measureRouteRequestKey(it, profile) }
     }
     // Un seul avertissement par activation : un itinéraire qui échoue échoue souvent pour tous les
     // traits (hors de France, réseau coupé), et autant de toasts serait insupportable.
@@ -3613,13 +3763,15 @@ fun MapScreen(
 
     // Mode « par la route / par les chemins » : on demande son itinéraire à chaque trait, un par un
     // — le service de la Géoplateforme est public et sans clé, on ne le sollicite pas en rafale. Le
-    // trait reste direct tant que la réponse n'est pas là, et le redevient si le calcul échoue.
+    // trait reste direct tant qu'aucune réponse n'est arrivée ; ensuite l'itinéraire obtenu tient
+    // jusqu'au suivant, réseau perdu compris.
     LaunchedEffect(isMeasuringMode, measureRouteProfileValue, measureRouteSignature) {
         val profile = measureRouteProfileValue ?: return@LaunchedEffect
         if (!isMeasuringMode) return@LaunchedEffect
         currentMeasureSegments.forEach { segment ->
-            val key = measureRouteKey(segment, profile)
-            if (measureRoutes.containsKey(key)) return@forEach
+            val requestKey = measureRouteRequestKey(segment, profile)
+            if (!measureRouteRequests.add(requestKey)) return@forEach
+            val cacheKey = measureRouteCacheKey(segment, profile)
             // Trait hors de portée d'un réseau routier commun : inutile d'appeler le service, mais
             // le trait direct qui subsiste est annoncé comme les autres échecs (toast plus bas).
             val tooFarToRoute =
@@ -3635,27 +3787,37 @@ fun MapScreen(
                     )
                 }
             } catch (cancellation: kotlinx.coroutines.CancellationException) {
-                // Chaîne modifiée en cours de route : on laisse la clé libre pour un nouvel essai.
+                // Chaîne modifiée en cours de route : on rend la clé pour un nouvel essai.
+                measureRouteRequests.remove(requestKey)
                 throw cancellation
             } catch (error: Throwable) {
                 AppLogger.w("GeoTowerMap", "Measure route unavailable", error)
                 null
             }
-            measureRoutes[key] = route
-                ?.let { result ->
-                    MeasureRoute.Ready(
-                        points = result.points.map { GeoPoint(it[0], it[1]) },
-                        distanceMeters = result.distanceMeters
-                    )
+
+            if (route != null) {
+                measureRoutes[cacheKey] = MeasureRoute.Ready(
+                    points = route.points.map { GeoPoint(it[0], it[1]) },
+                    distanceMeters = route.distanceMeters
+                )
+            } else {
+                // Échec : le dernier itinéraire connu reste affiché, recalé sur la position — sortir
+                // d'un tunnel ou traverser une zone blanche ne doit pas ramener la ligne droite. Et
+                // on rend la clé, pour retenter dès que la chaîne ou la position bouge.
+                measureRouteRequests.remove(requestKey)
+                if (measureRoutes[cacheKey] !is MeasureRoute.Ready) {
+                    // Là, rien n'a jamais abouti : le trait direct est ce qu'on affiche, et c'est le
+                    // seul cas qui mérite d'être annoncé.
+                    measureRoutes[cacheKey] = MeasureRoute.Unavailable
+                    if (!measureRouteWarningShown) {
+                        measureRouteWarningShown = true
+                        Toast.makeText(
+                            context,
+                            context.getString(R.string.appstrings_measure_route_unavailable),
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
                 }
-                ?: MeasureRoute.Unavailable
-            if (route == null && !measureRouteWarningShown) {
-                measureRouteWarningShown = true
-                Toast.makeText(
-                    context,
-                    context.getString(R.string.appstrings_measure_route_unavailable),
-                    Toast.LENGTH_SHORT
-                ).show()
             }
             mapViewRef?.let { refreshMeasureLayers(it) }
         }
@@ -3841,6 +4003,9 @@ fun MapScreen(
                         }
                     }
                     locationOverlay.setEnableAutoStop(false)
+                    // Se déplacer à la main sur la carte rend la main : la poursuite s'arrête au
+                    // lieu de ramener la vue sur la position à l'image suivante.
+                    locationOverlay.onUserPan = { isTrackingActive = false }
                     locationOverlay.showLocationMarker = AppConfig.showMapLocationMarker.value
                     locationOverlay.enableMyLocation()
 
@@ -3970,7 +4135,6 @@ fun MapScreen(
                         overlay.smoothRenderingActive = smoothLocationEnabled
                         shouldInvalidateMap = true
                     }
-                    overlay.smoothFollowActive = smoothLocationEnabled && isTrackingActive
                 }
 
                 // --- Orientation de la carte ---------------------------------------------------
@@ -4468,7 +4632,9 @@ fun MapScreen(
                     performSearch(searchQuery)
                     focusManager.clearFocus()
                 },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                autoFocus = searchAutoFocusPending,
+                onAutoFocusHandled = { searchAutoFocusPending = false }
             )
         }
 
@@ -5032,7 +5198,7 @@ fun MapScreen(
                 val route = measureRouteAlignedOnSegment(
                     segment,
                     measureRouteProfileValue
-                        ?.let { profile -> measureRoutes[measureRouteKey(segment, profile)] }
+                        ?.let { profile -> measureRoutes[measureRouteCacheKey(segment, profile)] }
                         ?.let { it as? MeasureRoute.Ready }
                 )
                 route?.distanceMeters ?: segment.start.distanceToAsDouble(segment.end)
@@ -5040,7 +5206,7 @@ fun MapScreen(
             // Itinéraires encore attendus : la clé n'est pas dans le cache. Le total affiché est
             // alors encore celui des traits directs, et la pilule le dit (animation + ligne d'état).
             val measureRoutesPending = measureRouteProfileValue?.let { profile ->
-                currentMeasureSegments.any { !measureRoutes.containsKey(measureRouteKey(it, profile)) }
+                currentMeasureSegments.any { !measureRoutes.containsKey(measureRouteCacheKey(it, profile)) }
             } == true
 
             // Total et suppression restent à leur place ; c'est le tiroir de mesure qui s'écarte.
@@ -5225,7 +5391,12 @@ fun MapScreen(
                     onToggleSearch = {
                         if (canUseMapSearch) {
                             isSearchActive = !isSearchActive
+                        // Ouvrir la barre pose le curseur dans le champ et lève le clavier ; la
+                        // refermer le range, sinon il resterait devant la carte qu'on vient de
+                        // dégager.
+                        searchAutoFocusPending = isSearchActive
                         if (!isSearchActive) {
+                            focusManager.clearFocus()
                             restoreOperatorSearchSelection()
                             searchQuery = ""
                             setCurrentCitySearch(null, null)
@@ -5301,7 +5472,9 @@ fun MapScreen(
                                     performSearch(searchQuery)
                                     focusManager.clearFocus()
                                 },
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier.weight(1f),
+                                autoFocus = searchAutoFocusPending,
+                                onAutoFocusHandled = { searchAutoFocusPending = false }
                             )
                             Spacer(modifier = Modifier.width(sizing.spacing(10.dp)))
                             toolboxContent()
@@ -5399,40 +5572,32 @@ fun MapScreen(
                                 map.controller.setCenter(location)
                                 currentZoom = zoom
                                 currentLat = location.latitude
-                                hasCenteredOnLocation = true
                             }
 
-                            when {
-                                isTrackingActive -> {
-                                    isTrackingActive = false
-                                    hasCenteredOnLocation = false
-                                    locationOverlay.disableFollowLocation()
-                                }
-                                !hasCenteredOnLocation -> {
-                                    locationOverlay.disableFollowLocation()
-                                    val location = locationOverlay.myLocation ?: myCurrentLoc
-                                    if (location != null) {
-                                        centerOnLocation(location)
-                                    } else {
-                                        locationOverlay.enableMyLocation()
-                                        locationOverlay.runOnFirstFix {
-                                            locationOverlay.myLocation?.let { firstLocation ->
-                                                map.post { centerOnLocation(firstLocation) }
-                                            }
-                                        }
+                            // Un seul effet : le bouton lance la poursuite, il ne l'arrête jamais.
+                            // C'est le glissement du doigt sur la carte qui rend la main (cf.
+                            // `onUserPan`) : on n'est plus bloqué sur sa position jusqu'à un second
+                            // appui. Rappuyer pendant la poursuite se contente donc de recadrer.
+                            isTrackingActive = true
+                            locationOverlay.setEnableAutoStop(false)
+                            locationOverlay.enableMyLocation()
+                            // En mode fluide, le recentrage est piloté image par image par la couche
+                            // de rendu : laisser en plus osmdroid animer la carte à chaque relevé
+                            // ferait tourner deux poursuites concurrentes.
+                            if (!smoothLocationEnabled) {
+                                locationOverlay.enableFollowLocation()
+                            }
+
+                            val known = locationOverlay.myLocation ?: myCurrentLoc
+                            if (known != null) {
+                                centerOnLocation(known)
+                            } else {
+                                // Pas encore de relevé : on cadre au premier qui tombe plutôt que de
+                                // laisser l'appui sans effet visible.
+                                locationOverlay.runOnFirstFix {
+                                    locationOverlay.myLocation?.let { firstLocation ->
+                                        map.post { centerOnLocation(firstLocation) }
                                     }
-                                }
-                                else -> {
-                                    isTrackingActive = true
-                                    locationOverlay.setEnableAutoStop(false)
-                                    locationOverlay.enableMyLocation()
-                                    // En mode fluide, le recentrage est piloté image par image par
-                                    // la couche de rendu : laisser en plus osmdroid animer la carte
-                                    // à chaque relevé ferait tourner deux poursuites concurrentes.
-                                    if (!smoothLocationEnabled) {
-                                        locationOverlay.enableFollowLocation()
-                                    }
-                                    (locationOverlay.myLocation ?: myCurrentLoc)?.let { centerOnLocation(it) }
                                 }
                             }
                         }
@@ -5568,46 +5733,47 @@ fun MapScreen(
             )
             }
 
-            if (plannerAskForDate) {
+            if (plannerAskToSave) {
                 AlertDialog(
-                    onDismissRequest = { plannerAskForDate = false },
-                    title = { Text(stringResource(R.string.trips_schedule_prompt_title)) },
-                    text = { Text(stringResource(R.string.trips_schedule_prompt_message)) },
+                    // Fermer sans choisir ramène à la carte : ni enregistrement ni perte.
+                    onDismissRequest = { plannerAskToSave = false },
+                    title = { Text(stringResource(R.string.trips_save_prompt_title)) },
+                    text = { Text(stringResource(R.string.trips_save_prompt_message)) },
                     confirmButton = {
                         TextButton(onClick = {
-                            plannerAskForDate = false
-                            plannerScheduling = true
+                            plannerAskToSave = false
+                            plannerSaving = true
                         }) {
-                            Text(stringResource(R.string.trips_schedule_prompt_set))
+                            Text(stringResource(R.string.trips_save_prompt_save))
                         }
                     },
                     dismissButton = {
-                        TextButton(onClick = {
-                            // Partir sans date est un choix légitime : on n'y revient pas.
-                            plannerAskForDate = false
-                            safeBackNavigation.navigateBack()
-                        }) {
-                            Text(stringResource(R.string.trips_schedule_prompt_later))
+                        TextButton(onClick = discardTripEditing) {
+                            Text(stringResource(R.string.trips_save_prompt_discard))
                         }
                     }
                 )
             }
 
-            if (plannerScheduling) {
+            if (plannerSaving) {
                 TripScheduleDialog(
                     plan = plan,
-                    onDismiss = { plannerScheduling = false },
-                    onConfirm = { plannedAtMillis, reminderOffsets, stopMinutes ->
+                    // Nom, date et heure d'un seul geste : c'est le moment où l'on décide ce que
+                    // devient la tournée.
+                    editableName = true,
+                    onDismiss = { plannerSaving = false },
+                    onConfirm = { name, plannedAtMillis, reminderOffsets, stopMinutes ->
                         val next = plan.withSchedule(
                             context = context,
                             plannedAtMillis = plannedAtMillis,
                             reminderOffsetsMinutes = reminderOffsets,
                             stopDurationMinutes = stopMinutes,
-                            locale = configuration.locales[0]
+                            locale = configuration.locales[0],
+                            editedName = name
                         )
                         savePlan(next)
                         TripReminderScheduler.reschedule(context, next)
-                        plannerScheduling = false
+                        plannerSaving = false
                         safeBackNavigation.navigateBack()
                     }
                 )
@@ -6181,9 +6347,26 @@ private fun MapSearchBar(
     placeholder: String,
     onQueryChange: (String) -> Unit,
     onSearch: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    autoFocus: Boolean = false,
+    onAutoFocusHandled: () -> Unit = {}
 ) {
     val sizing = LocalGeoTowerUiSizing.current
+    val focusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    LaunchedEffect(autoFocus) {
+        if (!autoFocus) return@LaunchedEffect
+        // La barre entre en fondu : sans attendre la première image, le nœud de focus n'est pas
+        // encore posé et la demande partirait dans le vide.
+        withFrameNanos { }
+        focusRequester.requestFocus()
+        // Le focus suffit d'ordinaire à lever le clavier, mais pas quand la vue vient d'apparaître :
+        // on le demande explicitement.
+        keyboardController?.show()
+        onAutoFocusHandled()
+    }
+
     Surface(
         modifier = modifier.height(mapSearchBarHeight),
         shape = RoundedCornerShape(mapSearchBarHeight / 2f),
@@ -6227,7 +6410,9 @@ private fun MapSearchBar(
                     keyboardActions = androidx.compose.foundation.text.KeyboardActions(
                         onSearch = { onSearch() }
                     ),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(focusRequester)
                 )
             }
 
@@ -6629,11 +6814,18 @@ open class CustomLocationOverlay(
     var smoothRenderingActive = false
 
     /**
-     * Poursuite pilotée par la couche fluide. osmdroid bloque le déplacement au doigt tant que son
-     * propre suivi est actif ; comme on ne l'utilise plus dans ce mode, on reproduit ce blocage ici,
-     * sans quoi le geste de l'utilisateur et le recentrage se battraient à chaque image.
+     * Prévient qu'un glissement du doigt vient de déplacer la carte : la poursuite doit rendre la
+     * main, sinon le geste de l'utilisateur et le recentrage se battraient à chaque image.
      */
-    var smoothFollowActive = false
+    var onUserPan: (() -> Unit)? = null
+
+    private val touchSlopPx =
+        android.view.ViewConfiguration.get(mapView.context).scaledTouchSlop.toFloat()
+
+    /** Point d'appui du glissement en cours. NaN = aucun doigt suivi pour l'instant. */
+    private var dragAnchorX = Float.NaN
+    private var dragAnchorY = Float.NaN
+    private var dragReported = false
 
     // --- On prépare les objets de dessin une seule fois pour éviter les allocations dans draw() ---
     private val pt = android.graphics.Point()
@@ -6665,13 +6857,37 @@ open class CustomLocationOverlay(
         event: android.view.MotionEvent,
         mapView: org.osmdroid.views.MapView
     ): Boolean {
-        if (smoothFollowActive &&
-            event.action == android.view.MotionEvent.ACTION_MOVE &&
-            event.pointerCount == 1
-        ) {
-            return true // on avale le glissement à un doigt, le pincement reste possible
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> anchorDrag(event.x, event.y)
+            MotionEvent.ACTION_MOVE -> if (event.pointerCount == 1) {
+                if (dragAnchorX.isNaN()) {
+                    // Sans ACTION_DOWN vu passer (avalé par un autre calque, ou fin de pincement),
+                    // ce relevé fait référence : au pire on ignore le tout premier déplacement.
+                    anchorDrag(event.x, event.y)
+                } else if (!dragReported &&
+                    (abs(event.x - dragAnchorX) > touchSlopPx || abs(event.y - dragAnchorY) > touchSlopPx)
+                ) {
+                    // Le doigt déplace vraiment la carte : un simple appui (marqueur, mesure) ne doit
+                    // pas couper la poursuite, d'où le seuil de glissement du système plutôt que le
+                    // `setEnableAutoStop` d'osmdroid, qui coupe dès qu'un doigt se pose.
+                    dragReported = true
+                    // Avant `super` : tant que le suivi osmdroid est actif, il avale le glissement à
+                    // un doigt et la carte resterait collée à la position.
+                    if (isFollowLocationEnabled) disableFollowLocation()
+                    onUserPan?.invoke()
+                }
+            }
+            // Doigt posé ou levé : les indices de pointeur sont rebattus, mesurer l'écart avec le
+            // point d'appui d'un autre doigt ferait passer un pincement pour un déplacement.
+            else -> anchorDrag(Float.NaN, Float.NaN)
         }
         return super.onTouchEvent(event, mapView)
+    }
+
+    private fun anchorDrag(x: Float, y: Float) {
+        dragAnchorX = x
+        dragAnchorY = y
+        dragReported = false
     }
 }
 
