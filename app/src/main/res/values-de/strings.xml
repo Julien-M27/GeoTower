@@ -2375,6 +2375,10 @@
     <string name="appstrings_measure_delete_mode_desc">Lege fest, was mit den anderen Linien passiert, wenn du eine löschst.</string>
     <string name="appstrings_measure_delete_independent">Unabhängig (die anderen Linien bleiben unverändert)</string>
     <string name="appstrings_measure_delete_reconnect">Neu verbinden (mit dem vorherigen Punkt neu berechnen)</string>
+    <string name="appstrings_routing_title">Routenberechnung</string>
+    <string name="appstrings_routing_desc">Gilt für Messungen entlang der Straßen und für geplante Touren. Zu Fuß ohne Wirkung: Der Dienst liefert dann in beiden Fällen denselben Weg.</string>
+    <string name="appstrings_routing_fastest">Schnellste (bevorzugt Hauptstraßen)</string>
+    <string name="appstrings_routing_shortest">Kürzeste (geringste Entfernung)</string>
     <string name="appstrings_measure_total_distance">Gesamt: %1$s</string>
     <string name="appstrings_measure_follow_roads_straight">Luftlinie</string>
     <string name="appstrings_measure_follow_roads_car">Entlang der Straßen</string>
@@ -2899,4 +2903,36 @@
     <string name="appstrings_release_v2031_nearest_filters">Die Verfolgung des nächstgelegenen Standorts behält nur noch, was die Karte zeigen würde: Deine Filter für Betreiber, Technologie, Untergrund und Funkloch gelten auch dort</string>
     <string name="appstrings_release_v2031_nearest_refresh">Das Ändern eines Filters startet die Verfolgung sofort neu, statt auf deine nächste Bewegung zu warten</string>
     <string name="appstrings_release_v2031_measure_search">Die Suche während einer Messung aufzurufen, erklärt jetzt, was zu tun ist, statt beides übereinanderzulegen</string>
+
+    <!-- Journal des notifications reçues par l'application -->
+    <string name="notification_history_title">Benachrichtigungen</string>
+    <string name="notification_history_none">Keine Benachrichtigung</string>
+    <string name="notification_history_empty">Noch keine Benachrichtigung aufgezeichnet.</string>
+    <string name="notification_history_clear">Protokoll leeren</string>
+    <string name="notification_history_clear_title">Protokoll leeren?</string>
+    <string name="notification_history_clear_desc">Alle aufgezeichneten Einträge werden gelöscht. Bereits vom System angezeigte Benachrichtigungen sind nicht betroffen.</string>
+    <string name="notification_history_settings_title">Anzeige des Protokolls</string>
+    <string name="notification_history_option_counter">Zähler anzeigen</string>
+    <string name="notification_history_option_detail">Nicht angezeigte Benachrichtigungen markieren</string>
+    <string name="notification_history_filter_all">Alle</string>
+    <string name="notification_history_muted">Die Benachrichtigungen der App sind ausgeschaltet: Ereignisse werden hier weiter aufgezeichnet, erscheinen aber nicht mehr in der Statusleiste.</string>
+    <string name="notification_history_not_shown">Nicht angezeigt</string>
+    <string name="notification_history_open_unavailable">Für diese Benachrichtigung gibt es nichts zu öffnen.</string>
+    <string name="notification_history_type_db_mobile">Mobilfunk-Datenbank</string>
+    <string name="notification_history_type_db_radio">Radio-Datenbank</string>
+    <string name="notification_history_type_db_enb">eNB/gNB-Kennungen</string>
+    <string name="notification_history_type_db_local_build">Aufbau der Datenbank</string>
+    <string name="notification_history_type_db_update">Datenbank-Update</string>
+    <string name="notification_history_type_app_update">App-Update</string>
+    <string name="notification_history_type_map_download">Offline-Karte</string>
+    <string name="notification_history_type_outages">Ausgefallene Standorte</string>
+    <string name="notification_history_type_photo_upload">Fotoversand</string>
+    <string name="notification_history_type_photo_report">Fotomeldung</string>
+    <string name="notification_history_type_trip_reminder">Fahrt-Erinnerung</string>
+    <string name="notification_history_type_pdf_report">PDF-Bericht</string>
+
+    <!-- Versionshinweise 2.0.32 -->
+    <string name="appstrings_release_v2032_notification_history">Eine Seite „Benachrichtigungen“ hält fest, was die App dir melden wollte, nach Art sortiert und filterbar</string>
+    <string name="appstrings_release_v2032_notification_not_shown">Ereignisse werden auch dann festgehalten, wenn die Benachrichtigung nicht erscheinen konnte – Benachrichtigungen aus, Berechtigung verweigert – und das Protokoll sagt es</string>
+    <string name="appstrings_release_v2032_routing_choice">Eine Einstellung wählt zwischen schnellster und kürzester Route, für Messungen „entlang der Straße“ und geplante Touren; zu Fuß ohne Wirkung, da der Dienst dann dieselbe Strecke liefert</string>
 </resources>

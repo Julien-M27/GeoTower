@@ -226,8 +226,20 @@ data class TripLeg(
     val durationSeconds: Double,
     val encodedGeometry: String,
     /** Manœuvres du guidage tour par tour. `null` tant que le lot 4 n'est pas livré. */
-    val maneuvers: List<TripManeuver>?
+    val maneuvers: List<TripManeuver>?,
+    /**
+     * Mode d'optimisation qui a produit ce segment ([RouteApi.OPTIMIZATION_FASTEST] ou
+     * [RouteApi.OPTIMIZATION_SHORTEST]).
+     *
+     * Ajouté après coup, donc **en fin de classe** et nullable : Gson le relit à `null` sur un
+     * trajet écrit par une version antérieure, ce qui est le bon repli — tous ces segments-là ont
+     * été calculés « le plus rapide », le seul mode qui existait. Voir [effectiveOptimization].
+     */
+    val optimization: String? = null
 ) {
+    /** Le mode réellement utilisé, un segment d'avant le réglage valant « le plus rapide ». */
+    fun effectiveOptimization(): String = optimization ?: RouteApi.OPTIMIZATION_FASTEST
+
     /** Écarte un segment dont les indices ne pointent plus sur des étapes existantes. */
     fun isWithin(stepCount: Int): Boolean =
         fromIndex in 0 until stepCount && toIndex in 0 until stepCount && fromIndex != toIndex

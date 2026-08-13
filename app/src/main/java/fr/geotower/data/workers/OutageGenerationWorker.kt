@@ -23,6 +23,7 @@ import fr.geotower.data.outages.OutageGenerationStep
 import fr.geotower.data.outages.OutageLocalConfig
 import fr.geotower.data.outages.labelRes
 import fr.geotower.utils.AppLogger
+import fr.geotower.data.notifications.NotificationHistoryStore
 import fr.geotower.utils.AppNotifications
 import fr.geotower.utils.NotificationIconResources
 import java.util.concurrent.atomic.AtomicInteger
@@ -174,6 +175,7 @@ class OutageGenerationWorker(
     }
 
     private fun showResult(count: Int, breakdown: String) {
+        recordHistory(NotificationHistoryStore.STATUS_SUCCESS, itemCount = count)
         val content = context.getString(R.string.outage_gen_notif_done, count)
         val builder = NotificationCompat.Builder(context, channelId)
             .setContentTitle(context.getString(R.string.outage_gen_notif_title))
@@ -188,6 +190,7 @@ class OutageGenerationWorker(
     }
 
     private fun showFailure(message: String) {
+        recordHistory(NotificationHistoryStore.STATUS_ERROR, detail = message)
         val builder = NotificationCompat.Builder(context, channelId)
             .setContentTitle(context.getString(R.string.outage_gen_notif_title))
             .setContentText(context.getString(R.string.outage_gen_notif_failed, message))
@@ -196,6 +199,19 @@ class OutageGenerationWorker(
             .setAutoCancel(true)
         NotificationIconResources.applyTo(builder, context)
         notifySafely(RESULT_NOTIFICATION_ID, builder.build())
+    }
+
+    /** Consigné même quand la notification ne part pas : voir [NotificationHistoryStore]. */
+    private fun recordHistory(status: String, itemCount: Int = 0, detail: String = "") {
+        NotificationHistoryStore.record(
+            context = context,
+            type = NotificationHistoryStore.TYPE_OUTAGES,
+            status = status,
+            detail = detail,
+            itemCount = itemCount,
+            target = "geotower://local_mode",
+            posted = AppNotifications.canPost(context)
+        )
     }
 
     private fun settingsPendingIntent(): PendingIntent {

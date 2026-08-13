@@ -25,6 +25,7 @@ import fr.geotower.data.api.EnbDatabaseDownloader
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.db.DbOperationTimings
 import fr.geotower.utils.AppLogger
+import fr.geotower.data.notifications.NotificationHistoryStore
 import fr.geotower.utils.AppNotifications
 import fr.geotower.utils.NotificationIconResources
 import kotlinx.coroutines.CancellationException
@@ -190,6 +191,7 @@ class EnbDatabaseDownloadWorker(
     }
 
     private fun showSuccessNotification() {
+        recordHistory(NotificationHistoryStore.STATUS_SUCCESS)
         val notification = NotificationCompat.Builder(context, channelId)
             .setContentTitle(context.getString(R.string.notification_database_downloaded_title))
             .setContentText(context.getString(R.string.notification_database_downloaded_content))
@@ -202,6 +204,7 @@ class EnbDatabaseDownloadWorker(
     }
 
     private fun showErrorNotification() {
+        recordHistory(NotificationHistoryStore.STATUS_ERROR)
         val notification = NotificationCompat.Builder(context, channelId)
             .setContentTitle(context.getString(R.string.notification_database_download_failed_title))
             .setContentText(context.getString(R.string.notification_database_download_failed_content))
@@ -210,6 +213,17 @@ class EnbDatabaseDownloadWorker(
             .build()
 
         notifySafely(DownloadNotificationCenter.ENB_DB_DOWNLOAD_RESULT_NOTIFICATION_ID, notification)
+    }
+
+    /** Voir [DatabaseDownloadWorker] : on consigne même quand la notification ne part pas. */
+    private fun recordHistory(status: String) {
+        NotificationHistoryStore.record(
+            context = context,
+            type = NotificationHistoryStore.TYPE_DB_ENB,
+            status = status,
+            target = "geotower://settings?section=db_enb",
+            posted = AppNotifications.canPost(context)
+        )
     }
 
     private fun settingsPendingIntent(requestCode: Int, showSuccessPopup: Boolean): PendingIntent {

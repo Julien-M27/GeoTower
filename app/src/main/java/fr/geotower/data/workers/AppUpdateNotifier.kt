@@ -15,6 +15,7 @@ import fr.geotower.data.api.AppUpdateChecker
 import fr.geotower.data.api.AppUpdateState
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.utils.AppLocale
+import fr.geotower.data.notifications.NotificationHistoryStore
 import fr.geotower.utils.AppNotifications
 import fr.geotower.utils.NotificationIconResources
 import kotlinx.coroutines.sync.Mutex
@@ -81,6 +82,20 @@ object AppUpdateNotifier {
     }
 
     private fun showNotification(context: Context, latestRelease: AppReleaseInfo) {
+        // Seule entrée du journal qui suppose la notification réellement affichée : les garde-fous en
+        // amont (notifications de mise à jour coupées, canPost) sortent AVANT d'avoir écrit
+        // LAST_NOTIFIED_APP_RELEASE_KEY, exprès, pour que l'alerte reparte une fois les notifications
+        // rallumées. Y consigner plus tôt obligerait à déplacer ce garde-fou et ferait sauter cette
+        // reprise. Rien n'est perdu pour autant : AppUpdateState.record() garde la mise à jour
+        // visible dans l'interface même notifications coupées.
+        NotificationHistoryStore.record(
+            context = context,
+            type = NotificationHistoryStore.TYPE_APP_UPDATE,
+            status = NotificationHistoryStore.STATUS_INFO,
+            label = latestRelease.versionName,
+            target = latestRelease.downloadUrl,
+            posted = true
+        )
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
         val appLanguage = prefs.getString("app_language", AppLocale.LANGUAGE_SYSTEM) ?: AppLocale.LANGUAGE_SYSTEM

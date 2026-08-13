@@ -38,15 +38,22 @@ object TripRouteCalculator {
     /**
      * @param force recalcule tous les segments, y compris ceux déjà connus. C'est ce qu'impose un
      *   changement de profil : un tracé voiture ne vaut rien pour un trajet à pied.
+     * @param optimization « le plus rapide » ou « le plus court » (cf. `AppConfig.routeOptimization`).
+     *   Les segments calculés dans l'autre mode sont refaits, sans quoi le trajet mélangerait les
+     *   deux après un changement de réglage.
      */
-    suspend fun computeRoute(plan: TripPlan, force: Boolean = false): TripRouteOutcome {
-        val requests = TripRoutePlanner.planRequests(plan, force)
+    suspend fun computeRoute(
+        plan: TripPlan,
+        force: Boolean = false,
+        optimization: String = RouteApi.OPTIMIZATION_FASTEST
+    ): TripRouteOutcome {
+        val requests = TripRoutePlanner.planRequests(plan, force, optimization)
         if (requests.isEmpty()) return TripRouteOutcome(plan, requestCount = 0, failedRequests = 0)
 
         val computed = ArrayList<TripLeg>()
         var failed = 0
         for (request in requests) {
-            val legs = runRequest(plan, request)
+            val legs = runRequest(plan, request, optimization)
             if (legs == null) failed++ else computed += legs
         }
 
@@ -68,7 +75,11 @@ object TripRouteCalculator {
     }
 
     /** Rend les segments d'une tranche, ou `null` si la requête a échoué en entier. */
-    private suspend fun runRequest(plan: TripPlan, stepIndices: List<Int>): List<TripLeg>? {
+    private suspend fun runRequest(
+        plan: TripPlan,
+        stepIndices: List<Int>,
+        optimization: String
+    ): List<TripLeg>? {
         val points = stepIndices.map { doubleArrayOf(plan.steps[it].latitude, plan.steps[it].longitude) }
         if (points.size < 2) return null
 
@@ -80,7 +91,7 @@ object TripRouteCalculator {
         if (tooFar) return null
 
         val portions = try {
-            withContext(Dispatchers.IO) { RouteApi.getRoutePortions(points, plan.profile) }
+            withContext(Dispatchers.IO) { RouteApi.getRoutePortions(points, plan.profile, optimization) }
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (error: Throwable) {
@@ -106,7 +117,8 @@ object TripRouteCalculator {
                             durationSeconds = it.durationSeconds
                         )
                     }
-                    .takeIf { it.isNotEmpty() }
+                    .takeIf { it.isNotEmpty() },
+                optimization = optimization
             )
         }
     }

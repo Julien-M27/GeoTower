@@ -282,8 +282,9 @@ internal fun homeHelpAlignment(corner: String): Alignment = when (corner) {
 }
 
 /**
- * Écart au bord, partagé par le vrai bouton et par les cibles du glissé — en haut à droite il
- * descend sous le bouton « Quitter », qui occupe déjà le coin.
+ * Écart au bord, partagé par le vrai bouton et par les cibles du glissé — les DEUX coins du haut
+ * descendent sous les boutons qui les occupent déjà : « Quitter » à droite, « Notifications » à
+ * gauche. Le cas ne visait que TOP_END tant que le coin gauche était libre.
  *
  * Pas de `navigationBarsPadding()` en bas : l'accueil est déjà décalé de la barre système par le
  * `innerPadding` du Scaffold racine, l'ajouter ici le compterait deux fois.
@@ -295,7 +296,7 @@ internal fun homeHelpCornerPadding(corner: String, sizing: GeoTowerUiSizing): Pa
         end = sizing.spacing(20.dp),
         bottom = sizing.spacing(32.dp)
     )
-    corner == TOP_END -> PaddingValues(
+    corner.startsWith("top") -> PaddingValues(
         start = sizing.spacing(20.dp),
         top = sizing.spacing(72.dp),
         end = sizing.spacing(20.dp),

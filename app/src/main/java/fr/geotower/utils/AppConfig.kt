@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import fr.geotower.data.api.RouteApi
 import fr.geotower.data.build.LocalBuildCapability
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.db.GeoTowerDatabaseValidator
@@ -175,6 +176,10 @@ object AppConfig {
     // Les deux derniers demandent un itinéraire au service navigation IGN (RouteApi) et affichent
     // la distance réelle du trajet ; le trait direct ne consomme aucun réseau.
     var measureFollowRoadsMode = mutableIntStateOf(0)
+    // Itinéraires : true = demander le trajet le plus court en distance, false = le plus rapide,
+    // qui est le défaut du service et privilégie les grands axes. Vaut pour la mesure « par la
+    // route » comme pour les trajets planifiés. Cf. routeOptimization().
+    var routePreferShortest = mutableStateOf(false)
     var showMapLocationMarker = mutableStateOf(true)
     // Déplacement continu du repère de position entre deux points GPS (interpolation, extrapolation
     // et estime piétonne). Coupé d'office en mode faible consommation, cf. PowerProfile.
@@ -392,6 +397,7 @@ object AppConfig {
         showSpeedometer.value = MapDisplayPrefs.showSpeedometer.read(prefs)
         measureReconnectOnDelete.value = MapDisplayPrefs.measureReconnectOnDelete.read(prefs)
         measureFollowRoadsMode.intValue = MapDisplayPrefs.measureFollowRoadsMode.read(prefs)
+        routePreferShortest.value = MapDisplayPrefs.routePreferShortest.read(prefs)
 
         showSitesInService.value = MapDisplayPrefs.showSitesInService.read(prefs)
         showSitesOutOfService.value = MapDisplayPrefs.showSitesOutOfService.read(prefs)
@@ -425,6 +431,14 @@ object AppConfig {
         f5G_4200.value = MapDisplayPrefs.f5G4200.read(prefs)
         f5G_26000.value = MapDisplayPrefs.f5G26000.read(prefs)
     }
+
+    /**
+     * Le mode d'optimisation à demander au service d'itinéraire, d'après [routePreferShortest].
+     * Source unique pour les trois endroits qui calculent une route : la mesure « par la route »,
+     * les segments d'un trajet planifié et son trajet d'approche.
+     */
+    fun routeOptimization(): String =
+        if (routePreferShortest.value) RouteApi.OPTIMIZATION_SHORTEST else RouteApi.OPTIMIZATION_FASTEST
 
     // --- Mode « traitement local » : niveau effectif + dérivés ---
     /** Niveau effectif : le kill-switch distant [RemoteFeatureFlags.Features.LOCAL_MODE_ENABLED] peut forcer 0. */

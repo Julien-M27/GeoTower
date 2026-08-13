@@ -95,4 +95,8 @@
         <item quantity="one">%1$d etapa</item>
         <item quantity="other">%1$d etapas</item>
     </plurals>
+    <plurals name="notification_history_recorded">
+        <item quantity="one">%1$d notificación registrada</item>
+        <item quantity="other">%1$d notificaciones registradas</item>
+    </plurals>
 </resources>

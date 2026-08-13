@@ -95,4 +95,8 @@
         <item quantity="one">%1$d step</item>
         <item quantity="other">%1$d steps</item>
     </plurals>
+    <plurals name="notification_history_recorded">
+        <item quantity="one">%1$d notification recorded</item>
+        <item quantity="other">%1$d notifications recorded</item>
+    </plurals>
 </resources>

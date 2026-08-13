@@ -32,6 +32,7 @@ import fr.geotower.data.upload.SignalQuestUploadManifest
 import fr.geotower.data.upload.SignalQuestUploadQueue
 import fr.geotower.data.upload.SignalQuestUploadQueueException
 import fr.geotower.utils.AppLogger
+import fr.geotower.data.notifications.NotificationHistoryStore
 import fr.geotower.utils.AppNotifications
 import fr.geotower.utils.NotificationIconResources
 import fr.geotower.utils.OperatorColors
@@ -133,17 +134,17 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
                 }
                 summary.uploadedCount == total -> {
                     SignalQuestUploadQueue.cleanupUpload(applicationContext, uploadId)
-                    showFinishedNotification(uploadId, manifest.operator, summary.uploadedCount, total, partial = false, progressNotificationId, resultNotificationId)
+                    showFinishedNotification(uploadId, manifest.siteId, manifest.operator, summary.uploadedCount, total, partial = false, progressNotificationId, resultNotificationId)
                     Result.success(uploadResultData(summary.uploadedCount, total))
                 }
                 summary.uploadedCount > 0 -> {
                     SignalQuestUploadQueue.cleanupUpload(applicationContext, uploadId)
-                    showFinishedNotification(uploadId, manifest.operator, summary.uploadedCount, total, partial = true, progressNotificationId, resultNotificationId)
+                    showFinishedNotification(uploadId, manifest.siteId, manifest.operator, summary.uploadedCount, total, partial = true, progressNotificationId, resultNotificationId)
                     Result.success(uploadResultData(summary.uploadedCount, total))
                 }
                 else -> {
                     SignalQuestUploadQueue.cleanupUpload(applicationContext, uploadId)
-                    showFinishedNotification(uploadId, manifest.operator, summary.uploadedCount, total, partial = true, progressNotificationId, resultNotificationId)
+                    showFinishedNotification(uploadId, manifest.siteId, manifest.operator, summary.uploadedCount, total, partial = true, progressNotificationId, resultNotificationId)
                     Result.failure(uploadResultData(summary.uploadedCount, total))
                 }
             }
@@ -202,6 +203,20 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
     }
 
     private fun showCancelledNotification(uploadId: String, summary: CancelledUploadSummary, resultNotificationId: Int) {
+        // Une annulation est un aboutissement, pas un échec : elle entre au journal. Les reprises
+        // (showRetryNotification), elles, n'y entrent jamais — un envoi qui rebondit dix fois sur un
+        // réseau instable remplirait la page à lui seul alors qu'il n'est pas terminé.
+        // Le site n'est plus accessible ici (le manifeste vient d'être finalisé) : on vise
+        // l'historique des photos envoyées, qui sait, lui, rouvrir la fiche.
+        NotificationHistoryStore.record(
+            context = applicationContext,
+            type = NotificationHistoryStore.TYPE_PHOTO_UPLOAD,
+            status = NotificationHistoryStore.STATUS_INFO,
+            detail = summary.totalCount.toString(),
+            itemCount = summary.uploadedCount,
+            target = "photo_upload_history",
+            posted = AppNotifications.canPost(applicationContext)
+        )
         if (!AppNotifications.canPost(applicationContext)) return
         notifySafely(
             resultNotificationId,
@@ -364,6 +379,7 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
 
     private fun showFinishedNotification(
         uploadId: String,
+        siteId: String,
         operator: String,
         successCount: Int,
         total: Int,
@@ -372,6 +388,21 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
         resultNotificationId: Int
     ) {
         cancelSafely(progressNotificationId)
+        // Le clic sur la notification rouvre une popup de bilan, portée par des extras : elle ne se
+        // rejoue pas depuis le journal. On y vise donc la fiche support de l'envoi, comme le fait la
+        // notification de progression — c'est de toute façon ce que l'utilisateur vient chercher.
+        // `detail` porte le total brut, `itemCount` le nombre de photos parties : la page compose le
+        // libellé « x sur y » dans la langue du moment.
+        NotificationHistoryStore.record(
+            context = applicationContext,
+            type = NotificationHistoryStore.TYPE_PHOTO_UPLOAD,
+            status = if (partial) NotificationHistoryStore.STATUS_ERROR else NotificationHistoryStore.STATUS_SUCCESS,
+            label = operator,
+            detail = total.toString(),
+            itemCount = successCount,
+            target = siteId.takeIf { it.isNotBlank() }?.let { "geotower://support/${Uri.encode(it)}" }.orEmpty(),
+            posted = AppNotifications.canPost(applicationContext)
+        )
         // Le bilan de l'envoi suit l'interrupteur maître des notifications ; la progression, elle,
         // appartient au service de premier plan et vient d'être retirée juste au-dessus.
         if (!AppNotifications.canPost(applicationContext)) return

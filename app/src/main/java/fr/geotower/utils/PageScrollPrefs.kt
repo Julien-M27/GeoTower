@@ -39,6 +39,7 @@ object PageScrollPrefs {
     const val HISTORIES = "histories"
     const val PHOTO_UPLOAD_HISTORY = "photo_upload_history"
     const val SHARE_HISTORY = "share_history"
+    const val NOTIFICATION_HISTORY = "notification_history"
     const val DEPARTMENT_STATS = "department_stats"
     const val TRIPS = "trips"
 

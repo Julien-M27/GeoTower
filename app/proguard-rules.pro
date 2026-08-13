@@ -30,10 +30,10 @@
 # and the first read crashes with a ClassCastException.
 #
 # Deliberately NOT listed, because keeping a class also freezes its field names and would make the
-# files already on devices unreadable once: ShareHistoryEntry, ExternalPhotoUploadHistoryEntry and
-# WidgetSiteData. They are flat (no collection field) and therefore safe as they stand -- but add a
-# List/Map/Set field to any of them and it MUST be kept here, along with a migration for the entries
-# users would otherwise lose.
+# files already on devices unreadable once: ShareHistoryEntry, NotificationHistoryEntry,
+# ExternalPhotoUploadHistoryEntry and WidgetSiteData. They are flat (no collection field) and
+# therefore safe as they stand -- but add a List/Map/Set field to any of them and it MUST be kept
+# here, along with a migration for the entries users would otherwise lose.
 -keep class fr.geotower.data.api.** { *; }
 -keep class fr.geotower.data.models.** { *; }
 -keep class fr.geotower.data.outages.CachedOutages { *; }

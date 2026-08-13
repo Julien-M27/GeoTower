@@ -36,12 +36,15 @@ import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -93,6 +96,7 @@ import fr.geotower.R
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.config.RemoteHomeAnnouncement
 import fr.geotower.data.db.DatabaseVersionPolicy
+import fr.geotower.data.notifications.NotificationHistoryStore
 import fr.geotower.data.db.GeoTowerDatabaseValidator
 import fr.geotower.services.LiveTrackingController
 import androidx.compose.ui.draw.clip
@@ -288,6 +292,27 @@ fun HomeScreen(navController: NavController) {
     val isDbInvalid = localDbState == GeoTowerDatabaseValidator.LocalDatabaseState.INVALID
 
     val lifecycleOwner = LocalLifecycleOwner.current // À ajouter avant les Effects
+
+    // Pastille du bouton « Notifications ». Relue à chaque ON_RESUME, ce qui couvre les deux cas :
+    // le retour du journal (l'ouvrir vaut lecture, la pastille doit retomber) et le retour
+    // d'arrière-plan, où un worker a pu notifier pendant ce temps. Dans un NavHost, le
+    // LocalLifecycleOwner est celui de la destination, donc l'événement arrive bien dans les deux.
+    var unreadNotifications by remember { mutableStateOf(0) }
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                scope.launch {
+                    // Lecture d'un fichier JSON : jamais sur le fil principal.
+                    val count = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        NotificationHistoryStore.unreadCount(context)
+                    }
+                    unreadNotifications = count
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     // ✅ BLOC 1 : On réutilise l'état validé au splash/onboarding et on ne rescane qu'en fallback ou après téléchargement.
     LaunchedEffect(isOnline) {
@@ -544,6 +569,20 @@ fun HomeScreen(navController: NavController) {
                             .zIndex(3f)
                     )
 
+                    // Symétrique du bouton « Quitter », dans le coin opposé.
+                    HomeNotificationsButton(
+                        unreadCount = unreadNotifications,
+                        onClick = {
+                            safeClick {
+                                navController.navigate("notification_history") { launchSingleTop = true }
+                            }
+                        },
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(top = sizing.spacing(12.dp), start = sizing.spacing(12.dp))
+                            .zIndex(3f)
+                    )
+
                     if (isLandscape) {
                         Row(
                             modifier = Modifier
@@ -770,6 +809,40 @@ private fun HomeQuitButton(
             contentDescription = stringResource(R.string.appstrings_home_quit_app),
             tint = MaterialTheme.colorScheme.onSurfaceVariant
         )
+    }
+}
+
+/**
+ * Journal des notifications reçues, en haut à gauche. La pastille compte les entrées arrivées depuis
+ * la dernière ouverture de la page : sans elle, un bouton d'icône dans un coin n'attire jamais l'œil
+ * et le journal ne serait jamais consulté.
+ */
+@Composable
+private fun HomeNotificationsButton(
+    unreadCount: Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    IconButton(
+        onClick = onClick,
+        modifier = modifier
+    ) {
+        BadgedBox(
+            badge = {
+                if (unreadCount > 0) {
+                    Badge {
+                        // Au-delà de 99 la pastille déborderait du bouton.
+                        Text(if (unreadCount > 99) "99+" else unreadCount.toString())
+                    }
+                }
+            }
+        ) {
+            Icon(
+                Icons.Default.Notifications,
+                contentDescription = stringResource(R.string.notification_history_title),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 

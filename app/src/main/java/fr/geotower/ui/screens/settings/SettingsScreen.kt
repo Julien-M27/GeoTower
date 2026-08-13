@@ -632,6 +632,7 @@ fun SettingsScreen(
     var showMapAttribution by remember { mutableStateOf(prefs.getBoolean("show_map_attribution", true)) }
     var showMapSpeedometer by remember { mutableStateOf(MapDisplayPrefs.showSpeedometer.read(prefs)) }
     var measureReconnectOnDelete by remember { mutableStateOf(MapDisplayPrefs.measureReconnectOnDelete.read(prefs)) }
+    var routePreferShortest by AppConfig.routePreferShortest
     var showMapSettingsSheet by remember { mutableStateOf(false) }
     var showMapLocation by remember { mutableStateOf(prefs.getBoolean("show_map_location", true)) }
     var showMapLocationMarker by AppConfig.showMapLocationMarker
@@ -1045,7 +1046,7 @@ fun SettingsScreen(
             // deux vocabulaires, mais mène à la page qui les regroupe.
             directEntry(
                 context.getString(R.string.histories_title),
-                "historiques historique envoi photos signalquest upload partages partage export pdf sites supports genere",
+                "historiques historique envoi photos signalquest upload partages partage export pdf sites supports genere notifications notification journal alertes rappels",
                 Icons.Default.History
             ) { navController.navigate("histories") }
             directEntry(
@@ -2021,6 +2022,14 @@ fun SettingsScreen(
                     measureReconnectOnDelete = it
                     AppConfig.measureReconnectOnDelete.value = it
                     prefs.edit().putBoolean(MapDisplayPrefs.measureReconnectOnDelete.key, it).apply()
+                },
+
+                routePreferShortest = routePreferShortest,
+                onRoutePreferShortestChange = {
+                    // Délégué sur AppConfig.routePreferShortest : l'affectation met à jour l'état
+                    // partagé, il ne reste que la persistance.
+                    routePreferShortest = it
+                    prefs.edit().putBoolean(MapDisplayPrefs.routePreferShortest.key, it).apply()
                 },
 
                 onDismiss = { showMapSettingsSheet = false },

@@ -253,6 +253,7 @@ private fun rememberGeoTowerBreadcrumbLabels(): GeoTowerBreadcrumbLabels {
         speedtests = stringResource(R.string.appstrings_speedtests_all_title),
         uploadHistory = stringResource(R.string.appstrings_upload_history_title),
         shareHistory = stringResource(R.string.share_history_title),
+        notificationHistory = stringResource(R.string.notification_history_title),
         histories = stringResource(R.string.histories_title),
         departmentStats = stringResource(R.string.department_stats_title),
         radio = stringResource(R.string.appstrings_radio_share_radio_title)
@@ -275,6 +276,7 @@ private data class GeoTowerBreadcrumbLabels(
     val speedtests: String,
     val uploadHistory: String,
     val shareHistory: String,
+    val notificationHistory: String,
     val histories: String,
     val departmentStats: String,
     val radio: String
@@ -305,6 +307,7 @@ private fun NavBackStackEntry.toGeoTowerBreadcrumbItem(
         "diagnostic" -> GeoTowerBreadcrumbItem(labels.diagnostic, Icons.Default.Info, onClick, "diagnostic")
         "photo_upload_history" -> GeoTowerBreadcrumbItem(labels.uploadHistory, Icons.Default.History, onClick, "photo_upload_history")
         "share_history" -> GeoTowerBreadcrumbItem(labels.shareHistory, Icons.Default.History, onClick, "share_history")
+        "notification_history" -> GeoTowerBreadcrumbItem(labels.notificationHistory, Icons.Default.History, onClick, "notification_history")
         "histories" -> GeoTowerBreadcrumbItem(labels.histories, Icons.Default.History, onClick, "histories")
         "support_detail/{id}?operator={operator}&fromMap={fromMap}&photoDraftId={photoDraftId}" -> GeoTowerBreadcrumbItem(labels.support, Icons.Default.VerticalAlignTop, onClick, "support_detail")
         "site_detail/{id}" -> GeoTowerBreadcrumbItem(labels.site, Icons.Default.Tag, onClick, "site_detail")

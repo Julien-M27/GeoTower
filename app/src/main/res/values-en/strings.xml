@@ -2375,6 +2375,10 @@
     <string name="appstrings_measure_delete_mode_desc">Choose what happens to the other segments when you delete one.</string>
     <string name="appstrings_measure_delete_independent">Independent (the other segments don\'t move)</string>
     <string name="appstrings_measure_delete_reconnect">Reconnect (recalculate with the previous point)</string>
+    <string name="appstrings_routing_title">Route calculation</string>
+    <string name="appstrings_routing_desc">Applies to measurements along roads and to planned trips. No effect on foot: the service returns the same path either way.</string>
+    <string name="appstrings_routing_fastest">Fastest (favours main roads)</string>
+    <string name="appstrings_routing_shortest">Shortest (lowest distance)</string>
     <string name="appstrings_measure_total_distance">Total: %1$s</string>
     <string name="appstrings_measure_follow_roads_straight">Straight line</string>
     <string name="appstrings_measure_follow_roads_car">Along roads</string>
@@ -2899,4 +2903,36 @@
     <string name="appstrings_release_v2031_nearest_filters">Nearest-site tracking now keeps only the sites the map would show: your operator, technology, underground and white-zone filters apply to it</string>
     <string name="appstrings_release_v2031_nearest_refresh">Changing a filter restarts tracking straight away, instead of waiting for your next move</string>
     <string name="appstrings_release_v2031_measure_search">Asking for search during a measurement explains what to do, instead of stacking the two</string>
+
+    <!-- Journal des notifications reçues par l'application -->
+    <string name="notification_history_title">Notifications</string>
+    <string name="notification_history_none">No notification</string>
+    <string name="notification_history_empty">No notification recorded yet.</string>
+    <string name="notification_history_clear">Clear the log</string>
+    <string name="notification_history_clear_title">Clear the log?</string>
+    <string name="notification_history_clear_desc">Every recorded entry will be deleted. Notifications already shown by the system are not affected.</string>
+    <string name="notification_history_settings_title">Log display</string>
+    <string name="notification_history_option_counter">Show the counter</string>
+    <string name="notification_history_option_detail">Flag notifications that were not shown</string>
+    <string name="notification_history_filter_all">All</string>
+    <string name="notification_history_muted">App notifications are turned off: events are still recorded here, but nothing appears in the status bar any more.</string>
+    <string name="notification_history_not_shown">Not shown</string>
+    <string name="notification_history_open_unavailable">Nothing to reopen for this notification.</string>
+    <string name="notification_history_type_db_mobile">Mobile database</string>
+    <string name="notification_history_type_db_radio">Radio database</string>
+    <string name="notification_history_type_db_enb">eNB/gNB identifiers</string>
+    <string name="notification_history_type_db_local_build">Database build</string>
+    <string name="notification_history_type_db_update">Database update</string>
+    <string name="notification_history_type_app_update">App update</string>
+    <string name="notification_history_type_map_download">Offline map</string>
+    <string name="notification_history_type_outages">Sites down</string>
+    <string name="notification_history_type_photo_upload">Photo upload</string>
+    <string name="notification_history_type_photo_report">Photo report</string>
+    <string name="notification_history_type_trip_reminder">Trip reminder</string>
+    <string name="notification_history_type_pdf_report">PDF report</string>
+
+    <!-- Release notes 2.0.32 -->
+    <string name="appstrings_release_v2032_notification_history">A “Notifications” page records everything the app tried to tell you, sorted by type and filterable</string>
+    <string name="appstrings_release_v2032_notification_not_shown">Events are recorded even when the notification could not be shown — notifications turned off, permission denied — and the log says so</string>
+    <string name="appstrings_release_v2032_routing_choice">A setting chooses between the fastest and the shortest route, for “by road” measurements and planned trips; no effect on foot, where the service returns the same path either way</string>
 </resources>

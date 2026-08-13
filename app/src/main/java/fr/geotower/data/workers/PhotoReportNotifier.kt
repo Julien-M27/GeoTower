@@ -11,6 +11,7 @@ import androidx.core.app.NotificationCompat
 import fr.geotower.R
 import fr.geotower.data.community.PhotoReportHistoryEntry
 import fr.geotower.utils.AppLocale
+import fr.geotower.data.notifications.NotificationHistoryStore
 import fr.geotower.utils.AppNotifications
 import fr.geotower.utils.NotificationIconResources
 
@@ -25,6 +26,13 @@ object PhotoReportNotifier {
 
     fun notifySent(context: Context) {
         val appContext = context.applicationContext
+        NotificationHistoryStore.record(
+            context = appContext,
+            type = NotificationHistoryStore.TYPE_PHOTO_REPORT,
+            status = NotificationHistoryStore.STATUS_SUCCESS,
+            target = "geotower://photo_reports",
+            posted = AppNotifications.canPost(appContext)
+        )
         if (!AppNotifications.canPost(appContext)) return
 
         val localized = localizedContext(appContext)
@@ -39,6 +47,15 @@ object PhotoReportNotifier {
 
     fun notifyRemoved(context: Context, entry: PhotoReportHistoryEntry) {
         val appContext = context.applicationContext
+        // `label` porte le site concerné : le libellé complet est reconstruit à l'affichage.
+        NotificationHistoryStore.record(
+            context = appContext,
+            type = NotificationHistoryStore.TYPE_PHOTO_REPORT,
+            status = NotificationHistoryStore.STATUS_INFO,
+            label = entry.siteId,
+            target = "geotower://photo_reports",
+            posted = AppNotifications.canPost(appContext)
+        )
         if (!AppNotifications.canPost(appContext)) return
 
         val localized = localizedContext(appContext)

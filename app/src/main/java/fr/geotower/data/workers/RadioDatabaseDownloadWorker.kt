@@ -25,6 +25,7 @@ import fr.geotower.data.api.RadioDatabaseDownloader
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.db.DbOperationTimings
 import fr.geotower.utils.AppLogger
+import fr.geotower.data.notifications.NotificationHistoryStore
 import fr.geotower.utils.AppNotifications
 import fr.geotower.utils.NotificationIconResources
 import kotlinx.coroutines.CancellationException
@@ -188,6 +189,7 @@ class RadioDatabaseDownloadWorker(
     }
 
     private fun showSuccessNotification() {
+        recordHistory(NotificationHistoryStore.STATUS_SUCCESS)
         val notification = NotificationCompat.Builder(context, channelId)
             .setContentTitle(context.getString(R.string.notification_database_downloaded_title))
             .setContentText(context.getString(R.string.notification_database_downloaded_content))
@@ -200,6 +202,7 @@ class RadioDatabaseDownloadWorker(
     }
 
     private fun showErrorNotification() {
+        recordHistory(NotificationHistoryStore.STATUS_ERROR)
         val notification = NotificationCompat.Builder(context, channelId)
             .setContentTitle(context.getString(R.string.notification_database_download_failed_title))
             .setContentText(context.getString(R.string.notification_database_download_failed_content))
@@ -208,6 +211,17 @@ class RadioDatabaseDownloadWorker(
             .build()
 
         notifySafely(DownloadNotificationCenter.RADIO_DB_DOWNLOAD_RESULT_NOTIFICATION_ID, notification)
+    }
+
+    /** Voir [DatabaseDownloadWorker] : on consigne même quand la notification ne part pas. */
+    private fun recordHistory(status: String) {
+        NotificationHistoryStore.record(
+            context = context,
+            type = NotificationHistoryStore.TYPE_DB_RADIO,
+            status = status,
+            target = "geotower://settings?section=db_radio",
+            posted = AppNotifications.canPost(context)
+        )
     }
 
     private fun settingsPendingIntent(requestCode: Int, showSuccessPopup: Boolean): PendingIntent {

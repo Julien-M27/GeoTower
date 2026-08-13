@@ -10,6 +10,7 @@ import android.net.Uri
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import fr.geotower.R
+import fr.geotower.data.notifications.NotificationHistoryStore
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.AppNotifications
 import fr.geotower.utils.NotificationIconResources
@@ -62,6 +63,16 @@ object PdfReportNotifier {
     /** Rapport enregistré : la notification ouvre le PDF, l'action ouvre les Téléchargements. */
     fun showDownloaded(context: Context, uri: Uri, fileName: String) {
         cancelProgress(context)
+        // Le journal vise le fichier lui-même : l'URI MediaStore reste valide après le redémarrage,
+        // et si le PDF a été supprimé entre-temps la page le dira plutôt que d'ouvrir dans le vide.
+        NotificationHistoryStore.record(
+            context = context,
+            type = NotificationHistoryStore.TYPE_PDF_REPORT,
+            status = NotificationHistoryStore.STATUS_SUCCESS,
+            label = fileName,
+            target = uri.toString(),
+            posted = AppNotifications.canPost(context)
+        )
         val description = context.getString(R.string.appstrings_pdf_downloaded_desc, fileName)
         val builder = builder(context)
             .setContentTitle(context.getString(R.string.appstrings_pdf_downloaded))

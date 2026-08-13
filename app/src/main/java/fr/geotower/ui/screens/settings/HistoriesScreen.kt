@@ -54,7 +54,8 @@ import fr.geotower.utils.PageScrollPrefs
 fun HistoriesScreen(
     onNavigateBack: () -> Unit,
     onOpenPhotoUploadHistory: () -> Unit,
-    onOpenShareHistory: () -> Unit
+    onOpenShareHistory: () -> Unit,
+    onOpenNotificationHistory: () -> Unit
 ) {
     val safeClick = rememberSafeClick()
     val scrollState = rememberScrollState()
@@ -131,6 +132,11 @@ fun HistoriesScreen(
                     cardShape = cardShape,
                     cardColor = cardColor,
                     onOpenHistory = onOpenShareHistory
+                )
+                NotificationHistoryShortcut(
+                    cardShape = cardShape,
+                    cardColor = cardColor,
+                    onOpenHistory = onOpenNotificationHistory
                 )
             }
 

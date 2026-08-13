@@ -95,4 +95,8 @@
         <item quantity="one">%1$d tappa</item>
         <item quantity="other">%1$d tappe</item>
     </plurals>
+    <plurals name="notification_history_recorded">
+        <item quantity="one">%1$d notifica registrata</item>
+        <item quantity="other">%1$d notifiche registrate</item>
+    </plurals>
 </resources>

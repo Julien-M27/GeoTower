@@ -25,6 +25,7 @@ import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.db.DbOperationTimings
 import android.content.pm.ServiceInfo
 import fr.geotower.utils.AppLogger
+import fr.geotower.data.notifications.NotificationHistoryStore
 import fr.geotower.utils.AppNotifications
 import fr.geotower.utils.NotificationIconResources
 import kotlinx.coroutines.CancellationException
@@ -201,6 +202,7 @@ class DatabaseDownloadWorker(
     }
 
     private fun showSuccessNotification() {
+        recordHistory(NotificationHistoryStore.STATUS_SUCCESS)
         val pendingIntent = settingsPendingIntent(1, showSuccessPopup = true)
 
         val title = context.getString(R.string.notification_database_downloaded_title)
@@ -218,6 +220,7 @@ class DatabaseDownloadWorker(
     }
 
     private fun showErrorNotification() {
+        recordHistory(NotificationHistoryStore.STATUS_ERROR)
         val title = context.getString(R.string.notification_database_download_failed_title)
         val content = context.getString(R.string.notification_database_download_failed_content)
 
@@ -228,6 +231,22 @@ class DatabaseDownloadWorker(
             .let { NotificationIconResources.applyTo(it, context) }
             .build()
         notifySafely(DownloadNotificationCenter.DB_DOWNLOAD_RESULT_NOTIFICATION_ID, notification)
+    }
+
+    /**
+     * Le journal des notifications garde la trace de l'événement même quand la notification ne part
+     * pas (notifications coupées, permission refusée) : c'est justement là qu'il sert. L'échec vise
+     * la même carte de réglages que la réussite — la notification d'échec n'est pas cliquable, mais
+     * depuis le journal c'est de là qu'on relance le téléchargement.
+     */
+    private fun recordHistory(status: String) {
+        NotificationHistoryStore.record(
+            context = context,
+            type = NotificationHistoryStore.TYPE_DB_MOBILE,
+            status = status,
+            target = "geotower://settings?section=db_mobile",
+            posted = AppNotifications.canPost(context)
+        )
     }
 
     /**

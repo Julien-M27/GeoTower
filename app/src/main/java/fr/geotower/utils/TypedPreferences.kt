@@ -61,6 +61,9 @@ object MapDisplayPrefs {
     // Outil de mesure : forme des traits. 0 = trait direct (à vol d'oiseau), 1 = par la route
     // (réseau routier), 2 = par les chemins (réseau piéton). Cf. AppConfig.measureFollowRoadsMode.
     val measureFollowRoadsMode = IntPreference("measure_follow_roads_mode", 0)
+    // Itinéraires : true = le plus court en distance, false = le plus rapide (défaut du service).
+    // Mesure « par la route » et trajets planifiés. Cf. AppConfig.routeOptimization().
+    val routePreferShortest = BooleanPreference("route_prefer_shortest", false)
     val showLocationMarker = BooleanPreference(AppConfig.PREF_SHOW_MAP_LOCATION_MARKER, true)
     val smoothLocation = BooleanPreference(AppConfig.PREF_SMOOTH_MAP_LOCATION, AppConfig.DEFAULT_SMOOTH_MAP_LOCATION)
     val locationZoom = IntPreference(AppConfig.PREF_MAP_LOCATION_ZOOM, AppConfig.DEFAULT_MAP_LOCATION_ZOOM)

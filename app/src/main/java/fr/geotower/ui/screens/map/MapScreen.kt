@@ -268,6 +268,12 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import fr.geotower.R
 
+/** Part de l'écart de cap rattrapée par image pendant le suivi : la carte tourne, elle ne saute pas. */
+private const val NAV_ORIENTATION_EASING = 0.12f
+
+/** En deçà, on laisse la carte tranquille : redresser un dixième de degré ne se voit pas. */
+private const val NAV_ORIENTATION_DEAD_ZONE_DEG = 0.2f
+
 private const val HS_OPERATOR_WILDCARD = "*"
 private const val MOUSE_WHEEL_ZOOM_STEP = 1.0
 private const val MOUSE_WHEEL_ZOOM_ANIMATION_MS = 80L
@@ -756,12 +762,15 @@ private sealed interface MeasureRoute {
  * tracé en place au lieu de rendre le trait à la ligne droite. [measureRouteAlignedOnSegment] le
  * recale sur la position du moment.
  */
-private fun measureRouteCacheKey(segment: MeasureSegment, profile: String): String {
+private fun measureRouteCacheKey(segment: MeasureSegment, profile: String, optimization: String): String {
     fun vertexKey(vertex: MeasureVertex, point: GeoPoint): String = when (vertex) {
         is MeasureVertex.Fixed -> String.format(Locale.US, "%.6f,%.6f", point.latitude, point.longitude)
         MeasureVertex.CurrentLocation -> "L"
     }
-    return "$profile|${vertexKey(segment.startVertex, segment.start)}>${vertexKey(segment.endVertex, segment.end)}"
+    // L'optimisation fait partie de la clé : basculer « le plus rapide / le plus court » demande de
+    // nouveaux itinéraires sans jeter les précédents, et revenir en arrière les retrouve tels quels.
+    return "$profile/$optimization|" +
+        "${vertexKey(segment.startVertex, segment.start)}>${vertexKey(segment.endVertex, segment.end)}"
 }
 
 /**
@@ -769,12 +778,12 @@ private fun measureRouteCacheKey(segment: MeasureSegment, profile: String): Stri
  * dit pas ce qu'on affiche mais ce qu'on a **déjà demandé** — c'est la cadence de rafraîchissement.
  * Sans cet arrondi, chaque point GPS relancerait une requête.
  */
-private fun measureRouteRequestKey(segment: MeasureSegment, profile: String): String {
+private fun measureRouteRequestKey(segment: MeasureSegment, profile: String, optimization: String): String {
     fun gridKey(vertex: MeasureVertex, point: GeoPoint): String = when (vertex) {
         is MeasureVertex.Fixed -> ""
         MeasureVertex.CurrentLocation -> String.format(Locale.US, "@%.3f,%.3f", point.latitude, point.longitude)
     }
-    return measureRouteCacheKey(segment, profile) +
+    return measureRouteCacheKey(segment, profile, optimization) +
         gridKey(segment.startVertex, segment.start) +
         gridKey(segment.endVertex, segment.end)
 }
@@ -1904,12 +1913,26 @@ fun MapScreen(
      */
     var navAnchorYPx by remember { mutableIntStateOf(0) }
 
+    /** Haut de la MapView dans la composition, pour ramener [navAnchorYPx] dans son repère. */
+    var mapTopInRootPx by remember { mutableIntStateOf(0) }
+
+    /** L'ancre exprimée dans la MapView, ou `null` tant qu'elle n'a pas été mesurée. */
+    fun navAnchorInMapOrNull(mapHeight: Int): Int? {
+        if (navAnchorYPx <= 0 || mapHeight <= 0) return null
+        val inMap = navAnchorYPx - mapTopInRootPx
+        // Une ancre hors de la carte ne veut rien dire : on laisse l'appelant reprendre son défaut.
+        return inMap.takeIf { it in 1 until mapHeight }
+    }
+
     // Trajet d'approche : la route entre là où l'on se trouve et l'étape à rejoindre, quand on
     // démarre le suivi loin du départ. Transitoire, donc jamais enregistré dans la tournée.
     var plannerApproachPoints by remember { mutableStateOf<List<DoubleArray>?>(null) }
     var plannerApproachRouted by remember { mutableStateOf(false) }
     var plannerApproachForStep by remember { mutableStateOf<Int?>(null) }
     var plannerApproachAnchor by remember { mutableStateOf<DoubleArray?>(null) }
+    // Mode d'optimisation du trajet d'approche affiché : changer le réglage en cours de suivi doit
+    // le refaire, sans quoi il resterait le seul tracé de l'écran calculé dans l'ancien mode.
+    var plannerApproachOptimization by remember { mutableStateOf<String?>(null) }
     // Hauteur réellement mesurée de la barre du trajet : les trois barres (consultation, édition,
     // suivi) n'ont pas la même, et c'est elle qui dit de combien remonter ce qui vit en bas.
     var tripBarHeightPx by remember { mutableIntStateOf(0) }
@@ -2093,11 +2116,14 @@ fun MapScreen(
         map.invalidate()
     }
 
-    // Recalcul des segments manquants. La signature ne retient que ce qui invalide un tracé :
-    // les positions des étapes, leur ordre, le profil et la fermeture de la boucle.
+    // Recalcul des segments manquants. La signature ne retient que ce qui invalide un tracé : les
+    // positions des étapes, leur ordre, le profil, la fermeture de la boucle — et le choix « le plus
+    // rapide / le plus court », qui périme les segments calculés dans l'autre mode.
+    val tripRouteOptimization = AppConfig.routeOptimization()
     val tripRouteSignature = plannerPlan?.let { plan ->
         buildString {
             append(plan.id).append('|').append(plan.profile).append('|').append(plan.returnToStart)
+            append('|').append(tripRouteOptimization)
             plan.steps.forEach { append('|').append(it.latitude).append(',').append(it.longitude) }
         }
     }
@@ -2108,7 +2134,9 @@ fun MapScreen(
             return@LaunchedEffect
         }
         plannerBusy = true
-        val outcome = runCatching { TripRouteCalculator.computeRoute(current) }.getOrNull()
+        val outcome = runCatching {
+            TripRouteCalculator.computeRoute(current, optimization = tripRouteOptimization)
+        }.getOrNull()
         plannerBusy = false
         if (outcome != null && outcome.plan.legs != current.legs) {
             savePlan(outcome.plan)
@@ -2237,7 +2265,7 @@ fun MapScreen(
     // Suivi de tournée : à chaque position reçue, on recalcule où on en est et on coche ce qu'on
     // vient d'atteindre. Placé ici et non dans le bloc du planificateur, parce que `myCurrentLoc`
     // n'est déclarée que maintenant.
-    LaunchedEffect(myCurrentLoc, tripMode, plannerPlan?.steps?.size) {
+    LaunchedEffect(myCurrentLoc, tripMode, plannerPlan?.steps?.size, tripRouteOptimization) {
         val plan = plannerPlan
         val location = myCurrentLoc
         if (tripMode != TRIP_MODE_FOLLOW || plan == null || location == null) {
@@ -2259,6 +2287,7 @@ fun MapScreen(
                 plannerApproachPoints = null
                 plannerApproachForStep = null
                 plannerApproachAnchor = null
+                plannerApproachOptimization = null
                 mapViewRef?.let { refreshTripLayers(it) }
             }
         } else {
@@ -2266,17 +2295,21 @@ fun MapScreen(
             val movedFar = anchor == null || haversineMeters(
                 anchor[0], anchor[1], location.latitude, location.longitude
             ) > NAV_APPROACH_REFRESH_METERS
+            val optimization = AppConfig.routeOptimization()
 
-            if (plannerApproachForStep != nextIndex || movedFar) {
+            if (plannerApproachForStep != nextIndex || movedFar ||
+                plannerApproachOptimization != optimization
+            ) {
                 plannerApproachForStep = nextIndex
                 plannerApproachAnchor = doubleArrayOf(location.latitude, location.longitude)
+                plannerApproachOptimization = optimization
                 val direct = listOf(
                     doubleArrayOf(location.latitude, location.longitude),
                     doubleArrayOf(nextStep.latitude, nextStep.longitude)
                 )
                 val routed = runCatching {
                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                        RouteApi.getRoutePortions(direct, plan.profile)
+                        RouteApi.getRoutePortions(direct, plan.profile, optimization)
                     }
                 }.getOrNull()?.firstOrNull()?.points
 
@@ -2309,7 +2342,13 @@ fun MapScreen(
     // Compteur d'images : le lire depuis la phase de dessin force le repère à se redessiner avec la
     // projection de l'image courante (cf. la couche fluide, plus bas).
     var smoothFrameTick by remember { mutableIntStateOf(0) }
-    val smoothLocationEnabled = PowerProfile.smoothLocation && canUseMapLocation
+    // Le suivi de tournée impose le rendu fluide, même si le réglage est coupé ou que le mode
+    // économie l'a désactivé : la caméra de navigation a besoin d'une position à chaque image, et
+    // le repère doit venir de la MÊME source qu'elle — sinon la carte glisse en continu pendant
+    // que le repère saute d'un relevé à l'autre, et rien ne paraît verrouillé. Le surcoût est
+    // marginal ici, l'écran étant de toute façon maintenu allumé pendant le suivi.
+    val smoothLocationEnabled = canUseMapLocation &&
+        (PowerProfile.smoothLocation || tripMode == TRIP_MODE_FOLLOW)
     // Pinceau partagé par la couche fluide (à l'écran) et par la capture de partage : quand le
     // lissage est actif, le calque osmdroid se tait, donc un map.draw() ne contient PAS le repère.
     // Sans ce second usage, l'image partagée ou copiée sortirait sans point de localisation.
@@ -2591,6 +2630,9 @@ fun MapScreen(
     // Cap de marche en haut, utilisateur en bas de l'écran : le cadrage des applis de guidage.
     LaunchedEffect(myCurrentLoc, navHeadingDegrees, tripMode, navCameraLocked) {
         if (tripMode != TRIP_MODE_FOLLOW || !navCameraLocked) return@LaunchedEffect
+        // Avec le rendu fluide, c'est la boucle d'images qui tient la caméra : recaler ici en plus
+        // ferait tirer deux poursuites sur la même carte.
+        if (smoothLocationEnabled) return@LaunchedEffect
         val map = mapViewRef ?: return@LaunchedEffect
         val location = myCurrentLoc ?: return@LaunchedEffect
 
@@ -2602,9 +2644,9 @@ fun MapScreen(
         }
 
         // Où poser le repère à l'écran : à la hauteur des boutons de zoom, mesurée et non devinée.
-        val aheadFraction = if (navAnchorYPx > 0 && map.height > 0) {
-            (navAnchorYPx.toDouble() / map.height - 0.5)
-                .coerceIn(0.0, NAV_CAMERA_MAX_AHEAD_FRACTION)
+        val anchorY = navAnchorInMapOrNull(map.height)
+        val aheadFraction = if (anchorY != null) {
+            (anchorY.toDouble() / map.height - 0.5).coerceIn(0.0, NAV_CAMERA_MAX_AHEAD_FRACTION)
         } else {
             NAV_CAMERA_AHEAD_FRACTION
         }
@@ -3169,6 +3211,9 @@ fun MapScreen(
         //    de la boucle compris (toIndex = -1). Le trait épouse le réseau routier dès que son
         //    itinéraire est arrivé, sinon il reste direct.
         val routeProfile = measureRouteProfile()
+        // Lus ici et non capturés à la composition : cette fonction est appelée depuis des lambdas
+        // mémorisées, où une valeur figée resterait celle du premier passage.
+        val routeOptimization = AppConfig.routeOptimization()
         measureSegments(
             vertices = measuredVertices,
             linkedToPrev = measuredLinkedToPrev,
@@ -3178,7 +3223,7 @@ fun MapScreen(
             val route = measureRouteAlignedOnSegment(
                 segment,
                 routeProfile
-                    ?.let { profile -> measureRoutes[measureRouteCacheKey(segment, profile)] }
+                    ?.let { profile -> measureRoutes[measureRouteCacheKey(segment, profile, routeOptimization)] }
                     ?.let { it as? MeasureRoute.Ready }
             )
             addMeasureSegment(segment.start, segment.end, route) {
@@ -3951,11 +3996,16 @@ fun MapScreen(
         }
     }
     val measureRouteProfileValue = measureRouteProfile()
+    // Lecture d'état : changer « le plus rapide / le plus court » dans les réglages recompose ici,
+    // change la signature ci-dessous, et les itinéraires se redemandent d'eux-mêmes.
+    val measureRouteOptimizationValue = AppConfig.routeOptimization()
     // Signature des itinéraires à obtenir. On relance les requêtes là-dessus et non sur les segments
     // eux-mêmes : la clé arrondit « ma position » (cf. measureRouteRequestKey), donc marcher quelques
     // mètres ne repart pas de zéro et n'interrompt pas un calcul en cours.
     val measureRouteSignature = measureRouteProfileValue?.let { profile ->
-        currentMeasureSegments.joinToString("|") { measureRouteRequestKey(it, profile) }
+        currentMeasureSegments.joinToString("|") {
+            measureRouteRequestKey(it, profile, measureRouteOptimizationValue)
+        }
     }
     // Un seul avertissement par activation : un itinéraire qui échoue échoue souvent pour tous les
     // traits (hors de France, réseau coupé), et autant de toasts serait insupportable.
@@ -3983,10 +4033,11 @@ fun MapScreen(
     LaunchedEffect(isMeasuringMode, measureRouteProfileValue, measureRouteSignature) {
         val profile = measureRouteProfileValue ?: return@LaunchedEffect
         if (!isMeasuringMode) return@LaunchedEffect
+        val optimization = measureRouteOptimizationValue
         currentMeasureSegments.forEach { segment ->
-            val requestKey = measureRouteRequestKey(segment, profile)
+            val requestKey = measureRouteRequestKey(segment, profile, optimization)
             if (!measureRouteRequests.add(requestKey)) return@forEach
-            val cacheKey = measureRouteCacheKey(segment, profile)
+            val cacheKey = measureRouteCacheKey(segment, profile, optimization)
             // Trait hors de portée d'un réseau routier commun : inutile d'appeler le service, mais
             // le trait direct qui subsiste est annoncé comme les autres échecs (toast plus bas).
             val tooFarToRoute =
@@ -3998,7 +4049,8 @@ fun MapScreen(
                         fromLongitude = segment.start.longitude,
                         toLatitude = segment.end.latitude,
                         toLongitude = segment.end.longitude,
-                        profile = profile
+                        profile = profile,
+                        optimization = optimization
                     )
                 }
             } catch (cancellation: kotlinx.coroutines.CancellationException) {
@@ -4237,7 +4289,13 @@ fun MapScreen(
         }
 
         AndroidView(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                // Origine de la MapView dans la composition : l'ancre du repère de suivi est
+                // mesurée sur les boutons de zoom, en coordonnées racine. Sans ce décalage, on
+                // diviserait une hauteur mesurée depuis le haut de l'écran par la hauteur de la
+                // carte — deux repères différents, donc un repère posé trop bas.
+                .onGloballyPositioned { mapTopInRootPx = it.positionInRoot().y.toInt() },
             factory = { ctx ->
                 MapView(ctx).apply {
                     mapViewUsable.set(true)
@@ -4657,17 +4715,58 @@ fun MapScreen(
 
                     target.setCoords(position.latitude, position.longitude)
                     map.projection.toPixels(target, projected)
+                    // Coordonnées réellement affichées : `toPixels` rend le repère « carte au
+                    // nord », alors qu'en suivi la carte est tournée.
+                    map.projectedPointToScreen(projected)
 
-                    if (isTrackingActive) {
+                    if (tripMode == TRIP_MODE_FOLLOW && navCameraLocked) {
+                        // Suivi de tournée : le repère est verrouillé à la hauteur des boutons de
+                        // zoom, pas au centre. Recaler ici, à chaque image, et non à chaque relevé
+                        // GPS : une fois par seconde, le repère glissait puis la carte sautait.
+                        val anchorY = navAnchorInMapOrNull(map.height)
+                            ?: (map.height * (0.5 + NAV_CAMERA_AHEAD_FRACTION)).toInt()
+                        val centerX = map.width / 2
+
+                        // Rotation amenée en douceur vers le cap de marche, comme le fait déjà
+                        // l'alignement sur la boussole : la poser d'un coup à chaque relevé donnait
+                        // une carte qui tourne par à-coups.
+                        val heading = navHeadingDegrees
+                        if (heading != null) {
+                            val wanted = normalizeMapOrientation(-heading.toFloat())
+                            val turn = shortestAngleDelta(map.mapOrientation, wanted)
+                            if (abs(turn) > NAV_ORIENTATION_DEAD_ZONE_DEG) {
+                                val next = normalizeMapOrientation(
+                                    map.mapOrientation + turn * NAV_ORIENTATION_EASING
+                                )
+                                map.applyOrientation(next)
+                                mapOrientationState.floatValue = next
+                            }
+                        }
+
+                        if (abs(projected.x - centerX) >= 1 || abs(projected.y - anchorY) >= 1) {
+                            val aheadFraction = ((anchorY.toDouble() / map.height) - 0.5)
+                                .coerceIn(0.0, NAV_CAMERA_MAX_AHEAD_FRACTION)
+                            val camera = navigationCameraTarget(
+                                latitude = position.latitude,
+                                longitude = position.longitude,
+                                headingDegrees = heading
+                                    ?: normalizeDegrees(-map.mapOrientation.toDouble()),
+                                zoom = map.zoomLevelDouble,
+                                screenHeightPixels = map.height,
+                                aheadFraction = aheadFraction
+                            )
+                            // Instance neuve à chaque fois : osmdroid GARDE la référence comme
+                            // centre courant, lui passer notre point réutilisable le ferait muter
+                            // dans son dos.
+                            map.controller.setCenter(GeoPoint(camera[0], camera[1]))
+                        }
+                    } else if (isTrackingActive) {
                         // Poursuite : la carte glisse sous un repère qui reste au centre. On ne
                         // recentre qu'au-delà du pixel, sinon on redessinerait la carte entière
                         // soixante fois par seconde pour un déplacement invisible.
                         val centerX = map.width / 2
                         val centerY = map.height / 2
                         if (abs(projected.x - centerX) >= 1 || abs(projected.y - centerY) >= 1) {
-                            // Instance neuve à chaque fois : osmdroid GARDE la référence comme
-                            // centre courant, lui passer notre point réutilisable le ferait muter
-                            // dans son dos.
                             map.controller.setCenter(GeoPoint(position.latitude, position.longitude))
                         }
                     }
@@ -5625,7 +5724,9 @@ fun MapScreen(
                 val route = measureRouteAlignedOnSegment(
                     segment,
                     measureRouteProfileValue
-                        ?.let { profile -> measureRoutes[measureRouteCacheKey(segment, profile)] }
+                        ?.let { profile ->
+                            measureRoutes[measureRouteCacheKey(segment, profile, measureRouteOptimizationValue)]
+                        }
                         ?.let { it as? MeasureRoute.Ready }
                 )
                 route?.distanceMeters ?: segment.start.distanceToAsDouble(segment.end)
@@ -5633,7 +5734,9 @@ fun MapScreen(
             // Itinéraires encore attendus : la clé n'est pas dans le cache. Le total affiché est
             // alors encore celui des traits directs, et la pilule le dit (animation + ligne d'état).
             val measureRoutesPending = measureRouteProfileValue?.let { profile ->
-                currentMeasureSegments.any { !measureRoutes.containsKey(measureRouteCacheKey(it, profile)) }
+                currentMeasureSegments.any {
+                    !measureRoutes.containsKey(measureRouteCacheKey(it, profile, measureRouteOptimizationValue))
+                }
             } == true
 
             // Total et suppression restent à leur place ; c'est le tiroir de mesure qui s'écarte.
@@ -6546,6 +6649,11 @@ fun MapScreen(
                 onMeasureReconnectChange = {
                     AppConfig.measureReconnectOnDelete.value = it
                     prefs.edit().putBoolean(MapDisplayPrefs.measureReconnectOnDelete.key, it).apply()
+                },
+                routePreferShortest = AppConfig.routePreferShortest.value,
+                onRoutePreferShortestChange = {
+                    AppConfig.routePreferShortest.value = it
+                    prefs.edit().putBoolean(MapDisplayPrefs.routePreferShortest.key, it).apply()
                 },
                 onDismiss = { showMapPageSettingsSheet = false },
                 onBack = { showMapPageSettingsSheet = false },

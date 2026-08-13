@@ -63,6 +63,21 @@ object RouteApi {
     const val PROFILE_PEDESTRIAN = "pedestrian"
 
     /**
+     * Le trajet le plus **rapide**, valeur par défaut du service : il privilégie les grands axes,
+     * quitte à rallonger la distance. Lyon → Saint-Étienne revient ainsi à 62,4 km en 1 h 05.
+     */
+    const val OPTIMIZATION_FASTEST = "fastest"
+
+    /**
+     * Le trajet le plus **court** en distance, quitte à y passer beaucoup plus de temps : le même
+     * Lyon → Saint-Étienne revient à 56,7 km, mais en 2 h 27.
+     *
+     * Sans effet sur [PROFILE_PEDESTRIAN] : le service y applique une vitesse constante, donc le
+     * plus rapide **est** le plus court — les deux réponses sont identiques au mètre près.
+     */
+    const val OPTIMIZATION_SHORTEST = "shortest"
+
+    /**
      * Au-delà, on ne sollicite pas le service : deux points aussi éloignés ne peuvent pas partager
      * un réseau routier (autre continent, métropole ↔ outre-mer), la réponse serait forcément un
      * rabattement absurde. Le plafond couvre largement la France : la plus longue diagonale
@@ -78,12 +93,17 @@ object RouteApi {
      */
     private const val SNAP_TOLERANCE_METERS = 2_000.0
 
+    /**
+     * @param optimization [OPTIMIZATION_FASTEST] ou [OPTIMIZATION_SHORTEST]. Le défaut reprend celui
+     *   du service, et c'est le seul qui vaille pour le profil piéton.
+     */
     fun getRoute(
         fromLatitude: Double,
         fromLongitude: Double,
         toLatitude: Double,
         toLongitude: Double,
-        profile: String
+        profile: String,
+        optimization: String = OPTIMIZATION_FASTEST
     ): RoutePathResult {
         if (!RemoteFeatureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.ROUTING_IGN)) {
             error("Routing provider disabled")
@@ -93,7 +113,7 @@ object RouteApi {
             .addQueryParameter("start", "${formatCoordinate(fromLongitude)},${formatCoordinate(fromLatitude)}")
             .addQueryParameter("end", "${formatCoordinate(toLongitude)},${formatCoordinate(toLatitude)}")
             .addQueryParameter("profile", profile)
-            .addQueryParameter("optimization", "fastest")
+            .addQueryParameter("optimization", optimization)
             .addQueryParameter("geometryFormat", "geojson")
             .addQueryParameter("getSteps", "false")
             .addQueryParameter("getBbox", "false")
@@ -151,8 +171,13 @@ object RouteApi {
      * [getRoute], qui n'a besoin que d'une longueur.
      *
      * @param points étapes en `[latitude, longitude]`, départ et arrivée compris.
+     * @param optimization [OPTIMIZATION_FASTEST] ou [OPTIMIZATION_SHORTEST].
      */
-    fun getRoutePortions(points: List<DoubleArray>, profile: String): List<RoutePortionResult> {
+    fun getRoutePortions(
+        points: List<DoubleArray>,
+        profile: String,
+        optimization: String = OPTIMIZATION_FASTEST
+    ): List<RoutePortionResult> {
         if (!RemoteFeatureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.ROUTING_IGN)) {
             error("Routing provider disabled")
         }
@@ -166,7 +191,7 @@ object RouteApi {
             .addQueryParameter("start", formatPoint(points.first()))
             .addQueryParameter("end", formatPoint(points.last()))
             .addQueryParameter("profile", profile)
-            .addQueryParameter("optimization", "fastest")
+            .addQueryParameter("optimization", optimization)
             .addQueryParameter("geometryFormat", "geojson")
             .addQueryParameter("getSteps", "true")
             .addQueryParameter("getBbox", "false")

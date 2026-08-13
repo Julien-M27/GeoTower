@@ -62,7 +62,9 @@ import fr.geotower.ui.screens.home.HomeScreen
 import fr.geotower.ui.screens.help.HelpScreen
 import fr.geotower.ui.screens.settings.SettingsScreen
 import fr.geotower.ui.screens.settings.PhotosFavoritesScreen
+import fr.geotower.ui.screens.settings.NotificationHistoryScreen
 import fr.geotower.ui.screens.settings.ShareHistoryScreen
+import fr.geotower.data.notifications.NotificationHistoryStore
 import fr.geotower.data.share.ShareHistoryStore
 import fr.geotower.ui.screens.coverage.TheoreticalCoverageScreen
 import fr.geotower.ui.screens.emitters.ElevationProfileScreen
@@ -995,7 +997,8 @@ class MainActivity : ComponentActivity() {
                                     fr.geotower.ui.screens.settings.HistoriesScreen(
                                         onNavigateBack = { navController.popBackStack() },
                                         onOpenPhotoUploadHistory = { navController.navigate("photo_upload_history") },
-                                        onOpenShareHistory = { navController.navigate("share_history") }
+                                        onOpenShareHistory = { navController.navigate("share_history") },
+                                        onOpenNotificationHistory = { navController.navigate("notification_history") }
                                     )
                                 }
                             }
@@ -1060,6 +1063,56 @@ class MainActivity : ComponentActivity() {
                                                 Toast.makeText(
                                                     this@MainActivity,
                                                     getString(R.string.share_history_open_unavailable),
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+                                            }
+                                        }
+                                    )
+                                }
+                            }
+
+                            // Journal des notifications de l'app (ouvert depuis l'accueil, les
+                            // Réglages ou « Historiques »).
+                            composable("notification_history") {
+                                Box(modifier = Modifier.padding(innerPadding)) {
+                                    NotificationHistoryScreen(
+                                        onNavigateBack = { navController.popBackStack() },
+                                        onOpenEntry = { entry ->
+                                            val target = entry.target
+                                            // Trois formes de cible, voir NotificationHistoryEntry :
+                                            // lien profond rejoué tel quel, fichier confié à une
+                                            // application tierce, ou route interne.
+                                            val opened = when {
+                                                target.isBlank() -> false
+
+                                                target.startsWith("geotower://") ->
+                                                    navController.handleDeepLink(
+                                                        Intent(Intent.ACTION_VIEW, Uri.parse(target))
+                                                    )
+
+                                                entry.type == NotificationHistoryStore.TYPE_PDF_REPORT ->
+                                                    // Le PDF a pu être supprimé depuis : sans ce
+                                                    // filet on ouvrirait une visionneuse vide.
+                                                    runCatching {
+                                                        startActivity(
+                                                            Intent(Intent.ACTION_VIEW).apply {
+                                                                setDataAndType(Uri.parse(target), "application/pdf")
+                                                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                            }
+                                                        )
+                                                    }.isSuccess
+
+                                                target.startsWith("http") ->
+                                                    runCatching {
+                                                        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(target)))
+                                                    }.isSuccess
+
+                                                else -> runCatching { navController.navigate(target) }.isSuccess
+                                            }
+                                            if (!opened) {
+                                                Toast.makeText(
+                                                    this@MainActivity,
+                                                    getString(R.string.notification_history_open_unavailable),
                                                     Toast.LENGTH_SHORT
                                                 ).show()
                                             }

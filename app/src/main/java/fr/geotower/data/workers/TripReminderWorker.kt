@@ -14,6 +14,7 @@ import fr.geotower.MainActivity
 import fr.geotower.R
 import fr.geotower.data.trip.TripPlan
 import fr.geotower.data.trip.TripPlanStore
+import fr.geotower.data.notifications.NotificationHistoryStore
 import fr.geotower.utils.AppNotifications
 import fr.geotower.utils.NotificationIconResources
 import java.text.DateFormat
@@ -52,6 +53,18 @@ class TripReminderWorker(
     }
 
     private fun showNotification(plan: TripPlan, plannedAtMillis: Long) {
+        // Un rappel manqué est précisément ce qu'on vient chercher dans le journal : on l'y consigne
+        // avant le garde-fou, avec l'heure de départ brute — la page la mettra en forme dans la
+        // langue du moment. Le trajet peut être sans nom : le libellé de repli est posé à l'affichage.
+        NotificationHistoryStore.record(
+            context = applicationContext,
+            type = NotificationHistoryStore.TYPE_TRIP_REMINDER,
+            status = NotificationHistoryStore.STATUS_INFO,
+            label = plan.name,
+            detail = plannedAtMillis.toString(),
+            target = "geotower://trips",
+            posted = AppNotifications.canPost(applicationContext)
+        )
         if (!AppNotifications.canPost(applicationContext)) return
 
         val manager = applicationContext

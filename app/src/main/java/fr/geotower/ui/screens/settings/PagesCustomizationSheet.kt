@@ -203,6 +203,9 @@ object HistoryPagePreferences {
     const val SHARE_ADDRESS = "page_share_history_address"
     const val SHARE_CONTENTS = "page_share_history_contents"
     const val SHARE_DATE_BAR = "page_share_history_date_bar"
+    const val NOTIF_COUNTER = "page_notification_history_counter"
+    const val NOTIF_DETAIL = "page_notification_history_detail"
+    const val NOTIF_DATE_BAR = "page_notification_history_date_bar"
 
     const val DEFAULT_ENABLED = true
 
@@ -1391,6 +1394,7 @@ fun MapSettingsSheet(
     showAttribution: Boolean, onAttributionChange: (Boolean) -> Unit,
     showSpeedometer: Boolean, onSpeedometerChange: (Boolean) -> Unit,
     measureReconnectOnDelete: Boolean, onMeasureReconnectChange: (Boolean) -> Unit,
+    routePreferShortest: Boolean, onRoutePreferShortestChange: (Boolean) -> Unit,
     onDismiss: () -> Unit, onBack: () -> Unit,
     onFiltersClick: (() -> Unit)? = null,
     sheetState: SheetState, useOneUi: Boolean, bubbleColor: Color
@@ -1544,6 +1548,40 @@ fun MapSettingsSheet(
                         bubbleColor
                     ) { onMeasureReconnectChange(true) }
                 }
+
+                // --- ITINÉRAIRES : le plus rapide ou le plus court ---
+                // Ce choix sert à la mesure « par la route » comme aux trajets planifiés, d'où une
+                // section à part de l'outil de mesure. Sans effet à pied : le service y rend le même
+                // tracé dans les deux modes.
+                Spacer(modifier = Modifier.height(sizing.spacing(20.dp)))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
+                Text(
+                    text = stringResource(R.string.appstrings_routing_title),
+                    style = sizing.textStyle(MaterialTheme.typography.titleMedium),
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Text(
+                    text = stringResource(R.string.appstrings_routing_desc),
+                    style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth().padding(top = sizing.spacing(4.dp), bottom = sizing.spacing(12.dp))
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))) {
+                    SettingsRadioItem(
+                        stringResource(R.string.appstrings_routing_fastest),
+                        !routePreferShortest,
+                        useOneUi,
+                        bubbleColor
+                    ) { onRoutePreferShortestChange(false) }
+                    SettingsRadioItem(
+                        stringResource(R.string.appstrings_routing_shortest),
+                        routePreferShortest,
+                        useOneUi,
+                        bubbleColor
+                    ) { onRoutePreferShortestChange(true) }
+                }
             }
 
             Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
@@ -1569,6 +1607,7 @@ fun MapSettingsSheet(
                     onScaleChange(true)
                     onAttributionChange(true)
                     onMeasureReconnectChange(false)
+                    onRoutePreferShortestChange(false)
                 }
             }) {
                 Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)

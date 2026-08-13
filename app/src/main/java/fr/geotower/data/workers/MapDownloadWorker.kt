@@ -21,6 +21,7 @@ import fr.geotower.data.api.RetrofitClient
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.db.DbOperationTimings
 import fr.geotower.utils.AppLogger
+import fr.geotower.data.notifications.NotificationHistoryStore
 import fr.geotower.utils.AppNotifications
 import fr.geotower.utils.NotificationIconResources
 import fr.geotower.utils.OfflineMapDisplayNames
@@ -306,6 +307,15 @@ class MapDownloadWorker(
         DownloadNotificationCenter.rememberMapDownloadNotification(applicationContext, mapFilename)
         ensureNotificationChannel()
         notificationManager.cancel(progressNotifId)
+        // Le journal, lui, garde la carte téléchargée même si la notification ne part pas.
+        NotificationHistoryStore.record(
+            context = applicationContext,
+            type = NotificationHistoryStore.TYPE_MAP_DOWNLOAD,
+            status = NotificationHistoryStore.STATUS_SUCCESS,
+            label = mapDisplayName,
+            target = offlineMapsDeepLink(mapFilename),
+            posted = AppNotifications.canPost(applicationContext)
+        )
         // La notification de fin suit l'interrupteur maître des notifications ; celle de progression
         // appartient au service de premier plan et vient d'être retirée.
         if (!AppNotifications.canPost(applicationContext)) return
@@ -333,19 +343,28 @@ class MapDownloadWorker(
         }
     }
 
+    /**
+     * Même cible que le clic sur la notification, sous forme de texte : c'est ce que le journal des
+     * notifications rejoue quand on rouvre l'entrée depuis la page dédiée.
+     */
+    private fun offlineMapsDeepLink(targetMapFilename: String? = null): String {
+        return android.net.Uri.Builder()
+            .scheme("geotower")
+            .authority("settings")
+            .appendQueryParameter("section", "offline_maps")
+            .apply {
+                if (!targetMapFilename.isNullOrBlank()) {
+                    appendQueryParameter("target_map", targetMapFilename)
+                }
+            }
+            .build()
+            .toString()
+    }
+
     private fun createOfflineMapsPendingIntent(requestCode: Int, targetMapFilename: String? = null): PendingIntent {
         val intent = Intent(applicationContext, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            data = android.net.Uri.Builder()
-                .scheme("geotower")
-                .authority("settings")
-                .appendQueryParameter("section", "offline_maps")
-                .apply {
-                    if (!targetMapFilename.isNullOrBlank()) {
-                        appendQueryParameter("target_map", targetMapFilename)
-                    }
-                }
-                .build()
+            data = android.net.Uri.parse(offlineMapsDeepLink(targetMapFilename))
         }
         return PendingIntent.getActivity(
             applicationContext,

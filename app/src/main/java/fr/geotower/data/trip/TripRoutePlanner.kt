@@ -41,13 +41,23 @@ object TripRoutePlanner {
      *
      * Un trajet entièrement calculé rend une liste vide. Passer `force = true` recalcule tout —
      * c'est ce que fait un changement de profil, qui invalide tous les segments.
+     *
+     * @param optimization mode d'optimisation attendu ([RouteApi.OPTIMIZATION_FASTEST] ou
+     *   [RouteApi.OPTIMIZATION_SHORTEST]) : un segment calculé dans l'autre mode compte pour
+     *   manquant, si bien que changer le réglage refait le tracé au lieu de mélanger les deux.
+     *   `null` accepte les segments tels quels, quel que soit leur mode.
      */
-    fun planRequests(plan: TripPlan, force: Boolean = false): List<List<Int>> {
+    fun planRequests(
+        plan: TripPlan,
+        force: Boolean = false,
+        optimization: String? = null
+    ): List<List<Int>> {
         val sequence = routeSequence(plan)
         if (sequence.size < 2) return emptyList()
 
         val missing = BooleanArray(sequence.size - 1) { legIndex ->
-            force || plan.legBetween(sequence[legIndex], sequence[legIndex + 1]) == null
+            val leg = plan.legBetween(sequence[legIndex], sequence[legIndex + 1])
+            force || leg == null || (optimization != null && leg.effectiveOptimization() != optimization)
         }
         return contiguousRuns(sequence, missing).flatMap { chunk(it) }
     }

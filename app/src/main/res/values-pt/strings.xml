@@ -2375,6 +2375,10 @@
     <string name="appstrings_measure_delete_mode_desc">Escolha o que acontece às outras linhas ao eliminar uma.</string>
     <string name="appstrings_measure_delete_independent">Independente (as outras linhas não se movem)</string>
     <string name="appstrings_measure_delete_reconnect">Reconectar (recalcular com o ponto anterior)</string>
+    <string name="appstrings_routing_title">Cálculo de itinerários</string>
+    <string name="appstrings_routing_desc">Aplica-se às medições pela estrada e aos trajetos planeados. Sem efeito a pé: o serviço devolve o mesmo traçado nos dois casos.</string>
+    <string name="appstrings_routing_fastest">O mais rápido (privilegia os eixos principais)</string>
+    <string name="appstrings_routing_shortest">O mais curto (menor distância)</string>
     <string name="appstrings_measure_total_distance">Total: %1$s</string>
     <string name="appstrings_measure_follow_roads_straight">Linha reta</string>
     <string name="appstrings_measure_follow_roads_car">Pelas estradas</string>
@@ -2899,4 +2903,36 @@
     <string name="appstrings_release_v2031_nearest_filters">O seguimento do site mais próximo passa a manter apenas os sites que o mapa mostraria: aplicam-se-lhe os seus filtros de operadora, tecnologia, subsolo e zona branca</string>
     <string name="appstrings_release_v2031_nearest_refresh">Alterar um filtro reinicia de imediato o seguimento, em vez de esperar pelo seu próximo deslocamento</string>
     <string name="appstrings_release_v2031_measure_search">Pedir a pesquisa durante uma medição explica o que fazer, em vez de sobrepor as duas</string>
+
+    <!-- Journal des notifications reçues par l'application -->
+    <string name="notification_history_title">Notificações</string>
+    <string name="notification_history_none">Nenhuma notificação</string>
+    <string name="notification_history_empty">Ainda não há nenhuma notificação registada.</string>
+    <string name="notification_history_clear">Limpar o registo</string>
+    <string name="notification_history_clear_title">Limpar o registo?</string>
+    <string name="notification_history_clear_desc">Todas as entradas registadas serão eliminadas. As notificações já mostradas pelo sistema não são afetadas.</string>
+    <string name="notification_history_settings_title">Apresentação do registo</string>
+    <string name="notification_history_option_counter">Mostrar o contador</string>
+    <string name="notification_history_option_detail">Assinalar as notificações não mostradas</string>
+    <string name="notification_history_filter_all">Tudo</string>
+    <string name="notification_history_muted">As notificações da aplicação estão desativadas: os eventos continuam a ser registados aqui, mas já não aparece nada na barra de estado.</string>
+    <string name="notification_history_not_shown">Não mostrada</string>
+    <string name="notification_history_open_unavailable">Nada para reabrir nesta notificação.</string>
+    <string name="notification_history_type_db_mobile">Base móvel</string>
+    <string name="notification_history_type_db_radio">Base de rádio</string>
+    <string name="notification_history_type_db_enb">Identificadores eNB/gNB</string>
+    <string name="notification_history_type_db_local_build">Geração da base</string>
+    <string name="notification_history_type_db_update">Atualização da base</string>
+    <string name="notification_history_type_app_update">Atualização da aplicação</string>
+    <string name="notification_history_type_map_download">Mapa offline</string>
+    <string name="notification_history_type_outages">Sites avariados</string>
+    <string name="notification_history_type_photo_upload">Envio de fotos</string>
+    <string name="notification_history_type_photo_report">Denúncia de foto</string>
+    <string name="notification_history_type_trip_reminder">Lembrete de trajeto</string>
+    <string name="notification_history_type_pdf_report">Relatório PDF</string>
+
+    <!-- Notas da versão 2.0.32 -->
+    <string name="appstrings_release_v2032_notification_history">Uma página «Notificações» regista tudo o que a aplicação lhe quis assinalar, ordenado por tipo e filtrável</string>
+    <string name="appstrings_release_v2032_notification_not_shown">Os eventos são registados mesmo quando a notificação não pôde aparecer — notificações desligadas, permissão recusada — e o registo indica-o</string>
+    <string name="appstrings_release_v2032_routing_choice">Uma definição escolhe entre o itinerário mais rápido e o mais curto, para as medições «pela estrada» e os trajetos planeados; sem efeito a pé, onde o serviço devolve o mesmo traçado</string>
 </resources>

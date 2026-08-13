@@ -16,6 +16,7 @@ import fr.geotower.data.build.LocalDbRebuildOffer
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.db.DatabaseVersionPolicy
 import fr.geotower.data.db.GeoTowerDatabaseValidator
+import fr.geotower.data.notifications.NotificationHistoryStore
 import fr.geotower.utils.NotificationIconResources
 
 class UpdateCheckWorker(private val context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
@@ -90,6 +91,21 @@ class UpdateCheckWorker(private val context: Context, params: WorkerParameters) 
     }
 
     private fun showNotification(rebuild: Boolean) {
+        // La mise à jour annoncée est celle de la base mobile : on ouvre sur SA carte — ou sur la
+        // carte de génération locale pour qui génère sa base sur l'appareil, puisque c'est là que
+        // se joue SA mise à jour.
+        val section = if (rebuild) "db_local_build" else "db_mobile"
+        // Consigné avant le garde-fou : l'appelant note de toute façon la version comme annoncée,
+        // donc sans cette ligne une mise à jour signalée notifications coupées ne laisserait
+        // aucune trace nulle part.
+        NotificationHistoryStore.record(
+            context = context,
+            type = NotificationHistoryStore.TYPE_DB_UPDATE,
+            status = NotificationHistoryStore.STATUS_INFO,
+            detail = if (rebuild) NotificationHistoryStore.DETAIL_DB_UPDATE_REBUILD else "",
+            target = "geotower://settings?section=$section",
+            posted = fr.geotower.utils.AppNotifications.canPost(context)
+        )
         if (!fr.geotower.utils.AppNotifications.canPost(context)) return
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
@@ -98,10 +114,6 @@ class UpdateCheckWorker(private val context: Context, params: WorkerParameters) 
             notificationManager.createNotificationChannel(channel)
         }
 
-        // La mise à jour annoncée est celle de la base mobile : on ouvre sur SA carte — ou sur la
-        // carte de génération locale pour qui génère sa base sur l'appareil, puisque c'est là que
-        // se joue SA mise à jour.
-        val section = if (rebuild) "db_local_build" else "db_mobile"
         val intent = Intent(Intent.ACTION_VIEW, Uri.parse("geotower://settings?section=$section")).apply {
             setPackage(context.packageName)
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP

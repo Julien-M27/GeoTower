@@ -26,6 +26,7 @@ import fr.geotower.data.build.LocalDbBuildPipeline
 import fr.geotower.data.build.labelRes
 import fr.geotower.data.db.DbOperationTimings
 import fr.geotower.utils.AppLogger
+import fr.geotower.data.notifications.NotificationHistoryStore
 import fr.geotower.utils.AppNotifications
 import fr.geotower.utils.NotificationIconResources
 import java.util.concurrent.atomic.AtomicInteger
@@ -215,6 +216,15 @@ class LocalDbBuildWorker(
     }
 
     private fun showResult(success: Boolean, reason: String?) {
+        // Consigné même quand la notification ne part pas : voir [NotificationHistoryStore].
+        NotificationHistoryStore.record(
+            context = context,
+            type = NotificationHistoryStore.TYPE_DB_LOCAL_BUILD,
+            status = if (success) NotificationHistoryStore.STATUS_SUCCESS else NotificationHistoryStore.STATUS_ERROR,
+            detail = reason.orEmpty(),
+            target = "geotower://settings?section=db_local_build",
+            posted = AppNotifications.canPost(context)
+        )
         val title = context.getString(R.string.appstrings_local_build_notif_title)
         val content = if (success) {
             context.getString(R.string.appstrings_local_build_notif_done)
