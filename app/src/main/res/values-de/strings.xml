@@ -2384,6 +2384,8 @@
     <string name="appstrings_measure_first_point_title">Setze deinen Startpunkt</string>
     <string name="appstrings_measure_first_point_hint">Tippe auf die Karte, um den ersten Punkt zu setzen.</string>
     <string name="appstrings_measure_first_point_hint_location">Tippe auf die Karte – oder auf deine Position, um von dort zu starten.</string>
+    <string name="appstrings_measure_search_blocked_title">Messung läuft</string>
+    <string name="appstrings_measure_search_blocked_message">Setze zuerst einen Punkt auf der Karte oder schließe das Messwerkzeug, um die Suche zu öffnen.</string>
     <!-- Lieblingsfotos (Einstellungen > Präferenzen) -->
     <string name="photos_favorites_title">Lieblingsfotos</string>
     <string name="photos_favorites_desc">Finde und verwalte die als Favorit markierten Standortfotos.</string>
@@ -2892,4 +2894,9 @@
     <string name="appstrings_release_v2030_marker_anchor">Beim Verfolgen sitzt deine Markierung auf Höhe der Zoom-Schaltflächen, unabhängig von Bildschirm- und Oberflächengröße</string>
     <string name="appstrings_release_v2030_nav_zoom">Der Zoom der Verfolgung ist enger: Straßennamen sind lesbar und die Kreuzung kommt sichtbar näher</string>
     <string name="appstrings_release_v2030_no_jump">Die Markierung springt beim Start nicht mehr in die Mitte, um nach dem ersten Meter wieder herunterzurutschen</string>
+
+    <!-- Versionshinweise 2.0.31 -->
+    <string name="appstrings_release_v2031_nearest_filters">Die Verfolgung des nächstgelegenen Standorts behält nur noch, was die Karte zeigen würde: Deine Filter für Betreiber, Technologie, Untergrund und Funkloch gelten auch dort</string>
+    <string name="appstrings_release_v2031_nearest_refresh">Das Ändern eines Filters startet die Verfolgung sofort neu, statt auf deine nächste Bewegung zu warten</string>
+    <string name="appstrings_release_v2031_measure_search">Die Suche während einer Messung aufzurufen, erklärt jetzt, was zu tun ist, statt beides übereinanderzulegen</string>
 </resources>

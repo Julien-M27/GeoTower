@@ -280,6 +280,12 @@ private const val MAP_RELOAD_MIN_VIEWPORT_SHIFT_RATIO = 0.10
 private const val MAP_MARKER_REDRAW_DEBOUNCE_MS = 40L
 private const val MAP_COMPASS_UPDATE_INTERVAL_MS = 80L
 private const val MAP_ACTIVE_FILTER_LIST_LIMIT = 3
+/**
+ * Distance parcourue au-delà de laquelle le suivi du site le plus proche relit son voisinage en
+ * base. Le plus petit palier de lecture couvre déjà ~1,5 km : on ne redemande donc rien tant qu'on
+ * n'a pas entamé cette marge, la cible étant recalculée sur la position réelle à chaque tour.
+ */
+private const val TRACKING_NEARBY_REFRESH_METERS = 400.0
 /** Repos de la boucle de rendu fluide quand il n'y a rien à animer (immobile ou sans position). */
 private const val SMOOTH_LOCATION_IDLE_POLL_MS = 50L
 
@@ -1204,6 +1210,38 @@ private fun visibleOperatorKeysForAntenna(
     }
 }
 
+/**
+ * Filtres d'affichage d'un site réel : opérateurs visibles, sous-sol, zone blanche, technologies.
+ *
+ * Volontairement muet sur les regroupements, l'emprise d'une commune et le slider temporel, qui
+ * disent ce qu'on regarde et non ce qui existe. Partagé par la liste de la carte et par le suivi du
+ * site le plus proche, qui doit retenir exactement les mêmes sites — mais autour de la position.
+ */
+private fun passesSiteDisplayFilters(
+    antenna: LocalisationEntity,
+    hsOperatorMap: Map<String, Set<String>>,
+    selectedOperatorKeys: Set<String>,
+    showSitesInService: Boolean,
+    showSitesOutOfService: Boolean,
+    showProjectSites: Boolean,
+    hideUndergroundSites: Boolean,
+    showOnlyZbSites: Boolean,
+    frequencyFilter: FrequencyFilterSelection
+): Boolean {
+    val visibleOperators = visibleOperatorKeysForAntenna(
+        antenna = antenna,
+        hsOperatorMap = hsOperatorMap,
+        showSitesInService = showSitesInService,
+        showSitesOutOfService = showSitesOutOfService,
+        showProjectSites = showProjectSites,
+        selectedOperatorKeys = selectedOperatorKeys
+    )
+    if (visibleOperators.isEmpty()) return false
+    if (hideUndergroundSites && antenna.hasUndergroundSupport == 1) return false
+    if (showOnlyZbSites && antenna.isZb != 1) return false
+    return frequencyFilter.matchesAntenna(antenna)
+}
+
 private fun hasVisibleHsOperator(
     antenna: LocalisationEntity,
     hsOperatorMap: Map<String, Set<String>>
@@ -1666,6 +1704,9 @@ fun MapScreen(
     var isMeasuringMode by rememberSaveable { mutableStateOf(false) }
     var trackNearestAll by rememberSaveable { mutableStateOf(false) }
     var trackNearestFav by rememberSaveable { mutableStateOf(false) }
+    // Recherche demandée alors que le mode d'emploi de la mesure occupe la barre du haut : on
+    // explique quoi faire au lieu d'empiler les deux (cf. `showMeasureFirstPointHint`).
+    var showMeasureSearchBlockedDialog by remember { mutableStateOf(false) }
     // Chaîne de mesure : suite ordonnée de sommets (point carte, antenne ou « ma position »),
     // reliés deux à deux. measuredLinkedToPrev[i] = true si un trait relie le sommet i au i-1.
     // Le premier sommet n'est jamais relié (measuredLinkedToPrev[0] toujours false).
@@ -2887,18 +2928,17 @@ fun MapScreen(
             val hsOperatorMap = buildHsOperatorMap(sitesHs)
 
             fun applyDisplayFilters(source: List<LocalisationEntity>) = source.filter { antenna ->
-                val visibleOperators = visibleOperatorKeysForAntenna(
-                    antenna = antenna,
-                    hsOperatorMap = hsOperatorMap,
-                    showSitesInService = showSitesInService,
-                    showSitesOutOfService = showSitesOutOfService,
-                    showProjectSites = showProjectSites,
-                    selectedOperatorKeys = selectedOperators
-                )
-
                 // ✅ 1. ON VÉRIFIE LES OPÉRATEURS TOUT DE SUITE
                 // 🚨 2. LA CORRECTION : Si c'est un cluster, on vérifie au moins l'opérateur !
                 if (antenna.idAnfr.startsWith("CLUSTER_")) {
+                    val visibleOperators = visibleOperatorKeysForAntenna(
+                        antenna = antenna,
+                        hsOperatorMap = hsOperatorMap,
+                        showSitesInService = showSitesInService,
+                        showSitesOutOfService = showSitesOutOfService,
+                        showProjectSites = showProjectSites,
+                        selectedOperatorKeys = selectedOperators
+                    )
                     return@filter frequencyFilter.isFullyEnabled &&
                         visibleOperators.isNotEmpty() &&
                         (!showOnlyZbSites || antenna.isZb == 1)
@@ -2906,12 +2946,18 @@ fun MapScreen(
 
                 // --- 3. POUR LES VRAIES ANTENNES, ON CONTINUE AVEC LE RESTE DES FILTRES ---
                 val isInCityBounds = currentCityPolygons.isNullOrEmpty() || currentCityPolygons!!.any { poly -> isPointInPolygon(antenna.latitude, antenna.longitude, poly) }
-                val matchesUndergroundFilter = !hideUndergroundSites || antenna.hasUndergroundSupport != 1
-                val matchesZbFilter = !showOnlyZbSites || antenna.isZb == 1
 
-                val matchTechno = frequencyFilter.matchesAntenna(antenna)
-
-                visibleOperators.isNotEmpty() && matchesUndergroundFilter && matchesZbFilter && isInCityBounds && matchTechno
+                isInCityBounds && passesSiteDisplayFilters(
+                    antenna = antenna,
+                    hsOperatorMap = hsOperatorMap,
+                    selectedOperatorKeys = selectedOperators,
+                    showSitesInService = showSitesInService,
+                    showSitesOutOfService = showSitesOutOfService,
+                    showProjectSites = showProjectSites,
+                    hideUndergroundSites = hideUndergroundSites,
+                    showOnlyZbSites = showOnlyZbSites,
+                    frequencyFilter = frequencyFilter
+                )
             }
 
             val base = applyDisplayFilters(antennas)
@@ -3994,6 +4040,47 @@ fun MapScreen(
 
     val currentFilteredAntennas by androidx.compose.runtime.rememberUpdatedState(filteredAntennas)
     val currentLoc by androidx.compose.runtime.rememberUpdatedState(myCurrentLoc)
+    val currentSitesHs by androidx.compose.runtime.rememberUpdatedState(sitesHs)
+
+    // Filtres d'affichage appliqués aux sites relus en base pour le suivi : la cible doit être un
+    // site que la carte montrerait si on la ramenait dessus, ni plus ni moins.
+    fun trackingDisplayFilter(): (LocalisationEntity) -> Boolean {
+        val hsOperatorMap = buildHsOperatorMap(currentSitesHs)
+        val selectedOperators = AppConfig.selectedOperatorKeys.value
+        val showSitesInService = AppConfig.showSitesInService.value
+        val showSitesOutOfService = AppConfig.showSitesOutOfService.value
+        val showProjectSites = AppConfig.showProjectSites.value
+        val hideUndergroundSites = AppConfig.hideUndergroundSites.value
+        val showOnlyZbSites = AppConfig.showOnlyZbSites.value
+        val frequencyFilter = FrequencyFilterSelection.fromMapConfig()
+        return { antenna ->
+            passesSiteDisplayFilters(
+                antenna = antenna,
+                hsOperatorMap = hsOperatorMap,
+                selectedOperatorKeys = selectedOperators,
+                showSitesInService = showSitesInService,
+                showSitesOutOfService = showSitesOutOfService,
+                showProjectSites = showProjectSites,
+                hideUndergroundSites = hideUndergroundSites,
+                showOnlyZbSites = showOnlyZbSites,
+                frequencyFilter = frequencyFilter
+            )
+        }
+    }
+
+    // Signature des filtres : le voisinage est trié avec au moment de la lecture, il est donc à
+    // relire dès qu'elle change — sinon un opérateur décoché resterait suivi jusqu'au prochain
+    // déplacement.
+    fun trackingFilterKey(): String = listOf(
+        AppConfig.selectedOperatorKeys.value.sorted().joinToString(","),
+        AppConfig.showSitesInService.value,
+        AppConfig.showSitesOutOfService.value,
+        AppConfig.showProjectSites.value,
+        AppConfig.hideUndergroundSites.value,
+        AppConfig.showOnlyZbSites.value,
+        FrequencyFilterSelection.fromMapConfig(),
+        currentSitesHs.size
+    ).joinToString("|")
 
     // =====================================================================
     // ✅ CORRECTION : MOTEUR DE SUIVI SANS "TRAITS FANTÔMES"
@@ -4001,6 +4088,15 @@ fun MapScreen(
     LaunchedEffect(Unit) {
         var lastTrackedAllId: String? = null
         var lastTrackedFavId: String? = null
+        // Voisinage relu en base autour de la position. Le suivi ne peut pas se contenter de la
+        // liste affichée : la carte peut regarder ailleurs, être dézoomée (elle ne porte alors que
+        // des regroupements) ou verrouillée sur une commune, et la cible n'y serait pas. Relu
+        // seulement quand on s'est éloigné du point de lecture ou quand les filtres changent —
+        // c'est une requête, pas un calcul.
+        var nearbySites = emptyList<LocalisationEntity>()
+        var nearbyFavSites = emptyList<LocalisationEntity>()
+        var nearbyCenter: GeoPoint? = null
+        var nearbyFilterKey: String? = null
 
         while (true) {
             // On lit l'état actuel des boutons en temps réel à l'intérieur de la boucle
@@ -4010,12 +4106,50 @@ fun MapScreen(
             if (isAllActive || isFavActive) {
                 val myLoc = currentLoc ?: locationOverlayRef?.myLocation
 
-                if (myLoc != null && currentFilteredAntennas.isNotEmpty()) {
+                if (myLoc != null) {
+                    // Réseau préféré décoché dans les filtres de la carte : aucun de ses sites ne
+                    // passerait, inutile de faire monter les paliers jusqu'au plus large pour rien.
+                    val favOperatorKey = OperatorColors.keyFor(AppConfig.defaultOperator.value)
+                        ?.takeIf { it in AppConfig.selectedOperatorKeys.value }
+                    val filterKey = listOf(
+                        trackingFilterKey(), isAllActive, isFavActive, favOperatorKey
+                    ).joinToString("|")
+                    val movedMeters = nearbyCenter?.distanceToAsDouble(myLoc) ?: Double.MAX_VALUE
+                    if (nearbyFilterKey != filterKey || movedMeters > TRACKING_NEARBY_REFRESH_METERS) {
+                        val displayFilter = trackingDisplayFilter()
+                        nearbySites = if (isAllActive) {
+                            viewModel.loadSitesAround(myLoc.latitude, myLoc.longitude, displayFilter)
+                        } else {
+                            emptyList()
+                        }
+                        // Le réseau préféré a besoin de sa propre montée en paliers : une boîte qui
+                        // s'arrête sur le premier voisin venu, d'un autre opérateur, laisserait ce
+                        // suivi-là sans cible alors que le site cherché est un peu plus loin.
+                        nearbyFavSites = if (isFavActive && favOperatorKey != null) {
+                            viewModel.loadSitesAround(myLoc.latitude, myLoc.longitude) { antenna ->
+                                displayFilter(antenna) &&
+                                    OperatorColors.keysFor(antenna.operateur).contains(favOperatorKey)
+                            }
+                        } else {
+                            emptyList()
+                        }
+                        nearbyCenter = myLoc
+                        nearbyFilterKey = filterKey
+                    }
+
+                    // La carte est ajoutée en appoint : elle peut porter des sites que les paliers
+                    // n'ont pas atteints, jamais l'inverse. Les regroupements en sont écartés — ce
+                    // sont des compteurs, pas des sites vers lesquels tirer un trait.
+                    val candidates = (
+                        nearbySites + nearbyFavSites +
+                            currentFilteredAntennas.filterNot { it.idAnfr.startsWith("CLUSTER_") }
+                        ).distinctBy { it.idAnfr }
+
                     var needsRefresh = false
 
                     // --- SUIVI 1 : LE PLUS PROCHE GLOBAL ---
                     if (isAllActive) {
-                        val nearestAll = currentFilteredAntennas.minByOrNull {
+                        val nearestAll = candidates.minByOrNull {
                             myLoc.distanceToAsDouble(GeoPoint(it.latitude, it.longitude))
                         }
                         val targetId = nearestAll?.idAnfr
@@ -4042,9 +4176,8 @@ fun MapScreen(
 
                     // --- SUIVI 2 : LE PLUS PROCHE OPÉRATEUR PRÉFÉRÉ ---
                     if (isFavActive) {
-                        val opQuery = OperatorColors.keyFor(AppConfig.defaultOperator.value)
-                        val nearestFav = currentFilteredAntennas
-                            .filter { opQuery != null && OperatorColors.keysFor(it.operateur).contains(opQuery) }
+                        val nearestFav = candidates
+                            .filter { favOperatorKey != null && OperatorColors.keysFor(it.operateur).contains(favOperatorKey) }
                             .minByOrNull { myLoc.distanceToAsDouble(GeoPoint(it.latitude, it.longitude)) }
 
                         val targetId = nearestFav?.idAnfr
@@ -4877,7 +5010,11 @@ fun MapScreen(
         // là. Le mode d'emploi prend donc le haut de l'écran en entier — barre du haut (retour,
         // titre, filtres) et bouton de partage s'effacent derrière lui, c'est la seule place qui se
         // lise d'un coup d'œil — et il rend le tout dès le premier point posé.
+        //
+        // Un suivi du site le plus proche le retire aussi : la carte trace déjà quelque chose, plus
+        // personne n'attend qu'on lui explique comment commencer.
         val showMeasureFirstPointHint = isMeasuringMode && measuredVertices.isEmpty() &&
+            !trackNearestAll && !trackNearestFav &&
             !hideMapControlsForSuggestions
         val showShareButton = !hideMapChrome && !showMeasureFirstPointHint
 
@@ -5684,7 +5821,13 @@ fun MapScreen(
                     },
                     isSearchActive = isSearchActive,
                     onToggleSearch = {
-                        if (canUseMapSearch) {
+                        if (!isSearchActive && showMeasureFirstPointHint) {
+                            // Le mode d'emploi de la mesure tient toute la barre du haut, juste où
+                            // la recherche viendrait s'ouvrir. Plutôt que de les empiler, on dit
+                            // quoi faire pour libérer la place. On ne bloque que l'OUVERTURE :
+                            // refermer une recherche déjà ouverte reste possible.
+                            showMeasureSearchBlockedDialog = true
+                        } else if (canUseMapSearch) {
                             isSearchActive = !isSearchActive
                         // Ouvrir la barre pose le curseur dans le champ et lève le clavier ; la
                         // refermer le range, sinon il resterait devant la carte qu'on vient de
@@ -6453,6 +6596,29 @@ fun MapScreen(
                         }
                         showColorWarningDialog = false
                     },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                ) {
+                    Text(text = txtUnderstood, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary)
+                }
+            }
+        )
+    }
+    if (showMeasureSearchBlockedDialog) {
+        AlertDialog(
+            onDismissRequest = { showMeasureSearchBlockedDialog = false },
+            containerColor = MaterialTheme.colorScheme.surface,
+            title = {
+                Text(
+                    text = stringResource(R.string.appstrings_measure_search_blocked_title),
+                    fontWeight = FontWeight.Bold,
+                    style = sizing.textStyle(MaterialTheme.typography.titleLarge)
+                )
+            },
+            text = { Text(text = stringResource(R.string.appstrings_measure_search_blocked_message)) },
+            confirmButton = {
+                Button(
+                    onClick = { showMeasureSearchBlockedDialog = false },
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) {

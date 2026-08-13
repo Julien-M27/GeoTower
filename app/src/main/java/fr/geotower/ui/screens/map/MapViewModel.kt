@@ -361,6 +361,63 @@ class MapViewModel(
         }
     }
 
+    /**
+     * Sites autour d'un point, **indépendamment de ce que la carte affiche**.
+     *
+     * Le suivi du site le plus proche (outil de mesure) ne peut pas se contenter de la liste à
+     * l'écran : dès qu'on regarde ailleurs, qu'on dézoome — il n'y a alors plus que des
+     * regroupements, qui ne sont pas des sites — ou qu'une commune est verrouillée, la cible n'y est
+     * plus et le trait disparaît. On relit donc la base autour de la position, avec la requête de la
+     * carte pour que [accept] (les filtres d'affichage) porte sur les mêmes colonnes.
+     *
+     * La boîte s'élargit par paliers, et un palier n'est retenu que si son site le plus proche tombe
+     * dans le cercle **inscrit** : trouver quelque chose dans un coin ne prouve rien, un site plus
+     * proche pouvant se tenir juste au-delà d'un bord. En ville le premier palier suffit, alors que
+     * partir d'emblée sur le plus large ramènerait des dizaines de milliers de lignes pour n'en
+     * garder qu'une.
+     */
+    suspend fun loadSitesAround(
+        lat: Double,
+        lon: Double,
+        accept: (LocalisationEntity) -> Boolean
+    ): List<LocalisationEntity> {
+        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val detailBackedBandMask = FrequencyFilterSelection.fromMapConfig()
+                .detailBackedBandMaskForEnrichment()
+            val center = GeoPoint(lat, lon)
+            // Un degré de longitude rétrécit avec la latitude : c'est lui qui donne le plus petit
+            // demi-côté, donc le rayon garanti par la boîte.
+            val metersPerDegree = DEGREE_METERS *
+                kotlin.math.cos(Math.toRadians(lat)).coerceAtLeast(0.05)
+            var best = emptyList<LocalisationEntity>()
+
+            for (radius in NEARBY_TRACKING_RADII_DEGREES) {
+                val kept = try {
+                    repository.getAntennasInBox(
+                        latNorth = lat + radius,
+                        lonEast = lon + radius,
+                        latSouth = lat - radius,
+                        lonWest = lon - radius,
+                        detailBackedBandMask = detailBackedBandMask
+                    ).filter { !it.idAnfr.startsWith("CLUSTER_") && accept(it) }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    AppLogger.w(TAG, "Nearby tracking sites request failed", e)
+                    return@withContext best
+                }
+                if (kept.isEmpty()) continue
+
+                best = kept
+                val nearestMeters = kept.minOf {
+                    center.distanceToAsDouble(GeoPoint(it.latitude, it.longitude))
+                }
+                if (nearestMeters <= radius * metersPerDegree) return@withContext kept
+            }
+            best
+        }
+    }
+
     /** Charge (une seule fois) la date de mise en service la plus ancienne pour borner le slider temporel. */
     fun ensureOldestServiceDateLoaded() {
         if (_oldestServiceDate.value != null) return
@@ -871,6 +928,13 @@ private const val CITY_STATS_TECHNIQUE_BATCH_SIZE = 400
 private const val OUTLINE_MIN_RING_SPAN_DEGREES = 0.01
 private const val OUTLINE_MAX_POINTS = 2500
 private const val MAP_AZIMUTH_TECHNIQUE_BATCH_SIZE = 400
+/**
+ * Paliers d'élargissement du voisinage cherché par le suivi, en degrés (~2, 7, 20 puis 55 km).
+ * Le dernier borne le coût : au-delà, la boîte pèserait bien plus que le service rendu.
+ */
+private val NEARBY_TRACKING_RADII_DEGREES = listOf(0.02, 0.06, 0.18, 0.5)
+/** Longueur d'un degré de latitude, en mètres. */
+private const val DEGREE_METERS = 111_320.0
 private const val SIGNALQUEST_COVERAGE_MIN_ZOOM = 13.0
 private const val SIGNALQUEST_COVERAGE_MAX_POINTS = 5000
 private const val SIGNALQUEST_COVERAGE_DAYS = 365

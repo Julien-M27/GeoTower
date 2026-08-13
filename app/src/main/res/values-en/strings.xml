@@ -2384,6 +2384,8 @@
     <string name="appstrings_measure_first_point_title">Place your starting point</string>
     <string name="appstrings_measure_first_point_hint">Tap the map to drop the first point.</string>
     <string name="appstrings_measure_first_point_hint_location">Tap the map, or tap your position to start from where you are.</string>
+    <string name="appstrings_measure_search_blocked_title">Measurement in progress</string>
+    <string name="appstrings_measure_search_blocked_message">Place a first point on the map, or close the measurement tool, to open the search.</string>
     <!-- Favorite photos page (Settings > Preferences) -->
     <string name="photos_favorites_title">Favorite photos</string>
     <string name="photos_favorites_desc">Find and manage the site photos you starred.</string>
@@ -2892,4 +2894,9 @@
     <string name="appstrings_release_v2030_marker_anchor">While following, your marker sits level with the zoom buttons, whatever the screen or interface size</string>
     <string name="appstrings_release_v2030_nav_zoom">The follow zoom is tighter: street names are readable and you see the junction coming</string>
     <string name="appstrings_release_v2030_no_jump">The marker no longer jumps to the centre at the start, only to slide back down after the first metre</string>
+
+    <!-- Release notes 2.0.31 -->
+    <string name="appstrings_release_v2031_nearest_filters">Nearest-site tracking now keeps only the sites the map would show: your operator, technology, underground and white-zone filters apply to it</string>
+    <string name="appstrings_release_v2031_nearest_refresh">Changing a filter restarts tracking straight away, instead of waiting for your next move</string>
+    <string name="appstrings_release_v2031_measure_search">Asking for search during a measurement explains what to do, instead of stacking the two</string>
 </resources>

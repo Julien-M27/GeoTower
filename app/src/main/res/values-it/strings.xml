@@ -2384,6 +2384,8 @@
     <string name="appstrings_measure_first_point_title">Posiziona il punto di partenza</string>
     <string name="appstrings_measure_first_point_hint">Tocca la mappa per posizionare il primo punto.</string>
     <string name="appstrings_measure_first_point_hint_location">Tocca la mappa, oppure la tua posizione per partire da dove sei.</string>
+    <string name="appstrings_measure_search_blocked_title">Misurazione in corso</string>
+    <string name="appstrings_measure_search_blocked_message">Posiziona un primo punto sulla mappa, oppure chiudi lo strumento di misura, per aprire la ricerca.</string>
     <!-- Foto preferite (Impostazioni > Preferenze) -->
     <string name="photos_favorites_title">Foto preferite</string>
     <string name="photos_favorites_desc">Trova e gestisci le foto dei siti aggiunte ai preferiti.</string>
@@ -2892,4 +2894,9 @@
     <string name="appstrings_release_v2030_marker_anchor">Durante l\'inseguimento, il tuo indicatore si colloca all\'altezza dei pulsanti di zoom, qualunque sia la dimensione dello schermo o dell\'interfaccia</string>
     <string name="appstrings_release_v2030_nav_zoom">Lo zoom dell\'inseguimento è più stretto: si leggono i nomi delle vie e si vede arrivare l\'incrocio</string>
     <string name="appstrings_release_v2030_no_jump">L\'indicatore non salta più al centro all\'avvio, per poi riscendere dopo il primo metro</string>
+
+    <!-- Note di versione 2.0.31 -->
+    <string name="appstrings_release_v2031_nearest_filters">Il seguimento del sito più vicino conserva ora solo i siti che la mappa mostrerebbe: vi si applicano i tuoi filtri di operatore, tecnologia, sottosuolo e zona bianca</string>
+    <string name="appstrings_release_v2031_nearest_refresh">Cambiare un filtro riavvia subito il seguimento, invece di aspettare il tuo prossimo spostamento</string>
+    <string name="appstrings_release_v2031_measure_search">Chiedere la ricerca durante una misura spiega cosa fare, invece di sovrapporre le due cose</string>
 </resources>

@@ -2384,6 +2384,8 @@
     <string name="appstrings_measure_first_point_title">Coloca tu punto de partida</string>
     <string name="appstrings_measure_first_point_hint">Toca el mapa para colocar el primer punto.</string>
     <string name="appstrings_measure_first_point_hint_location">Toca el mapa, o tu posición para salir desde donde estás.</string>
+    <string name="appstrings_measure_search_blocked_title">Medición en curso</string>
+    <string name="appstrings_measure_search_blocked_message">Coloca un primer punto en el mapa, o cierra la herramienta de medición, para abrir la búsqueda.</string>
     <!-- Fotos favoritas (Ajustes > Preferencias) -->
     <string name="photos_favorites_title">Fotos favoritas</string>
     <string name="photos_favorites_desc">Encuentra y gestiona las fotos de emplazamientos marcadas como favoritas.</string>
@@ -2892,4 +2894,9 @@
     <string name="appstrings_release_v2030_marker_anchor">Durante el seguimiento, tu marcador se sitúa a la altura de los botones de zoom, sea cual sea el tamaño de la pantalla o de la interfaz</string>
     <string name="appstrings_release_v2030_nav_zoom">El zoom del seguimiento es más cerrado: se leen los nombres de las calles y se ve llegar el cruce</string>
     <string name="appstrings_release_v2030_no_jump">El marcador ya no salta al centro al arrancar para volver a bajar tras el primer metro</string>
+
+    <!-- Notas de la versión 2.0.31 -->
+    <string name="appstrings_release_v2031_nearest_filters">El seguimiento del sitio más cercano solo conserva ahora los sitios que el mapa mostraría: se le aplican tus filtros de operador, tecnología, subsuelo y zona blanca</string>
+    <string name="appstrings_release_v2031_nearest_refresh">Cambiar un filtro reinicia el seguimiento de inmediato, en lugar de esperar a tu próximo desplazamiento</string>
+    <string name="appstrings_release_v2031_measure_search">Pedir la búsqueda durante una medición explica qué hacer, en lugar de superponer ambas</string>
 </resources>
