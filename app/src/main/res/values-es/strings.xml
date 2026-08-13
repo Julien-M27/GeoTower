@@ -2881,4 +2881,10 @@
     <string name="appstrings_release_v2028_nav_no_spin">Ya no gira con el ruido del GPS cuando estás parado</string>
     <string name="appstrings_release_v2028_approach_route">Iniciar un seguimiento lejos del punto de partida muestra ahora el trayecto de aproximación a la primera parada, en un color distinto</string>
     <string name="appstrings_release_v2028_measure_first_point">La herramienta de medición indica claramente dónde poner el primer punto y propone partir de tu posición</string>
+
+    <!-- Notas de la versión 2.0.29 -->
+    <string name="appstrings_release_v2029_eta_real_pace">El tiempo restante de una ronda se estima a partir del ritmo realmente observado en el itinerario, paradas incluidas, en lugar de una velocidad media fija</string>
+    <string name="appstrings_release_v2029_camera_release">Desplazar el mapa durante un seguimiento recupera el control de la vista; el botón de recentrado se lo devuelve</string>
+    <string name="appstrings_release_v2029_compass_hidden">La brújula se aparta mientras la caja de herramientas está desplegada, y vuelve al cerrarla</string>
+    <string name="appstrings_release_v2029_measure_hint">La medición explica en la parte superior de la pantalla dónde poner el primer punto, hasta que se coloca</string>
 </resources>

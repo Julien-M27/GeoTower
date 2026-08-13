@@ -2881,4 +2881,10 @@
     <string name="appstrings_release_v2028_nav_no_spin">It no longer spins with GPS noise when you are standing still</string>
     <string name="appstrings_release_v2028_approach_route">Starting a follow far from the start now draws the approach route to the first stop, in a distinct colour</string>
     <string name="appstrings_release_v2028_measure_first_point">The measuring tool says clearly where to put the first point, and offers to start from your position</string>
+
+    <!-- Release notes 2.0.29 -->
+    <string name="appstrings_release_v2029_eta_real_pace">A trip\'s remaining time is estimated from the pace actually observed along the route, stops included, rather than a fixed average speed</string>
+    <string name="appstrings_release_v2029_camera_release">Panning the map during a follow takes back control of the view; the recentre button hands it over again</string>
+    <string name="appstrings_release_v2029_compass_hidden">The compass steps aside while the toolbox is open, and returns when it is closed</string>
+    <string name="appstrings_release_v2029_measure_hint">Measuring explains at the top of the screen where to place the first point, until it is placed</string>
 </resources>

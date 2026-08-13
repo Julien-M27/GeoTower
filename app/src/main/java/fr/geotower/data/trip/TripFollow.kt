@@ -1,5 +1,6 @@
 package fr.geotower.data.trip
 
+import fr.geotower.data.api.RouteApi
 import kotlin.math.cos
 import kotlin.math.sqrt
 
@@ -13,6 +14,8 @@ data class TripFollowStatus(
     val distanceToNextMeters: Double?,
     /** Distance qu'il reste à parcourir, étape suivante comprise. */
     val remainingDistanceMeters: Double,
+    /** Temps qu'il reste, arrêts sur les étapes non relevées compris. */
+    val remainingDurationSeconds: Double,
     /** Écart au tracé calculé, ou `null` si aucun segment n'est encore calculé. */
     val offRouteMeters: Double?,
     val isOffRoute: Boolean,
@@ -53,15 +56,28 @@ fun computeTripFollowStatus(
         haversineMeters(latitude, longitude, plan.steps[it].latitude, plan.steps[it].longitude)
     }
 
+    // Ce qu'il reste : le trajet à vol d'oiseau jusqu'à l'étape suivante, puis les segments
+    // calculés au-delà. On ne prétend pas connaître la route depuis un point hors tracé.
+    val remainingLegs = if (nextIndex == null) {
+        emptyList()
+    } else {
+        plan.legPairs().filter { it.first >= nextIndex }
+    }
     val remaining = if (nextIndex == null) {
         0.0
     } else {
-        // Ce qu'il reste : le trajet à vol d'oiseau jusqu'à l'étape suivante, puis les segments
-        // calculés au-delà. On ne prétend pas connaître la route depuis un point hors tracé.
-        val after = plan.legPairs()
-            .filter { it.first >= nextIndex }
-            .sumOf { plan.legBetween(it.first, it.second)?.distanceMeters ?: 0.0 }
-        (distanceToNext ?: 0.0) + after
+        (distanceToNext ?: 0.0) +
+            remainingLegs.sumOf { plan.legBetween(it.first, it.second)?.distanceMeters ?: 0.0 }
+    }
+
+    val remainingDuration = if (nextIndex == null) {
+        0.0
+    } else {
+        val legsDuration = remainingLegs
+            .sumOf { plan.legBetween(it.first, it.second)?.durationSeconds ?: 0.0 }
+        val stops = plan.steps.drop(nextIndex).count { it.visitedAtMillis == null } *
+            plan.stopDurationMinutes * 60.0
+        legsDuration + (distanceToNext ?: 0.0) / approachSpeedMetersPerSecond(plan, nextIndex) + stops
     }
 
     val offRoute = distanceToRouteMeters(plan, latitude, longitude)
@@ -69,10 +85,35 @@ fun computeTripFollowStatus(
         nextStepIndex = nextIndex,
         distanceToNextMeters = distanceToNext,
         remainingDistanceMeters = remaining,
+        remainingDurationSeconds = remainingDuration,
         offRouteMeters = offRoute,
         isOffRoute = offRoute != null && offRoute > offRouteThresholdMeters,
         reachedStepIndices = reached
     )
+}
+
+/** Repli quand aucun segment calculé ne renseigne le rythme réel : ~40 km/h et ~4,5 km/h. */
+private const val DEFAULT_CAR_SPEED_METERS_PER_SECOND = 11.0
+private const val DEFAULT_WALK_SPEED_METERS_PER_SECOND = 1.25
+
+/**
+ * À quelle vitesse estimer les mètres qui restent jusqu'à l'étape suivante.
+ *
+ * On préfère le rythme **réellement observé sur le segment qui y mène** (sa distance divisée par sa
+ * durée, telles que le service les a rendues) : il tient compte du relief, des limitations et du
+ * type de voie, là où une constante ne saurait rien de tout ça. Sans ce segment, on retombe sur une
+ * vitesse de repli propre au profil.
+ */
+private fun approachSpeedMetersPerSecond(plan: TripPlan, nextIndex: Int): Double {
+    val leadingLeg = plan.legBetween(nextIndex - 1, nextIndex)
+    if (leadingLeg != null && leadingLeg.durationSeconds > 0.0 && leadingLeg.distanceMeters > 0.0) {
+        return leadingLeg.distanceMeters / leadingLeg.durationSeconds
+    }
+    return if (plan.profile == RouteApi.PROFILE_PEDESTRIAN) {
+        DEFAULT_WALK_SPEED_METERS_PER_SECOND
+    } else {
+        DEFAULT_CAR_SPEED_METERS_PER_SECOND
+    }
 }
 
 /**

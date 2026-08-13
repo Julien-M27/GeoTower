@@ -18,8 +18,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -28,8 +30,11 @@ import androidx.compose.ui.unit.sp
 import fr.geotower.R
 import fr.geotower.data.trip.TripFollowStatus
 import fr.geotower.data.trip.TripPlan
+import fr.geotower.data.trip.formatTripDuration
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.formatSiteDistanceMeters
+import java.text.DateFormat
+import java.util.Date
 
 /**
  * Barre du **suivi** de tournée, distincte de celle de l'édition : sur le terrain on ne pose plus
@@ -121,21 +126,57 @@ fun TripFollowBar(
                     )
                 }
             }
+
+            // Heure d'arrivée, temps et distance restants : la ligne que les applis de guidage
+            // mettent en bas d'écran, celle qu'on lit d'un coup d'œil au volant.
+            if (nextStep != null && status != null) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = sizing.spacing(6.dp)),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.Bottom
+                ) {
+                    Text(
+                        text = arrivalTimeLabel(status.remainingDurationSeconds),
+                        fontSize = sizing.text(22.sp),
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = " · " + formatTripDuration(
+                            seconds = status.remainingDurationSeconds,
+                            hourLabel = stringResource(R.string.trips_duration_hour_short),
+                            minuteLabel = stringResource(R.string.trips_duration_minute_short)
+                        ) + " · " + formatSiteDistanceMeters(
+                            status.remainingDistanceMeters,
+                            distanceUnit
+                        ),
+                        fontSize = sizing.text(14.sp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = sizing.spacing(2.dp))
+                    )
+                }
+            }
         }
     }
+}
+
+/** L'heure qu'il sera en arrivant, au format court du téléphone. */
+@Composable
+private fun arrivalTimeLabel(remainingSeconds: Double): String {
+    val locale = LocalConfiguration.current.locales[0]
+    val format = remember(locale) { DateFormat.getTimeInstance(DateFormat.SHORT, locale) }
+    val arrival = System.currentTimeMillis() + (remainingSeconds * 1000L).toLong()
+    return format.format(Date(arrival))
 }
 
 /** « 1,2 km — 3/8 relevées — reste 14,5 km », sans annoncer ce qu'on ne sait pas. */
 @Composable
 private fun followDetail(plan: TripPlan, status: TripFollowStatus?, distanceUnit: Int): String {
+    // Ce qui reste au total est désormais sur la ligne d'arrivée, en bas : le répéter ici mettrait
+    // deux distances côte à côte sans dire laquelle est laquelle.
     val parts = mutableListOf<String>()
     status?.distanceToNextMeters?.let { parts += formatSiteDistanceMeters(it, distanceUnit) }
     parts += stringResource(R.string.trips_progress, plan.visitedCount(), plan.relevantStepCount())
-    if (status != null && status.nextStepIndex != null) {
-        parts += stringResource(
-            R.string.trips_follow_remaining,
-            formatSiteDistanceMeters(status.remainingDistanceMeters, distanceUnit)
-        )
-    }
     return parts.joinToString(" - ")
 }

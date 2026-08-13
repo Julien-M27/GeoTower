@@ -2881,4 +2881,10 @@
     <string name="appstrings_release_v2028_nav_no_spin">Deixa de girar com o ruído do GPS quando está parado</string>
     <string name="appstrings_release_v2028_approach_route">Iniciar um seguimento longe da partida mostra agora o percurso de aproximação à primeira etapa, numa cor distinta</string>
     <string name="appstrings_release_v2028_measure_first_point">A ferramenta de medição indica claramente onde colocar o primeiro ponto e propõe partir da sua posição</string>
+
+    <!-- Notas da versão 2.0.29 -->
+    <string name="appstrings_release_v2029_eta_real_pace">O tempo restante de uma ronda é estimado pelo ritmo realmente observado ao longo do itinerário, paragens incluídas, em vez de uma velocidade média fixa</string>
+    <string name="appstrings_release_v2029_camera_release">Deslocar o mapa durante um seguimento retoma o controlo da vista; o botão de recentragem devolve-o</string>
+    <string name="appstrings_release_v2029_compass_hidden">A bússola afasta-se enquanto a caixa de ferramentas está aberta, e regressa ao fechá-la</string>
+    <string name="appstrings_release_v2029_measure_hint">A medição explica no topo do ecrã onde colocar o primeiro ponto, até este ser colocado</string>
 </resources>

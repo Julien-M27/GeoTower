@@ -2881,4 +2881,10 @@
     <string name="appstrings_release_v2028_nav_no_spin">Sie dreht sich nicht mehr mit dem GPS-Rauschen, wenn du stehst</string>
     <string name="appstrings_release_v2028_approach_route">Startest du die Verfolgung weit vom Beginn entfernt, wird jetzt die Anfahrt zum ersten Stopp in einer eigenen Farbe gezeichnet</string>
     <string name="appstrings_release_v2028_measure_first_point">Das Messwerkzeug sagt klar, wo der erste Punkt hingehört, und bietet an, von deiner Position auszugehen</string>
+
+    <!-- Versionshinweise 2.0.29 -->
+    <string name="appstrings_release_v2029_eta_real_pace">Die Restzeit einer Tour wird aus dem tatsächlich auf der Route beobachteten Tempo geschätzt, Stopps eingerechnet, statt aus einer festen Durchschnittsgeschwindigkeit</string>
+    <string name="appstrings_release_v2029_camera_release">Das Verschieben der Karte während der Verfolgung übernimmt die Ansicht; die Zentrieren-Schaltfläche gibt sie wieder frei</string>
+    <string name="appstrings_release_v2029_compass_hidden">Der Kompass tritt zurück, solange der Werkzeugkasten geöffnet ist, und kehrt beim Schließen zurück</string>
+    <string name="appstrings_release_v2029_measure_hint">Die Messung erklärt oben am Bildschirm, wo der erste Punkt hingehört, bis er gesetzt ist</string>
 </resources>

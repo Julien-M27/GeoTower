@@ -23,6 +23,7 @@ import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.expandHorizontally
@@ -1843,6 +1844,15 @@ fun MapScreen(
     val tripHeadingSmoother = remember { TripHeadingSmoother() }
     var navHeadingDegrees by remember { mutableStateOf<Double?>(null) }
 
+    /**
+     * La caméra de suivi colle-t-elle à la position ?
+     *
+     * Elle lâche prise dès qu'on déplace la carte au doigt — on veut pouvoir regarder la suite du
+     * trajet — et se rattache au bouton de recentrage, comme dans les applis de guidage. Sans ça,
+     * chaque relevé GPS ramènerait la vue et le geste serait impossible.
+     */
+    var navCameraLocked by remember { mutableStateOf(true) }
+
     // Trajet d'approche : la route entre là où l'on se trouve et l'étape à rejoindre, quand on
     // démarre le suivi loin du départ. Transitoire, donc jamais enregistré dans la tournée.
     var plannerApproachPoints by remember { mutableStateOf<List<DoubleArray>?>(null) }
@@ -2516,6 +2526,7 @@ fun MapScreen(
             isTrackingActive = false
             locationOverlayRef?.disableFollowLocation()
             mapViewRef?.controller?.setZoom(NAV_FOLLOW_ZOOM)
+            navCameraLocked = true
         }
 
         onDispose {
@@ -2527,8 +2538,8 @@ fun MapScreen(
     }
 
     // Cap de marche en haut, utilisateur en bas de l'écran : le cadrage des applis de guidage.
-    LaunchedEffect(myCurrentLoc, navHeadingDegrees, tripMode) {
-        if (tripMode != TRIP_MODE_FOLLOW) return@LaunchedEffect
+    LaunchedEffect(myCurrentLoc, navHeadingDegrees, tripMode, navCameraLocked) {
+        if (tripMode != TRIP_MODE_FOLLOW || !navCameraLocked) return@LaunchedEffect
         val map = mapViewRef ?: return@LaunchedEffect
         val location = myCurrentLoc ?: return@LaunchedEffect
 
@@ -4160,7 +4171,11 @@ fun MapScreen(
                     locationOverlay.setEnableAutoStop(false)
                     // Se déplacer à la main sur la carte rend la main : la poursuite s'arrête au
                     // lieu de ramener la vue sur la position à l'image suivante.
-                    locationOverlay.onUserPan = { isTrackingActive = false }
+                    locationOverlay.onUserPan = {
+                        isTrackingActive = false
+                        // Même règle pour la caméra de suivi de tournée : le doigt reprend la main.
+                        navCameraLocked = false
+                    }
                     locationOverlay.showLocationMarker = AppConfig.showMapLocationMarker.value
                     locationOverlay.enableMyLocation()
 
@@ -4883,6 +4898,13 @@ fun MapScreen(
         val showCompactCompass = showCompass && AppConfig.hasCompass.value &&
             useCompactCompassPlacement && !showCompassInMapHeader && !isPlannerMode
 
+        // Boîte à outils dépliée : elle prend tout le côté droit, jusqu'en haut de l'écran sur un
+        // téléphone. La boussole s'efface alors, quelle que soit sa place — sinon elle passe derrière
+        // la colonne d'outils, ou la pousse hors de l'écran quand elle est empilée au-dessus. Elle
+        // revient dès qu'on referme la boîte. Le choix de l'emplacement, lui, n'est pas touché : ce
+        // sont les trois points d'affichage qui se taisent, pas la logique qui les répartit.
+        val hideCompassForToolbox = showToolbox && isToolboxExpanded && !isPlannerMode
+
         /**
          * Écran trajet : la boussole quitte ses trois emplacements habituels — bandeau en paysage,
          * flottant en haut à droite, compact au-dessus de la boîte à outils — pour se ranger sous
@@ -5065,7 +5087,7 @@ fun MapScreen(
 
         AnimatedVisibility(
             visible = showCompass && AppConfig.hasCompass.value && !useCompactCompassPlacement &&
-                !showCompassInMapHeader && !hideMapChrome,
+                !showCompassInMapHeader && !hideMapChrome && !hideCompassForToolbox,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier
@@ -5291,7 +5313,63 @@ fun MapScreen(
         }
 
 
+        // Mesure ouverte, chaîne encore vide : rien à l'écran ne dit qu'il faut toucher la carte
+        // pour choisir d'où l'on part, ni que toucher son propre repère fait démarrer la mesure de
+        // là. Le mode d'emploi prend donc la barre du haut en entier — retour, titre et filtres
+        // s'effacent derrière lui, c'est la seule place qui se lise d'un coup d'œil — et rend le
+        // tout dès le premier point posé.
+        val showMeasureFirstPointHint = isMeasuringMode && measuredVertices.isEmpty() &&
+            !hideMapControlsForSuggestions
         Column(modifier = Modifier.fillMaxWidth().padding(top = sizing.spacing(48.dp)), horizontalAlignment = Alignment.CenterHorizontally) {
+            Crossfade(targetState = showMeasureFirstPointHint, label = "mapHeaderMeasureHint") { showHint ->
+            if (showHint) {
+                // Le repère de position n'est proposé que s'il est réellement affiché et localisé :
+                // sinon on désignerait quelque chose d'invisible.
+                val canStartFromMyLocation = myCurrentLoc != null && showLocationMarker
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = sizing.spacing(16.dp)),
+                    shape = RoundedCornerShape(24.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    shadowElevation = 4.dp,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(
+                            horizontal = sizing.spacing(16.dp),
+                            vertical = sizing.spacing(10.dp)
+                        ),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.TouchApp,
+                            null,
+                            tint = measureLineColor,
+                            modifier = Modifier.size(sizing.component(20.dp))
+                        )
+                        Spacer(Modifier.width(sizing.spacing(10.dp)))
+                        Column {
+                            Text(
+                                text = stringResource(R.string.appstrings_measure_first_point_title),
+                                fontSize = sizing.text(13.sp),
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = stringResource(
+                                    if (canStartFromMyLocation) {
+                                        R.string.appstrings_measure_first_point_hint_location
+                                    } else {
+                                        R.string.appstrings_measure_first_point_hint
+                                    }
+                                ),
+                                fontSize = sizing.text(11.sp),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            } else {
             Box(modifier = Modifier.fillMaxWidth().padding(horizontal = sizing.spacing(16.dp))) {
                 // En mode simplifié la carte est la racine : le retour n'a plus de sens, le bouton
                 // ouvre le tiroir. La sélection de photo partagée garde en revanche son « annuler ».
@@ -5330,7 +5408,7 @@ fun MapScreen(
                     horizontalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp)),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (showCompassInMapHeader) {
+                    if (showCompassInMapHeader && !hideCompassForToolbox) {
                         MapCompassButton(
                             azimuth = azimuth,
                             mapOrientation = { mapOrientationState.floatValue },
@@ -5356,7 +5434,9 @@ fun MapScreen(
                         ) { safeClick { showSettingsSheet = true } }
                     }
                 }
-            }
+            } // fin de la barre du haut habituelle
+            } // fin du else
+            } // fin du Crossfade
 
             AnimatedVisibility(
                 // Même règle que le bouton Filtres : annoncer des filtres actifs là où on ne peut
@@ -5411,65 +5491,6 @@ fun MapScreen(
                     measureInfoBottomPx = position.y + it.size.height
                 }
             ) {
-                // Chaîne encore vide : la place du total sert de mode d'emploi. Rien à l'écran ne dit
-                // qu'il faut toucher la carte pour choisir d'où l'on part, ni que toucher son propre
-                // repère fait démarrer la mesure de là. Le bandeau s'efface au premier point posé,
-                // le total prend alors le relais. Le repère n'est proposé que s'il est réellement
-                // affiché et localisé : sinon on désignerait quelque chose d'invisible.
-                val canStartFromMyLocation = myCurrentLoc != null && showLocationMarker
-                AnimatedVisibility(
-                    visible = isMeasuringMode && measuredVertices.isEmpty() &&
-                        !hideMapControlsForSuggestions,
-                    enter = fadeIn(),
-                    exit = fadeOut()
-                ) {
-                    Surface(
-                        modifier = Modifier.padding(
-                            start = sizing.spacing(24.dp),
-                            end = sizing.spacing(24.dp),
-                            bottom = sizing.spacing(10.dp)
-                        ),
-                        shape = RoundedCornerShape(24.dp),
-                        color = MaterialTheme.colorScheme.surface,
-                        shadowElevation = 4.dp,
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(
-                                horizontal = sizing.spacing(16.dp),
-                                vertical = sizing.spacing(10.dp)
-                            ),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                Icons.Default.TouchApp,
-                                null,
-                                tint = measureLineColor,
-                                modifier = Modifier.size(sizing.component(18.dp))
-                            )
-                            Spacer(Modifier.width(sizing.spacing(8.dp)))
-                            Column {
-                                Text(
-                                    text = stringResource(R.string.appstrings_measure_first_point_title),
-                                    fontSize = sizing.text(13.sp),
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = stringResource(
-                                        if (canStartFromMyLocation) {
-                                            R.string.appstrings_measure_first_point_hint_location
-                                        } else {
-                                            R.string.appstrings_measure_first_point_hint
-                                        }
-                                    ),
-                                    fontSize = sizing.text(11.sp),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
-                }
-
                 AnimatedVisibility(
                     visible = currentMeasureSegments.isNotEmpty(),
                     enter = fadeIn(),
@@ -5613,7 +5634,7 @@ fun MapScreen(
             horizontalAlignment = Alignment.End,
             verticalArrangement = Arrangement.spacedBy(sizing.spacing(16.dp))
         ) {
-            if (showCompactCompass) {
+            if (showCompactCompass && !hideCompassForToolbox) {
                 MapCompassButton(
                     azimuth = azimuth,
                     mapOrientation = { mapOrientationState.floatValue },
@@ -5823,6 +5844,16 @@ fun MapScreen(
                                 currentLat = location.latitude
                             }
 
+                            // Suivi de tournée : c'est notre caméra qui tient la vue (cap de marche
+                            // en haut, position en bas). Le bouton se contente de la rattacher —
+                            // lancer en plus la poursuite d'osmdroid recentrerait au milieu de
+                            // l'écran et écraserait ce cadrage.
+                            if (tripMode == TRIP_MODE_FOLLOW) {
+                                navCameraLocked = true
+                                map.controller.setZoom(NAV_FOLLOW_ZOOM)
+                                return@safeClick
+                            }
+
                             // Un seul effet : le bouton lance la poursuite, il ne l'arrête jamais.
                             // C'est le glissement du doigt sur la carte qui rend la main (cf.
                             // `onUserPan`) : on n'est plus bloqué sur sa position jusqu'à un second
@@ -5860,7 +5891,10 @@ fun MapScreen(
                         modifier = Modifier
                             .fillMaxSize()
                             .then(
-                                if (isTrackingActive) {
+                                // En suivi de tournée, c'est l'accrochage de NOTRE caméra qui compte.
+                                if (isTrackingActive ||
+                                    (tripMode == TRIP_MODE_FOLLOW && navCameraLocked)
+                                ) {
                                     Modifier.border(
                                         width = 1.5.dp, // Cercle très fin
                                         color = MaterialTheme.colorScheme.primary, // Couleur principale
@@ -6105,7 +6139,9 @@ fun MapScreen(
             horizontalAlignment = Alignment.Start,
             verticalArrangement = Arrangement.spacedBy(sizing.spacing(4.dp))
         ) {
-            if (AppConfig.showSpeedometer.value && !isPlannerMode) {
+            // Le compteur reste pendant le suivi : c'est une information de conduite, comme sur les
+            // applis de guidage. Il ne disparaît qu'en consultation et en édition.
+            if (AppConfig.showSpeedometer.value && (!isPlannerMode || tripMode == TRIP_MODE_FOLLOW)) {
                 fr.geotower.ui.components.MapSpeedometer(speedKmH = currentSpeedKmH)
             }
 

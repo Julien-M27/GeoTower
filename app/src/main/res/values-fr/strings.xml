@@ -2883,4 +2883,10 @@
     <string name="appstrings_release_v2028_nav_no_spin">Elle ne pivote plus au gré du GPS quand vous êtes à l\'arrêt</string>
     <string name="appstrings_release_v2028_approach_route">Démarrer un suivi loin du départ affiche le trajet d\'approche vers la première étape, dans une couleur distincte</string>
     <string name="appstrings_release_v2028_measure_first_point">L\'outil de mesure indique clairement où poser le premier point, et propose de partir de votre position</string>
+
+    <!-- Notes de version 2.0.29 -->
+    <string name="appstrings_release_v2029_eta_real_pace">Le temps restant d\'une tournée est estimé sur le rythme réellement observé le long de l\'itinéraire, arrêts compris, plutôt que sur une vitesse moyenne fixe</string>
+    <string name="appstrings_release_v2029_camera_release">Déplacer la carte pendant un suivi reprend la main sur la vue ; le bouton de recentrage la rend</string>
+    <string name="appstrings_release_v2029_compass_hidden">La boussole s\'efface quand la boîte à outils est dépliée, et revient à sa fermeture</string>
+    <string name="appstrings_release_v2029_measure_hint">La mesure explique en haut de l\'écran où poser le premier point, jusqu\'à ce qu\'il soit posé</string>
 </resources>

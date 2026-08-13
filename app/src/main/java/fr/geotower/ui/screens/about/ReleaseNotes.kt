@@ -32,10 +32,10 @@ internal data class ReleaseNoteItem(
 @Composable
 internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
     section(stringResource(R.string.appstrings_release_section_map)) {
-        item(stringResource(R.string.appstrings_release_v2028_nav_camera))
-        item(stringResource(R.string.appstrings_release_v2028_nav_no_spin))
-        item(stringResource(R.string.appstrings_release_v2028_approach_route))
-        item(stringResource(R.string.appstrings_release_v2028_measure_first_point))
+        item(stringResource(R.string.appstrings_release_v2029_eta_real_pace))
+        item(stringResource(R.string.appstrings_release_v2029_camera_release))
+        item(stringResource(R.string.appstrings_release_v2029_compass_hidden))
+        item(stringResource(R.string.appstrings_release_v2029_measure_hint))
     }
 }
 

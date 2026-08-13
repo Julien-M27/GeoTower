@@ -2881,4 +2881,10 @@
     <string name="appstrings_release_v2028_nav_no_spin">Non ruota più con il rumore del GPS quando sei fermo</string>
     <string name="appstrings_release_v2028_approach_route">Avviare l\'inseguimento lontano dalla partenza mostra ora il tragitto di avvicinamento alla prima tappa, in un colore distinto</string>
     <string name="appstrings_release_v2028_measure_first_point">Lo strumento di misura indica chiaramente dove porre il primo punto e propone di partire dalla tua posizione</string>
+
+    <!-- Note di versione 2.0.29 -->
+    <string name="appstrings_release_v2029_eta_real_pace">Il tempo restante di un giro è stimato sul ritmo realmente osservato lungo l\'itinerario, soste comprese, invece che su una velocità media fissa</string>
+    <string name="appstrings_release_v2029_camera_release">Spostare la mappa durante l\'inseguimento riprende il controllo della vista; il pulsante di ricentratura lo restituisce</string>
+    <string name="appstrings_release_v2029_compass_hidden">La bussola si fa da parte finché la cassetta degli attrezzi è aperta, e torna alla chiusura</string>
+    <string name="appstrings_release_v2029_measure_hint">La misura spiega in alto allo schermo dove porre il primo punto, finché non è posato</string>
 </resources>
