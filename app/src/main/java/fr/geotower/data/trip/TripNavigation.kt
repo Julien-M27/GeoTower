@@ -22,8 +22,14 @@ const val NAV_HEADING_SMOOTHING = 0.25
  */
 const val NAV_CAMERA_AHEAD_FRACTION = 0.25
 
-/** Niveau de zoom du suivi : assez près pour lire les rues, assez loin pour voir le prochain virage. */
-const val NAV_FOLLOW_ZOOM = 17.5
+/** Au-delà, le repère sortirait par le bas de l'écran. */
+const val NAV_CAMERA_MAX_AHEAD_FRACTION = 0.42
+
+/**
+ * Niveau de zoom du suivi. Serré, comme les applis de guidage : à cette échelle on lit les noms de
+ * rue et on voit l'intersection arriver, ce qu'un cadrage plus large ne permet pas au volant.
+ */
+const val NAV_FOLLOW_ZOOM = 18.5
 
 /**
  * En deçà, on considère qu'on est sur l'étape : inutile de calculer une route d'approche pour les

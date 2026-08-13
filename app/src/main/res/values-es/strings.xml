@@ -2887,4 +2887,9 @@
     <string name="appstrings_release_v2029_camera_release">Desplazar el mapa durante un seguimiento recupera el control de la vista; el botón de recentrado se lo devuelve</string>
     <string name="appstrings_release_v2029_compass_hidden">La brújula se aparta mientras la caja de herramientas está desplegada, y vuelve al cerrarla</string>
     <string name="appstrings_release_v2029_measure_hint">La medición explica en la parte superior de la pantalla dónde poner el primer punto, hasta que se coloca</string>
+
+    <!-- Notas de la versión 2.0.30 -->
+    <string name="appstrings_release_v2030_marker_anchor">Durante el seguimiento, tu marcador se sitúa a la altura de los botones de zoom, sea cual sea el tamaño de la pantalla o de la interfaz</string>
+    <string name="appstrings_release_v2030_nav_zoom">El zoom del seguimiento es más cerrado: se leen los nombres de las calles y se ve llegar el cruce</string>
+    <string name="appstrings_release_v2030_no_jump">El marcador ya no salta al centro al arrancar para volver a bajar tras el primer metro</string>
 </resources>

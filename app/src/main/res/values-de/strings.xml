@@ -2887,4 +2887,9 @@
     <string name="appstrings_release_v2029_camera_release">Das Verschieben der Karte während der Verfolgung übernimmt die Ansicht; die Zentrieren-Schaltfläche gibt sie wieder frei</string>
     <string name="appstrings_release_v2029_compass_hidden">Der Kompass tritt zurück, solange der Werkzeugkasten geöffnet ist, und kehrt beim Schließen zurück</string>
     <string name="appstrings_release_v2029_measure_hint">Die Messung erklärt oben am Bildschirm, wo der erste Punkt hingehört, bis er gesetzt ist</string>
+
+    <!-- Versionshinweise 2.0.30 -->
+    <string name="appstrings_release_v2030_marker_anchor">Beim Verfolgen sitzt deine Markierung auf Höhe der Zoom-Schaltflächen, unabhängig von Bildschirm- und Oberflächengröße</string>
+    <string name="appstrings_release_v2030_nav_zoom">Der Zoom der Verfolgung ist enger: Straßennamen sind lesbar und die Kreuzung kommt sichtbar näher</string>
+    <string name="appstrings_release_v2030_no_jump">Die Markierung springt beim Start nicht mehr in die Mitte, um nach dem ersten Meter wieder herunterzurutschen</string>
 </resources>

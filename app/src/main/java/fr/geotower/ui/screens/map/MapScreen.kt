@@ -178,7 +178,10 @@ import fr.geotower.data.trip.TripOrderOptimizer
 import fr.geotower.data.trip.TripPlan
 import fr.geotower.data.trip.NAV_APPROACH_MIN_METERS
 import fr.geotower.data.trip.NAV_APPROACH_REFRESH_METERS
+import fr.geotower.data.trip.NAV_CAMERA_AHEAD_FRACTION
+import fr.geotower.data.trip.NAV_CAMERA_MAX_AHEAD_FRACTION
 import fr.geotower.data.trip.NAV_FOLLOW_ZOOM
+import fr.geotower.data.trip.normalizeDegrees
 import fr.geotower.data.trip.TripHeadingSmoother
 import fr.geotower.data.trip.computeTripFollowStatus
 import fr.geotower.data.trip.haversineMeters
@@ -1853,6 +1856,13 @@ fun MapScreen(
      */
     var navCameraLocked by remember { mutableStateOf(true) }
 
+    /**
+     * Hauteur à l'écran où poser le repère de position pendant le suivi, mesurée sur la colonne des
+     * boutons de zoom plutôt que devinée : le repère se retrouve ainsi à leur niveau, quel que soit
+     * l'écran, la taille d'interface ou la hauteur de la barre du bas.
+     */
+    var navAnchorYPx by remember { mutableIntStateOf(0) }
+
     // Trajet d'approche : la route entre là où l'on se trouve et l'étape à rejoindre, quand on
     // démarre le suivi loin du départ. Transitoire, donc jamais enregistré dans la tournée.
     var plannerApproachPoints by remember { mutableStateOf<List<DoubleArray>?>(null) }
@@ -2550,19 +2560,27 @@ fun MapScreen(
             mapOrientationState.floatValue = orientation
         }
 
-        // Tant qu'aucun cap fiable n'est établi (à l'arrêt, au tout début), on se contente de
-        // centrer sur la position : décaler « devant » n'aurait pas de direction où pointer.
-        val target = if (heading == null) {
-            doubleArrayOf(location.latitude, location.longitude)
+        // Où poser le repère à l'écran : à la hauteur des boutons de zoom, mesurée et non devinée.
+        val aheadFraction = if (navAnchorYPx > 0 && map.height > 0) {
+            (navAnchorYPx.toDouble() / map.height - 0.5)
+                .coerceIn(0.0, NAV_CAMERA_MAX_AHEAD_FRACTION)
         } else {
-            navigationCameraTarget(
-                latitude = location.latitude,
-                longitude = location.longitude,
-                headingDegrees = heading,
-                zoom = map.zoomLevelDouble,
-                screenHeightPixels = map.height
-            )
+            NAV_CAMERA_AHEAD_FRACTION
         }
+
+        // Sans cap fiable (à l'arrêt, au tout début), on vise dans l'axe de la carte : le repère se
+        // pose au même endroit, au lieu de sauter au centre puis de redescendre au premier mètre
+        // parcouru.
+        val effectiveHeading = heading ?: normalizeDegrees(-map.mapOrientation.toDouble())
+
+        val target = navigationCameraTarget(
+            latitude = location.latitude,
+            longitude = location.longitude,
+            headingDegrees = effectiveHeading,
+            zoom = map.zoomLevelDouble,
+            screenHeightPixels = map.height,
+            aheadFraction = aheadFraction
+        )
         map.controller.setCenter(GeoPoint(target[0], target[1]))
     }
 
@@ -4854,6 +4872,15 @@ fun MapScreen(
         // élément d'interface qu'on peut retirer par confort.
         val hideMapChrome = hideMapControlsForSuggestions || isPlannerMode
 
+        // Mesure ouverte, chaîne encore vide : rien à l'écran ne dit qu'il faut toucher la carte
+        // pour choisir d'où l'on part, ni que toucher son propre repère fait démarrer la mesure de
+        // là. Le mode d'emploi prend donc le haut de l'écran en entier — barre du haut (retour,
+        // titre, filtres) et bouton de partage s'effacent derrière lui, c'est la seule place qui se
+        // lise d'un coup d'œil — et il rend le tout dès le premier point posé.
+        val showMeasureFirstPointHint = isMeasuringMode && measuredVertices.isEmpty() &&
+            !hideMapControlsForSuggestions
+        val showShareButton = !hideMapChrome && !showMeasureFirstPointHint
+
         AnimatedVisibility(
             visible = hideMapControlsForSuggestions,
             enter = fadeIn() + expandVertically(expandFrom = Alignment.Top),
@@ -5029,7 +5056,7 @@ fun MapScreen(
 
         // ✅ NOUVEAU : Bouton de Partage positionné sous le bouton Retour avec animation
         AnimatedVisibility(
-            visible = !hideMapChrome,
+            visible = showShareButton,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier
@@ -5313,13 +5340,6 @@ fun MapScreen(
         }
 
 
-        // Mesure ouverte, chaîne encore vide : rien à l'écran ne dit qu'il faut toucher la carte
-        // pour choisir d'où l'on part, ni que toucher son propre repère fait démarrer la mesure de
-        // là. Le mode d'emploi prend donc la barre du haut en entier — retour, titre et filtres
-        // s'effacent derrière lui, c'est la seule place qui se lise d'un coup d'œil — et rend le
-        // tout dès le premier point posé.
-        val showMeasureFirstPointHint = isMeasuringMode && measuredVertices.isEmpty() &&
-            !hideMapControlsForSuggestions
         Column(modifier = Modifier.fillMaxWidth().padding(top = sizing.spacing(48.dp)), horizontalAlignment = Alignment.CenterHorizontally) {
             Crossfade(targetState = showMeasureFirstPointHint, label = "mapHeaderMeasureHint") { showHint ->
             if (showHint) {
@@ -5630,7 +5650,12 @@ fun MapScreen(
                 // Même raison que la colonne d'infos : la barre du planificateur tient toute la
                 // largeur du bas, ces boutons passeraient dessous.
                 .padding(bottom = sizing.spacing(32.dp) + plannerLift, end = sizing.spacing(16.dp))
-                .navigationBarsPadding(),
+                .navigationBarsPadding()
+                // Sert d'ancre au repère de position pendant le suivi : il se pose à la hauteur de
+                // ces boutons plutôt qu'à une fraction d'écran choisie au hasard.
+                .onGloballyPositioned {
+                    navAnchorYPx = (it.positionInRoot().y + it.size.height / 2f).toInt()
+                },
             horizontalAlignment = Alignment.End,
             verticalArrangement = Arrangement.spacedBy(sizing.spacing(16.dp))
         ) {
@@ -6121,7 +6146,12 @@ fun MapScreen(
         // (ou sur un écran court). On compare les positions réellement mesurées :
         // si le haut de la colonne recouvre le bas du bouton de partage (haut
         // gauche), on la rend invisible pour ne pas le masquer.
-        val infoColumnMasksShare = isLandscapeLayout &&
+        //
+        // `showShareButton` d'abord : la dernière position mesurée survit à la disparition du
+        // bouton (plus personne ne repositionne, donc plus personne ne remet à zéro). Sans cette
+        // garde, s'effacer devant un bouton absent emporterait l'attribution du fond de carte.
+        val infoColumnMasksShare = showShareButton &&
+            isLandscapeLayout &&
             shareButtonBottomPx > 0f &&
             infoColumnTopPx > 0f &&
             infoColumnTopPx < shareButtonBottomPx

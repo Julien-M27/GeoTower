@@ -2889,4 +2889,9 @@
     <string name="appstrings_release_v2029_camera_release">Déplacer la carte pendant un suivi reprend la main sur la vue ; le bouton de recentrage la rend</string>
     <string name="appstrings_release_v2029_compass_hidden">La boussole s\'efface quand la boîte à outils est dépliée, et revient à sa fermeture</string>
     <string name="appstrings_release_v2029_measure_hint">La mesure explique en haut de l\'écran où poser le premier point, jusqu\'à ce qu\'il soit posé</string>
+
+    <!-- Notes de version 2.0.30 -->
+    <string name="appstrings_release_v2030_marker_anchor">Pendant le suivi, votre repère se pose à la hauteur des boutons de zoom, quelle que soit la taille de l\'écran ou de l\'interface</string>
+    <string name="appstrings_release_v2030_nav_zoom">Le zoom du suivi est resserré : on lit les noms de rue et on voit l\'intersection arriver</string>
+    <string name="appstrings_release_v2030_no_jump">Le repère ne saute plus au centre au démarrage, avant de redescendre au premier mètre parcouru</string>
 </resources>

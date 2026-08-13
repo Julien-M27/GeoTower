@@ -2887,4 +2887,9 @@
     <string name="appstrings_release_v2029_camera_release">Spostare la mappa durante l\'inseguimento riprende il controllo della vista; il pulsante di ricentratura lo restituisce</string>
     <string name="appstrings_release_v2029_compass_hidden">La bussola si fa da parte finché la cassetta degli attrezzi è aperta, e torna alla chiusura</string>
     <string name="appstrings_release_v2029_measure_hint">La misura spiega in alto allo schermo dove porre il primo punto, finché non è posato</string>
+
+    <!-- Note di versione 2.0.30 -->
+    <string name="appstrings_release_v2030_marker_anchor">Durante l\'inseguimento, il tuo indicatore si colloca all\'altezza dei pulsanti di zoom, qualunque sia la dimensione dello schermo o dell\'interfaccia</string>
+    <string name="appstrings_release_v2030_nav_zoom">Lo zoom dell\'inseguimento è più stretto: si leggono i nomi delle vie e si vede arrivare l\'incrocio</string>
+    <string name="appstrings_release_v2030_no_jump">L\'indicatore non salta più al centro all\'avvio, per poi riscendere dopo il primo metro</string>
 </resources>

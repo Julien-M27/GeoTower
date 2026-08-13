@@ -2911,4 +2911,9 @@
     <string name="appstrings_release_v2029_camera_release">Panning the map during a follow takes back control of the view; the recentre button hands it over again</string>
     <string name="appstrings_release_v2029_compass_hidden">The compass steps aside while the toolbox is open, and returns when it is closed</string>
     <string name="appstrings_release_v2029_measure_hint">Measuring explains at the top of the screen where to place the first point, until it is placed</string>
+
+    <!-- Release notes 2.0.30 -->
+    <string name="appstrings_release_v2030_marker_anchor">While following, your marker sits level with the zoom buttons, whatever the screen or interface size</string>
+    <string name="appstrings_release_v2030_nav_zoom">The follow zoom is tighter: street names are readable and you see the junction coming</string>
+    <string name="appstrings_release_v2030_no_jump">The marker no longer jumps to the centre at the start, only to slide back down after the first metre</string>
 </resources>

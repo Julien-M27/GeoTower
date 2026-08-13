@@ -2887,4 +2887,9 @@
     <string name="appstrings_release_v2029_camera_release">Deslocar o mapa durante um seguimento retoma o controlo da vista; o botão de recentragem devolve-o</string>
     <string name="appstrings_release_v2029_compass_hidden">A bússola afasta-se enquanto a caixa de ferramentas está aberta, e regressa ao fechá-la</string>
     <string name="appstrings_release_v2029_measure_hint">A medição explica no topo do ecrã onde colocar o primeiro ponto, até este ser colocado</string>
+
+    <!-- Notas da versão 2.0.30 -->
+    <string name="appstrings_release_v2030_marker_anchor">Durante o seguimento, o seu marcador fica à altura dos botões de zoom, seja qual for o tamanho do ecrã ou da interface</string>
+    <string name="appstrings_release_v2030_nav_zoom">O zoom do seguimento é mais fechado: leem-se os nomes das ruas e vê-se o cruzamento a chegar</string>
+    <string name="appstrings_release_v2030_no_jump">O marcador deixa de saltar para o centro no arranque, para depois voltar a descer após o primeiro metro</string>
 </resources>

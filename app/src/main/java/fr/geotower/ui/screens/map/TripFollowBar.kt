@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -134,26 +135,36 @@ fun TripFollowBar(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = sizing.spacing(6.dp)),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.Bottom
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // Trois parts égales : c'est ce qui garde l'heure d'arrivée réellement au
+                    // milieu, quelle que soit la longueur de la durée et de la distance.
                     Text(
-                        text = arrivalTimeLabel(status.remainingDurationSeconds),
-                        fontSize = sizing.text(22.sp),
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = " · " + formatTripDuration(
+                        text = formatTripDuration(
                             seconds = status.remainingDurationSeconds,
                             hourLabel = stringResource(R.string.trips_duration_hour_short),
                             minuteLabel = stringResource(R.string.trips_duration_minute_short)
-                        ) + " · " + formatSiteDistanceMeters(
-                            status.remainingDistanceMeters,
-                            distanceUnit
                         ),
                         fontSize = sizing.text(14.sp),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(bottom = sizing.spacing(2.dp))
+                        maxLines = 1,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(
+                        text = arrivalTimeLabel(status.remainingDurationSeconds),
+                        fontSize = sizing.text(22.sp),
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(
+                        text = formatSiteDistanceMeters(status.remainingDistanceMeters, distanceUnit),
+                        fontSize = sizing.text(14.sp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.End,
+                        maxLines = 1,
+                        modifier = Modifier.weight(1f)
                     )
                 }
             }
