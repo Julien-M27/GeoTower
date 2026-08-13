@@ -74,6 +74,7 @@ import androidx.compose.material.icons.filled.LocationCity
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Straighten
 import androidx.compose.material.icons.filled.Timeline
+import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.LocationDisabled
 import androidx.compose.material.icons.filled.MyLocation
@@ -126,12 +127,12 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.focus.FocusRequester
@@ -174,7 +175,13 @@ import fr.geotower.data.models.SiteHsEntity
 import fr.geotower.data.trip.TripFollowStatus
 import fr.geotower.data.trip.TripOrderOptimizer
 import fr.geotower.data.trip.TripPlan
+import fr.geotower.data.trip.NAV_APPROACH_MIN_METERS
+import fr.geotower.data.trip.NAV_APPROACH_REFRESH_METERS
+import fr.geotower.data.trip.NAV_FOLLOW_ZOOM
+import fr.geotower.data.trip.TripHeadingSmoother
 import fr.geotower.data.trip.computeTripFollowStatus
+import fr.geotower.data.trip.haversineMeters
+import fr.geotower.data.trip.navigationCameraTarget
 import fr.geotower.data.trip.tripDirectionArrows
 import fr.geotower.data.workers.TripReminderScheduler
 import fr.geotower.ui.screens.trips.TripScheduleDialog
@@ -248,6 +255,7 @@ import android.os.Environment
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
+import kotlin.math.exp
 import kotlin.math.hypot
 import kotlin.math.log2
 import kotlin.math.roundToInt
@@ -271,17 +279,29 @@ private const val MAP_ACTIVE_FILTER_LIST_LIMIT = 3
 /** Repos de la boucle de rendu fluide quand il n'y a rien à animer (immobile ou sans position). */
 private const val SMOOTH_LOCATION_IDLE_POLL_MS = 50L
 
-/**
- * Rotation de la carte : chaque pas repose TOUS les marqueurs de la vue. On ne suit donc pas le
- * capteur au degré près — en dessous de cet écart la carte ne bouge pas, et deux pas sont espacés
- * d'au moins cet intervalle. Le geste à deux doigts, lui, doit rester collé au doigt : sa cadence
- * est plus rapide, mais le nombre d'images reste borné pendant tout le pincement.
- */
 /** Orientation de la carte au moment où on l'a quittée, pour la retrouver telle quelle. */
 private const val PREF_LAST_MAP_ORIENTATION = "last_map_orientation"
-private const val MAP_FOLLOW_ORIENTATION_MIN_DELTA_DEG = 2f
-private const val MAP_FOLLOW_ORIENTATION_INTERVAL_MS = 100L
-private const val MAP_ROTATION_GESTURE_INTERVAL_MS = 25L
+
+/**
+ * Alignement de la carte sur le cap de l'appareil.
+ *
+ * La carte rejoint la cible par un fondu : à chaque image, elle couvre une part de l'écart restant,
+ * et au bout de cette durée elle en a couvert environ 63 %. Appliquer le cap tel quel ferait
+ * trembler la carte au moindre frémissement du capteur, et l'appliquer par paliers la ferait sauter
+ * d'un bloc — c'est bien un pas régulier, et non un gros pas rare, qui se lit comme une rotation
+ * fluide.
+ *
+ * Le pas se calcule sur le temps écoulé et non sur le nombre d'images : la carte met le même temps à
+ * rejoindre le cap que l'écran soit à 60 ou à 120 Hz, et une image sautée sur une vue chargée ne
+ * fait pas prendre du retard à la rotation.
+ */
+private const val MAP_FOLLOW_ORIENTATION_TIME_CONSTANT_MS = 70f
+/** Reprise après un cap stable : aucune image précédente à mesurer, on part d'une image « type ». */
+private const val MAP_FOLLOW_ORIENTATION_REFERENCE_FRAME_MS = 16f
+/** En deçà de cet écart, la carte est arrivée : on ne repeint pas pour du bruit de capteur. */
+private const val MAP_FOLLOW_ORIENTATION_DEAD_ZONE_DEG = 0.2f
+/** Cap stable : on rend la boucle d'images et on se contente de surveiller le capteur. */
+private const val MAP_FOLLOW_ORIENTATION_IDLE_POLL_MS = 60L
 /**
  * Amorce du geste : tant que les deux doigts n'ont pas tourné d'au moins autant, la carte ne bouge
  * pas. Écarter deux doigts pour zoomer fait toujours pivoter un peu la main — sans ce seuil, un
@@ -425,6 +445,20 @@ private fun shortestAngleDelta(from: Float, to: Float): Float {
 private fun normalizeMapOrientation(degrees: Float): Float {
     val normalized = degrees % 360f
     return if (normalized < 0f) normalized + 360f else normalized
+}
+
+/**
+ * Tourne la carte sans passer par le setter d'osmdroid.
+ *
+ * `mapOrientation = x` appelle `requestLayout()`, qui ne sert qu'à replacer les vues ancrées à une
+ * position (les bulles d'info) : sans enfant, il ne fait que renvoyer TOUTE la hiérarchie Compose
+ * dans une passe de mesure à chaque pas de rotation. C'est le principal responsable des à-coups —
+ * la projection, elle, est reconstruite à chaque dessin, un simple `invalidate()` suffit donc.
+ */
+private fun MapView.applyOrientation(degrees: Float) {
+    setMapOrientation(degrees, false)
+    if (childCount > 0) requestLayout()
+    invalidate()
 }
 
 /**
@@ -1804,6 +1838,17 @@ fun MapScreen(
     // et les lambdas mémorisées le captureraient périmé. On compare `tripMode` sur place.
     var tripMode by rememberSaveable { mutableStateOf(tripMapModeOrDefault(plannedTripMode)) }
     var plannerFollowStatus by remember { mutableStateOf<TripFollowStatus?>(null) }
+
+    // Cap de navigation : tiré du déplacement, pas de la boussole. Voir TripHeadingSmoother.
+    val tripHeadingSmoother = remember { TripHeadingSmoother() }
+    var navHeadingDegrees by remember { mutableStateOf<Double?>(null) }
+
+    // Trajet d'approche : la route entre là où l'on se trouve et l'étape à rejoindre, quand on
+    // démarre le suivi loin du départ. Transitoire, donc jamais enregistré dans la tournée.
+    var plannerApproachPoints by remember { mutableStateOf<List<DoubleArray>?>(null) }
+    var plannerApproachRouted by remember { mutableStateOf(false) }
+    var plannerApproachForStep by remember { mutableStateOf<Int?>(null) }
+    var plannerApproachAnchor by remember { mutableStateOf<DoubleArray?>(null) }
     // Hauteur réellement mesurée de la barre du trajet : les trois barres (consultation, édition,
     // suivi) n'ont pas la même, et c'est elle qui dit de combien remonter ce qui vit en bas.
     var tripBarHeightPx by remember { mutableIntStateOf(0) }
@@ -1913,6 +1958,21 @@ fun MapScreen(
         if (plan == null) {
             map.invalidate()
             return
+        }
+
+        // Trajet d'approche d'abord, sous la tournée : c'est le chemin pour aller la prendre, pas
+        // la tournée elle-même, d'où sa couleur distincte.
+        plannerApproachPoints?.takeIf { it.size >= 2 }?.let { approach ->
+            tripOverlay.add(
+                Polyline(map).apply {
+                    outlinePaint.color = TRIP_APPROACH_COLOR
+                    outlinePaint.strokeWidth = 7f
+                    if (!plannerApproachRouted) {
+                        outlinePaint.pathEffect = DashPathEffect(floatArrayOf(18f, 12f), 0f)
+                    }
+                    setPoints(approach.map { GeoPoint(it[0], it[1]) })
+                }
+            )
         }
 
         plan.legPairs().forEach { (fromIndex, toIndex) ->
@@ -2094,11 +2154,11 @@ fun MapScreen(
             prefs.edit().putBoolean(AppConfig.PREF_MAP_FOLLOW_ORIENTATION, enabled).apply()
         }
     }
-    // Cadence d'application du cap à la carte (cf. MAP_FOLLOW_ORIENTATION_*), gardée hors de la
-    // composition : ces valeurs ne doivent déclencher aucun redessin par elles-mêmes.
-    val followOrientationState = remember { longArrayOf(0L) }
     // Orientation courante, reflétée dans la composition : la MapView n'est pas observable, or la
-    // rose des vents du bouton boussole doit tourner avec la carte.
+    // rose des vents du bouton boussole doit tourner avec la carte. Écrite à la cadence des images
+    // pendant une rotation : ses lecteurs doivent la lire au dessin (rose des vents) ou dans une
+    // couche graphique, jamais dans le corps d'un composable — sans quoi tourner la carte
+    // recomposerait tout l'écran, image après image.
     val mapOrientationState = remember {
         mutableFloatStateOf(normalizeMapOrientation(prefs.getFloat(PREF_LAST_MAP_ORIENTATION, 0f)))
     }
@@ -2106,10 +2166,7 @@ fun MapScreen(
     // le capteur reprendrait la main dans la foulée.
     val resetMapOrientation: () -> Unit = {
         if (AppConfig.mapFollowOrientation.value) setFollowOrientation(false)
-        mapViewRef?.let { map ->
-            map.mapOrientation = 0f
-            map.invalidate()
-        }
+        mapViewRef?.applyOrientation(0f)
         mapOrientationState.floatValue = 0f
     }
 
@@ -2130,6 +2187,46 @@ fun MapScreen(
         val status = computeTripFollowStatus(plan, location.latitude, location.longitude)
         plannerFollowStatus = status
 
+        // Trajet d'approche : démarrer le suivi loin de l'étape à rejoindre est le cas normal --
+        // on est chez soi, la tournée commence ailleurs. On calcule donc la route qui y mène depuis
+        // là où l'on est, recalculée seulement si l'étape change ou si l'on s'est notablement
+        // déplacé, pour ne pas solliciter le service à chaque position reçue.
+        val nextIndex = status.nextStepIndex
+        val nextStep = nextIndex?.let { plan.steps.getOrNull(it) }
+        if (nextStep == null || (status.distanceToNextMeters ?: 0.0) <= NAV_APPROACH_MIN_METERS) {
+            if (plannerApproachPoints != null) {
+                plannerApproachPoints = null
+                plannerApproachForStep = null
+                plannerApproachAnchor = null
+                mapViewRef?.let { refreshTripLayers(it) }
+            }
+        } else {
+            val anchor = plannerApproachAnchor
+            val movedFar = anchor == null || haversineMeters(
+                anchor[0], anchor[1], location.latitude, location.longitude
+            ) > NAV_APPROACH_REFRESH_METERS
+
+            if (plannerApproachForStep != nextIndex || movedFar) {
+                plannerApproachForStep = nextIndex
+                plannerApproachAnchor = doubleArrayOf(location.latitude, location.longitude)
+                val direct = listOf(
+                    doubleArrayOf(location.latitude, location.longitude),
+                    doubleArrayOf(nextStep.latitude, nextStep.longitude)
+                )
+                val routed = runCatching {
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        RouteApi.getRoutePortions(direct, plan.profile)
+                    }
+                }.getOrNull()?.firstOrNull()?.points
+
+                // Comme pour un segment de tournée : faute de route connue, trait direct en
+                // pointillés plutôt qu'une route inventée.
+                plannerApproachRouted = routed != null
+                plannerApproachPoints = routed ?: direct
+                mapViewRef?.let { refreshTripLayers(it) }
+            }
+        }
+
         if (status.reachedStepIndices.isNotEmpty()) {
             val reachedAt = System.currentTimeMillis()
             val steps = plan.steps.mapIndexed { index, step ->
@@ -2141,21 +2238,6 @@ fun MapScreen(
         }
     }
 
-    // Écran maintenu allumé pendant le suivi : une tournée se fait la carte sous les yeux, et un
-    // écran qui s'éteint toutes les trente secondes rend le suivi inutilisable.
-    val currentView = androidx.compose.ui.platform.LocalView.current
-    DisposableEffect(tripMode) {
-        val following = tripMode == TRIP_MODE_FOLLOW
-        currentView.keepScreenOn = following
-        // Cap en haut pendant le suivi -- puis on rend son réglage à l'utilisateur : suivre une
-        // tournée une fois ne doit pas changer durablement sa carte.
-        val hadFollowOrientation = AppConfig.mapFollowOrientation.value
-        if (following && !hadFollowOrientation) setFollowOrientation(true)
-        onDispose {
-            currentView.keepScreenOn = false
-            if (following && !hadFollowOrientation) setFollowOrientation(false)
-        }
-    }
 
     // --- Déplacement continu du repère de position -------------------------------------------
     // Le GPS ne donne qu'un point par seconde : sans lissage le repère se téléporte. Le moteur
@@ -2414,6 +2496,64 @@ fun MapScreen(
     var showCityStatsPopup by rememberSaveable { mutableStateOf(false) }
     var showCityStatsDetail by rememberSaveable { mutableStateOf(false) }
     var isTrackingActive by rememberSaveable { mutableStateOf(false) }
+
+    // ================= CAMÉRA DE SUIVI DE TOURNÉE =================
+    // Posé ici, après `isTrackingActive` : la poursuite d'osmdroid recentre la position au milieu
+    // de l'écran à chaque image, et annulerait le cadrage « utilisateur en bas » posé plus bas.
+    val currentView = androidx.compose.ui.platform.LocalView.current
+    DisposableEffect(tripMode) {
+        val following = tripMode == TRIP_MODE_FOLLOW
+        // Une tournée se suit la carte sous les yeux : un écran qui s'éteint toutes les trente
+        // secondes rend le suivi inutilisable.
+        currentView.keepScreenOn = following
+
+        // Pendant le suivi, l'orientation vient du DÉPLACEMENT et non de la boussole : on coupe
+        // donc le suivi de cap magnétique, qui se battrait avec elle -- puis on rend son réglage à
+        // l'utilisateur, suivre une tournée une fois ne devant pas changer durablement sa carte.
+        val hadFollowOrientation = AppConfig.mapFollowOrientation.value
+        if (following && hadFollowOrientation) setFollowOrientation(false)
+        if (following) {
+            isTrackingActive = false
+            locationOverlayRef?.disableFollowLocation()
+            mapViewRef?.controller?.setZoom(NAV_FOLLOW_ZOOM)
+        }
+
+        onDispose {
+            currentView.keepScreenOn = false
+            if (following && hadFollowOrientation) setFollowOrientation(true)
+            tripHeadingSmoother.reset()
+            navHeadingDegrees = null
+        }
+    }
+
+    // Cap de marche en haut, utilisateur en bas de l'écran : le cadrage des applis de guidage.
+    LaunchedEffect(myCurrentLoc, navHeadingDegrees, tripMode) {
+        if (tripMode != TRIP_MODE_FOLLOW) return@LaunchedEffect
+        val map = mapViewRef ?: return@LaunchedEffect
+        val location = myCurrentLoc ?: return@LaunchedEffect
+
+        val heading = navHeadingDegrees
+        if (heading != null) {
+            val orientation = normalizeMapOrientation(-heading.toFloat())
+            map.mapOrientation = orientation
+            mapOrientationState.floatValue = orientation
+        }
+
+        // Tant qu'aucun cap fiable n'est établi (à l'arrêt, au tout début), on se contente de
+        // centrer sur la position : décaler « devant » n'aurait pas de direction où pointer.
+        val target = if (heading == null) {
+            doubleArrayOf(location.latitude, location.longitude)
+        } else {
+            navigationCameraTarget(
+                latitude = location.latitude,
+                longitude = location.longitude,
+                headingDegrees = heading,
+                zoom = map.zoomLevelDouble,
+                screenHeightPixels = map.height
+            )
+        }
+        map.controller.setCenter(GeoPoint(target[0], target[1]))
+    }
 
     // Appui long sur la rose des vents. Aligner la carte sur son cap depuis l'autre bout de la
     // France n'aurait aucun sens : en allumant le suivi, on ramène la carte sur la position, au
@@ -3987,6 +4127,21 @@ fun MapScreen(
                                 } else {
                                     currentSpeedKmH = 0
                                 }
+                                // Cap du suivi de tournée : le déplacement dit la direction bien
+                                // mieux que le magnétomètre, faussé par un support métallique ou un
+                                // moteur. Le lissage vit dans TripHeadingSmoother.
+                                navHeadingDegrees = tripHeadingSmoother.update(
+                                    bearingDegrees = if (location.hasBearing()) {
+                                        location.bearing.toDouble()
+                                    } else {
+                                        null
+                                    },
+                                    speedMetersPerSecond = if (location.hasSpeed()) {
+                                        location.speed.toDouble()
+                                    } else {
+                                        null
+                                    }
+                                )
                                 smoothEngine.onFix(
                                     RawFix(
                                         latitude = location.latitude,
@@ -4138,22 +4293,13 @@ fun MapScreen(
                 }
 
                 // --- Orientation de la carte ---------------------------------------------------
+                // L'alignement sur le cap est piloté image par image, hors composition (voir plus
+                // bas) : le suivre ici reviendrait à ne tourner la carte qu'aux recompositions,
+                // donc par paliers.
                 rotationOverlayRef?.isEnabled = mapRotationEnabled
-                if (followOrientation) {
-                    // Un pas de rotation redessine toute la carte : on ne suit le cap ni au degré
-                    // près, ni à la cadence du capteur (cf. MAP_FOLLOW_ORIENTATION_*).
-                    val target = normalizeMapOrientation(-azimuth)
-                    val now = SystemClock.uptimeMillis()
-                    if (abs(shortestAngleDelta(map.mapOrientation, target)) >= MAP_FOLLOW_ORIENTATION_MIN_DELTA_DEG &&
-                        now - followOrientationState[0] >= MAP_FOLLOW_ORIENTATION_INTERVAL_MS
-                    ) {
-                        followOrientationState[0] = now
-                        map.mapOrientation = target
-                        mapOrientationState.floatValue = target
-                    }
-                } else if (!mapRotationEnabled && map.mapOrientation % 360f != 0f) {
+                if (!followOrientation && !mapRotationEnabled && map.mapOrientation % 360f != 0f) {
                     // Plus aucun moyen de la redresser à la main : on remet le nord en haut.
-                    map.mapOrientation = 0f
+                    map.applyOrientation(0f)
                     mapOrientationState.floatValue = 0f
                 }
 
@@ -4237,6 +4383,50 @@ fun MapScreen(
                 }
             }
         )
+
+        // --- Alignement de la carte sur le cap de l'appareil ------------------------------------
+        // Piloté image par image, et à partir du cap déjà lissé du capteur plutôt que de l'état
+        // d'interface : ce dernier est bridé en cadence pour ne pas rejouer l'écran à chaque
+        // relevé, et faire tourner la carte à ce rythme la faisait avancer par paliers.
+        LaunchedEffect(followOrientation) {
+            if (!followOrientation) return@LaunchedEffect
+            // Le réglage est relu à chaque pas, et pas seulement à l'entrée : couper l'alignement
+            // puis remettre le nord en haut se fait dans le même geste (appui sur la rose des
+            // vents), or cet effet n'est annulé qu'à la recomposition suivante — un pas de plus et
+            // la carte repartirait aussitôt sur le cap.
+            var lastFrameNs = 0L
+            while (PowerProfile.mapFollowOrientation && AppConfig.hasCompass.value) {
+                val map = mapViewRef
+                val delta = if (map == null) {
+                    0f
+                } else {
+                    shortestAngleDelta(map.mapOrientation, normalizeMapOrientation(-continuousAzimuth[0]))
+                }
+                if (map == null || abs(delta) < MAP_FOLLOW_ORIENTATION_DEAD_ZONE_DEG) {
+                    // Cap stable : on lâche le moteur d'images plutôt que de le réveiller à chaque
+                    // image pour ne rien faire tourner.
+                    lastFrameNs = 0L
+                    delay(MAP_FOLLOW_ORIENTATION_IDLE_POLL_MS)
+                    continue
+                }
+
+                // Un pas par image : c'est la régularité de la cadence qui se lit comme de la
+                // fluidité, pas le nombre de degrés parcourus.
+                val frameNs = withFrameNanos { it }
+                val elapsedMs = if (lastFrameNs == 0L) {
+                    MAP_FOLLOW_ORIENTATION_REFERENCE_FRAME_MS
+                } else {
+                    // Borné : une image sautée ne doit pas rattraper tout l'écart d'un coup.
+                    ((frameNs - lastFrameNs) / 1_000_000L).toFloat().coerceIn(1f, 100f)
+                }
+                lastFrameNs = frameNs
+
+                val easing = 1f - exp(-elapsedMs / MAP_FOLLOW_ORIENTATION_TIME_CONSTANT_MS)
+                val next = normalizeMapOrientation(map.mapOrientation + delta * easing)
+                map.applyOrientation(next)
+                mapOrientationState.floatValue = next
+            }
+        }
 
         // --- Couche de rendu fluide du repère de position ---------------------------------------
         // Le repère est peint ICI, au-dessus de la MapView, et non dans un calque osmdroid : un
@@ -4805,7 +4995,7 @@ fun MapScreen(
             ) {
                 MapCompassButton(
                     azimuth = azimuth,
-                    mapOrientation = mapOrientationState.floatValue,
+                    mapOrientation = { mapOrientationState.floatValue },
                     followActive = followOrientation,
                     onToggleFollow = if (PowerProfile.isEco) null else toggleFollowOrientation,
                     modifier = Modifier.size(mapControlButtonDiameter)
@@ -4884,7 +5074,7 @@ fun MapScreen(
         ) {
             MapCompassButton(
                 azimuth = azimuth,
-                mapOrientation = mapOrientationState.floatValue,
+                mapOrientation = { mapOrientationState.floatValue },
                 followActive = followOrientation,
                 onToggleFollow = if (PowerProfile.isEco) null else toggleFollowOrientation,
                 modifier = Modifier.size(mapControlButtonDiameter)
@@ -5143,7 +5333,7 @@ fun MapScreen(
                     if (showCompassInMapHeader) {
                         MapCompassButton(
                             azimuth = azimuth,
-                            mapOrientation = mapOrientationState.floatValue,
+                            mapOrientation = { mapOrientationState.floatValue },
                             followActive = followOrientation,
                             onToggleFollow = if (PowerProfile.isEco) null else toggleFollowOrientation,
                             modifier = Modifier.size(mapControlButtonDiameter)
@@ -5221,6 +5411,65 @@ fun MapScreen(
                     measureInfoBottomPx = position.y + it.size.height
                 }
             ) {
+                // Chaîne encore vide : la place du total sert de mode d'emploi. Rien à l'écran ne dit
+                // qu'il faut toucher la carte pour choisir d'où l'on part, ni que toucher son propre
+                // repère fait démarrer la mesure de là. Le bandeau s'efface au premier point posé,
+                // le total prend alors le relais. Le repère n'est proposé que s'il est réellement
+                // affiché et localisé : sinon on désignerait quelque chose d'invisible.
+                val canStartFromMyLocation = myCurrentLoc != null && showLocationMarker
+                AnimatedVisibility(
+                    visible = isMeasuringMode && measuredVertices.isEmpty() &&
+                        !hideMapControlsForSuggestions,
+                    enter = fadeIn(),
+                    exit = fadeOut()
+                ) {
+                    Surface(
+                        modifier = Modifier.padding(
+                            start = sizing.spacing(24.dp),
+                            end = sizing.spacing(24.dp),
+                            bottom = sizing.spacing(10.dp)
+                        ),
+                        shape = RoundedCornerShape(24.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        shadowElevation = 4.dp,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(
+                                horizontal = sizing.spacing(16.dp),
+                                vertical = sizing.spacing(10.dp)
+                            ),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.TouchApp,
+                                null,
+                                tint = measureLineColor,
+                                modifier = Modifier.size(sizing.component(18.dp))
+                            )
+                            Spacer(Modifier.width(sizing.spacing(8.dp)))
+                            Column {
+                                Text(
+                                    text = stringResource(R.string.appstrings_measure_first_point_title),
+                                    fontSize = sizing.text(13.sp),
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = stringResource(
+                                        if (canStartFromMyLocation) {
+                                            R.string.appstrings_measure_first_point_hint_location
+                                        } else {
+                                            R.string.appstrings_measure_first_point_hint
+                                        }
+                                    ),
+                                    fontSize = sizing.text(11.sp),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+
                 AnimatedVisibility(
                     visible = currentMeasureSegments.isNotEmpty(),
                     enter = fadeIn(),
@@ -5367,7 +5616,7 @@ fun MapScreen(
             if (showCompactCompass) {
                 MapCompassButton(
                     azimuth = azimuth,
-                    mapOrientation = mapOrientationState.floatValue,
+                    mapOrientation = { mapOrientationState.floatValue },
                     followActive = followOrientation,
                     onToggleFollow = if (PowerProfile.isEco) null else toggleFollowOrientation,
                     modifier = Modifier.size(mapControlButtonDiameter)
@@ -6680,7 +6929,12 @@ private fun ActiveMapFiltersBanner(
 @Composable
 private fun MapCompassButton(
     azimuth: Float,
-    mapOrientation: Float,
+    /**
+     * Lu au moment de composer la couche graphique, et non dans le corps du composable : cette
+     * valeur change à chaque image pendant une rotation, et la lire ici recomposerait tout l'écran
+     * de la carte à la même cadence.
+     */
+    mapOrientation: () -> Float,
     followActive: Boolean,
     modifier: Modifier = Modifier,
     onToggleFollow: (() -> Unit)? = null,
@@ -6706,7 +6960,9 @@ private fun MapCompassButton(
         }
     ) {
         Box(
-            modifier = Modifier.fillMaxSize().rotate(mapOrientation),
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer { rotationZ = mapOrientation() },
             contentAlignment = Alignment.Center
         ) {
             Text(
@@ -6745,7 +7001,7 @@ private fun MapCompassButton(
                     .size(sizing.component(30.dp))
                     // La rose tourne déjà avec la carte : on l'annule ici pour que l'aiguille garde
                     // le cap de l'appareil à l'écran, comme un compas posé sur la carte.
-                    .rotate(-azimuth - mapOrientation)
+                    .graphicsLayer { rotationZ = -azimuth - mapOrientation() }
             ) {
                 val w = size.width
                 val h = size.height
@@ -6865,7 +7121,9 @@ open class CustomLocationOverlay(
                     // ce relevé fait référence : au pire on ignore le tout premier déplacement.
                     anchorDrag(event.x, event.y)
                 } else if (!dragReported &&
-                    (abs(event.x - dragAnchorX) > touchSlopPx || abs(event.y - dragAnchorY) > touchSlopPx)
+                    // Distance et non écart par axe : les calques reçoivent des coordonnées déjà
+                    // remises « carte au nord », un seuil par axe dépendrait donc de la rotation.
+                    hypot(event.x - dragAnchorX, event.y - dragAnchorY) > touchSlopPx
                 ) {
                     // Le doigt déplace vraiment la carte : un simple appui (marqueur, mesure) ne doit
                     // pas couper la poursuite, d'où le seuil de glissement du système plutôt que le
@@ -7378,8 +7636,6 @@ private class MapRotationGestureOverlay(
     /** Rotation accumulée depuis la pose des doigts, tant que l'amorce n'est pas franchie. */
     private var rotationSinceTouch = 0f
     private var engaged = false
-    private var pendingAngle = 0f
-    private var lastAppliedMs = 0L
 
     override fun onTouchEvent(event: MotionEvent, mapView: MapView): Boolean {
         if (!isEnabled) {
@@ -7418,20 +7674,17 @@ private class MapRotationGestureOverlay(
             return
         }
 
-        pendingAngle += delta
-        val now = SystemClock.uptimeMillis()
-        if (now - lastAppliedMs < MAP_ROTATION_GESTURE_INTERVAL_MS) return
-        lastAppliedMs = now
-        val orientation = normalizeMapOrientation(map.mapOrientation + pendingAngle)
-        pendingAngle = 0f
-        map.mapOrientation = orientation
+        // Appliqué à chaque relevé, sans cadence bornée : la carte reste collée au doigt, et le
+        // système ne repeint de toute façon qu'une fois par image, quel que soit le nombre
+        // d'invalidations reçues entre deux.
+        val orientation = normalizeMapOrientation(map.mapOrientation + delta)
+        map.applyOrientation(orientation)
         onRotated(orientation)
     }
 
     private fun resetGesture() {
         lastFingerAngle = Float.NaN
         rotationSinceTouch = 0f
-        pendingAngle = 0f
         engaged = false
     }
 

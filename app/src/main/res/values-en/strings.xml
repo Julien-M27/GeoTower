@@ -2381,6 +2381,9 @@
     <string name="appstrings_measure_follow_roads_walk">Along paths</string>
     <string name="appstrings_measure_route_unavailable">No route found: straight line kept.</string>
     <string name="appstrings_measure_route_searching">Finding the route…</string>
+    <string name="appstrings_measure_first_point_title">Place your starting point</string>
+    <string name="appstrings_measure_first_point_hint">Tap the map to drop the first point.</string>
+    <string name="appstrings_measure_first_point_hint_location">Tap the map, or tap your position to start from where you are.</string>
     <!-- Favorite photos page (Settings > Preferences) -->
     <string name="photos_favorites_title">Favorite photos</string>
     <string name="photos_favorites_desc">Find and manage the site photos you starred.</string>
@@ -2872,4 +2875,10 @@
     <string name="appstrings_release_v2027_photo_report_honest">The screen states plainly what happens: SignalQuest hosts the photo and alone decides what follows; GeoTower can neither edit nor remove it</string>
     <string name="appstrings_release_v2027_photo_reports_page">A “My reports” page tracks what you sent, and a notification tells you if the photo eventually disappears</string>
     <string name="appstrings_release_v2027_trip_save_prompt">Leaving a modified trip without saving now asks for confirmation</string>
+
+    <!-- Release notes 2.0.28 -->
+    <string name="appstrings_release_v2028_nav_camera">While following a trip, the map turns with your movement and places you at the bottom of the screen, the road ahead of you</string>
+    <string name="appstrings_release_v2028_nav_no_spin">It no longer spins with GPS noise when you are standing still</string>
+    <string name="appstrings_release_v2028_approach_route">Starting a follow far from the start now draws the approach route to the first stop, in a distinct colour</string>
+    <string name="appstrings_release_v2028_measure_first_point">The measuring tool says clearly where to put the first point, and offers to start from your position</string>
 </resources>

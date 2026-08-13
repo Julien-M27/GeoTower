@@ -2381,6 +2381,9 @@
     <string name="appstrings_measure_follow_roads_walk">Por los caminos</string>
     <string name="appstrings_measure_route_unavailable">No se encontró ninguna ruta: se mantiene la línea recta.</string>
     <string name="appstrings_measure_route_searching">Buscando la ruta…</string>
+    <string name="appstrings_measure_first_point_title">Coloca tu punto de partida</string>
+    <string name="appstrings_measure_first_point_hint">Toca el mapa para colocar el primer punto.</string>
+    <string name="appstrings_measure_first_point_hint_location">Toca el mapa, o tu posición para salir desde donde estás.</string>
     <!-- Fotos favoritas (Ajustes > Preferencias) -->
     <string name="photos_favorites_title">Fotos favoritas</string>
     <string name="photos_favorites_desc">Encuentra y gestiona las fotos de emplazamientos marcadas como favoritas.</string>
@@ -2872,4 +2875,10 @@
     <string name="appstrings_release_v2027_photo_report_honest">La pantalla dice claramente lo que ocurre: SignalQuest aloja la foto y decide por sí solo qué hacer; GeoTower no puede ni modificarla ni retirarla</string>
     <string name="appstrings_release_v2027_photo_reports_page">Una página «Mis denuncias» hace seguimiento de tus envíos, y una notificación te avisa si la foto acaba desapareciendo</string>
     <string name="appstrings_release_v2027_trip_save_prompt">Salir de un viaje modificado sin guardarlo ahora pide confirmación</string>
+
+    <!-- Notas de la versión 2.0.28 -->
+    <string name="appstrings_release_v2028_nav_camera">Durante el seguimiento de un viaje, el mapa se orienta según tu desplazamiento y te sitúa en la parte inferior de la pantalla, con la carretera por delante</string>
+    <string name="appstrings_release_v2028_nav_no_spin">Ya no gira con el ruido del GPS cuando estás parado</string>
+    <string name="appstrings_release_v2028_approach_route">Iniciar un seguimiento lejos del punto de partida muestra ahora el trayecto de aproximación a la primera parada, en un color distinto</string>
+    <string name="appstrings_release_v2028_measure_first_point">La herramienta de medición indica claramente dónde poner el primer punto y propone partir de tu posición</string>
 </resources>

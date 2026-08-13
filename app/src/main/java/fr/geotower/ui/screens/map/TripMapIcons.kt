@@ -131,4 +131,11 @@ private fun buildArrowBitmap(diameter: Int, bearingDegrees: Float, density: Floa
  */
 val TRIP_STEP_COLOR = Color.rgb(25, 118, 210)
 
+/**
+ * Vert-bleu du trajet d'approche : la route entre la position courante et l'étape à rejoindre. Une
+ * autre couleur que le tracé, parce que ce n'est pas la tournée enregistrée — c'est le chemin pour
+ * aller la prendre.
+ */
+val TRIP_APPROACH_COLOR = Color.rgb(0, 137, 123)
+
 private val VISITED_COLOR = Color.rgb(46, 125, 50)

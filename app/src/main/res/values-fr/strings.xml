@@ -2381,6 +2381,9 @@
     <string name="appstrings_measure_follow_roads_walk">Par les chemins</string>
     <string name="appstrings_measure_route_unavailable">Aucun itinéraire trouvé : trait direct conservé.</string>
     <string name="appstrings_measure_route_searching">Recherche de l\'itinéraire…</string>
+    <string name="appstrings_measure_first_point_title">Placez votre point de départ</string>
+    <string name="appstrings_measure_first_point_hint">Touchez la carte pour poser le premier point.</string>
+    <string name="appstrings_measure_first_point_hint_location">Touchez la carte, ou votre position pour partir d\'où vous êtes.</string>
     <!-- Photos favorites (Réglages > Préférences) -->
     <string name="photos_favorites_title">Photos favorites</string>
     <string name="photos_favorites_desc">Retrouvez et gérez les photos de site mises en favori.</string>
@@ -2874,4 +2877,10 @@
     <string name="appstrings_release_v2027_photo_report_honest">L\'écran dit franchement ce qui se passe : SignalQuest héberge la photo et décide seul de la suite, GeoTower ne peut ni la modifier ni la retirer</string>
     <string name="appstrings_release_v2027_photo_reports_page">Une page « Mes signalements » suit vos envois, et une notification vous prévient si la photo finit par disparaître</string>
     <string name="appstrings_release_v2027_trip_save_prompt">Quitter un trajet modifié sans l\'enregistrer demande désormais confirmation</string>
+
+    <!-- Notes de version 2.0.28 -->
+    <string name="appstrings_release_v2028_nav_camera">Pendant le suivi d\'un trajet, la carte s\'oriente sur votre déplacement et vous place en bas de l\'écran, la route devant vous</string>
+    <string name="appstrings_release_v2028_nav_no_spin">Elle ne pivote plus au gré du GPS quand vous êtes à l\'arrêt</string>
+    <string name="appstrings_release_v2028_approach_route">Démarrer un suivi loin du départ affiche le trajet d\'approche vers la première étape, dans une couleur distincte</string>
+    <string name="appstrings_release_v2028_measure_first_point">L\'outil de mesure indique clairement où poser le premier point, et propose de partir de votre position</string>
 </resources>

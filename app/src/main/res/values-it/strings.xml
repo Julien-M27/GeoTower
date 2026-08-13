@@ -2381,6 +2381,9 @@
     <string name="appstrings_measure_follow_roads_walk">Lungo i sentieri</string>
     <string name="appstrings_measure_route_unavailable">Nessun percorso trovato: resta la linea retta.</string>
     <string name="appstrings_measure_route_searching">Ricerca del percorso…</string>
+    <string name="appstrings_measure_first_point_title">Posiziona il punto di partenza</string>
+    <string name="appstrings_measure_first_point_hint">Tocca la mappa per posizionare il primo punto.</string>
+    <string name="appstrings_measure_first_point_hint_location">Tocca la mappa, oppure la tua posizione per partire da dove sei.</string>
     <!-- Foto preferite (Impostazioni > Preferenze) -->
     <string name="photos_favorites_title">Foto preferite</string>
     <string name="photos_favorites_desc">Trova e gestisci le foto dei siti aggiunte ai preferiti.</string>
@@ -2872,4 +2875,10 @@
     <string name="appstrings_release_v2027_photo_report_honest">La schermata dice chiaramente cosa succede: SignalQuest ospita la foto e decide da solo il seguito; GeoTower non può né modificarla né rimuoverla</string>
     <string name="appstrings_release_v2027_photo_reports_page">Una pagina «Le mie segnalazioni» segue i tuoi invii, e una notifica ti avvisa se la foto finisce per sparire</string>
     <string name="appstrings_release_v2027_trip_save_prompt">Uscire da un percorso modificato senza salvarlo chiede ora conferma</string>
+
+    <!-- Note di versione 2.0.28 -->
+    <string name="appstrings_release_v2028_nav_camera">Durante l\'inseguimento di un percorso, la mappa si orienta secondo il tuo spostamento e ti colloca in basso allo schermo, con la strada davanti</string>
+    <string name="appstrings_release_v2028_nav_no_spin">Non ruota più con il rumore del GPS quando sei fermo</string>
+    <string name="appstrings_release_v2028_approach_route">Avviare l\'inseguimento lontano dalla partenza mostra ora il tragitto di avvicinamento alla prima tappa, in un colore distinto</string>
+    <string name="appstrings_release_v2028_measure_first_point">Lo strumento di misura indica chiaramente dove porre il primo punto e propone di partire dalla tua posizione</string>
 </resources>

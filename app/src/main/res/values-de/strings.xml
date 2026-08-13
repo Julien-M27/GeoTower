@@ -2381,6 +2381,9 @@
     <string name="appstrings_measure_follow_roads_walk">Entlang der Wege</string>
     <string name="appstrings_measure_route_unavailable">Keine Route gefunden: Luftlinie bleibt.</string>
     <string name="appstrings_measure_route_searching">Route wird gesucht…</string>
+    <string name="appstrings_measure_first_point_title">Setze deinen Startpunkt</string>
+    <string name="appstrings_measure_first_point_hint">Tippe auf die Karte, um den ersten Punkt zu setzen.</string>
+    <string name="appstrings_measure_first_point_hint_location">Tippe auf die Karte – oder auf deine Position, um von dort zu starten.</string>
     <!-- Lieblingsfotos (Einstellungen > Präferenzen) -->
     <string name="photos_favorites_title">Lieblingsfotos</string>
     <string name="photos_favorites_desc">Finde und verwalte die als Favorit markierten Standortfotos.</string>
@@ -2872,4 +2875,10 @@
     <string name="appstrings_release_v2027_photo_report_honest">Der Bildschirm sagt klar, was passiert: SignalQuest hostet das Foto und entscheidet allein über das Weitere; GeoTower kann es weder ändern noch entfernen</string>
     <string name="appstrings_release_v2027_photo_reports_page">Eine Seite „Meine Meldungen“ verfolgt deine Meldungen, und eine Benachrichtigung informiert dich, wenn das Foto schließlich verschwindet</string>
     <string name="appstrings_release_v2027_trip_save_prompt">Eine geänderte Tour ohne Speichern zu verlassen, verlangt jetzt eine Bestätigung</string>
+
+    <!-- Versionshinweise 2.0.28 -->
+    <string name="appstrings_release_v2028_nav_camera">Beim Verfolgen einer Tour dreht sich die Karte mit deiner Bewegung und setzt dich an den unteren Bildrand, die Straße vor dir</string>
+    <string name="appstrings_release_v2028_nav_no_spin">Sie dreht sich nicht mehr mit dem GPS-Rauschen, wenn du stehst</string>
+    <string name="appstrings_release_v2028_approach_route">Startest du die Verfolgung weit vom Beginn entfernt, wird jetzt die Anfahrt zum ersten Stopp in einer eigenen Farbe gezeichnet</string>
+    <string name="appstrings_release_v2028_measure_first_point">Das Messwerkzeug sagt klar, wo der erste Punkt hingehört, und bietet an, von deiner Position auszugehen</string>
 </resources>
