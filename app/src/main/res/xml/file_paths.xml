@@ -6,6 +6,8 @@
     <!-- Exports de trajets (GPX/JSON). Sans cette ligne, FileProvider refuse le fichier et le
          partage plante avant même d'ouvrir le sélecteur. -->
     <cache-path name="trip_exports" path="trip_exports/"/>
+    <!-- Sauvegarde complète des données (AppBackupManager), même règle que ci-dessus. -->
+    <cache-path name="backup_exports" path="backup_exports/"/>
     <!-- Journal de débogage (AppFileLog) : dans filesDir, pour survivre au vidage du cache. -->
     <files-path name="debug_logs" path="logs/"/>
     <!-- Rapports PDF enregistrés dans Téléchargements avant Android 10 (MediaStore ensuite). -->

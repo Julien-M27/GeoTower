@@ -76,7 +76,17 @@ data class PreferenceProfileImportConflict(
 
 enum class PreferenceProfileImportResolution {
     RenameImported,
-    ReplaceExisting
+    ReplaceExisting,
+
+    /**
+     * Un nom déjà pris ici est laissé tel quel, et le profil importé est simplement ignoré.
+     *
+     * C'est le mode de la sauvegarde complète ([fr.geotower.data.backup.AppBackupManager]) :
+     * [RenameImported] y créerait un « Profil 2 », puis un « Profil 3 » à chaque réapplication de
+     * la même sauvegarde, et [ReplaceExisting] écraserait des réglages que l'utilisateur n'a pas
+     * demandé à remplacer.
+     */
+    SkipExisting
 }
 
 data class PreferenceProfileImportResult(
@@ -511,6 +521,8 @@ object PreferenceProfileManager {
                     updatedAt = now
                 )
                 added++
+            } else if (resolution == PreferenceProfileImportResolution.SkipExisting) {
+                return@forEach
             } else if (resolution == PreferenceProfileImportResolution.ReplaceExisting) {
                 profiles = profiles.map { local ->
                     if (local.id == conflict.id) {

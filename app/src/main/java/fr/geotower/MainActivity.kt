@@ -961,6 +961,19 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
 
+                            // Sauvegarde et restauration des données personnelles (ouvert depuis
+                            // les Réglages). L'import y est additif : voir AppBackupManager.
+                            composable(
+                                route = "backup",
+                                deepLinks = listOf(navDeepLink { uriPattern = "geotower://backup" })
+                            ) {
+                                Box(modifier = Modifier.padding(innerPadding)) {
+                                    fr.geotower.ui.screens.settings.BackupScreen(
+                                        navController = navController
+                                    )
+                                }
+                            }
+
                             // Photos favorites (ouvert depuis Réglages ▸ Préférences)
                             composable("photos_favorites") {
                                 Box(modifier = Modifier.padding(innerPadding)) {
@@ -1390,7 +1403,11 @@ class MainActivity : ComponentActivity() {
                             // --- 3. ÉCRAN D'ENVOI SIGNAL QUEST ---
                             composable(
                                 // ✅ AJOUT DE &azimuts={azimuts} À LA FIN
-                                route = "sq_upload/{siteId}/{operatorName}?draftId={draftId}&lat={lat}&lon={lon}&azimuts={azimuts}&operatorTargets={operatorTargets}&address={address}&keepDraft={keepDraft}",
+                                // `tripId` / `tripStep` : d'où vient l'envoi quand il est lancé
+                                // depuis l'arrivée sur une étape de tournée. Portés par la route et
+                                // non par un objet en mémoire, pour survivre à la mort du processus
+                                // pendant que l'appareil photo est ouvert.
+                                route = "sq_upload/{siteId}/{operatorName}?draftId={draftId}&lat={lat}&lon={lon}&azimuts={azimuts}&operatorTargets={operatorTargets}&address={address}&keepDraft={keepDraft}&tripId={tripId}&tripStep={tripStep}",
                                 arguments = listOf(
                                     navArgument("siteId") { type = NavType.StringType },
                                     navArgument("operatorName") { type = NavType.StringType },
@@ -1402,7 +1419,9 @@ class MainActivity : ComponentActivity() {
                                     navArgument("azimuts") { type = NavType.StringType; defaultValue = "" },
                                     navArgument("operatorTargets") { type = NavType.StringType; defaultValue = "" },
                                     navArgument("address") { type = NavType.StringType; defaultValue = "" },
-                                    navArgument("keepDraft") { type = NavType.BoolType; defaultValue = false }
+                                    navArgument("keepDraft") { type = NavType.BoolType; defaultValue = false },
+                                    navArgument("tripId") { type = NavType.StringType; defaultValue = "" },
+                                    navArgument("tripStep") { type = NavType.IntType; defaultValue = -1 }
                                 )
                             ) { backStackEntry ->
                                 val siteId = backStackEntry.arguments?.getString("siteId") ?: ""
@@ -1421,6 +1440,8 @@ class MainActivity : ComponentActivity() {
                                     .trim()
                                     .takeIf { it.isNotBlank() }
                                 val keepDraft = backStackEntry.arguments?.getBoolean("keepDraft") ?: false
+                                val uploadTripId = backStackEntry.arguments?.getString("tripId").orEmpty()
+                                val uploadTripStep = backStackEntry.arguments?.getInt("tripStep") ?: -1
 
                                 val uris = remember(draftId) {
                                     if (draftId.isBlank()) emptyList() else SignalQuestUploadDraftStore.peek(draftId)
@@ -1475,6 +1496,22 @@ class MainActivity : ComponentActivity() {
                                                             )
 
                                                             SignalQuestUploadScheduler.enqueue(applicationContext, manifest, batchId)
+                                                        }
+                                                    }
+
+                                                    // Envoi lancé depuis l'arrivée sur une étape :
+                                                    // la tournée en garde la trace, pour se relire
+                                                    // ensuite comme un compte rendu de terrain.
+                                                    // Compté une seule fois, pas une par opérateur :
+                                                    // ce sont les mêmes photos.
+                                                    if (uploadTripId.isNotBlank() && uploadTripStep >= 0) {
+                                                        withContext(Dispatchers.IO) {
+                                                            fr.geotower.data.trip.TripPlanStore.addPhotosSent(
+                                                                context = applicationContext,
+                                                                tripId = uploadTripId,
+                                                                stepIndex = uploadTripStep,
+                                                                count = finalSources.size
+                                                            )
                                                         }
                                                     }
 

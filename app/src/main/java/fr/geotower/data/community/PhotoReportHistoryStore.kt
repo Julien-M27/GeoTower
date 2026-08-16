@@ -122,6 +122,33 @@ object PhotoReportHistoryStore {
         return readInternal(context).sortedByDescending { it.createdAtMillis }
     }
 
+    /**
+     * Ajoute les signalements d'une sauvegarde qui manquent ici. La clé est la **photo** et non
+     * l'identifiant d'entrée : côté SignalQuest, un client API n'a qu'un signalement par photo (voir
+     * [add]), donc deux appareils qui signalent la même photo décrivent le même signalement.
+     *
+     * Un signalement déjà connu n'est jamais réécrit : son statut est le fruit du suivi mené par cet
+     * appareil-ci, la sauvegarde n'en sait pas plus que lui. Rend le nombre d'entrées réellement
+     * conservées après application du plafond [MAX_ENTRIES].
+     */
+    @Synchronized
+    fun mergeEntries(context: Context, entries: List<PhotoReportHistoryEntry>): Int {
+        if (entries.isEmpty()) return 0
+
+        val existing = readInternal(context)
+        val knownPhotoIds = existing.mapTo(HashSet()) { it.photoId }
+        val incoming = entries.filter { it.photoId.isNotBlank() && knownPhotoIds.add(it.photoId) }
+        if (incoming.isEmpty()) return 0
+
+        val nextEntries = (existing + incoming)
+            .sortedByDescending { it.createdAtMillis }
+            .take(MAX_ENTRIES)
+        saveInternal(context, nextEntries)
+
+        val keptPhotoIds = nextEntries.mapTo(HashSet()) { it.photoId }
+        return incoming.count { it.photoId in keptPhotoIds }
+    }
+
     @Synchronized
     fun remove(context: Context, entryIds: Collection<String>) {
         val ids = entryIds.filter { it.isNotBlank() }.toSet()

@@ -8,6 +8,11 @@ import fr.geotower.data.AnfrRepository
 import fr.geotower.data.RadioRepository
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.db.CommuneNameRow
+import fr.geotower.data.trip.TRIP_STEP_SITE_RADIUS_METERS
+import fr.geotower.data.trip.TripStepAntennaRef
+import fr.geotower.data.trip.TripStepSupport
+import fr.geotower.data.trip.groupTripStepSupports
+import fr.geotower.data.trip.tripStepSearchBox
 import fr.geotower.data.api.NominatimApi
 import fr.geotower.data.api.SignalQuestClient
 import fr.geotower.data.api.SignalQuestOperators
@@ -79,6 +84,13 @@ data class SupportChoice(
     val representative: LocalisationEntity,
     val operatorKeys: List<String>,
     val nature: String?
+)
+
+/** Un support autour d'une étape, enrichi de ses stations et de son adresse. */
+data class TripStepSupportDetails(
+    val support: TripStepSupport,
+    val antennas: List<LocalisationEntity>,
+    val address: String
 )
 
 class MapViewModel(
@@ -661,6 +673,67 @@ class MapViewModel(
                     representative = group.first(),
                     operatorKeys = operatorKeys,
                     nature = natureByKey[key]
+                )
+            }
+        }
+    }
+
+    /**
+     * Les supports présents autour d'une étape de tournée, du plus proche au plus lointain, avec
+     * leurs stations et leur adresse : de quoi proposer un envoi de photos en arrivant sur place.
+     *
+     * La lecture est **volontairement non filtrée** : on est devant le pylône, ses opérateurs
+     * masqués sur la carte n'en existent pas moins, et rien ne serait plus déroutant qu'un envoi
+     * impossible parce qu'une case de filtre est décochée à l'autre bout des réglages.
+     */
+    suspend fun loadTripStepSupports(
+        latitude: Double,
+        longitude: Double,
+        radiusMeters: Double = TRIP_STEP_SITE_RADIUS_METERS
+    ): List<TripStepSupportDetails> {
+        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val box = tripStepSearchBox(latitude, longitude, radiusMeters)
+            val nearby = repository
+                .getAntennasInBox(box[0], box[1], box[2], box[3])
+                .distinctBy { it.idAnfr }
+            if (nearby.isEmpty()) return@withContext emptyList()
+
+            // Une seule requête pour tous les supports, puis une pour toutes les adresses : autour
+            // d'une étape il y a rarement plus d'une poignée de stations, mais sur un site étendu
+            // une requête par station se paierait à l'arrivée, montre en main.
+            val physiqueByAnfr = repository.getPhysiqueDetailsByIds(nearby.map { it.idAnfr })
+            val supports = groupTripStepSupports(
+                antennas = nearby.map { antenna ->
+                    TripStepAntennaRef(
+                        idAnfr = antenna.idAnfr,
+                        supportId = physiqueByAnfr[antenna.idAnfr]
+                            ?.firstOrNull()
+                            ?.idSupport
+                            ?.trim()
+                            .orEmpty(),
+                        latitude = antenna.latitude,
+                        longitude = antenna.longitude
+                    )
+                },
+                stepLatitude = latitude,
+                stepLongitude = longitude,
+                radiusMeters = radiusMeters
+            )
+            if (supports.isEmpty()) return@withContext emptyList()
+
+            val antennaById = nearby.associateBy { it.idAnfr }
+            val techniques = repository.getTechniqueDetailsByIds(
+                supports.flatMap { it.idAnfrs }.distinct()
+            )
+            supports.map { support ->
+                TripStepSupportDetails(
+                    support = support,
+                    antennas = support.idAnfrs.mapNotNull { antennaById[it] },
+                    address = support.idAnfrs
+                        .firstNotNullOfOrNull { idAnfr ->
+                            techniques[idAnfr]?.adresse?.trim()?.takeIf { it.isNotBlank() }
+                        }
+                        .orEmpty()
                 )
             }
         }

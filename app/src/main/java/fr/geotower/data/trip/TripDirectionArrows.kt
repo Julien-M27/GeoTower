@@ -9,7 +9,12 @@ data class TripArrow(
     val latitude: Double,
     val longitude: Double,
     /** Cap géographique, 0 = nord, croissant vers l'est. */
-    val bearingDegrees: Double
+    val bearingDegrees: Double,
+    /**
+     * Distance depuis le début du tracé qui la porte. C'est elle qui dit si la flèche est déjà
+     * derrière nous pendant un suivi — la comparer sur les coordonnées demanderait de reprojeter.
+     */
+    val distanceAlongMeters: Double = 0.0
 )
 
 /** Au-delà, un long segment couvrirait la carte de flèches sans rien apprendre de plus. */
@@ -70,11 +75,86 @@ fun tripDirectionArrows(
             // Interpolation linéaire : à l'échelle d'un segment de tracé, la courbure est nulle.
             latitude = from[0] + (to[0] - from[0]) * ratio,
             longitude = from[1] + (to[1] - from[1]) * ratio,
-            bearingDegrees = bearingDegrees(from[0], from[1], to[0], to[1])
+            bearingDegrees = bearingDegrees(from[0], from[1], to[0], to[1]),
+            distanceAlongMeters = target
         )
         target += spacing
     }
     return arrows
+}
+
+/**
+ * Nombre de points du rail d'animation. Assez dense pour que le défilement paraisse continu, assez
+ * court pour rester projetable à chaque image.
+ */
+const val TRIP_FLOW_SAMPLES = 600
+
+/**
+ * Le tracé **entier** rééchantillonné à pas constant, du départ à l'arrivée : le rail sur lequel
+ * les flèches défilent.
+ *
+ * C'est ce qui permet de faire glisser tout le fil d'un coup. Décaler l'indice de départ d'une
+ * image à l'autre fait avancer toutes les flèches ensemble, et comme le pas est constant, la boucle
+ * se referme sans saut : après un pas complet, chaque flèche occupe la place de la suivante.
+ *
+ * Les segments non calculés comptent aussi, avec leur trait direct : le sens de parcours est connu
+ * même quand la route ne l'est pas.
+ */
+fun tripFlowTrack(plan: TripPlan, sampleCount: Int = TRIP_FLOW_SAMPLES): List<TripArrow> {
+    if (sampleCount < 2) return emptyList()
+
+    val points = ArrayList<DoubleArray>()
+    plan.legPairs().forEach { (fromIndex, toIndex) ->
+        val leg = plan.legBetween(fromIndex, toIndex)?.points()?.takeIf { it.size >= 2 }
+            ?: listOf(
+                doubleArrayOf(plan.steps[fromIndex].latitude, plan.steps[fromIndex].longitude),
+                doubleArrayOf(plan.steps[toIndex].latitude, plan.steps[toIndex].longitude)
+            )
+        leg.forEach { point ->
+            // La jonction entre deux segments est le même point des deux côtés : le garder deux
+            // fois créerait un pas de longueur nulle, donc un cap indéfini.
+            val last = points.lastOrNull()
+            if (last == null || last[0] != point[0] || last[1] != point[1]) points += point
+        }
+    }
+    if (points.size < 2) return emptyList()
+
+    val segmentLengths = DoubleArray(points.size - 1)
+    var total = 0.0
+    for (index in 0 until points.size - 1) {
+        val length = haversineMeters(
+            points[index][0], points[index][1],
+            points[index + 1][0], points[index + 1][1]
+        )
+        segmentLengths[index] = length
+        total += length
+    }
+    if (total <= 0.0) return emptyList()
+
+    val step = total / sampleCount
+    val samples = ArrayList<TripArrow>(sampleCount)
+    var travelled = 0.0
+    var segment = 0
+    for (index in 0 until sampleCount) {
+        val target = index * step
+        while (segment < segmentLengths.size && travelled + segmentLengths[segment] < target) {
+            travelled += segmentLengths[segment]
+            segment++
+        }
+        if (segment >= segmentLengths.size) break
+
+        val length = segmentLengths[segment]
+        val ratio = if (length <= 0.0) 0.0 else ((target - travelled) / length).coerceIn(0.0, 1.0)
+        val from = points[segment]
+        val to = points[segment + 1]
+        samples += TripArrow(
+            latitude = from[0] + (to[0] - from[0]) * ratio,
+            longitude = from[1] + (to[1] - from[1]) * ratio,
+            bearingDegrees = bearingDegrees(from[0], from[1], to[0], to[1]),
+            distanceAlongMeters = target
+        )
+    }
+    return samples
 }
 
 /** Cap initial de `from` vers `to`, en degrés depuis le nord. */

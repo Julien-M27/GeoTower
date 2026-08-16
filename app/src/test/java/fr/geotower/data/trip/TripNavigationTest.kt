@@ -26,6 +26,64 @@ class TripNavigationTest {
         assertEquals(135.0, smoother.update(135.0, 5.0)!!, 0.001)
     }
 
+    // --- Cap de repli, lu sur le tracé ------------------------------------------------------
+
+    @Test
+    fun readsTheHeadingOffTheRouteWhenStandingStill() {
+        // Un tracé plein est : à l'arrêt, la carte doit s'orienter comme si on le parcourait.
+        val eastbound = listOf(doubleArrayOf(48.80, 2.30), doubleArrayOf(48.80, 2.40))
+
+        assertEquals(90.0, routeHeadingAhead(eastbound)!!, 1.0)
+    }
+
+    @Test
+    fun ignoresAShortWiggleAtTheVeryStart() {
+        // Sortie de parking de quelques mètres plein ouest, puis la route part au nord : c'est le
+        // nord qui doit commander, sinon la carte se mettrait de travers dès le départ.
+        val wiggle = listOf(
+            doubleArrayOf(48.8000, 2.3000),
+            doubleArrayOf(48.8000, 2.2999),
+            doubleArrayOf(48.8050, 2.2999)
+        )
+
+        val heading = routeHeadingAhead(wiggle)!!
+
+        assertTrue("cap=$heading", heading < 5.0 || heading > 355.0)
+    }
+
+    @Test
+    fun stopsLookingAheadAtTheGivenDistance() {
+        // Cent mètres au nord puis un virage plein est : en ne regardant que 100 m devant, le
+        // virage ne doit pas encore compter.
+        val corner = listOf(
+            doubleArrayOf(48.8000, 2.3000),
+            doubleArrayOf(48.8009, 2.3000),
+            doubleArrayOf(48.8009, 2.4000)
+        )
+
+        val heading = routeHeadingAhead(corner, aheadMeters = 100.0)!!
+
+        assertEquals(0.0, heading, 1.0)
+    }
+
+    @Test
+    fun takesWhatItHasOnARouteShorterThanTheLookahead() {
+        // 30 m plein nord : plus court que la portée, mais le cap reste lisible.
+        val short = listOf(doubleArrayOf(48.80000, 2.30000), doubleArrayOf(48.80027, 2.30000))
+
+        assertEquals(0.0, routeHeadingAhead(short)!!, 1.0)
+    }
+
+    @Test
+    fun hasNoFallbackHeadingWithoutARoute() {
+        assertNull(routeHeadingAhead(emptyList()))
+        assertNull(routeHeadingAhead(listOf(doubleArrayOf(48.80, 2.30))))
+        // Points confondus : aucune direction à en tirer.
+        assertNull(
+            routeHeadingAhead(listOf(doubleArrayOf(48.80, 2.30), doubleArrayOf(48.80, 2.30)))
+        )
+    }
+
     @Test
     fun staysSilentUntilAReliableHeadingArrives() {
         val smoother = TripHeadingSmoother()

@@ -210,6 +210,9 @@ fun TripStepActionsDialog(
     stepNumber: Int,
     label: String,
     visited: Boolean,
+    /** Photos parties depuis cette étape, et note de terrain : le compte rendu du passage. */
+    photosSentCount: Int,
+    note: String,
     canMoveUp: Boolean,
     canMoveDown: Boolean,
     onMoveUp: () -> Unit,
@@ -232,6 +235,26 @@ fun TripStepActionsDialog(
         },
         text = {
             Column {
+                // Ce que l'étape a produit sur le terrain, avant les actions : c'est ce qu'on vient
+                // relire en rouvrant une tournée faite.
+                if (photosSentCount > 0) {
+                    Text(
+                        text = pluralStringResource(
+                            R.plurals.trips_arrival_already_sent,
+                            photosSentCount,
+                            photosSentCount
+                        ),
+                        fontSize = sizing.text(13.sp),
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                if (note.isNotBlank()) {
+                    Text(
+                        text = note,
+                        fontSize = sizing.text(13.sp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 StepActionRow(
                     icon = Icons.Default.KeyboardArrowUp,
                     labelRes = R.string.trips_step_move_up,

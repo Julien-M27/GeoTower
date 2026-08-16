@@ -594,6 +594,7 @@
     <string name="appstrings_photo_report_unavailable">Reporting is unavailable</string>
     <string name="appstrings_photo_report_failed">The report could not be sent</string>
     <string name="photo_reports_title">My reports</string>
+    <string name="photo_reports_desc">Track the photos you reported to SignalQuest.</string>
     <string name="photo_reports_intro">SignalQuest does not publish the outcome of a report. GeoTower can only tell you that it was sent, and let you know if the photo eventually disappears.</string>
     <string name="photo_reports_empty">You have not reported any photo yet.</string>
     <string name="photo_reports_status_sent">Sent — awaiting moderation</string>
@@ -2860,6 +2861,19 @@
     <string name="trips_step_mark_visited">Mark as surveyed</string>
     <string name="trips_step_mark_not_visited">Mark as not surveyed</string>
     <string name="trips_step_delete">Delete this step</string>
+    <string name="trips_arrival_title">Arrival at step %1$d</string>
+    <string name="trips_arrival_searching">Looking for the site around you…</string>
+    <string name="trips_arrival_no_site">No known mast nearby.</string>
+    <string name="trips_arrival_choose_site">Which mast did you photograph?</string>
+    <string name="trips_arrival_operators">Send to which operators?</string>
+    <string name="trips_arrival_no_operator">No operator on this mast accepts photos.</string>
+    <string name="trips_arrival_send_photos">Send photos</string>
+    <string name="trips_arrival_note_label">Field note</string>
+    <string name="trips_arrival_note_placeholder">Access, mast condition, remark…</string>
+    <string name="trips_arrival_upload_unavailable">Photo upload is unavailable.</string>
+    <string name="trips_arrival_notification_title">Arrived at %1$s</string>
+    <string name="trips_arrival_notification_text">Send photos of the site?</string>
+    <string name="notification_trip_arrival_channel_name">Trip steps</string>
     <string name="notification_trip_reminder_channel_name">Trip reminders</string>
     <string name="trips_reminder_text">Departure planned %1$s</string>
     <string name="trips_reminder_action_postpone">Postpone by one day</string>
@@ -2953,10 +2967,54 @@
     <string name="notification_history_type_photo_upload">Photo upload</string>
     <string name="notification_history_type_photo_report">Photo report</string>
     <string name="notification_history_type_trip_reminder">Trip reminder</string>
+    <string name="notification_history_type_trip_arrival">Step reached</string>
     <string name="notification_history_type_pdf_report">PDF report</string>
 
     <!-- Release notes 2.0.32 -->
     <string name="appstrings_release_v2032_notification_history">A “Notifications” page records everything the app tried to tell you, sorted by type and filterable</string>
     <string name="appstrings_release_v2032_notification_not_shown">Events are recorded even when the notification could not be shown — notifications turned off, permission denied — and the log says so</string>
     <string name="appstrings_release_v2032_routing_choice">A setting chooses between the fastest and the shortest route, for “by road” measurements and planned trips; no effect on foot, where the service returns the same path either way</string>
+
+    <!-- Sauvegarde et restauration des donnees personnelles -->
+    <string name="backup_title">Backup and restore</string>
+    <string name="backup_desc">Export your histories, trips, favourite photos and settings profiles to a single file, then import it on another phone. An import only adds what is missing here: nothing is ever deleted or replaced, and importing the same file twice changes nothing the second time.</string>
+    <string name="backup_export_title">Export</string>
+    <string name="backup_export_desc">Choose what to take with you.</string>
+    <string name="backup_export_thumbnails">Include photo thumbnails</string>
+    <string name="backup_export_thumbnails_desc">Larger file, but sent photos keep their preview</string>
+    <string name="backup_export_save">Save</string>
+    <string name="backup_export_share">Share</string>
+    <string name="backup_export_saved">Backup saved</string>
+    <string name="backup_export_failed">Could not write the backup</string>
+    <string name="backup_import_title">Import</string>
+    <string name="backup_import_desc">Pick a backup file made by GeoTower, on this phone or another one.</string>
+    <string name="backup_import_pick">Choose a file</string>
+    <string name="backup_import_failed">This file is not a GeoTower backup.</string>
+    <string name="backup_import_preview_title">What this backup would add</string>
+    <string name="backup_import_preview_version">GeoTower %1$s</string>
+    <string name="backup_import_preview_nothing">This phone already has everything in this file.</string>
+    <string name="backup_import_profiles_note">Imported settings profiles are added without being applied: open “Settings profiles” to switch to one.</string>
+    <string name="backup_import_confirm">Import</string>
+    <string name="backup_import_result_title">Import finished</string>
+    <string name="backup_import_result_nothing">Nothing to add: this phone already had everything.</string>
+    <string name="backup_refreshed_items">%1$d updated</string>
+    <string name="backup_section_empty">Nothing recorded</string>
+    <string name="backup_section_to_update">%1$d to update</string>
+    <string name="backup_section_counter_higher">Higher in the backup</string>
+    <string name="backup_section_share_history">Shares and copies</string>
+    <string name="backup_section_notification_history">Notification log</string>
+    <string name="backup_section_photo_uploads">Sent photos</string>
+    <string name="backup_section_photo_reports">Reported photos</string>
+    <string name="backup_section_trips">Trips</string>
+    <string name="backup_section_photo_favorites">Favourite photos</string>
+    <string name="backup_section_counters">Photos sent in total</string>
+    <string name="backup_section_settings_profiles">Settings profiles</string>
+    <string name="backup_section_unknown">Other</string>
+    <string name="backup_settings_entry_desc">Move your histories and trips to another phone</string>
+
+    <!-- Release notes 2.0.33 -->
+    <string name="appstrings_release_v2033_backup">A “Backup and restore” page exports your histories, trips, favourite photos and settings profiles into a single file, to import on another phone</string>
+    <string name="appstrings_release_v2033_backup_additive">An import only adds what is missing: nothing is deleted or replaced, and importing the same file again changes nothing the second time</string>
+    <string name="appstrings_release_v2033_backup_preview">A preview shows what the backup would add before you confirm</string>
+    <string name="appstrings_release_v2033_trip_arrival">Arriving at a stop offers to send photos of the mast: the app looks for the site around you, asks which operators to send to, and takes a field note</string>
 </resources>

@@ -42,6 +42,7 @@ import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Radio
+import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Storage
@@ -627,6 +628,7 @@ private val NOTIFICATION_HISTORY_TYPES: List<String> = listOf(
     NotificationHistoryStore.TYPE_PHOTO_UPLOAD,
     NotificationHistoryStore.TYPE_PHOTO_REPORT,
     NotificationHistoryStore.TYPE_TRIP_REMINDER,
+    NotificationHistoryStore.TYPE_TRIP_ARRIVAL,
     NotificationHistoryStore.TYPE_PDF_REPORT
 )
 
@@ -782,6 +784,7 @@ private fun notificationTypeIcon(type: String): ImageVector = when (type) {
     NotificationHistoryStore.TYPE_PHOTO_UPLOAD -> Icons.Default.PhotoLibrary
     NotificationHistoryStore.TYPE_PHOTO_REPORT -> Icons.Default.Flag
     NotificationHistoryStore.TYPE_TRIP_REMINDER -> Icons.Default.Route
+    NotificationHistoryStore.TYPE_TRIP_ARRIVAL -> Icons.Default.AddAPhoto
     NotificationHistoryStore.TYPE_PDF_REPORT -> Icons.Default.PictureAsPdf
     else -> Icons.Default.Notifications
 }
@@ -799,6 +802,7 @@ private fun notificationTypeLabel(type: String): String = when (type) {
     NotificationHistoryStore.TYPE_PHOTO_UPLOAD -> stringResource(R.string.notification_history_type_photo_upload)
     NotificationHistoryStore.TYPE_PHOTO_REPORT -> stringResource(R.string.notification_history_type_photo_report)
     NotificationHistoryStore.TYPE_TRIP_REMINDER -> stringResource(R.string.notification_history_type_trip_reminder)
+    NotificationHistoryStore.TYPE_TRIP_ARRIVAL -> stringResource(R.string.notification_history_type_trip_arrival)
     NotificationHistoryStore.TYPE_PDF_REPORT -> stringResource(R.string.notification_history_type_pdf_report)
     else -> type
 }
@@ -876,6 +880,12 @@ private fun notificationEntryDescription(item: NotificationHistoryEntry): String
             val name = item.label.ifBlank { stringResource(R.string.trips_untitled) }
             val text = stringResource(R.string.trips_reminder_text, departure)
             "$name - $text"
+        }
+
+        NotificationHistoryStore.TYPE_TRIP_ARRIVAL -> {
+            // `label` = nom de l'étape, déjà mis en forme au moment de la notification.
+            val title = stringResource(R.string.trips_arrival_notification_title, item.label)
+            "$title - ${stringResource(R.string.trips_arrival_notification_text)}"
         }
 
         NotificationHistoryStore.TYPE_PDF_REPORT ->

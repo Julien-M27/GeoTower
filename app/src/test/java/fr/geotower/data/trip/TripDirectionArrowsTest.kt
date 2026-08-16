@@ -73,6 +73,65 @@ class TripDirectionArrowsTest {
         assertEquals(emptyList<TripArrow>(), tripDirectionArrows(tiny))
     }
 
+    // --- Rail de défilement ----------------------------------------------------------------
+
+    @Test
+    fun samplesTheWholeTourAtAConstantStep() {
+        val tour = plan(listOf(step(48.70, 2.30), step(48.80, 2.30), step(48.90, 2.30)))
+
+        val track = tripFlowTrack(tour, sampleCount = 100)
+
+        assertEquals(100, track.size)
+        // Pas constant : c'est ce qui referme la boucle sans saut, chaque flèche prenant la place
+        // de la suivante après un pas complet.
+        val first = haversineMeters(
+            track[0].latitude, track[0].longitude, track[1].latitude, track[1].longitude
+        )
+        val middle = haversineMeters(
+            track[50].latitude, track[50].longitude, track[51].latitude, track[51].longitude
+        )
+        assertEquals(first, middle, 1.0)
+    }
+
+    @Test
+    fun runsFromTheStartToTheEndInOrder() {
+        val tour = plan(listOf(step(48.70, 2.30), step(48.90, 2.30)))
+
+        val track = tripFlowTrack(tour, sampleCount = 50)
+
+        assertEquals(48.70, track.first().latitude, 1e-3)
+        assertTrue(track.last().latitude > 48.88)
+        // Cap au nord tout du long.
+        track.forEach { assertEquals(0.0, it.bearingDegrees, 1.0) }
+    }
+
+    @Test
+    fun keepsFollowingTheRouteThroughATurn() {
+        val corner = listOf(
+            doubleArrayOf(48.70, 2.30),
+            doubleArrayOf(48.80, 2.30),
+            doubleArrayOf(48.80, 2.40)
+        )
+        val tour = plan(
+            listOf(step(48.70, 2.30), step(48.80, 2.40)),
+            legs = listOf(leg(0, 1).copy(encodedGeometry = TripGeometryCodec.encode(corner)))
+        )
+
+        val track = tripFlowTrack(tour, sampleCount = 100)
+
+        assertTrue(track.any { it.bearingDegrees < 5.0 || it.bearingDegrees > 355.0 })
+        assertTrue(track.any { kotlin.math.abs(it.bearingDegrees - 90.0) < 5.0 })
+    }
+
+    @Test
+    fun hasNoRailWithoutATour() {
+        assertEquals(emptyList<TripArrow>(), tripFlowTrack(plan(listOf(step(48.80, 2.30)))))
+        assertEquals(emptyList<TripArrow>(), tripFlowTrack(plan(ladder(2)), sampleCount = 1))
+        // Deux étapes confondues : longueur nulle, donc aucun rail à parcourir.
+        val degenerate = plan(listOf(step(48.80, 2.30), step(48.80, 2.30)))
+        assertEquals(emptyList<TripArrow>(), tripFlowTrack(degenerate))
+    }
+
     @Test
     fun followsEachTurnOfASinuousLeg() {
         // Un L : nord puis est. Les flèches du premier tronçon pointent au nord, celles du second

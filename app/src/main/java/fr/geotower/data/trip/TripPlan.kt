@@ -85,6 +85,9 @@ data class TripPlan(
 
     fun visitedCount(): Int = steps.count { it.visitedAtMillis != null }
 
+    /** Photos parties depuis l'ensemble de la tournée : ce qu'elle a produit sur le terrain. */
+    fun photosSentTotal(): Int = steps.sumOf { it.photosSentCount }
+
     /**
      * Brouillon sans la moindre étape : rien n'y a été posé, il n'a pas à être conservé. Le statut
      * compte autant que les étapes — une tournée datée, terminée ou archivée reste un choix de
@@ -178,10 +181,21 @@ data class TripStep(
     val kind: String,
     val supportId: String?,
     val visitedAtMillis: Long?,
-    /** Réservé : note de terrain, sans interface pour l'instant. */
+    /** Note de terrain saisie à l'arrivée sur l'étape. */
     val note: String?,
     /** Réservé : profil du segment vers l'étape suivante. `null` = celui du trajet. */
-    val profileToNext: String?
+    val profileToNext: String?,
+    /**
+     * Nombre de photos parties depuis cette étape.
+     *
+     * Compteur et non liste : l'envoi appartient à SignalQuest, qui a son propre historique. Ce
+     * qu'on garde ici, c'est ce que la tournée a produit — de quoi relire un compte rendu de terrain
+     * sans dépendre d'un serveur.
+     *
+     * Champ ajouté après coup : les trajets enregistrés avant ne le portent pas, et Gson leur donne
+     * alors 0 — ce qui est exactement la bonne valeur.
+     */
+    val photosSentCount: Int = 0
 ) {
     @Suppress("SENSELESS_COMPARISON", "USELESS_ELVIS", "UNNECESSARY_SAFE_CALL")
     fun sanitized(): TripStep? {
@@ -189,7 +203,9 @@ data class TripStep(
         if (latitude !in -90.0..90.0 || longitude !in -180.0..180.0) return null
         return copy(
             label = label ?: "",
-            kind = kind.takeIf { it in ALL_KINDS } ?: KIND_MANUAL
+            kind = kind.takeIf { it in ALL_KINDS } ?: KIND_MANUAL,
+            // Un compteur négatif ne veut rien dire : relecture d'un fichier trafiqué ou corrompu.
+            photosSentCount = photosSentCount.coerceAtLeast(0)
         )
     }
 

@@ -633,6 +633,10 @@ private fun tripSummaryLine(plan: TripPlan, distanceUnit: Int): String {
         )
     }
     parts += pluralStringResource(R.plurals.trips_steps, plan.steps.size, plan.steps.size)
+    // Ce que la tournée a produit sur le terrain : la seule ligne qui distingue une tournée faite
+    // d'une tournée seulement parcourue.
+    val photos = plan.photosSentTotal()
+    if (photos > 0) parts += pluralStringResource(R.plurals.trips_photos_sent_short, photos, photos)
     return parts.joinToString(" - ")
 }
 

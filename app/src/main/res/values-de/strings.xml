@@ -517,6 +517,7 @@
     <string name="appstrings_photo_report_unavailable">Melden ist nicht verfügbar</string>
     <string name="appstrings_photo_report_failed">Die Meldung konnte nicht übermittelt werden</string>
     <string name="photo_reports_title">Meine Meldungen</string>
+    <string name="photo_reports_desc">Verfolge die Fotos, die du SignalQuest gemeldet hast.</string>
     <string name="photo_reports_intro">SignalQuest veröffentlicht nicht, was aus einer Meldung wird. GeoTower kann nur bestätigen, dass sie übermittelt wurde, und Bescheid geben, falls das Foto irgendwann verschwindet.</string>
     <string name="photo_reports_empty">Sie haben noch kein Foto gemeldet.</string>
     <string name="photo_reports_status_sent">Übermittelt — Moderation ausstehend</string>
@@ -2836,6 +2837,19 @@
     <string name="trips_step_mark_visited">Als erfasst markieren</string>
     <string name="trips_step_mark_not_visited">Als nicht erfasst markieren</string>
     <string name="trips_step_delete">Diese Etappe löschen</string>
+    <string name="trips_arrival_title">Ankunft an Schritt %1$d</string>
+    <string name="trips_arrival_searching">Standort in der Umgebung wird gesucht…</string>
+    <string name="trips_arrival_no_site">Kein bekannter Mast in der Nähe.</string>
+    <string name="trips_arrival_choose_site">Welchen Mast haben Sie fotografiert?</string>
+    <string name="trips_arrival_operators">An welche Betreiber senden?</string>
+    <string name="trips_arrival_no_operator">Kein Betreiber dieses Masts nimmt Fotos an.</string>
+    <string name="trips_arrival_send_photos">Fotos senden</string>
+    <string name="trips_arrival_note_label">Feldnotiz</string>
+    <string name="trips_arrival_note_placeholder">Zugang, Zustand des Masts, Anmerkung…</string>
+    <string name="trips_arrival_upload_unavailable">Das Senden von Fotos ist nicht verfügbar.</string>
+    <string name="trips_arrival_notification_title">Angekommen an %1$s</string>
+    <string name="trips_arrival_notification_text">Fotos des Standorts senden?</string>
+    <string name="notification_trip_arrival_channel_name">Streckenetappen</string>
     <string name="notification_trip_reminder_channel_name">Routenerinnerungen</string>
     <string name="trips_reminder_text">Abfahrt geplant %1$s</string>
     <string name="trips_reminder_action_postpone">Um einen Tag verschieben</string>
@@ -2929,10 +2943,54 @@
     <string name="notification_history_type_photo_upload">Fotoversand</string>
     <string name="notification_history_type_photo_report">Fotomeldung</string>
     <string name="notification_history_type_trip_reminder">Fahrt-Erinnerung</string>
+    <string name="notification_history_type_trip_arrival">Schritt erreicht</string>
     <string name="notification_history_type_pdf_report">PDF-Bericht</string>
 
     <!-- Versionshinweise 2.0.32 -->
     <string name="appstrings_release_v2032_notification_history">Eine Seite „Benachrichtigungen“ hält fest, was die App dir melden wollte, nach Art sortiert und filterbar</string>
     <string name="appstrings_release_v2032_notification_not_shown">Ereignisse werden auch dann festgehalten, wenn die Benachrichtigung nicht erscheinen konnte – Benachrichtigungen aus, Berechtigung verweigert – und das Protokoll sagt es</string>
     <string name="appstrings_release_v2032_routing_choice">Eine Einstellung wählt zwischen schnellster und kürzester Route, für Messungen „entlang der Straße“ und geplante Touren; zu Fuß ohne Wirkung, da der Dienst dann dieselbe Strecke liefert</string>
+
+    <!-- Sauvegarde et restauration des donnees personnelles -->
+    <string name="backup_title">Sicherung und Wiederherstellung</string>
+    <string name="backup_desc">Exportiere deine Verläufe, Touren, Lieblingsfotos und Einstellungsprofile in eine einzige Datei und importiere sie auf einem anderen Telefon. Ein Import ergänzt nur, was hier fehlt: nichts wird je gelöscht oder ersetzt, und dieselbe Datei ein zweites Mal zu importieren ändert nichts mehr.</string>
+    <string name="backup_export_title">Exportieren</string>
+    <string name="backup_export_desc">Wähle, was mitkommen soll.</string>
+    <string name="backup_export_thumbnails">Vorschaubilder der Fotos mitnehmen</string>
+    <string name="backup_export_thumbnails_desc">Größere Datei, dafür behalten gesendete Fotos ihre Vorschau</string>
+    <string name="backup_export_save">Speichern</string>
+    <string name="backup_export_share">Teilen</string>
+    <string name="backup_export_saved">Sicherung gespeichert</string>
+    <string name="backup_export_failed">Sicherung konnte nicht geschrieben werden</string>
+    <string name="backup_import_title">Importieren</string>
+    <string name="backup_import_desc">Wähle eine von GeoTower erstellte Sicherungsdatei, von diesem oder einem anderen Telefon.</string>
+    <string name="backup_import_pick">Datei wählen</string>
+    <string name="backup_import_failed">Diese Datei ist keine GeoTower-Sicherung.</string>
+    <string name="backup_import_preview_title">Was diese Sicherung ergänzen würde</string>
+    <string name="backup_import_preview_version">GeoTower %1$s</string>
+    <string name="backup_import_preview_nothing">Dieses Telefon hat bereits alles aus dieser Datei.</string>
+    <string name="backup_import_profiles_note">Importierte Einstellungsprofile werden hinzugefügt, aber nicht angewendet: öffne „Einstellungsprofile“, um zu einem zu wechseln.</string>
+    <string name="backup_import_confirm">Importieren</string>
+    <string name="backup_import_result_title">Import abgeschlossen</string>
+    <string name="backup_import_result_nothing">Nichts zu ergänzen: dieses Telefon hatte bereits alles.</string>
+    <string name="backup_refreshed_items">%1$d aktualisiert</string>
+    <string name="backup_section_empty">Nichts erfasst</string>
+    <string name="backup_section_to_update">%1$d zu aktualisieren</string>
+    <string name="backup_section_counter_higher">In der Sicherung höher</string>
+    <string name="backup_section_share_history">Freigaben und Kopien</string>
+    <string name="backup_section_notification_history">Benachrichtigungsprotokoll</string>
+    <string name="backup_section_photo_uploads">Gesendete Fotos</string>
+    <string name="backup_section_photo_reports">Gemeldete Fotos</string>
+    <string name="backup_section_trips">Touren</string>
+    <string name="backup_section_photo_favorites">Lieblingsfotos</string>
+    <string name="backup_section_counters">Gesendete Fotos insgesamt</string>
+    <string name="backup_section_settings_profiles">Einstellungsprofile</string>
+    <string name="backup_section_unknown">Sonstiges</string>
+    <string name="backup_settings_entry_desc">Verläufe und Touren auf ein anderes Telefon mitnehmen</string>
+
+    <!-- Versionshinweise 2.0.33 -->
+    <string name="appstrings_release_v2033_backup">Eine Seite „Sicherung und Wiederherstellung“ exportiert deine Verläufe, Touren, Lieblingsfotos und Einstellungsprofile in eine einzige Datei, die sich auf einem anderen Telefon importieren lässt</string>
+    <string name="appstrings_release_v2033_backup_additive">Ein Import ergänzt nur, was fehlt: Nichts wird gelöscht oder ersetzt, und dieselbe Datei erneut zu importieren ändert beim zweiten Mal nichts</string>
+    <string name="appstrings_release_v2033_backup_preview">Eine Vorschau zeigt vor dem Bestätigen, was die Sicherung ergänzen würde</string>
+    <string name="appstrings_release_v2033_trip_arrival">Bei Ankunft an einem Stopp bietet die App an, Fotos des Masts zu senden: Sie sucht den Standort um dich herum, fragt nach den Betreibern und nimmt eine Notiz auf</string>
 </resources>

@@ -228,6 +228,35 @@ object ShareHistoryStore {
         return readInternal(context).sortedByDescending { it.createdAtMillis }
     }
 
+    /**
+     * Ajoute les entrées d'une sauvegarde qui manquent ici, et **rien d'autre** : une entrée dont
+     * l'identifiant est déjà connu est laissée telle quelle. Un partage est un événement révolu,
+     * son identifiant est tiré une seule fois à l'enregistrement — deux appareils ne peuvent donc
+     * pas décrire le même partage sous deux identifiants, ni le même identifiant sous deux
+     * partages. Réimporter la même sauvegarde ne change alors rien.
+     *
+     * Rend le nombre d'entrées réellement conservées : le plafond [MAX_ENTRIES] peut recaler les
+     * plus anciennes, y compris certaines de celles qu'on vient d'ajouter.
+     */
+    @Synchronized
+    fun mergeEntries(context: Context, entries: List<ShareHistoryEntry>): Int {
+        if (entries.isEmpty()) return 0
+
+        val applicationContext = context.applicationContext
+        val existing = readInternal(applicationContext)
+        val knownIds = existing.mapTo(HashSet()) { it.id }
+        val incoming = entries.filter { it.id.isNotBlank() && knownIds.add(it.id) }
+        if (incoming.isEmpty()) return 0
+
+        val nextEntries = (existing + incoming)
+            .sortedByDescending { it.createdAtMillis }
+            .take(MAX_ENTRIES)
+        saveInternal(applicationContext, nextEntries)
+
+        val keptIds = nextEntries.mapTo(HashSet()) { it.id }
+        return incoming.count { it.id in keptIds }
+    }
+
     @Synchronized
     fun removeEntries(context: Context, entryIds: Collection<String>) {
         val ids = entryIds.filter { it.isNotBlank() }.toSet()

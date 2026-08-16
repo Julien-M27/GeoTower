@@ -16,6 +16,9 @@ import java.util.UUID
  * L'écriture est atomique pour la même raison : une coupure en pleine sauvegarde ne doit pas laisser
  * un fichier tronqué à la place de toutes les tournées.
  */
+/** Compte rendu de [TripPlanStore.mergePlans] : trajets ajoutés, et trajets remis à jour. */
+data class TripPlanMergeResult(val added: Int, val refreshed: Int)
+
 object TripPlanStore {
     /** Version du format écrit par cette version de l'app. Voir [TripPlan.schemaVersion]. */
     const val SCHEMA_VERSION = 1
@@ -60,6 +63,38 @@ object TripPlanStore {
         return kept
     }
 
+    /**
+     * Crédite une étape des photos qui viennent de partir depuis elle.
+     *
+     * Lecture-modification-écriture sous verrou plutôt qu'un `save` construit par l'appelant : au
+     * moment où l'envoi démarre, l'écran de la carte a pu écrire le trajet de son côté (une note
+     * saisie, une étape cochée), et repartir d'une copie en mémoire écraserait ce travail.
+     *
+     * Sans effet si le trajet ou l'étape n'existent plus : une tournée peut être modifiée pendant
+     * qu'un envoi est en vol, et un envoi ne doit jamais faire échouer autre chose.
+     */
+    @Synchronized
+    fun addPhotosSent(context: Context, tripId: String, stepIndex: Int, count: Int) {
+        if (count <= 0) return
+        val plans = readInternal(context.applicationContext)
+        val planIndex = plans.indexOfFirst { it.id == tripId }
+        if (planIndex < 0) return
+        val plan = plans[planIndex]
+        val step = plan.steps.getOrNull(stepIndex) ?: return
+
+        val steps = plan.steps.toMutableList().apply {
+            set(stepIndex, step.copy(photosSentCount = step.photosSentCount + count))
+        }
+        val updated = plan
+            .copy(steps = steps, updatedAtMillis = System.currentTimeMillis())
+            .sanitized()
+            ?: return
+        saveInternal(
+            context.applicationContext,
+            plans.toMutableList().apply { set(planIndex, updated) }
+        )
+    }
+
     @Synchronized
     fun delete(context: Context, id: String) {
         val plans = readInternal(context.applicationContext)
@@ -71,6 +106,47 @@ object TripPlanStore {
     @Synchronized
     fun replaceAll(context: Context, plans: List<TripPlan>) {
         saveInternal(context.applicationContext, plans.mapNotNull { it.sanitized() })
+    }
+
+    /**
+     * Fusionne les trajets d'une sauvegarde avec ceux d'ici. Contrairement aux historiques, une
+     * tournée n'est pas un événement révolu mais un document qu'on rouvre et qu'on modifie : elle se
+     * fusionne donc sur [TripPlan.updatedAtMillis], et non par simple ajout.
+     *
+     * - trajet inconnu → ajouté ;
+     * - trajet connu, version importée **strictement** plus récente → remplacée (les étapes cochées
+     *   sur l'autre appareil reviennent ici) ;
+     * - trajet connu, version importée aussi ancienne ou plus → laissée intacte.
+     *
+     * Rien n'est jamais supprimé, et la comparaison stricte rend l'opération sans effet à la
+     * deuxième application de la même sauvegarde.
+     */
+    @Synchronized
+    fun mergePlans(context: Context, plans: List<TripPlan>): TripPlanMergeResult {
+        val sanitized = plans.mapNotNull { it.sanitized() }.filterNot { it.isEmptyDraft() }
+        if (sanitized.isEmpty()) return TripPlanMergeResult(0, 0)
+
+        val existing = readInternal(context.applicationContext)
+        val byId = existing.associateByTo(LinkedHashMap()) { it.id }
+        var added = 0
+        var refreshed = 0
+        sanitized.forEach { incoming ->
+            val local = byId[incoming.id]
+            when {
+                local == null -> {
+                    byId[incoming.id] = incoming
+                    added++
+                }
+                incoming.updatedAtMillis > local.updatedAtMillis -> {
+                    byId[incoming.id] = incoming
+                    refreshed++
+                }
+            }
+        }
+
+        if (added == 0 && refreshed == 0) return TripPlanMergeResult(0, 0)
+        saveInternal(context.applicationContext, byId.values.toList())
+        return TripPlanMergeResult(added, refreshed)
     }
 
     @Synchronized

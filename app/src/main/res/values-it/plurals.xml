@@ -91,6 +91,14 @@
         <item quantity="one">Trasmettitore a %1$s</item>
         <item quantity="other">Trasmettitori a %1$s</item>
     </plurals>
+    <plurals name="trips_photos_sent_short">
+        <item quantity="one">%1$d foto inviata</item>
+        <item quantity="other">%1$d foto inviate</item>
+    </plurals>
+    <plurals name="trips_arrival_already_sent">
+        <item quantity="one">%1$d foto inviata da questa tappa</item>
+        <item quantity="other">%1$d foto inviate da questa tappa</item>
+    </plurals>
     <plurals name="trips_steps">
         <item quantity="one">%1$d tappa</item>
         <item quantity="other">%1$d tappe</item>
@@ -98,5 +106,29 @@
     <plurals name="notification_history_recorded">
         <item quantity="one">%1$d notifica registrata</item>
         <item quantity="other">%1$d notifiche registrate</item>
+    </plurals>
+    <plurals name="backup_items">
+        <item quantity="one">%1$d elemento</item>
+        <item quantity="other">%1$d elementi</item>
+    </plurals>
+    <plurals name="backup_photos_sent">
+        <item quantity="one">%1$d foto</item>
+        <item quantity="other">%1$d foto</item>
+    </plurals>
+    <plurals name="backup_new_items">
+        <item quantity="one">%1$d da aggiungere</item>
+        <item quantity="other">%1$d da aggiungere</item>
+    </plurals>
+    <plurals name="backup_already_present">
+        <item quantity="one">%1$d già presente</item>
+        <item quantity="other">%1$d già presenti</item>
+    </plurals>
+    <plurals name="backup_added_items">
+        <item quantity="one">%1$d aggiunto</item>
+        <item quantity="other">%1$d aggiunti</item>
+    </plurals>
+    <plurals name="backup_unknown_sections">
+        <item quantity="one">%1$d sezione proviene da una versione più recente e sarà ignorata</item>
+        <item quantity="other">%1$d sezioni provengono da una versione più recente e saranno ignorate</item>
     </plurals>
 </resources>

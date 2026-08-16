@@ -91,6 +91,14 @@
         <item quantity="one">Sendeantenne in %1$s Höhe</item>
         <item quantity="other">Sendeantennen in %1$s Höhe</item>
     </plurals>
+    <plurals name="trips_photos_sent_short">
+        <item quantity="one">%1$d Foto gesendet</item>
+        <item quantity="other">%1$d Fotos gesendet</item>
+    </plurals>
+    <plurals name="trips_arrival_already_sent">
+        <item quantity="one">%1$d Foto von diesem Schritt gesendet</item>
+        <item quantity="other">%1$d Fotos von diesem Schritt gesendet</item>
+    </plurals>
     <plurals name="trips_steps">
         <item quantity="one">%1$d Etappe</item>
         <item quantity="other">%1$d Etappen</item>
@@ -98,5 +106,29 @@
     <plurals name="notification_history_recorded">
         <item quantity="one">%1$d Benachrichtigung aufgezeichnet</item>
         <item quantity="other">%1$d Benachrichtigungen aufgezeichnet</item>
+    </plurals>
+    <plurals name="backup_items">
+        <item quantity="one">%1$d Eintrag</item>
+        <item quantity="other">%1$d Einträge</item>
+    </plurals>
+    <plurals name="backup_photos_sent">
+        <item quantity="one">%1$d Foto</item>
+        <item quantity="other">%1$d Fotos</item>
+    </plurals>
+    <plurals name="backup_new_items">
+        <item quantity="one">%1$d hinzuzufügen</item>
+        <item quantity="other">%1$d hinzuzufügen</item>
+    </plurals>
+    <plurals name="backup_already_present">
+        <item quantity="one">%1$d bereits vorhanden</item>
+        <item quantity="other">%1$d bereits vorhanden</item>
+    </plurals>
+    <plurals name="backup_added_items">
+        <item quantity="one">%1$d hinzugefügt</item>
+        <item quantity="other">%1$d hinzugefügt</item>
+    </plurals>
+    <plurals name="backup_unknown_sections">
+        <item quantity="one">%1$d Abschnitt stammt aus einer neueren Version und wird übergangen</item>
+        <item quantity="other">%1$d Abschnitte stammen aus einer neueren Version und werden übergangen</item>
     </plurals>
 </resources>

@@ -55,6 +55,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.compose.material.icons.filled.VerticalAlignTop
 import androidx.compose.material.icons.filled.WifiTethering
+import androidx.compose.material.icons.outlined.Backup
 import androidx.compose.material.icons.outlined.Bookmarks
 import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.Dns
@@ -1055,6 +1056,11 @@ fun SettingsScreen(
                 Icons.Default.BarChart
             ) { navController.navigate(DEPARTMENT_STATS_ROUTE) }
             directEntry(
+                context.getString(R.string.backup_title),
+                "sauvegarde backup restauration restaurer export exporter import importer transfert changer telephone migration donnees historiques fusion",
+                Icons.Outlined.Backup
+            ) { navController.navigate("backup") }
+            directEntry(
                 context.getString(R.string.preference_profiles_title),
                 "profil profils profiles preferences sauvegarde configuration",
                 Icons.Outlined.Bookmarks
@@ -1278,8 +1284,16 @@ fun SettingsScreen(
                             safeClick { navController.navigate("photos_favorites") }
                         }
                         Spacer(Modifier.height(sizing.spacing(8.dp)))
+                        NavigationMenuItem(stringResource(R.string.photo_reports_title), Icons.Default.Flag, false, isDark) {
+                            safeClick { navController.navigate("photo_reports") }
+                        }
+                        Spacer(Modifier.height(sizing.spacing(8.dp)))
                         NavigationMenuItem(stringResource(R.string.histories_title), Icons.Default.History, false, isDark) {
                             safeClick { navController.navigate("histories") }
+                        }
+                        Spacer(Modifier.height(sizing.spacing(8.dp)))
+                        NavigationMenuItem(stringResource(R.string.backup_title), Icons.Outlined.Backup, false, isDark) {
+                            safeClick { navController.navigate("backup") }
                         }
                         Spacer(Modifier.height(sizing.spacing(8.dp)))
                         NavigationMenuItem(stringResource(R.string.preference_profiles_title), Icons.Outlined.Bookmarks, false, isDark) {
@@ -1475,7 +1489,9 @@ fun SettingsScreen(
                                     onSectionClick = { openSection(it) },
                                     onShowAll = { if (useWideSections) setNavMode(0) else setSettingsSectionsMode(false) },
                                     onPhotosFavorites = { navController.navigate("photos_favorites") },
+                                    onPhotoReports = { navController.navigate("photo_reports") },
                                     onHistories = { navController.navigate("histories") },
+                                    onBackup = { navController.navigate("backup") },
                                     onPreferenceProfiles = { showPreferenceProfilesSheet = true },
                                     shape = cardShape,
                                     border = cardBorder,
@@ -1536,7 +1552,9 @@ fun SettingsScreen(
                                     onTargetMapPositioned = { top, height -> offlineMapsTargetBounds = SettingsSectionBounds(top = top, height = height) },
                                     onOpenDiagnostic = { navController.navigate("diagnostic") },
                                     onPhotosFavorites = { navController.navigate("photos_favorites") },
+                                    onPhotoReports = { navController.navigate("photo_reports") },
                                     onHistories = { navController.navigate("histories") },
+                                    onBackup = { navController.navigate("backup") },
                                     onLocalMode = { navController.navigate("local_mode") },
                                     databaseCardModifiers = databaseCardAnchorModifiers,
                                     databaseRefreshState = databaseRefreshState
@@ -2631,7 +2649,9 @@ fun AllSettingsContent(
     onTargetMapPositioned: (Float, Int) -> Unit = { _, _ -> },
     onOpenDiagnostic: () -> Unit = {},
     onPhotosFavorites: () -> Unit = {},
+    onPhotoReports: () -> Unit = {},
     onHistories: () -> Unit = {},
+    onBackup: () -> Unit = {},
     onLocalMode: () -> Unit = {},
     databaseCardModifiers: Map<String, Modifier> = emptyMap(),
     databaseRefreshState: DatabaseRefreshState? = null
@@ -2690,7 +2710,9 @@ fun AllSettingsContent(
     Spacer(Modifier.height(sizing.spacing(32.dp)))
     SettingsDirectEntries(
         onPhotosFavorites = onPhotosFavorites,
+        onPhotoReports = onPhotoReports,
         onHistories = onHistories,
+        onBackup = onBackup,
         onPreferenceProfiles = onPreferenceProfiles,
         shape = shape,
         border = border,
@@ -4351,14 +4373,16 @@ fun IconSheet(
 
 /**
  * Entrées qui ne sont pas des réglages d'une section : deux journaux (photos favorites, historique
- * des partages) et un méta-réglage qui sauvegarde tous les autres (profils). Rendues à l'identique
- * sur l'accueil par sections et en fin de page unique ; la barre latérale des tablettes a ses
- * propres lignes.
+ * des partages), la sauvegarde des données, et un méta-réglage qui sauvegarde tous les autres
+ * (profils). Rendues à l'identique sur l'accueil par sections et en fin de page unique ; la barre
+ * latérale des tablettes a ses propres lignes.
  */
 @Composable
 private fun SettingsDirectEntries(
     onPhotosFavorites: () -> Unit,
+    onPhotoReports: () -> Unit,
     onHistories: () -> Unit,
+    onBackup: () -> Unit,
     onPreferenceProfiles: () -> Unit,
     shape: Shape,
     border: BorderStroke?,
@@ -4380,6 +4404,18 @@ private fun SettingsDirectEntries(
             icon = Icons.Default.PhotoLibrary
         )
         Spacer(Modifier.height(sizing.spacing(12.dp)))
+        PreferenceActionCard(
+            title = stringResource(R.string.photo_reports_title),
+            desc = stringResource(R.string.photo_reports_desc),
+            onClick = onPhotoReports,
+            shape = shape,
+            border = border,
+            bubbleColor = bubbleColor,
+            useOneUi = useOneUi,
+            safeClick = safeClick,
+            icon = Icons.Default.Flag
+        )
+        Spacer(Modifier.height(sizing.spacing(12.dp)))
         // Un seul bouton pour les deux journaux locaux (envois de photos et partages) : la page
         // « Historiques » les propose côte à côte.
         PreferenceActionCard(
@@ -4392,6 +4428,19 @@ private fun SettingsDirectEntries(
             useOneUi = useOneUi,
             safeClick = safeClick,
             icon = Icons.Default.History
+        )
+        Spacer(Modifier.height(sizing.spacing(12.dp)))
+        // Voisine des journaux, parce que c'est eux qu'elle emporte en premier.
+        PreferenceActionCard(
+            title = stringResource(R.string.backup_title),
+            desc = stringResource(R.string.backup_settings_entry_desc),
+            onClick = onBackup,
+            shape = shape,
+            border = border,
+            bubbleColor = bubbleColor,
+            useOneUi = useOneUi,
+            safeClick = safeClick,
+            icon = Icons.Outlined.Backup
         )
         Spacer(Modifier.height(sizing.spacing(12.dp)))
         PreferenceActionCard(
@@ -4417,7 +4466,9 @@ private fun SettingsSectionsHome(
     onSectionClick: (Int) -> Unit,
     onShowAll: () -> Unit,
     onPhotosFavorites: () -> Unit,
+    onPhotoReports: () -> Unit,
     onHistories: () -> Unit,
+    onBackup: () -> Unit,
     onPreferenceProfiles: () -> Unit,
     shape: Shape,
     border: BorderStroke?,
@@ -4454,7 +4505,9 @@ private fun SettingsSectionsHome(
         Spacer(Modifier.height(sizing.spacing(12.dp)))
         SettingsDirectEntries(
             onPhotosFavorites = onPhotosFavorites,
+            onPhotoReports = onPhotoReports,
             onHistories = onHistories,
+            onBackup = onBackup,
             onPreferenceProfiles = onPreferenceProfiles,
             shape = shape,
             border = border,

@@ -517,6 +517,7 @@
     <string name="appstrings_photo_report_unavailable">Le signalement est indisponible</string>
     <string name="appstrings_photo_report_failed">Le signalement n\'a pas pu être transmis</string>
     <string name="photo_reports_title">Mes signalements</string>
+    <string name="photo_reports_desc">Suivez les photos que vous avez signalées à SignalQuest.</string>
     <string name="photo_reports_intro">SignalQuest ne publie pas la suite donnée à un signalement. GeoTower peut seulement vous dire qu\'il est parti, et vous prévenir si la photo finit par disparaître.</string>
     <string name="photo_reports_empty">Vous n\'avez encore signalé aucune photo.</string>
     <string name="photo_reports_status_sent">Transmis — en attente de modération</string>
@@ -2838,6 +2839,19 @@
     <string name="trips_step_mark_visited">Marquer comme relevée</string>
     <string name="trips_step_mark_not_visited">Marquer comme non relevée</string>
     <string name="trips_step_delete">Supprimer cette étape</string>
+    <string name="trips_arrival_title">Arrivée à l\'étape %1$d</string>
+    <string name="trips_arrival_searching">Recherche du site autour de vous…</string>
+    <string name="trips_arrival_no_site">Aucun pylône connu à proximité.</string>
+    <string name="trips_arrival_choose_site">Quel pylône avez-vous photographié ?</string>
+    <string name="trips_arrival_operators">Envoyer vers quels opérateurs ?</string>
+    <string name="trips_arrival_no_operator">Aucun opérateur de ce pylône n\'accepte les photos.</string>
+    <string name="trips_arrival_send_photos">Envoyer des photos</string>
+    <string name="trips_arrival_note_label">Note de terrain</string>
+    <string name="trips_arrival_note_placeholder">Accès, état du pylône, remarque…</string>
+    <string name="trips_arrival_upload_unavailable">L\'envoi de photos n\'est pas disponible.</string>
+    <string name="trips_arrival_notification_title">Arrivée à %1$s</string>
+    <string name="trips_arrival_notification_text">Envoyer des photos du site ?</string>
+    <string name="notification_trip_arrival_channel_name">Étapes de trajet</string>
     <string name="notification_trip_reminder_channel_name">Rappels de trajet</string>
     <string name="trips_reminder_text">Départ prévu %1$s</string>
     <string name="trips_reminder_action_postpone">Repousser d\'un jour</string>
@@ -2931,10 +2945,54 @@
     <string name="notification_history_type_photo_upload">Envoi de photos</string>
     <string name="notification_history_type_photo_report">Signalement de photo</string>
     <string name="notification_history_type_trip_reminder">Rappel de trajet</string>
+    <string name="notification_history_type_trip_arrival">Étape atteinte</string>
     <string name="notification_history_type_pdf_report">Rapport PDF</string>
 
     <!-- Notes de version 2.0.32 -->
     <string name="appstrings_release_v2032_notification_history">Une page « Notifications » consigne tout ce que l\'application a voulu vous signaler, classé par type et filtrable</string>
     <string name="appstrings_release_v2032_notification_not_shown">Les événements y sont enregistrés même quand la notification n\'a pas pu s\'afficher — notifications coupées, autorisation refusée — et le journal le précise</string>
     <string name="appstrings_release_v2032_routing_choice">Un réglage choisit entre l\'itinéraire le plus rapide et le plus court, pour les mesures « par la route » et les trajets planifiés ; sans effet à pied, le service rendant alors le même tracé</string>
+
+    <!-- Sauvegarde et restauration des donnees personnelles -->
+    <string name="backup_title">Sauvegarde et restauration</string>
+    <string name="backup_desc">Exportez vos historiques, vos trajets, vos photos favorites et vos profils de réglages dans un seul fichier, puis importez-le sur un autre téléphone. Un import n\'ajoute que ce qui manque ici : rien n\'est jamais supprimé ni remplacé, et réimporter le même fichier ne change rien la seconde fois.</string>
+    <string name="backup_export_title">Exporter</string>
+    <string name="backup_export_desc">Choisissez ce que vous emportez.</string>
+    <string name="backup_export_thumbnails">Inclure les vignettes des photos</string>
+    <string name="backup_export_thumbnails_desc">Fichier plus lourd, mais les photos envoyées gardent leur aperçu</string>
+    <string name="backup_export_save">Enregistrer</string>
+    <string name="backup_export_share">Partager</string>
+    <string name="backup_export_saved">Sauvegarde enregistrée</string>
+    <string name="backup_export_failed">Impossible d\'écrire la sauvegarde</string>
+    <string name="backup_import_title">Importer</string>
+    <string name="backup_import_desc">Choisissez un fichier de sauvegarde produit par GeoTower, sur ce téléphone ou sur un autre.</string>
+    <string name="backup_import_pick">Choisir un fichier</string>
+    <string name="backup_import_failed">Ce fichier n\'est pas une sauvegarde GeoTower.</string>
+    <string name="backup_import_preview_title">Ce que cette sauvegarde ajouterait</string>
+    <string name="backup_import_preview_version">GeoTower %1$s</string>
+    <string name="backup_import_preview_nothing">Ce téléphone a déjà tout ce que porte ce fichier.</string>
+    <string name="backup_import_profiles_note">Les profils de réglages importés sont ajoutés sans être appliqués : ouvrez « Profils de réglages » pour basculer sur l\'un d\'eux.</string>
+    <string name="backup_import_confirm">Importer</string>
+    <string name="backup_import_result_title">Import terminé</string>
+    <string name="backup_import_result_nothing">Rien à ajouter : ce téléphone avait déjà tout.</string>
+    <string name="backup_refreshed_items">%1$d mis à jour</string>
+    <string name="backup_section_empty">Rien d\'enregistré</string>
+    <string name="backup_section_to_update">%1$d à mettre à jour</string>
+    <string name="backup_section_counter_higher">Plus élevé dans la sauvegarde</string>
+    <string name="backup_section_share_history">Partages et copies</string>
+    <string name="backup_section_notification_history">Journal des notifications</string>
+    <string name="backup_section_photo_uploads">Photos envoyées</string>
+    <string name="backup_section_photo_reports">Photos signalées</string>
+    <string name="backup_section_trips">Trajets</string>
+    <string name="backup_section_photo_favorites">Photos favorites</string>
+    <string name="backup_section_counters">Total de photos envoyées</string>
+    <string name="backup_section_settings_profiles">Profils de réglages</string>
+    <string name="backup_section_unknown">Autre</string>
+    <string name="backup_settings_entry_desc">Emporter vos historiques et vos trajets sur un autre téléphone</string>
+
+    <!-- Notes de version 2.0.33 -->
+    <string name="appstrings_release_v2033_backup">Une page « Sauvegarde et restauration » exporte vos historiques, vos trajets, vos photos favorites et vos profils de réglages dans un seul fichier, à réimporter sur un autre téléphone</string>
+    <string name="appstrings_release_v2033_backup_additive">L\'import n\'ajoute que ce qui manque : rien n\'est supprimé ni remplacé, et réimporter le même fichier ne change rien la seconde fois</string>
+    <string name="appstrings_release_v2033_backup_preview">Un aperçu montre ce que la sauvegarde ajouterait avant que vous confirmiez</string>
+    <string name="appstrings_release_v2033_trip_arrival">Arriver à une étape propose d\'envoyer des photos du pylône : l\'app cherche le site autour de vous, demande vers quels opérateurs envoyer, et accepte une note de terrain</string>
 </resources>

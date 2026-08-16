@@ -8,6 +8,28 @@ import org.junit.Test
 
 class TripPlanTest {
     @Test
+    fun addsUpWhatTheWholeTourProduced() {
+        val tour = plan(
+            listOf(
+                step(48.80, 2.30).copy(photosSentCount = 3),
+                step(48.81, 2.31),
+                step(48.82, 2.32).copy(photosSentCount = 2)
+            )
+        )
+
+        assertEquals(5, tour.photosSentTotal())
+        assertEquals(0, plan(ladder(3)).photosSentTotal())
+    }
+
+    @Test
+    fun refusesANegativePhotoCount() {
+        // Fichier trafiqué ou corrompu : un compteur négatif fausserait le total de la tournée.
+        val step = step(48.80, 2.30).copy(photosSentCount = -4).sanitized()!!
+
+        assertEquals(0, step.photosSentCount)
+    }
+
+    @Test
     fun listsTheLegsAnOpenTripNeeds() {
         assertEquals(listOf(0 to 1, 1 to 2), plan(ladder(3)).legPairs())
     }

@@ -210,6 +210,45 @@ object ExternalPhotoUploadHistoryStore {
         thumbnailDir(context).deleteRecursively()
     }
 
+    /**
+     * Ajoute les entrées d'une sauvegarde qui manquent ici, sur le même contrat que
+     * [fr.geotower.data.share.ShareHistoryStore.mergeEntries]. Aucun plafond ici : tout ce qui
+     * entre est conservé, donc le compte rendu vaut le nombre d'entrées ajoutées.
+     *
+     * Le statut d'une entrée déjà connue n'est jamais réécrit : c'est cet appareil-ci qui a suivi
+     * l'envoi jusqu'au bout, la sauvegarde n'en sait pas plus que lui.
+     */
+    @Synchronized
+    fun mergeEntries(context: Context, entries: List<ExternalPhotoUploadHistoryEntry>): Int {
+        if (entries.isEmpty()) return 0
+
+        val applicationContext = context.applicationContext
+        val existing = readInternal(applicationContext)
+        val knownIds = existing.mapTo(HashSet()) { it.id }
+        val incoming = entries.filter { it.id.isNotBlank() && knownIds.add(it.id) }
+        if (incoming.isEmpty()) return 0
+
+        val nextEntries = (existing + incoming).sortedByDescending { it.createdAtMillis }
+        saveInternal(applicationContext, nextEntries)
+        return incoming.size
+    }
+
+    /** Chemin de la vignette d'une entrée importée, ou `null` si l'écriture échoue. */
+    fun writeThumbnail(context: Context, entryId: String, bytes: ByteArray): String? {
+        if (entryId.isBlank() || bytes.isEmpty()) return null
+        return runCatching {
+            val targetFile = File(thumbnailDir(context.applicationContext).apply { mkdirs() }, "$entryId.jpg")
+            targetFile.writeBytes(bytes)
+            targetFile.absolutePath
+        }.getOrNull()
+    }
+
+    /** Contenu de la vignette d'une entrée, pour la joindre à une sauvegarde. */
+    fun readThumbnailBytes(entry: ExternalPhotoUploadHistoryEntry): ByteArray? {
+        val file = entry.thumbnailPath?.let(::File)?.takeIf { it.isFile } ?: return null
+        return runCatching { file.readBytes() }.getOrNull()
+    }
+
     private fun createThumbnail(
         context: Context,
         sourceFile: File,

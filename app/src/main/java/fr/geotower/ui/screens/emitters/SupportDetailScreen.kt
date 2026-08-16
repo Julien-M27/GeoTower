@@ -106,6 +106,8 @@ import fr.geotower.data.upload.SignalQuestUploadDraftStore
 import fr.geotower.data.upload.SignalQuestUploadQueue
 import fr.geotower.data.upload.SignalQuestUploadTarget
 import fr.geotower.data.upload.SignalQuestUploadTargets
+import fr.geotower.data.upload.SupportSharedPhotoUploadOperator
+import fr.geotower.data.upload.supportSharedPhotoUploadOperators
 import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.components.GeoTowerBreadcrumbItem
 import fr.geotower.ui.components.GeoTowerLoadingMessage
@@ -1642,51 +1644,6 @@ private suspend fun loadSupportCommunityPhotos(
         AppLogger.w(TAG_SUPPORT_DETAIL, "Support photos refresh failed", e)
         null
     }
-}
-
-private data class SupportSharedPhotoUploadOperator(
-    val key: String,
-    val label: String,
-    val uploadOperator: String,
-    val antenna: LocalisationEntity,
-    // Azimuts de TOUTES les stations de cet operateur sur le support : `antenna` n'en porte qu'une,
-    // et la confirmation d'envoi doit montrer tout ce qui appartient a l'operateur.
-    val azimuts: String
-)
-
-private fun supportSharedPhotoUploadOperators(
-    antennas: List<LocalisationEntity>,
-    prefs: android.content.SharedPreferences
-): List<SupportSharedPhotoUploadOperator> {
-    val operatorsByKey = linkedMapOf<String, SupportSharedPhotoUploadOperator>()
-
-    antennas.forEach { antenna ->
-        OperatorColors.keysFor(antenna.operateur).forEach { key ->
-            val known = operatorsByKey[key]
-            if (known != null) {
-                // Station supplementaire du meme operateur : on garde la premiere pour la position,
-                // mais ses azimuts rejoignent ceux deja retenus.
-                operatorsByKey[key] = known.copy(
-                    azimuts = SignalQuestUploadTargets.mergeAzimuts(known.azimuts, antenna.azimuts)
-                )
-                return@forEach
-            }
-
-            val uploadOperator = SignalQuestOperators.operatorParamFor(key) ?: return@forEach
-            if (!CommunityDataPreferences.isSignalQuestPhotosEnabled(prefs, key)) return@forEach
-
-            operatorsByKey[key] = SupportSharedPhotoUploadOperator(
-                key = key,
-                label = OperatorColors.specForKey(key)?.label ?: uploadOperator,
-                uploadOperator = uploadOperator,
-                antenna = antenna,
-                azimuts = SignalQuestUploadTargets.mergeAzimuts(antenna.azimuts)
-            )
-        }
-    }
-
-    return OperatorColors.orderedKeys.mapNotNull { operatorsByKey[it] } +
-        operatorsByKey.values.filterNot { it.key in OperatorColors.orderedKeys }
 }
 
 private fun List<LocalisationEntity>.selectSupportAnchor(

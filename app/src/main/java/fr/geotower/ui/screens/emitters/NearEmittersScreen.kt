@@ -112,6 +112,7 @@ import fr.geotower.ui.screens.map.SectionTitle
 import fr.geotower.ui.screens.map.SelectableButton
 import fr.geotower.ui.screens.settings.NearbySettingsSheet
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
+import fr.geotower.utils.AnfrDisplayText
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.FrequencyFilterSelection
@@ -1403,6 +1404,21 @@ fun EmitterCard(
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = site.address, style = sizing.textStyle(MaterialTheme.typography.bodyMedium), fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurface)
+                // Nature du support entre l'adresse et la ville (traduite comme sur la fiche site).
+                val supportTypeLabel = site.supportTypes
+                    .filter { it.isNotBlank() }
+                    .map { AnfrDisplayText.nature(it) }
+                    .distinct()
+                    .joinToString(" • ")
+                if (supportTypeLabel.isNotBlank()) {
+                    Text(
+                        text = supportTypeLabel,
+                        style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
                 Text(text = site.description, style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
 

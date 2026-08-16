@@ -91,6 +91,14 @@
         <item quantity="one">Emisor a %1$s</item>
         <item quantity="other">Emisores a %1$s</item>
     </plurals>
+    <plurals name="trips_photos_sent_short">
+        <item quantity="one">%1$d foto enviada</item>
+        <item quantity="other">%1$d fotos enviadas</item>
+    </plurals>
+    <plurals name="trips_arrival_already_sent">
+        <item quantity="one">%1$d foto enviada desde este punto</item>
+        <item quantity="other">%1$d fotos enviadas desde este punto</item>
+    </plurals>
     <plurals name="trips_steps">
         <item quantity="one">%1$d etapa</item>
         <item quantity="other">%1$d etapas</item>
@@ -98,5 +106,29 @@
     <plurals name="notification_history_recorded">
         <item quantity="one">%1$d notificación registrada</item>
         <item quantity="other">%1$d notificaciones registradas</item>
+    </plurals>
+    <plurals name="backup_items">
+        <item quantity="one">%1$d elemento</item>
+        <item quantity="other">%1$d elementos</item>
+    </plurals>
+    <plurals name="backup_photos_sent">
+        <item quantity="one">%1$d foto</item>
+        <item quantity="other">%1$d fotos</item>
+    </plurals>
+    <plurals name="backup_new_items">
+        <item quantity="one">%1$d por añadir</item>
+        <item quantity="other">%1$d por añadir</item>
+    </plurals>
+    <plurals name="backup_already_present">
+        <item quantity="one">%1$d ya presente</item>
+        <item quantity="other">%1$d ya presentes</item>
+    </plurals>
+    <plurals name="backup_added_items">
+        <item quantity="one">%1$d añadido</item>
+        <item quantity="other">%1$d añadidos</item>
+    </plurals>
+    <plurals name="backup_unknown_sections">
+        <item quantity="one">%1$d sección procede de una versión más reciente y se ignorará</item>
+        <item quantity="other">%1$d secciones proceden de una versión más reciente y se ignorarán</item>
     </plurals>
 </resources>

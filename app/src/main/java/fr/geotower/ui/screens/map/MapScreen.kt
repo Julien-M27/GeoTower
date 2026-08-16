@@ -25,7 +25,14 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -186,7 +193,24 @@ import fr.geotower.data.trip.TripHeadingSmoother
 import fr.geotower.data.trip.computeTripFollowStatus
 import fr.geotower.data.trip.haversineMeters
 import fr.geotower.data.trip.navigationCameraTarget
+import fr.geotower.data.trip.routeHeadingAhead
+import fr.geotower.data.trip.TripRouteProgress
+import fr.geotower.data.trip.headingAlignedToRoute
+import fr.geotower.data.trip.remainingLegPoints
+import fr.geotower.data.trip.tripRouteProgress
+import fr.geotower.data.notifications.TripArrivalNotifier
+import fr.geotower.data.upload.SignalQuestUploadTarget
+import fr.geotower.data.upload.SignalQuestUploadTargets
+import fr.geotower.data.upload.SupportSharedPhotoUploadOperator
+import fr.geotower.data.upload.supportSharedPhotoUploadOperators
+import fr.geotower.data.trip.TripArrow
+import fr.geotower.data.trip.destinationPoint
+import fr.geotower.data.trip.metersPerPixel
+import fr.geotower.data.trip.tripBoundingBox
 import fr.geotower.data.trip.tripDirectionArrows
+import fr.geotower.data.trip.tripFlowTrack
+import fr.geotower.data.trip.mapSwoopZoom
+import fr.geotower.data.trip.tripFrameZoom
 import fr.geotower.data.workers.TripReminderScheduler
 import fr.geotower.ui.screens.trips.TripScheduleDialog
 import fr.geotower.ui.screens.trips.withSchedule
@@ -267,6 +291,104 @@ import kotlin.math.sin
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import fr.geotower.R
+
+/** Marge autour du tracé au cadrage d'ouverture : de l'air, sans reculer inutilement. */
+private const val TRIP_FRAME_BORDER_DP = 28f
+
+/** Un segment dessiné, gardé pour pouvoir le raccourcir sans reconstruire tout le calque. */
+private class TripLegDrawing(
+    val ordinal: Int,
+    val points: List<DoubleArray>,
+    val polyline: Polyline
+)
+
+/** Une flèche de sens, avec sa place le long de son segment : c'est elle qui dit si on l'a dépassée. */
+private class TripArrowMarker(
+    val ordinal: Int,
+    val distanceIntoLegMeters: Double,
+    val marker: Marker
+)
+
+/** Durée totale du survol, recul et plongeon compris. */
+private const val MAP_SWOOP_DURATION_MS = 1600L
+
+/**
+ * Part du survol passée à reculer ; le reste sert à replonger.
+ *
+ * Moins de la moitié : on prend du champ franchement, puis on redescend posément. L'inverse donne
+ * l'impression que la carte tombe.
+ */
+private const val MAP_SWOOP_OUT_FRACTION = 0.42
+
+/**
+ * Adoucissement : vitesse nulle aux deux bouts, maximale au milieu.
+ *
+ * C'est ce qui manquait au survol en deux animations enchaînées. `animateTo` d'osmdroid ne pose
+ * aucun interpolateur, donc chacune de ses animations décélère jusqu'à l'arrêt avant que la suivante
+ * ne réaccélère : le raccord se lisait comme un temps mort au milieu du vol.
+ */
+private fun mapSwoopEase(t: Double): Double {
+    val clamped = t.coerceIn(0.0, 1.0)
+    return clamped * clamped * (3.0 - 2.0 * clamped)
+}
+
+/**
+ * Temps mis par le fil pour avancer d'un intervalle entre deux flèches. Au bout, chaque flèche
+ * occupe la place de la suivante : la boucle se referme sans que l'œil la voie.
+ */
+private const val TRIP_FLOW_CYCLE_MS = 3200
+
+/**
+ * Un point du rail sur [TRIP_FLOW_STRIDE] porte une flèche. Le rail comptant
+ * [fr.geotower.data.trip.TRIP_FLOW_SAMPLES] points, cela fait une vingtaine de chevrons bien
+ * espacés : le sens se lit sans que les flèches masquent le tracé qu'elles décorent.
+ *
+ * Il commande aussi la vitesse : un intervalle est parcouru par cycle, donc espacer les flèches
+ * sans allonger [TRIP_FLOW_CYCLE_MS] les ferait défiler d'autant plus vite.
+ */
+private const val TRIP_FLOW_STRIDE = 28
+
+/**
+ * Chevron du fil de sens, peint au-dessus de la carte. Deux traits — un sombre en dessous,
+ * un clair par-dessus — pour rester lisible sur un fond de carte clair comme sombre.
+ */
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawTripFlowChevron(
+    centerX: Float,
+    centerY: Float,
+    angleDegrees: Float,
+    alpha: Float
+) {
+    // `DrawScope` porte lui-même la densité : la prendre en paramètre invitait à lui passer le
+    // `Density` du composable, qui n'est pas un Float.
+    val halfWidth = 4.5f * density
+    val halfHeight = 4f * density
+    val path = androidx.compose.ui.graphics.Path().apply {
+        moveTo(centerX - halfWidth, centerY + halfHeight)
+        lineTo(centerX, centerY - halfHeight)
+        lineTo(centerX + halfWidth, centerY + halfHeight)
+    }
+
+    rotate(degrees = angleDegrees, pivot = androidx.compose.ui.geometry.Offset(centerX, centerY)) {
+        drawPath(
+            path = path,
+            color = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.35f * alpha),
+            style = androidx.compose.ui.graphics.drawscope.Stroke(
+                width = 3.4f * density,
+                cap = androidx.compose.ui.graphics.StrokeCap.Round,
+                join = androidx.compose.ui.graphics.StrokeJoin.Round
+            )
+        )
+        drawPath(
+            path = path,
+            color = androidx.compose.ui.graphics.Color.White.copy(alpha = alpha),
+            style = androidx.compose.ui.graphics.drawscope.Stroke(
+                width = 1.8f * density,
+                cap = androidx.compose.ui.graphics.StrokeCap.Round,
+                join = androidx.compose.ui.graphics.StrokeJoin.Round
+            )
+        )
+    }
+}
 
 /** Part de l'écart de cap rattrapée par image pendant le suivi : la carte tourne, elle ne saute pas. */
 private const val NAV_ORIENTATION_EASING = 0.12f
@@ -409,12 +531,15 @@ private fun preferredLocationZoom(): Double = AppConfig.mapLocationZoom.intValue
     .coerceIn(AppConfig.MIN_MAP_LOCATION_ZOOM, AppConfig.MAX_MAP_LOCATION_ZOOM)
     .toDouble()
 
-private fun MapView.enableMouseWheelZoom() {
+private fun MapView.enableMouseWheelZoom(onUserZoom: () -> Unit = {}) {
     setOnGenericMotionListener { _, event ->
         if (event.action != MotionEvent.ACTION_SCROLL) return@setOnGenericMotionListener false
 
         val scrollY = event.getAxisValue(MotionEvent.AXIS_VSCROLL)
         if (scrollY == 0f) return@setOnGenericMotionListener false
+
+        // À la molette comme aux boutons, zoomer soi-même rend la main à l'utilisateur.
+        onUserZoom()
 
         val zoomDirection = if (scrollY > 0f) 1.0 else -1.0
         val targetZoom = (zoomLevelDouble + zoomDirection * MOUSE_WHEEL_ZOOM_STEP)
@@ -1684,6 +1809,15 @@ fun MapScreen(
             featureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.SEARCH_NOMINATIM)
     val canUseMapMeasure = featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.MAP_MEASURE)
     val canUseTrips = featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.TRIPS)
+    // Envoi de photos depuis une étape : exactement les mêmes verrous que la fiche support — écran,
+    // fonction, action et travailleur. Un seul coupé côté serveur et la proposition disparaît,
+    // plutôt que d'ouvrir un écran d'envoi qui refuserait ensuite de partir.
+    val canUploadTripPhotos =
+        featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.SIGNALQUEST_UPLOAD) &&
+            featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SITE_PHOTO_UPLOAD) &&
+            featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SIGNALQUEST_UPLOAD) &&
+            featureFlags.isActionEnabled(RemoteFeatureFlags.Actions.START_SIGNALQUEST_UPLOAD) &&
+            featureFlags.isWorkerEnabled(RemoteFeatureFlags.Workers.SIGNALQUEST_UPLOAD)
     // Sans magnétomètre, la page Boussole n'a rien à montrer : même garde que l'accueil.
     val canUseCompassPage = AppConfig.hasCompass.value &&
         featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.COMPASS)
@@ -1907,6 +2041,26 @@ fun MapScreen(
     var navCameraLocked by remember { mutableStateOf(true) }
 
     /**
+     * Un survol est en cours : la caméra appartient à l'animation, pas à la boucle d'images ni aux
+     * effets. Sans ce verrou, le premier recalage écraserait le vol dès l'image suivante.
+     */
+    var mapSwoopActive by remember { mutableStateOf(false) }
+
+    /**
+     * Jeton du survol en cours. Deux appuis rapprochés sur le bouton lancent deux vols : sans lui,
+     * la fin du premier relâcherait la caméra en plein milieu du second.
+     */
+    var mapSwoopToken by remember { mutableIntStateOf(0) }
+
+    /**
+     * Le suivi vient d'être lancé et attend sa première position pour survoler jusqu'à elle.
+     *
+     * Consommé une fois : au démarrage il n'y a pas encore de relevé, et poser la caméra sans
+     * position n'aurait rien à viser.
+     */
+    var navSwoopPending by remember { mutableStateOf(false) }
+
+    /**
      * Hauteur à l'écran où poser le repère de position pendant le suivi, mesurée sur la colonne des
      * boutons de zoom plutôt que devinée : le repère se retrouve ainsi à leur niveau, quel que soit
      * l'écran, la taille d'interface ou la hauteur de la barre du bas.
@@ -1915,6 +2069,25 @@ fun MapScreen(
 
     /** Haut de la MapView dans la composition, pour ramener [navAnchorYPx] dans son repère. */
     var mapTopInRootPx by remember { mutableIntStateOf(0) }
+
+    /** Flèches du tracé, dans l'ordre de la tournée : support de l'animation de sens. */
+    var tripFlowArrows by remember { mutableStateOf<List<TripArrow>>(emptyList()) }
+
+    /**
+     * Où l'on en est sur le tracé, recalculé à chaque position pendant un suivi.
+     *
+     * C'est de lui que dépend le trait effacé derrière soi. Rien n'est consommé définitivement :
+     * faire demi-tour fait reculer la progression et le chemin réapparaît.
+     */
+    var tripProgress by remember { mutableStateOf<TripRouteProgress?>(null) }
+
+    /**
+     * Les traits et les flèches déjà posés sur la carte, gardés pour pouvoir les raccourcir sans
+     * tout reconstruire : refaire les pastilles d'étapes à chaque relevé GPS recréerait leurs
+     * images une fois par seconde.
+     */
+    val tripLegDrawings = remember { mutableListOf<TripLegDrawing>() }
+    val tripArrowMarkers = remember { mutableListOf<TripArrowMarker>() }
 
     /** L'ancre exprimée dans la MapView, ou `null` tant qu'elle n'a pas été mesurée. */
     fun navAnchorInMapOrNull(mapHeight: Int): Int? {
@@ -1933,6 +2106,18 @@ fun MapScreen(
     // Mode d'optimisation du trajet d'approche affiché : changer le réglage en cours de suivi doit
     // le refaire, sans quoi il resterait le seul tracé de l'écran calculé dans l'ancien mode.
     var plannerApproachOptimization by remember { mutableStateOf<String?>(null) }
+    // Arrivée sur une étape : l'index concerné, et les supports trouvés autour. `null` = aucune
+    // feuille à l'écran. Ce n'est pas dérivé du trajet : on veut pouvoir fermer la feuille sans que
+    // le cochage de l'étape la rouvre aussitôt.
+    var tripArrivalStepIndex by remember { mutableStateOf<Int?>(null) }
+    var tripArrivalSupports by remember { mutableStateOf<List<TripArrivalSupport>>(emptyList()) }
+    var tripArrivalLoading by remember { mutableStateOf(false) }
+    // La note se saisit en mémoire et n'est écrite qu'en fermant la feuille : `savePlan` réécrit le
+    // fichier de TOUS les trajets, et le faire à chaque frappe se sentirait au clavier.
+    var tripArrivalNote by remember { mutableStateOf("") }
+    // Étapes déjà annoncées pendant ce suivi : repasser devant un pylône ne doit pas relancer la
+    // proposition en boucle, et une étape décochée à la main peut au contraire la mériter à nouveau.
+    val tripAnnouncedSteps = remember { mutableSetOf<Int>() }
     // Hauteur réellement mesurée de la barre du trajet : les trois barres (consultation, édition,
     // suivi) n'ont pas la même, et c'est elle qui dit de combien remonter ce qui vit en bas.
     var tripBarHeightPx by remember { mutableIntStateOf(0) }
@@ -2036,10 +2221,43 @@ fun MapScreen(
         savePlan(current.copy(steps = steps, legs = emptyList()))
     }
 
+    /**
+     * Efface le tracé derrière soi, et rallume ce qu'un demi-tour remet devant.
+     *
+     * Appliqué sur les traits déjà posés plutôt qu'en reconstruisant le calque : la progression
+     * change à chaque relevé GPS, et refaire les pastilles d'étapes une fois par seconde recréerait
+     * leurs images pour rien.
+     */
+    fun applyTripRouteTrim(map: MapView) {
+        val progress = tripProgress
+        tripLegDrawings.forEach { drawing ->
+            val remaining = when {
+                progress == null -> drawing.points
+                drawing.ordinal < progress.legOrdinal -> emptyList()
+                drawing.ordinal > progress.legOrdinal -> drawing.points
+                else -> remainingLegPoints(drawing.points, progress.distanceIntoLegMeters)
+            }
+            drawing.polyline.isEnabled = remaining.size >= 2
+            if (remaining.size >= 2) {
+                drawing.polyline.setPoints(remaining.map { GeoPoint(it[0], it[1]) })
+            }
+        }
+        tripArrowMarkers.forEach { arrow ->
+            arrow.marker.isEnabled = progress == null ||
+                arrow.ordinal > progress.legOrdinal ||
+                (arrow.ordinal == progress.legOrdinal &&
+                    arrow.distanceIntoLegMeters > progress.distanceIntoLegMeters)
+        }
+        map.invalidate()
+    }
+
     fun refreshTripLayers(map: MapView) {
         tripOverlay.items.clear()
+        tripLegDrawings.clear()
+        tripArrowMarkers.clear()
         val plan = plannerPlan
         if (plan == null) {
+            tripFlowArrows = emptyList()
             map.invalidate()
             return
         }
@@ -2059,7 +2277,7 @@ fun MapScreen(
             )
         }
 
-        plan.legPairs().forEach { (fromIndex, toIndex) ->
+        plan.legPairs().forEachIndexed { ordinal, (fromIndex, toIndex) ->
             val computed = plan.legBetween(fromIndex, toIndex)?.points()?.takeIf { it.size >= 2 }
             // Segment pas encore calculé : trait direct en pointillés. Dire « je ne connais pas
             // encore la route » vaut mieux que d'en dessiner une fausse.
@@ -2068,32 +2286,39 @@ fun MapScreen(
                 doubleArrayOf(plan.steps[toIndex].latitude, plan.steps[toIndex].longitude)
             )
 
-            tripOverlay.add(
-                Polyline(map).apply {
-                    outlinePaint.color = TRIP_STEP_COLOR
-                    outlinePaint.strokeWidth = 8f
-                    if (computed == null) {
-                        outlinePaint.pathEffect = DashPathEffect(floatArrayOf(18f, 12f), 0f)
-                    }
-                    setPoints(legPoints.map { GeoPoint(it[0], it[1]) })
+            val polyline = Polyline(map).apply {
+                outlinePaint.color = TRIP_STEP_COLOR
+                outlinePaint.strokeWidth = 8f
+                if (computed == null) {
+                    outlinePaint.pathEffect = DashPathEffect(floatArrayOf(18f, 12f), 0f)
                 }
-            )
+                setPoints(legPoints.map { GeoPoint(it[0], it[1]) })
+            }
+            tripOverlay.add(polyline)
+            tripLegDrawings += TripLegDrawing(ordinal, legPoints, polyline)
 
-            // Flèches de sens, posées par-dessus le trait mais sous les pastilles d'étapes.
-            tripDirectionArrows(legPoints).forEach { arrow ->
-                tripOverlay.add(
-                    Marker(map).apply {
-                        position = GeoPoint(arrow.latitude, arrow.longitude)
-                        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-                        icon = createTripArrowIcon(context, arrow.bearingDegrees)
-                        // « À plat » : la flèche tourne avec la carte, donc elle continue de
-                        // désigner la bonne direction quand on oriente au cap.
-                        isFlat = true
-                        // `false` = clic non consommé : toucher une flèche doit rester un toucher
-                        // de carte, qui ajoute une étape en édition.
-                        setOnMarkerClickListener { _, _ -> false }
-                    }
-                )
+            // Flèches de sens fixes, posées par-dessus le trait mais sous les pastilles d'étapes.
+            // Réservées au suivi : ailleurs, c'est le fil animé qui porte le sens, et superposer
+            // les deux jeux de flèches ne ferait que charger le tracé.
+            val staticArrows = if (tripMode == TRIP_MODE_FOLLOW) {
+                tripDirectionArrows(legPoints)
+            } else {
+                emptyList()
+            }
+            staticArrows.forEach { arrow ->
+                val marker = Marker(map).apply {
+                    position = GeoPoint(arrow.latitude, arrow.longitude)
+                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                    icon = createTripArrowIcon(context, arrow.bearingDegrees)
+                    // « À plat » : la flèche tourne avec la carte, donc elle continue de
+                    // désigner la bonne direction quand on oriente au cap.
+                    isFlat = true
+                    // `false` = clic non consommé : toucher une flèche doit rester un toucher
+                    // de carte, qui ajoute une étape en édition.
+                    setOnMarkerClickListener { _, _ -> false }
+                }
+                tripOverlay.add(marker)
+                tripArrowMarkers += TripArrowMarker(ordinal, arrow.distanceAlongMeters, marker)
             }
         }
 
@@ -2113,7 +2338,13 @@ fun MapScreen(
             }
             tripOverlay.add(marker)
         }
-        map.invalidate()
+
+        // Rail du fil animé : le tracé entier à pas constant, recalculé seulement ici.
+        tripFlowArrows = tripFlowTrack(plan)
+
+        // Le calque vient d'être refait : il ignore où l'on en est. On le lui réapplique, sans quoi
+        // le chemin déjà parcouru réapparaîtrait à chaque étape cochée.
+        applyTripRouteTrim(map)
     }
 
     // Recalcul des segments manquants. La signature ne retient que ce qui invalide un tracé : les
@@ -2141,6 +2372,12 @@ fun MapScreen(
         if (outcome != null && outcome.plan.legs != current.legs) {
             savePlan(outcome.plan)
         }
+        mapViewRef?.let { refreshTripLayers(it) }
+    }
+
+    // Le suivi et la consultation ne portent pas le même jeu de flèches : ici le fil animé, là des
+    // flèches fixes. Le changement de mode ne touche pas au trajet, donc rien d'autre ne redessine.
+    LaunchedEffect(tripMode) {
         mapViewRef?.let { refreshTripLayers(it) }
     }
 
@@ -2270,11 +2507,26 @@ fun MapScreen(
         val location = myCurrentLoc
         if (tripMode != TRIP_MODE_FOLLOW || plan == null || location == null) {
             plannerFollowStatus = null
+            // Hors suivi, le tracé se montre entier : on ne rejoue pas une tournée en consultation.
+            if (tripProgress != null) {
+                tripProgress = null
+                mapViewRef?.let { applyTripRouteTrim(it) }
+            }
             return@LaunchedEffect
         }
 
         val status = computeTripFollowStatus(plan, location.latitude, location.longitude)
         plannerFollowStatus = status
+
+        // Où l'on en est sur le tracé : c'est ce qui l'efface derrière nous. On repart des points
+        // déjà décodés pour le calque plutôt que de redécoder toutes les géométries à chaque relevé.
+        tripProgress = tripRouteProgress(
+            legs = tripLegDrawings.map { it.points },
+            latitude = location.latitude,
+            longitude = location.longitude,
+            previousDistanceFromStartMeters = tripProgress?.distanceFromStartMeters
+        )
+        mapViewRef?.let { applyTripRouteTrim(it) }
 
         // Trajet d'approche : démarrer le suivi loin de l'étape à rejoindre est le cas normal --
         // on est chez soi, la tournée commence ailleurs. On calcule donc la route qui y mène depuis
@@ -2329,7 +2581,56 @@ fun MapScreen(
             // Cocher ne change pas l'ordre : les segments calculés restent valables.
             savePlan(plan.copy(steps = steps))
             mapViewRef?.let { refreshTripLayers(it) }
+
+            // On ne s'est pas déplacé jusqu'à un pylône pour le cocher, mais pour le photographier :
+            // c'est ici que la tournée sert à quelque chose. La proposition n'est faite qu'UNE fois
+            // par étape et par suivi — repasser devant en revenant ne doit pas la relancer.
+            val arrival = status.reachedStepIndices
+                .filterNot { it in tripAnnouncedSteps }
+                .minOrNull()
+            if (arrival != null) {
+                tripAnnouncedSteps += arrival
+                tripArrivalStepIndex = arrival
+                // Téléphone en poche ou écran éteint : la feuille s'ouvre quand même, mais personne
+                // ne la voit. La notification ne fait que ramener l'application dessus.
+                if (!lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+                    TripArrivalNotifier.notifyArrival(
+                        context = context,
+                        tripId = plan.id,
+                        stepIndex = arrival,
+                        stepLabel = plan.steps.getOrNull(arrival)?.label?.takeIf { it.isNotBlank() }
+                            ?: context.getString(R.string.trips_step_fallback_pattern, arrival + 1)
+                    )
+                }
+            }
         }
+    }
+
+    // Résolution du support sous l'étape atteinte. Séparée du cochage : elle lit la base, et la
+    // feuille doit s'ouvrir tout de suite plutôt qu'après la requête.
+    LaunchedEffect(tripArrivalStepIndex, plannerPlan?.id) {
+        val index = tripArrivalStepIndex
+        val step = index?.let { plannerPlan?.steps?.getOrNull(it) }
+        if (step == null) {
+            tripArrivalSupports = emptyList()
+            tripArrivalLoading = false
+            return@LaunchedEffect
+        }
+        tripArrivalNote = step.note.orEmpty()
+        tripArrivalLoading = true
+        tripArrivalSupports = runCatching {
+            viewModel.loadTripStepSupports(step.latitude, step.longitude).map { details ->
+                TripArrivalSupport(
+                    supportId = details.support.supportId,
+                    latitude = details.support.latitude,
+                    longitude = details.support.longitude,
+                    distanceMeters = details.support.distanceMeters,
+                    address = details.address,
+                    operators = supportSharedPhotoUploadOperators(details.antennas, prefs)
+                )
+            }.filter { it.operators.isNotEmpty() }
+        }.getOrDefault(emptyList())
+        tripArrivalLoading = false
     }
 
 
@@ -2615,8 +2916,20 @@ fun MapScreen(
         if (following) {
             isTrackingActive = false
             locationOverlayRef?.disableFollowLocation()
-            mapViewRef?.controller?.setZoom(NAV_FOLLOW_ZOOM)
             navCameraLocked = true
+            // Pas de `setZoom` ici : la carte cadre encore toute la tournée, et sauter au zoom de
+            // navigation d'un coup ferait perdre l'échelle qu'on quitte. C'est le survol qui
+            // l'emmène, dès la première position connue.
+            navSwoopPending = true
+
+            // Départ à l'arrêt : aucun cap de déplacement n'est encore fiable, donc la boucle
+            // d'images ne toucherait pas à l'orientation et la carte resterait sur l'angle qu'elle
+            // traînait — reste d'alignement boussole ou rotation à deux doigts. On repart donc du
+            // nord en haut, état déterminé, et le cap de marche prend le relais au premier mètre.
+            tripHeadingSmoother.reset()
+            navHeadingDegrees = null
+            mapViewRef?.applyOrientation(0f)
+            mapOrientationState.floatValue = 0f
         }
 
         onDispose {
@@ -2624,24 +2937,182 @@ fun MapScreen(
             if (following && hadFollowOrientation) setFollowOrientation(true)
             tripHeadingSmoother.reset()
             navHeadingDegrees = null
+            // Un nouveau suivi reproposera les photos : on refait la tournée, on la rephotographie.
+            tripAnnouncedSteps.clear()
+            tripArrivalStepIndex = null
+            navSwoopPending = false
         }
     }
 
-    // Cap de marche en haut, utilisateur en bas de l'écran : le cadrage des applis de guidage.
-    LaunchedEffect(myCurrentLoc, navHeadingDegrees, tripMode, navCameraLocked) {
-        if (tripMode != TRIP_MODE_FOLLOW || !navCameraLocked) return@LaunchedEffect
-        // Avec le rendu fluide, c'est la boucle d'images qui tient la caméra : recaler ici en plus
-        // ferait tirer deux poursuites sur la même carte.
-        if (smoothLocationEnabled) return@LaunchedEffect
-        val map = mapViewRef ?: return@LaunchedEffect
-        val location = myCurrentLoc ?: return@LaunchedEffect
+    /**
+     * Amène la carte sur un point en la faisant **reculer puis replonger**.
+     *
+     * Un saut de caméra laisse chercher où l'on a atterri ; le survol, lui, montre le trajet
+     * parcouru et l'échelle qu'on quitte. C'est ce que font les applis de cartographie quand on se
+     * recentre, et ce qui rend un lancement de tournée lisible.
+     *
+     * @return `true` si le survol a été lancé, `false` s'il n'y avait pas de quoi bouger —
+     *   l'appelant pose alors la caméra directement.
+     */
+    fun swoopMapTo(map: MapView, latitude: Double, longitude: Double, targetZoom: Double): Boolean {
+        if (map.width <= 0 || map.height <= 0) return false
+        val center = map.mapCenter
+        val outZoom = mapSwoopZoom(
+            fromLatitude = center.latitude,
+            fromLongitude = center.longitude,
+            toLatitude = latitude,
+            toLongitude = longitude,
+            currentZoom = map.zoomLevelDouble,
+            targetZoom = targetZoom,
+            viewportWidthPixels = map.width,
+            viewportHeightPixels = map.height,
+            borderPixels = (TRIP_FRAME_BORDER_DP * context.resources.displayMetrics.density).toInt()
+        )
+        if (targetZoom - outZoom < 0.1 && map.zoomLevelDouble - outZoom < 0.1) return false
 
-        val heading = navHeadingDegrees
-        if (heading != null) {
-            val orientation = normalizeMapOrientation(-heading.toFloat())
-            map.mapOrientation = orientation
-            mapOrientationState.floatValue = orientation
+        mapSwoopToken++
+        val token = mapSwoopToken
+        mapSwoopActive = true
+        map.controller.stopAnimation(false)
+
+        val startZoom = map.zoomLevelDouble
+        val startLatitude = center.latitude
+        val startLongitude = center.longitude
+
+        // Vol piloté image par image plutôt que confié à deux `animateTo` enchaînés. Ce que fait
+        // osmdroid à chaque image est exactement ce qu'on fait ici — zoom, centre, invalidation —
+        // mais en le tenant soi-même, le mouvement est d'un seul tenant et l'adoucissement nous
+        // appartient.
+        scope.launch {
+            val beganAtNs = withFrameNanos { it }
+            while (true) {
+                val nowNs = withFrameNanos { it }
+                // Survol remplacé ou annulé entre deux images : celui-ci n'a plus la main.
+                if (mapSwoopToken != token) return@launch
+
+                val elapsed = (nowNs - beganAtNs) / 1_000_000.0 / MAP_SWOOP_DURATION_MS
+                val progress = elapsed.coerceIn(0.0, 1.0)
+
+                // Le déplacement, lui, est adouci sur TOUTE la durée : la carte glisse sans jamais
+                // s'arrêter, y compris au sommet de l'arc où le zoom, lui, marque le pas.
+                val glide = mapSwoopEase(progress)
+                val zoom = if (progress <= MAP_SWOOP_OUT_FRACTION) {
+                    val phase = mapSwoopEase(progress / MAP_SWOOP_OUT_FRACTION)
+                    startZoom + (outZoom - startZoom) * phase
+                } else {
+                    val phase = mapSwoopEase(
+                        (progress - MAP_SWOOP_OUT_FRACTION) / (1.0 - MAP_SWOOP_OUT_FRACTION)
+                    )
+                    outZoom + (targetZoom - outZoom) * phase
+                }
+
+                map.controller.setZoom(zoom)
+                // Instance neuve : osmdroid GARDE la référence comme centre courant, lui passer un
+                // point réutilisable le ferait muter dans son dos.
+                map.controller.setCenter(
+                    GeoPoint(
+                        startLatitude + (latitude - startLatitude) * glide,
+                        startLongitude + (longitude - startLongitude) * glide
+                    )
+                )
+                map.invalidate()
+                if (progress >= 1.0) break
+            }
+            // Rendre la main à la caméra ordinaire une fois posé, et pas avant : elle écraserait le
+            // vol dès l'image suivante.
+            if (mapSwoopToken == token) mapSwoopActive = false
         }
+        return true
+    }
+
+    /** Le doigt gagne toujours : un glissement pendant un survol l'interrompt sur place. */
+    fun cancelMapSwoop() {
+        if (!mapSwoopActive) return
+        mapSwoopToken++
+        mapSwoopActive = false
+        mapViewRef?.controller?.stopAnimation(false)
+    }
+
+    /**
+     * Le cap à suivre quand le GPS n'en donne pas : à l'arrêt, et donc au démarrage du suivi.
+     *
+     * Sans lui la carte reste au nord et le trajet à parcourir barre l'écran en travers — ce n'est
+     * pas ce que montre une appli de guidage à l'arrêt. On lit donc la direction du **tracé** :
+     * d'abord celle de l'approche, qui part exactement d'où l'on est ; à défaut celle du segment qui
+     * mène à l'étape suivante ; en dernier recours la ligne droite qui y va.
+     */
+    fun navRouteHeadingOrNull(): Double? {
+        plannerApproachPoints?.let { approach -> routeHeadingAhead(approach)?.let { return it } }
+
+        val plan = plannerPlan ?: return null
+        val nextIndex = plannerFollowStatus?.nextStepIndex ?: return null
+        val next = plan.steps.getOrNull(nextIndex) ?: return null
+        val previous = plan.steps.getOrNull(nextIndex - 1) ?: return null
+
+        plan.legBetween(nextIndex - 1, nextIndex)?.points()?.takeIf { it.size >= 2 }
+            ?.let { leg -> routeHeadingAhead(leg)?.let { return it } }
+
+        return routeHeadingAhead(
+            listOf(
+                doubleArrayOf(previous.latitude, previous.longitude),
+                doubleArrayOf(next.latitude, next.longitude)
+            )
+        )
+    }
+
+    /**
+     * Le cap qui commande la carte et la flèche pendant un suivi.
+     *
+     * Tant que le déplacement mesuré va dans le sens du tracé, c'est **le tracé** qui fait foi : la
+     * flèche suit la ligne au lieu de frétiller au gré du GPS sur une route parfaitement droite. Dès
+     * qu'on s'en écarte franchement — virage, demi-tour, sortie de route — la mesure reprend la main.
+     */
+    fun navEffectiveHeading(): Double? =
+        headingAlignedToRoute(navHeadingDegrees, tripProgress?.bearingDegrees)
+            ?: navRouteHeadingOrNull()
+
+    /**
+     * Pose la caméra du suivi : cap de marche en haut, repère à la hauteur des boutons de zoom.
+     *
+     * Une seule implémentation, partagée par la boucle d'images et par le bouton de recentrage. Ce
+     * dernier ne peut pas se contenter de rattacher la caméra : la boucle d'images s'endort dès
+     * qu'on est immobile, si bien que le bouton ne ferait alors que zoomer là où l'on avait fait
+     * glisser la carte — c'est-à-dire n'importe où.
+     *
+     * @param snapOrientation pose le cap d'un coup au lieu de l'amener en douceur. C'est ce qu'on
+     *   veut d'un recentrage volontaire ou d'une pose à l'arrêt ; la boucle d'images, elle, lisse.
+     * @param recenter à `false` quand la vue est déjà cadrée au pixel près : inutile de redessiner.
+     * @param zoom zoom à atteindre, ou `null` pour garder celui de la carte.
+     * @param swoop amène la carte par un survol au lieu de la poser sèchement.
+     */
+    fun applyNavigationCamera(
+        map: MapView,
+        latitude: Double,
+        longitude: Double,
+        snapOrientation: Boolean,
+        recenter: Boolean = true,
+        zoom: Double? = null,
+        swoop: Boolean = false
+    ) {
+        val heading = navEffectiveHeading()
+        if (heading != null) {
+            val wanted = normalizeMapOrientation(-heading.toFloat())
+            val next = if (snapOrientation) {
+                wanted
+            } else {
+                val turn = shortestAngleDelta(map.mapOrientation, wanted)
+                if (abs(turn) <= NAV_ORIENTATION_DEAD_ZONE_DEG) {
+                    map.mapOrientation
+                } else {
+                    normalizeMapOrientation(map.mapOrientation + turn * NAV_ORIENTATION_EASING)
+                }
+            }
+            if (next != map.mapOrientation) {
+                map.applyOrientation(next)
+                mapOrientationState.floatValue = next
+            }
+        }
+        if (!recenter) return
 
         // Où poser le repère à l'écran : à la hauteur des boutons de zoom, mesurée et non devinée.
         val anchorY = navAnchorInMapOrNull(map.height)
@@ -2651,20 +3122,179 @@ fun MapScreen(
             NAV_CAMERA_AHEAD_FRACTION
         }
 
-        // Sans cap fiable (à l'arrêt, au tout début), on vise dans l'axe de la carte : le repère se
-        // pose au même endroit, au lieu de sauter au centre puis de redescendre au premier mètre
-        // parcouru.
-        val effectiveHeading = heading ?: normalizeDegrees(-map.mapOrientation.toDouble())
-
+        // Le décalage « utilisateur en bas » se mesure en mètres : il dépend donc du zoom d'ARRIVÉE,
+        // pas de celui d'où l'on part. Le calculer sur le zoom courant ferait atterrir le repère à
+        // côté de son ancrage à la fin d'un survol.
+        val finalZoom = zoom ?: map.zoomLevelDouble
         val target = navigationCameraTarget(
-            latitude = location.latitude,
-            longitude = location.longitude,
-            headingDegrees = effectiveHeading,
-            zoom = map.zoomLevelDouble,
+            latitude = latitude,
+            longitude = longitude,
+            // Ni cap de marche ni tracé à lire : on vise dans l'axe de la carte, pour que le repère
+            // se pose au même endroit au lieu de sauter au centre.
+            headingDegrees = heading ?: normalizeDegrees(-map.mapOrientation.toDouble()),
+            zoom = finalZoom,
             screenHeightPixels = map.height,
             aheadFraction = aheadFraction
         )
+        if (swoop && swoopMapTo(map, target[0], target[1], finalZoom)) return
+
+        if (zoom != null) map.controller.setZoom(zoom)
+        // Instance neuve : osmdroid GARDE la référence comme centre courant, lui passer un point
+        // réutilisable le ferait muter dans son dos.
         map.controller.setCenter(GeoPoint(target[0], target[1]))
+    }
+
+    /** Écrit la note de terrain dans l'étape, si elle a changé. Une seule écriture, à la fermeture. */
+    fun commitTripArrivalNote(stepIndex: Int) {
+        val plan = plannerPlan ?: return
+        val step = plan.steps.getOrNull(stepIndex) ?: return
+        val next = tripArrivalNote.trim().takeIf { it.isNotBlank() }
+        if (next == step.note) return
+        savePlan(
+            plan.copy(
+                steps = plan.steps.toMutableList().apply {
+                    set(stepIndex, step.copy(note = next))
+                }
+            )
+        )
+    }
+
+    /**
+     * Passe la main à l'écran d'envoi SignalQuest, sans photo : c'est lui qui ouvre l'appareil
+     * photo, la galerie ou les fichiers.
+     *
+     * Rien n'est refait ici — ni sélecteur, ni file d'attente, ni notification de progression. On se
+     * contente de lui donner la cible : le support, ses opérateurs avec LEURS azimuts (deux
+     * opérateurs d'un pylône mutualisé n'ont pas les mêmes), l'adresse, et de quoi recréditer
+     * l'étape une fois l'envoi lancé.
+     */
+    fun openTripPhotoUpload(
+        tripId: String,
+        stepIndex: Int,
+        support: TripArrivalSupport,
+        operators: List<SupportSharedPhotoUploadOperator>
+    ) {
+        val first = operators.firstOrNull() ?: return
+        // Deux opérateurs locaux peuvent viser la même cible SignalQuest (SRR et SFR…) : une seule
+        // cible, mais tous leurs azimuts.
+        val targetsByOperator = linkedMapOf<String, SignalQuestUploadTarget>()
+        operators.forEach { operator ->
+            val known = targetsByOperator[operator.uploadOperator]
+            targetsByOperator[operator.uploadOperator] = SignalQuestUploadTarget(
+                operator = operator.uploadOperator,
+                azimuts = SignalQuestUploadTargets.mergeAzimuts(known?.azimuts, operator.azimuts)
+            )
+        }
+        val encodedTargets = Uri.encode(
+            SignalQuestUploadTargets.encode(targetsByOperator.values.toList())
+        )
+        navController.navigate(
+            "sq_upload/${Uri.encode(support.supportId)}/${Uri.encode(first.uploadOperator)}" +
+                "?lat=${support.latitude}" +
+                "&lon=${support.longitude}" +
+                "&azimuts=${Uri.encode(first.azimuts)}" +
+                "&operatorTargets=$encodedTargets" +
+                "&address=${Uri.encode(support.address)}" +
+                "&tripId=${Uri.encode(tripId)}" +
+                "&tripStep=$stepIndex"
+        )
+    }
+
+    /**
+     * Zoomer à la main pendant le suivi rend la main à l'utilisateur, exactement comme un glissement
+     * du doigt.
+     *
+     * Sans cela le repère resterait peint à son point d'ancrage alors que le cadrage, lui, est
+     * calculé pour le zoom du suivi : en dézoomant, il continuait d'occuper le même pixel sans plus
+     * désigner l'endroit où l'on se trouve. Détaché, il retrouve sa vraie place ; le bouton de
+     * recentrage rattache le tout.
+     */
+    fun releaseNavCameraForManualZoom() {
+        if (tripMode == TRIP_MODE_FOLLOW) navCameraLocked = false
+        // Zoomer pendant un survol, c'est vouloir autre chose que ce qu'il allait montrer.
+        cancelMapSwoop()
+    }
+
+    // À l'arrêt, la boucle d'images dort : plus rien ne tiendrait la caméra. C'est donc ici que la
+    // carte se pose et s'oriente quand on ne bouge pas — au démarrage du suivi, à un feu, ou juste
+    // après avoir rattaché la caméra. Le cap vient alors du tracé, pas du GPS qui se tait.
+    LaunchedEffect(
+        myCurrentLoc, navHeadingDegrees, plannerApproachPoints,
+        plannerFollowStatus?.nextStepIndex, tripMode, navCameraLocked
+    ) {
+        if (tripMode != TRIP_MODE_FOLLOW || !navCameraLocked) return@LaunchedEffect
+        val map = mapViewRef ?: return@LaunchedEffect
+        val location = myCurrentLoc ?: return@LaunchedEffect
+        if (mapSwoopActive) return@LaunchedEffect
+
+        // Première position depuis le lancement du suivi : c'est le moment du survol, la carte
+        // cadrant encore la tournée entière.
+        val launching = navSwoopPending
+        if (launching) navSwoopPending = false
+        // En mouvement, c'est la boucle d'images qui commande : deux poursuites sur la même carte se
+        // battraient. On ne prend la main que là où elle s'arrête — sauf pour le survol de
+        // lancement, qui doit partir même si l'on roule déjà.
+        if (!launching && !smoothEngine.isIdle(SystemClock.elapsedRealtime())) return@LaunchedEffect
+
+        applyNavigationCamera(
+            map = map,
+            latitude = location.latitude,
+            longitude = location.longitude,
+            snapOrientation = true,
+            zoom = if (launching) NAV_FOLLOW_ZOOM else null,
+            swoop = launching
+        )
+    }
+
+    /**
+     * Cadrage d'ouverture : en arrivant sur un trajet, on montre la tournée **entière** plutôt que
+     * la portion de carte où l'on se trouvait. Une seule fois par trajet — refaire le cadrage à
+     * chaque recomposition rendrait la carte impossible à déplacer.
+     */
+    var tripFramedForId by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(tripMode, plannerPlan?.id) {
+        val plan = plannerPlan ?: return@LaunchedEffect
+        // Le suivi et l'édition ont leur propre logique de vue : seule la consultation cadre.
+        if (tripMode != TRIP_MODE_VIEW || tripFramedForId == plan.id) return@LaunchedEffect
+        val map = mapViewRef ?: return@LaunchedEffect
+        val box = tripBoundingBox(plan) ?: return@LaunchedEffect
+        tripFramedForId = plan.id
+
+        // `post` : à la première composition la MapView n'est pas encore mesurée, et un cadrage
+        // demandé sur une vue de taille nulle ne fait rien du tout.
+        map.post {
+            if (map.width <= 0 || map.height <= 0) return@post
+            // Le cadrage d'osmdroid raisonne carte au nord : une carte restée tournée par un suivi
+            // précédent verrait son tracé rogné.
+            map.applyOrientation(0f)
+            mapOrientationState.floatValue = 0f
+
+            // Marge uniforme majorée d'une demi-hauteur de barre, puis contenu remonté d'autant :
+            // il reste la marge voulue en haut, et la barre du bas ne recouvre plus le tracé.
+            val lift = tripBarHeightPx / 2
+            val border =
+                (TRIP_FRAME_BORDER_DP * context.resources.displayMetrics.density).toInt() + lift
+
+            val zoom = tripFrameZoom(box, map.width, map.height, border)
+            val centerLat = (box[0] + box[2]) / 2.0
+            val centerLon = (box[1] + box[3]) / 2.0
+            map.controller.setZoom(zoom)
+
+            // Décalage calculé, pas relu dans la projection : après un changement de zoom, celle-ci
+            // n'est à jour qu'à la passe de dessin suivante. Viser un point plus au SUD fait monter
+            // le contenu à l'écran, ce qui dégage la barre du bas.
+            val center = if (lift > 0) {
+                destinationPoint(
+                    latitude = centerLat,
+                    longitude = centerLon,
+                    bearingDegrees = 180.0,
+                    distanceMeters = lift * metersPerPixel(centerLat, zoom)
+                )
+            } else {
+                doubleArrayOf(centerLat, centerLon)
+            }
+            map.controller.setCenter(GeoPoint(center[0], center[1]))
+        }
     }
 
     // Appui long sur la rose des vents. Aligner la carte sur son cap depuis l'autre bout de la
@@ -4316,7 +4946,7 @@ fun MapScreen(
                     }
 
                     setMultiTouchControls(true)
-                    enableMouseWheelZoom()
+                    enableMouseWheelZoom(onUserZoom = ::releaseNavCameraForManualZoom)
                     applyWorldMapBounds()
                     addOnLayoutChangeListener { view, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
                         if (right - left != oldRight - oldLeft || bottom - top != oldBottom - oldTop) {
@@ -4384,6 +5014,9 @@ fun MapScreen(
                         isTrackingActive = false
                         // Même règle pour la caméra de suivi de tournée : le doigt reprend la main.
                         navCameraLocked = false
+                        // Et un survol en cours s'arrête net : voir la carte continuer de voler
+                        // sous un doigt qui la retient serait le contraire d'un contrôle direct.
+                        cancelMapSwoop()
                     }
                     locationOverlay.showLocationMarker = AppConfig.showMapLocationMarker.value
                     locationOverlay.enableMyLocation()
@@ -4652,6 +5285,83 @@ fun MapScreen(
             }
         }
 
+        // --- Sens de circulation du trajet ------------------------------------------------------
+        // Le tracé entier défile : toutes les flèches avancent ensemble, du départ vers l'arrivée.
+        // C'est le fil lui-même qui glisse, et il dit d'un coup d'œil dans quel sens la tournée se
+        // parcourt — ce qu'une flèche fixe ne montre que localement.
+        //
+        // Peinte ICI, au-dessus de la MapView, et non dans un calque osmdroid : animer un calque
+        // imposerait de réinvalider toute la carte — donc de redessiner les milliers de marqueurs
+        // d'antennes — à chaque image, pour n'animer qu'une poignée de chevrons.
+        if (isPlannerMode && tripMode != TRIP_MODE_FOLLOW && tripFlowArrows.isNotEmpty()) {
+            val flowTransition = rememberInfiniteTransition(label = "tripFlow")
+            val flowCursor by flowTransition.animateFloat(
+                initialValue = 0f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(TRIP_FLOW_CYCLE_MS, easing = LinearEasing),
+                    repeatMode = RepeatMode.Restart
+                ),
+                label = "tripFlowCursor"
+            )
+            val flowPixel = remember { android.graphics.Point() }
+            val flowPoint = remember { GeoPoint(0.0, 0.0) }
+
+            ComposeCanvas(modifier = Modifier.fillMaxSize()) {
+                val map = mapViewRef ?: return@ComposeCanvas
+                // La MapView n'est pas observable : sans cette lecture, un déplacement de la carte
+                // laisserait la lueur collée à ses anciens pixels.
+                @Suppress("UNUSED_EXPRESSION")
+                mapOrientationState.floatValue
+
+                val track = tripFlowArrows
+                if (track.size < 2) return@ComposeCanvas
+
+                // Le même décalage est appliqué à **toutes** les flèches : c'est ce qui fait glisser
+                // le fil d'un bloc. Il parcourt exactement un intervalle par cycle, si bien qu'au
+                // rebouclage chaque flèche reprend la place de la suivante, sans saut visible.
+                val advance = flowCursor * TRIP_FLOW_STRIDE
+                val ratio = advance - advance.toInt()
+                val lastIndex = track.size - 1
+                val fadeSpan = TRIP_FLOW_STRIDE.toFloat()
+
+                var position = advance
+                while (position < lastIndex) {
+                    // Interpolation entre deux points du rail : sans elle, les flèches sauteraient
+                    // d'un point à l'autre au lieu d'avancer.
+                    val base = position.toInt()
+                    val from = track[base]
+                    val to = track[base + 1]
+                    flowPoint.setCoords(
+                        from.latitude + (to.latitude - from.latitude) * ratio,
+                        from.longitude + (to.longitude - from.longitude) * ratio
+                    )
+                    map.projection.toPixels(flowPoint, flowPixel)
+                    map.projectedPointToScreen(flowPixel)
+                    val x = flowPixel.x.toFloat()
+                    val y = flowPixel.y.toFloat()
+                    // Hors écran : ne rien peindre plutôt que de laisser le canevas rogner.
+                    val onScreen = x > -60f && y > -60f &&
+                        x < this.size.width + 60f && y < this.size.height + 60f
+                    if (onScreen) {
+                        drawTripFlowChevron(
+                            centerX = x,
+                            centerY = y,
+                            angleDegrees = map.screenAngleOf(from.bearingDegrees.toFloat()),
+                            // Fondu aux deux bouts : une flèche qui disparaît à l'arrivée pendant
+                            // qu'une autre naît au départ le ferait sinon en clignotant.
+                            alpha = minOf(
+                                1f,
+                                position / fadeSpan,
+                                (lastIndex - position) / fadeSpan
+                            ).coerceAtLeast(0f)
+                        )
+                    }
+                    position += TRIP_FLOW_STRIDE
+                }
+            }
+        }
+
         // --- Couche de rendu fluide du repère de position ---------------------------------------
         // Le repère est peint ICI, au-dessus de la MapView, et non dans un calque osmdroid : un
         // calque imposerait de réinvalider toute la carte — donc de redessiner les milliers de
@@ -4672,10 +5382,36 @@ fun MapScreen(
                 // que rien d'autre ne rejoue ce dessin.
                 @Suppress("UNUSED_EXPRESSION")
                 mapOrientationState.floatValue
-                if (!showLocationMarker) return@ComposeCanvas
+                // Le repère reste visible pendant un suivi même s'il est masqué dans les réglages :
+                // se guider sans se voir n'a pas de sens. Cela vaut caméra accrochée ou non — s'être
+                // détaché pour regarder la suite du trajet ne doit pas faire disparaître sa position.
+                val following = tripMode == TRIP_MODE_FOLLOW
+                if (!showLocationMarker && !following) return@ComposeCanvas
                 val map = mapViewRef ?: return@ComposeCanvas
                 val position = smoothEngine.sample(SystemClock.elapsedRealtime())
                     ?: return@ComposeCanvas
+
+                // Suivi de tournée, caméra accrochée : le repère est VERROUILLÉ au point d'ancrage et
+                // pointe vers le haut ; c'est la carte qui glisse dessous. On ne le projette donc
+                // pas — une projection recalculée à chaque image le ferait frémir d'un pixel à
+                // l'autre, et la moindre latence de la caméra se lirait comme un flottement.
+                // Pendant un survol, le repère n'est PAS à son ancrage : la carte vole encore. On le
+                // projette donc à sa vraie place, et il vient se poser sur l'ancrage à l'atterrissage
+                // — le survol finit exactement sur la cible de la caméra.
+                if (following && navCameraLocked && !mapSwoopActive) {
+                    val anchorY = navAnchorInMapOrNull(map.height)
+                        ?: (map.height * (0.5 + NAV_CAMERA_AHEAD_FRACTION)).toInt()
+                    markerPainter.draw(
+                        canvas = drawContext.canvas.nativeCanvas,
+                        x = map.width / 2f,
+                        y = anchorY.toFloat(),
+                        // La carte est orientée cap de marche en haut : la flèche pointe donc
+                        // toujours vers le haut de l'écran, comme dans les applis de guidage.
+                        rotationDegrees = 0f,
+                        showDirection = true
+                    )
+                    return@ComposeCanvas
+                }
 
                 drawPoint.setCoords(position.latitude, position.longitude)
                 map.projection.toPixels(drawPoint, drawPixel)
@@ -4686,8 +5422,18 @@ fun MapScreen(
                     canvas = drawContext.canvas.nativeCanvas,
                     x = drawPixel.x.toFloat(),
                     y = drawPixel.y.toFloat(),
-                    rotationDegrees = map.screenAngleOf(if (PowerProfile.mapCompassRotation) azimuth else 0f),
-                    showDirection = AppConfig.hasCompass.value
+                    rotationDegrees = map.screenAngleOf(
+                        when {
+                            // Suivi, caméra détachée : le repère est à sa vraie place et garde le
+                            // cap de MARCHE — aligné sur le tracé tant qu'on va dans son sens. Le
+                            // faire tourner avec la boussole ici le ferait désigner autre chose que
+                            // la direction suivie.
+                            following -> navEffectiveHeading()?.toFloat() ?: 0f
+                            PowerProfile.mapCompassRotation -> azimuth
+                            else -> 0f
+                        }
+                    ),
+                    showDirection = following || AppConfig.hasCompass.value
                 )
             }
 
@@ -4701,7 +5447,11 @@ fun MapScreen(
 
                 while (true) {
                     val map = mapViewRef
-                    if (map == null || smoothEngine.isIdle(SystemClock.elapsedRealtime())) {
+                    // Le survol garde la boucle éveillée même à l'arrêt : c'est la carte qui bouge
+                    // sous le repère, et sans image le repère resterait collé à son ancien pixel.
+                    if (map == null ||
+                        (smoothEngine.isIdle(SystemClock.elapsedRealtime()) && !mapSwoopActive)
+                    ) {
                         // Rien à animer (immobile, ou pas encore de position) : on relâche la boucle
                         // plutôt que de réveiller le processeur à chaque image pour ne rien peindre.
                         // 50 ms de latence au démarrage d'un glissement, soit moins d'un pixel.
@@ -4719,47 +5469,29 @@ fun MapScreen(
                     // nord », alors qu'en suivi la carte est tournée.
                     map.projectedPointToScreen(projected)
 
-                    if (tripMode == TRIP_MODE_FOLLOW && navCameraLocked) {
+                    if (mapSwoopActive) {
+                        // Survol en cours : la caméra appartient à l'animation. Recaler ici la
+                        // couperait dès la première image.
+                    } else if (tripMode == TRIP_MODE_FOLLOW && navCameraLocked) {
                         // Suivi de tournée : le repère est verrouillé à la hauteur des boutons de
                         // zoom, pas au centre. Recaler ici, à chaque image, et non à chaque relevé
                         // GPS : une fois par seconde, le repère glissait puis la carte sautait.
+                        //
+                        // Rotation amenée en douceur, comme le fait déjà l'alignement sur la
+                        // boussole : la poser d'un coup à chaque relevé donnait une carte qui tourne
+                        // par à-coups. Le cap, lui, vient du tracé tant qu'on va dans son sens.
                         val anchorY = navAnchorInMapOrNull(map.height)
                             ?: (map.height * (0.5 + NAV_CAMERA_AHEAD_FRACTION)).toInt()
                         val centerX = map.width / 2
-
-                        // Rotation amenée en douceur vers le cap de marche, comme le fait déjà
-                        // l'alignement sur la boussole : la poser d'un coup à chaque relevé donnait
-                        // une carte qui tourne par à-coups.
-                        val heading = navHeadingDegrees
-                        if (heading != null) {
-                            val wanted = normalizeMapOrientation(-heading.toFloat())
-                            val turn = shortestAngleDelta(map.mapOrientation, wanted)
-                            if (abs(turn) > NAV_ORIENTATION_DEAD_ZONE_DEG) {
-                                val next = normalizeMapOrientation(
-                                    map.mapOrientation + turn * NAV_ORIENTATION_EASING
-                                )
-                                map.applyOrientation(next)
-                                mapOrientationState.floatValue = next
-                            }
-                        }
-
-                        if (abs(projected.x - centerX) >= 1 || abs(projected.y - anchorY) >= 1) {
-                            val aheadFraction = ((anchorY.toDouble() / map.height) - 0.5)
-                                .coerceIn(0.0, NAV_CAMERA_MAX_AHEAD_FRACTION)
-                            val camera = navigationCameraTarget(
-                                latitude = position.latitude,
-                                longitude = position.longitude,
-                                headingDegrees = heading
-                                    ?: normalizeDegrees(-map.mapOrientation.toDouble()),
-                                zoom = map.zoomLevelDouble,
-                                screenHeightPixels = map.height,
-                                aheadFraction = aheadFraction
-                            )
-                            // Instance neuve à chaque fois : osmdroid GARDE la référence comme
-                            // centre courant, lui passer notre point réutilisable le ferait muter
-                            // dans son dos.
-                            map.controller.setCenter(GeoPoint(camera[0], camera[1]))
-                        }
+                        applyNavigationCamera(
+                            map = map,
+                            latitude = position.latitude,
+                            longitude = position.longitude,
+                            snapOrientation = false,
+                            // Déjà cadré au pixel près : redessiner la carte n'y changerait rien.
+                            recenter = abs(projected.x - centerX) >= 1 ||
+                                abs(projected.y - anchorY) >= 1
+                        )
                     } else if (isTrackingActive) {
                         // Poursuite : la carte glisse sous un repère qui reste au centre. On ne
                         // recentre qu'au-delà du pixel, sinon on redessinerait la carte entière
@@ -6068,7 +6800,10 @@ fun MapScreen(
                                 bottomStart = 10.dp,
                                 bottomEnd = 10.dp
                             ),
-                            onClick = { mapViewRef?.controller?.zoomIn() }
+                            onClick = {
+                                releaseNavCameraForManualZoom()
+                                mapViewRef?.controller?.zoomIn()
+                            }
                         )
                         HorizontalDivider(
                             modifier = Modifier.width(sizing.component(32.dp)),
@@ -6082,7 +6817,10 @@ fun MapScreen(
                                 bottomStart = mapControlButtonDiameter / 2f,
                                 bottomEnd = mapControlButtonDiameter / 2f
                             ),
-                            onClick = { mapViewRef?.controller?.zoomOut() }
+                            onClick = {
+                                releaseNavCameraForManualZoom()
+                                mapViewRef?.controller?.zoomOut()
+                            }
                         )
                     }
                 }
@@ -6108,11 +6846,16 @@ fun MapScreen(
 
                             fun centerOnLocation(location: GeoPoint) {
                                 val zoom = preferredLocationZoom()
+                                currentZoom = zoom
+                                currentLat = location.latitude
+                                // Survol plutôt que saut : on voit d'où l'on vient, et l'appui sur
+                                // le bouton se lit même quand on est déjà à peu près au bon endroit.
+                                if (swoopMapTo(map, location.latitude, location.longitude, zoom)) {
+                                    return
+                                }
                                 map.controller.stopAnimation(false)
                                 map.controller.setZoom(zoom)
                                 map.controller.setCenter(location)
-                                currentZoom = zoom
-                                currentLat = location.latitude
                             }
 
                             // Suivi de tournée : c'est notre caméra qui tient la vue (cap de marche
@@ -6121,7 +6864,23 @@ fun MapScreen(
                             // l'écran et écraserait ce cadrage.
                             if (tripMode == TRIP_MODE_FOLLOW) {
                                 navCameraLocked = true
-                                map.controller.setZoom(NAV_FOLLOW_ZOOM)
+                                // Poser la caméra ICI, tout de suite. Se contenter de la rattacher
+                                // laissait la vue là où le doigt l'avait emmenée quand la boucle
+                                // d'images dort — c'est-à-dire dès qu'on est à l'arrêt. Le survol
+                                // ramène en montrant le chemin, au lieu de téléporter.
+                                val known = myCurrentLoc ?: locationOverlay.myLocation
+                                if (known != null) {
+                                    applyNavigationCamera(
+                                        map = map,
+                                        latitude = known.latitude,
+                                        longitude = known.longitude,
+                                        snapOrientation = true,
+                                        zoom = NAV_FOLLOW_ZOOM,
+                                        swoop = true
+                                    )
+                                } else {
+                                    map.controller.setZoom(NAV_FOLLOW_ZOOM)
+                                }
                                 return@safeClick
                             }
 
@@ -6342,6 +7101,8 @@ fun MapScreen(
                         stepNumber = index + 1,
                         label = step.label,
                         visited = step.visitedAtMillis != null,
+                        photosSentCount = step.photosSentCount,
+                        note = step.note.orEmpty(),
                         canMoveUp = index > 0,
                         canMoveDown = index < plan.steps.lastIndex,
                         onMoveUp = {
@@ -6382,6 +7143,36 @@ fun MapScreen(
                             mapViewRef?.let { refreshTripLayers(it) }
                         },
                         onDismiss = { plannerStepMenuIndex = null }
+                    )
+                }
+            }
+
+            tripArrivalStepIndex?.let { index ->
+                val step = plan.steps.getOrNull(index)
+                if (step == null) {
+                    tripArrivalStepIndex = null
+                } else {
+                    TripArrivalSheet(
+                        stepNumber = index + 1,
+                        stepLabel = step.label,
+                        supports = tripArrivalSupports,
+                        loading = tripArrivalLoading,
+                        note = tripArrivalNote,
+                        photosSentCount = step.photosSentCount,
+                        distanceUnit = AppConfig.distanceUnit.intValue,
+                        canUploadPhotos = canUploadTripPhotos,
+                        onNoteChange = { tripArrivalNote = it },
+                        onSendPhotos = { support, operators ->
+                            commitTripArrivalNote(index)
+                            tripArrivalStepIndex = null
+                            openTripPhotoUpload(plan.id, index, support, operators)
+                        },
+                        // Fermer enregistre : au pied d'un pylône, on balaie la feuille sans y
+                        // penser, et perdre la note qu'on vient d'écrire serait impardonnable.
+                        onDismiss = {
+                            commitTripArrivalNote(index)
+                            tripArrivalStepIndex = null
+                        }
                     )
                 }
             }
