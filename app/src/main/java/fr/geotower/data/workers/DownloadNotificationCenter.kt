@@ -7,6 +7,8 @@ import android.os.Build
 object DownloadNotificationCenter {
     const val DB_UPDATE_AVAILABLE_NOTIFICATION_ID = 2001
     const val APP_UPDATE_AVAILABLE_NOTIFICATION_ID = 2002
+    const val RADIO_DB_UPDATE_AVAILABLE_NOTIFICATION_ID = 2003
+    const val ENB_DB_UPDATE_AVAILABLE_NOTIFICATION_ID = 2004
     const val DB_DOWNLOAD_PROGRESS_NOTIFICATION_ID = 2101
     const val DB_DOWNLOAD_RESULT_NOTIFICATION_ID = 2102
     const val RADIO_DB_DOWNLOAD_PROGRESS_NOTIFICATION_ID = 2111
@@ -63,6 +65,8 @@ object DownloadNotificationCenter {
     fun clearDatabaseSectionNotifications(context: Context) {
         val manager = notificationManager(context)
         manager.cancel(DB_UPDATE_AVAILABLE_NOTIFICATION_ID)
+        manager.cancel(RADIO_DB_UPDATE_AVAILABLE_NOTIFICATION_ID)
+        manager.cancel(ENB_DB_UPDATE_AVAILABLE_NOTIFICATION_ID)
         manager.cancel(DB_DOWNLOAD_RESULT_NOTIFICATION_ID)
         manager.cancel(RADIO_DB_DOWNLOAD_RESULT_NOTIFICATION_ID)
         manager.cancel(ENB_DB_DOWNLOAD_RESULT_NOTIFICATION_ID)

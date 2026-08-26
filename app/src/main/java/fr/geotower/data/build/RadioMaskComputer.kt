@@ -62,6 +62,28 @@ object RadioMaskComputer {
         if (families and FAMILY_5G != 0) masks.techMask = masks.techMask or RadioFilterMasks.TECH_5G
     }
 
+    /**
+     * Variante sans objet temporaire pour les builds nationaux : les deux masques sont empaquetes
+     * dans un Long (tech en bas, bandes en haut). Elle evite de creer un [StationMasks] par ligne
+     * de l'observatoire ou par jointure emetteur x bande.
+     */
+    fun updateMasksFromGeneration(packedMasks: Long, generation: String?): Long {
+        val families = families(generationFamilies, generation) { g ->
+            var flags = 0
+            if (g.contains("2G")) flags = flags or FAMILY_2G
+            if (g.contains("3G")) flags = flags or FAMILY_3G
+            if (g.contains("4G")) flags = flags or FAMILY_4G
+            if (g.contains("5G")) flags = flags or FAMILY_5G
+            flags
+        }
+        var techMask = packedMasks.toInt()
+        if (families and FAMILY_2G != 0) techMask = techMask or RadioFilterMasks.TECH_2G
+        if (families and FAMILY_3G != 0) techMask = techMask or RadioFilterMasks.TECH_3G
+        if (families and FAMILY_4G != 0) techMask = techMask or RadioFilterMasks.TECH_4G
+        if (families and FAMILY_5G != 0) techMask = techMask or RadioFilterMasks.TECH_5G
+        return packMasks(techMask, (packedMasks ushr 32).toInt())
+    }
+
     /** Python `update_masks_from_system_and_band`. */
     fun updateMasksFromSystemAndBand(
         masks: StationMasks,
@@ -126,10 +148,77 @@ object RadioMaskComputer {
         }
     }
 
+    /** Variante empaquetee sans allocation, pour [GeoTowerDbBuilder]. */
+    fun updateMasksFromSystemAndBand(
+        packedMasks: Long,
+        system: String?,
+        fStartMhz: Double?,
+        fEndMhz: Double?,
+    ): Long {
+        val families = families(systemFamilies, system) { s ->
+            if (s.contains("FH")) {
+                FAMILY_FH
+            } else {
+                var flags = 0
+                if (s.contains("GSM") || s.contains("2G")) flags = flags or FAMILY_2G
+                if (s.contains("UMTS") || s.contains("3G")) flags = flags or FAMILY_3G
+                if (s.contains("LTE") || s.contains("4G")) flags = flags or FAMILY_4G
+                if (s.contains("NR") || s.contains("5G")) flags = flags or FAMILY_5G
+                flags
+            }
+        }
+
+        var techMask = packedMasks.toInt()
+        var bandMask = (packedMasks ushr 32).toInt()
+        if (families and FAMILY_FH != 0) {
+            techMask = techMask or RadioFilterMasks.TECH_FH
+            bandMask = bandMask or RadioFilterMasks.BAND_FH
+            return packMasks(techMask, bandMask)
+        }
+
+        val is2g = families and FAMILY_2G != 0
+        val is3g = families and FAMILY_3G != 0
+        val is4g = families and FAMILY_4G != 0
+        val is5g = families and FAMILY_5G != 0
+
+        if (is2g) {
+            techMask = techMask or RadioFilterMasks.TECH_2G
+            if (overlaps(fStartMhz, fEndMhz, 880.0, 960.0)) bandMask = bandMask or RadioFilterMasks.BAND_2G_900
+            if (overlaps(fStartMhz, fEndMhz, 1710.0, 1880.0)) bandMask = bandMask or RadioFilterMasks.BAND_2G_1800
+        }
+        if (is3g) {
+            techMask = techMask or RadioFilterMasks.TECH_3G
+            if (overlaps(fStartMhz, fEndMhz, 880.0, 960.0)) bandMask = bandMask or RadioFilterMasks.BAND_3G_900
+            if (overlaps(fStartMhz, fEndMhz, 1920.0, 2170.0)) bandMask = bandMask or RadioFilterMasks.BAND_3G_2100
+        }
+        if (is4g) {
+            techMask = techMask or RadioFilterMasks.TECH_4G
+            if (overlaps(fStartMhz, fEndMhz, 700.0, 790.0)) bandMask = bandMask or RadioFilterMasks.BAND_4G_700
+            if (overlaps(fStartMhz, fEndMhz, 791.0, 862.0)) bandMask = bandMask or RadioFilterMasks.BAND_4G_800
+            if (overlaps(fStartMhz, fEndMhz, 880.0, 960.0)) bandMask = bandMask or RadioFilterMasks.BAND_4G_900
+            if (overlaps(fStartMhz, fEndMhz, 1710.0, 1880.0)) bandMask = bandMask or RadioFilterMasks.BAND_4G_1800
+            if (overlaps(fStartMhz, fEndMhz, 1920.0, 2170.0)) bandMask = bandMask or RadioFilterMasks.BAND_4G_2100
+            if (overlaps(fStartMhz, fEndMhz, 2500.0, 2690.0)) bandMask = bandMask or RadioFilterMasks.BAND_4G_2600
+        }
+        if (is5g) {
+            techMask = techMask or RadioFilterMasks.TECH_5G
+            if (overlaps(fStartMhz, fEndMhz, 700.0, 790.0)) bandMask = bandMask or RadioFilterMasks.BAND_5G_700
+            if (overlaps(fStartMhz, fEndMhz, 1427.0, 1518.0)) bandMask = bandMask or RadioFilterMasks.BAND_5G_1400
+            if (overlaps(fStartMhz, fEndMhz, 1920.0, 2170.0)) bandMask = bandMask or RadioFilterMasks.BAND_5G_2100
+            if (overlaps(fStartMhz, fEndMhz, 3300.0, 3800.0)) bandMask = bandMask or RadioFilterMasks.BAND_5G_3500
+            if (overlaps(fStartMhz, fEndMhz, 3800.1, 4200.0)) bandMask = bandMask or RadioFilterMasks.BAND_5G_4200
+            if (overlaps(fStartMhz, fEndMhz, 24000.0, 27500.0)) bandMask = bandMask or RadioFilterMasks.BAND_5G_26000
+        }
+        return packMasks(techMask, bandMask)
+    }
+
     private fun addBand(masks: StationMasks, bandBit: Int) {
         masks.bandMask = masks.bandMask or bandBit
     }
 
     private fun overlaps(start: Double?, end: Double?, low: Double, high: Double): Boolean =
         AnfrParsing.rangeOverlaps(start, end, low, high)
+
+    private fun packMasks(techMask: Int, bandMask: Int): Long =
+        (bandMask.toLong() shl 32) or (techMask.toLong() and 0xffffffffL)
 }

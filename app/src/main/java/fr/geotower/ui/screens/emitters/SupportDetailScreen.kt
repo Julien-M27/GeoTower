@@ -160,6 +160,7 @@ fun SupportDetailScreen(
     applyMapFilters: Boolean = false,
     photoDraftId: String? = null,
     isSplitScreen: Boolean = false,
+    showBreadcrumb: Boolean = true,
     onCloseSplitScreen: () -> Unit = {},
     // Mode simplifié : opérateur à déplier d'emblée (notification, widget, lien profond ou
     // historique qui visait auparavant la fiche site autonome). Sans lui, on ouvre le premier.
@@ -842,15 +843,16 @@ fun SupportDetailScreen(
                         }
                     }
                 )
-                GeoTowerNavigationBreadcrumbBar(
-                    navController = navController,
-                    currentItem = GeoTowerBreadcrumbItem(
-                        label = txtSupportDetailTitle,
-                        icon = Icons.Default.VerticalAlignTop,
-                        key = "support_detail"
-                    ),
-                    currentRouteKeys = setOf("support_detail", "site_detail", "site_detail_from_map"),
-                    impliedParentItems = listOfNotNull(
+                if (showBreadcrumb) {
+                    GeoTowerNavigationBreadcrumbBar(
+                        navController = navController,
+                        currentItem = GeoTowerBreadcrumbItem(
+                            label = txtSupportDetailTitle,
+                            icon = Icons.Default.VerticalAlignTop,
+                            key = "support_detail"
+                        ),
+                        currentRouteKeys = setOf("support_detail", "site_detail", "site_detail_from_map"),
+                        impliedParentItems = listOfNotNull(
                         // Le mode simplifié n'a pas d'accueil : le fil d'Ariane commence à la
                         // carte (ou à « À proximité »), pas sur une page qui n'existe plus.
                         if (AppConfig.simpleModeActive()) {
@@ -893,12 +895,13 @@ fun SupportDetailScreen(
                                 key = "emitters"
                             )
                         }
-                    ),
-                    onBackStackItemClick = {
-                        if (isSplitScreen) onCloseSplitScreen()
-                    },
-                    backgroundColor = if (useOneUi) cardBgColor else MaterialTheme.colorScheme.surfaceContainer
-                )
+                        ),
+                        onBackStackItemClick = {
+                            if (isSplitScreen) onCloseSplitScreen()
+                        },
+                        backgroundColor = if (useOneUi) cardBgColor else MaterialTheme.colorScheme.surfaceContainer
+                    )
+                }
             }
         }
     ) { padding ->

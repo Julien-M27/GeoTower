@@ -125,6 +125,7 @@ import fr.geotower.R
 import fr.geotower.data.AnfrRepository
 import fr.geotower.data.api.ApiEndpoints
 import fr.geotower.data.workers.DownloadNotificationCenter
+import fr.geotower.data.workers.DatabaseBulkUpdate
 import fr.geotower.data.workers.UpdateCheckScheduler
 import fr.geotower.ui.screens.stats.DEPARTMENT_STATS_ROUTE
 import fr.geotower.utils.AppConfig
@@ -1200,28 +1201,15 @@ fun SettingsScreen(
             modifier = Modifier.padding(top = innerPadding.calculateTopPadding()),
             // ✅ AJOUT : onCloseSidebar
             sidebar = { width, onCloseSidebar ->
-                // La barre latérale doit défiler : elle porte 6 sections + 6 entrées directes + la
-                // version, ce qui dépasse la hauteur d'un Fold dès l'échelle 100 %. Sans défilement
-                // le `Spacer(weight(1f))` du bas n'a plus rien à distribuer et les dernières entrées
-                // (profils, À propos, réinitialisation) étaient purement et simplement rognées.
+                // Seul le contenu de la barre latérale doit défiler : les actions retour/menu
+                // restent toujours accessibles en haut du volet.
                 val sidebarScrollState = rememberScrollState()
                 Row(modifier = Modifier.width(width).fillMaxHeight().background(mainBgColor)) {
                     Column(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxHeight()
-                            // 🚨 CORRECTION 2 : Marge pour les boutons de navigation
-                            .navigationBarsPadding()
-                            // `fillMaxHeight` + `navigationBarsPadding` fixent la hauteur MINIMALE
-                            // transmise au contenu ; le défilement ne relâche que le maximum. Le
-                            // `Spacer(weight(1f))` continue donc de plaquer la version en bas quand
-                            // il reste de la place, et la colonne défile quand il n'y en a plus.
-                            .verticalScroll(sidebarScrollState)
-                            // Même resserrage que l'en-tête du volet de contenu, pour que la ligne
-                            // retour/menu et le titre restent sur le même axe.
-                            .padding(top = sizing.spacing(4.dp), bottom = sizing.spacing(16.dp))
                     ) {
-                        // ✅ RETOUR DU ROW AVEC LES DEUX BOUTONS
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -1245,80 +1233,92 @@ fun SettingsScreen(
                             }
                         }
                         Spacer(Modifier.height(sizing.spacing(8.dp)))
-                        // Mode « pages » : première entrée = l'accueil des sections, sur lequel on
-                        // arrive en ouvrant les réglages. Sans elle, la barre latérale n'offrirait
-                        // aucun moyen d'y revenir une fois une section ouverte.
-                        if (useWideSections) {
-                            NavigationMenuItem(
-                                stringResource(R.string.settings_sections_home_title),
-                                Icons.Outlined.Dashboard,
-                                openedSection == null,
-                                isDark
-                            ) {
-                                openSection(null)
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                                .navigationBarsPadding()
+                                // Le fondu bas signale les entrées cachées sans ajouter un
+                                // contrôle visuel permanent dans ce volet de navigation.
+                                .geoTowerFadingEdge(sidebarScrollState, requireScrollableContent = true)
+                                .verticalScroll(sidebarScrollState)
+                                .padding(bottom = sizing.spacing(16.dp))
+                        ) {
+                            // Mode « pages » : première entrée = l'accueil des sections, sur lequel on
+                            // arrive en ouvrant les réglages. Sans elle, la barre latérale n'offrirait
+                            // aucun moyen d'y revenir une fois une section ouverte.
+                            if (useWideSections) {
+                                NavigationMenuItem(
+                                    stringResource(R.string.settings_sections_home_title),
+                                    Icons.Outlined.Dashboard,
+                                    openedSection == null,
+                                    isDark
+                                ) {
+                                    openSection(null)
+                                }
+                                Spacer(Modifier.height(sizing.spacing(8.dp)))
                             }
-                            Spacer(Modifier.height(sizing.spacing(8.dp)))
-                        }
-                        visibleMenuItems.forEach { (title, icon, index) ->
-                            val isSelected = if (useWideSections) openedSection == index else activeSectionIndex == index
-                            NavigationMenuItem(title, icon, isSelected, isDark) {
-                                activeSectionIndex = index
-                                if (navMode == 0) {
-                                    scope.launch {
-                                        sectionBringIntoViewRequesters[index].bringIntoView()
-                                        kotlinx.coroutines.delay(80)
-                                        alignAnchorToViewportTop(sectionRootPositions[index])
+                            visibleMenuItems.forEach { (title, icon, index) ->
+                                val isSelected = if (useWideSections) openedSection == index else activeSectionIndex == index
+                                NavigationMenuItem(title, icon, isSelected, isDark) {
+                                    activeSectionIndex = index
+                                    if (navMode == 0) {
+                                        scope.launch {
+                                            sectionBringIntoViewRequesters[index].bringIntoView()
+                                            kotlinx.coroutines.delay(80)
+                                            alignAnchorToViewportTop(sectionRootPositions[index])
+                                        }
+                                    } else {
+                                        // Mode « pages » : la nouvelle section remplace l'ancienne (ou
+                                        // l'accueil), on repart de son début (sinon on hérite du
+                                        // défilement précédent).
+                                        openSection(index)
                                     }
-                                } else {
-                                    // Mode « pages » : la nouvelle section remplace l'ancienne (ou
-                                    // l'accueil), on repart de son début (sinon on hérite du
-                                    // défilement précédent).
-                                    openSection(index)
                                 }
                             }
-                        }
-                        Spacer(Modifier.height(sizing.spacing(8.dp)))
-                        HorizontalDivider(modifier = Modifier.padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(8.dp)), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                        // Entrées directes : une galerie et un méta-réglage, pas des sections.
-                        NavigationMenuItem(stringResource(R.string.photos_favorites_title), Icons.Default.PhotoLibrary, false, isDark) {
-                            safeClick { navController.navigate("photos_favorites") }
-                        }
-                        Spacer(Modifier.height(sizing.spacing(8.dp)))
-                        NavigationMenuItem(stringResource(R.string.photo_reports_title), Icons.Default.Flag, false, isDark) {
-                            safeClick { navController.navigate("photo_reports") }
-                        }
-                        Spacer(Modifier.height(sizing.spacing(8.dp)))
-                        NavigationMenuItem(stringResource(R.string.histories_title), Icons.Default.History, false, isDark) {
-                            safeClick { navController.navigate("histories") }
-                        }
-                        Spacer(Modifier.height(sizing.spacing(8.dp)))
-                        NavigationMenuItem(stringResource(R.string.backup_title), Icons.Outlined.Backup, false, isDark) {
-                            safeClick { navController.navigate("backup") }
-                        }
-                        Spacer(Modifier.height(sizing.spacing(8.dp)))
-                        NavigationMenuItem(stringResource(R.string.preference_profiles_title), Icons.Outlined.Bookmarks, false, isDark) {
-                            safeClick { showPreferenceProfilesSheet = true }
-                        }
-                        Spacer(Modifier.height(sizing.spacing(8.dp)))
-                        NavigationMenuItem(stringResource(R.string.nav_about), Icons.Outlined.Info, false, isDark) {
-                            safeClick {
-                                val currentDestinationId = navController.currentDestination?.id
-                                navController.navigate("about") {
-                                    launchSingleTop = true
-                                    if (currentDestinationId != null) {
-                                        popUpTo(currentDestinationId) {
-                                            inclusive = true
+                            Spacer(Modifier.height(sizing.spacing(8.dp)))
+                            HorizontalDivider(modifier = Modifier.padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(8.dp)), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                            // Entrées directes : une galerie et un méta-réglage, pas des sections.
+                            NavigationMenuItem(stringResource(R.string.photos_favorites_title), Icons.Default.PhotoLibrary, false, isDark) {
+                                safeClick { navController.navigate("photos_favorites") }
+                            }
+                            Spacer(Modifier.height(sizing.spacing(8.dp)))
+                            NavigationMenuItem(stringResource(R.string.photo_reports_title), Icons.Default.Flag, false, isDark) {
+                                safeClick { navController.navigate("photo_reports") }
+                            }
+                            Spacer(Modifier.height(sizing.spacing(8.dp)))
+                            NavigationMenuItem(stringResource(R.string.histories_title), Icons.Default.History, false, isDark) {
+                                safeClick { navController.navigate("histories") }
+                            }
+                            Spacer(Modifier.height(sizing.spacing(8.dp)))
+                            NavigationMenuItem(stringResource(R.string.backup_title), Icons.Outlined.Backup, false, isDark) {
+                                safeClick { navController.navigate("backup") }
+                            }
+                            Spacer(Modifier.height(sizing.spacing(8.dp)))
+                            NavigationMenuItem(stringResource(R.string.preference_profiles_title), Icons.Outlined.Bookmarks, false, isDark) {
+                                safeClick { showPreferenceProfilesSheet = true }
+                            }
+                            Spacer(Modifier.height(sizing.spacing(8.dp)))
+                            NavigationMenuItem(stringResource(R.string.nav_about), Icons.Outlined.Info, false, isDark) {
+                                safeClick {
+                                    val currentDestinationId = navController.currentDestination?.id
+                                    navController.navigate("about") {
+                                        launchSingleTop = true
+                                        if (currentDestinationId != null) {
+                                            popUpTo(currentDestinationId) {
+                                                inclusive = true
+                                            }
                                         }
                                     }
                                 }
                             }
+                            Spacer(Modifier.height(sizing.spacing(8.dp)))
+                            NavigationMenuItem(title = stringResource(R.string.settings_reset), icon = Icons.Default.Refresh, isSelected = false, isDark = isDark) {
+                                safeClick { showGlobalResetDialog = true }
+                            }
+                            Spacer(Modifier.weight(1f))
+                            Text("${stringResource(R.string.common_version)} $versionName", style = sizing.textStyle(MaterialTheme.typography.labelSmall), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f), modifier = Modifier.fillMaxWidth().padding(horizontal = sizing.spacing(16.dp)), textAlign = TextAlign.Center)
                         }
-                        Spacer(Modifier.height(sizing.spacing(8.dp)))
-                        NavigationMenuItem(title = stringResource(R.string.settings_reset), icon = Icons.Default.Refresh, isSelected = false, isDark = isDark) {
-                            safeClick { showGlobalResetDialog = true }
-                        }
-                        Spacer(Modifier.weight(1f))
-                        Text("${stringResource(R.string.common_version)} $versionName", style = sizing.textStyle(MaterialTheme.typography.labelSmall), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f), modifier = Modifier.fillMaxWidth().padding(horizontal = sizing.spacing(16.dp)), textAlign = TextAlign.Center)
                     }
                     VerticalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                 }
@@ -3694,6 +3694,13 @@ fun SectionDatabase(
     val showMobileCard = !generatesInstead
     val showRadioCard = !generatesInstead
     val showEnbCard = !serverDataCutOff
+    val workManager = remember(context) { androidx.work.WorkManager.getInstance(context) }
+    val bulkWorkInfos by workManager
+        .getWorkInfosForUniqueWorkFlow(DatabaseBulkUpdate.UNIQUE_WORK_NAME)
+        .collectAsState(initial = emptyList())
+    val isBulkUpdateRunning = bulkWorkInfos.any { workInfo -> !workInfo.state.isFinished }
+    var isCheckingBulkUpdates by remember { mutableStateOf(false) }
+    var queuedBulkUpdateCount by remember { mutableStateOf<Int?>(null) }
 
     // 🚀 LA CARTE DE LA BASE DE DONNÉES (Existante)
     Column(modifier = modifier.fillMaxWidth()) {
@@ -3735,6 +3742,80 @@ fun SectionDatabase(
         )
 
         Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+
+        // Un seul appui cherche les versions distantes puis enfile uniquement les bases réellement
+        // en retard. La chaine est sequentielle : pas de concurrence entre les gros fichiers.
+        if (showMobileCard || showRadioCard || showEnbCard) {
+            Surface(
+                shape = shape,
+                border = border,
+                color = if (useOneUi) bubbleColor else Color.Transparent,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(sizing.spacing(16.dp))) {
+                    Text(
+                        text = stringResource(R.string.database_update_all_title),
+                        style = sizing.textStyle(MaterialTheme.typography.titleMedium),
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(sizing.spacing(4.dp)))
+                    Text(
+                        text = stringResource(R.string.database_update_all_desc),
+                        style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+                    Button(
+                        onClick = {
+                            safeClick("database_update_all") {
+                                isCheckingBulkUpdates = true
+                                queuedBulkUpdateCount = null
+                                scope.launch {
+                                    val targets = DatabaseBulkUpdate.findAvailableUpdates(context, workManager)
+                                    if (targets.isNotEmpty()) {
+                                        DatabaseBulkUpdate.enqueue(workManager, targets)
+                                    }
+                                    queuedBulkUpdateCount = targets.size
+                                    isCheckingBulkUpdates = false
+                                }
+                            }
+                        },
+                        enabled = !isCheckingBulkUpdates && !isBulkUpdateRunning,
+                        modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = sizing.component(50.dp)),
+                        shape = RoundedCornerShape(sizing.component(12.dp))
+                    ) {
+                        Icon(Icons.Default.CloudDownload, contentDescription = null)
+                        Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
+                        Text(
+                            text = when {
+                                isCheckingBulkUpdates -> stringResource(R.string.database_update_all_checking)
+                                isBulkUpdateRunning -> stringResource(R.string.database_update_all_running)
+                                else -> stringResource(R.string.database_update_all_action)
+                            },
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    if (isCheckingBulkUpdates || isBulkUpdateRunning) {
+                        Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    }
+                    queuedBulkUpdateCount?.let { count ->
+                        Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+                        Text(
+                            text = if (count == 0) {
+                                stringResource(R.string.database_update_all_none)
+                            } else {
+                                stringResource(R.string.database_update_all_queued, count)
+                            },
+                            style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+        }
 
         if (showMobileCard) {
             Box(modifier = cardAnchor(ANCHOR_DB_MOBILE).fillMaxWidth()) {

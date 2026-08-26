@@ -180,6 +180,7 @@ fun ThroughputCalculatorScreen(
     repository: AnfrRepository,
     antennaId: String,
     isSplitScreen: Boolean = false,
+    showBreadcrumb: Boolean = true,
     onCloseSplitScreen: () -> Unit = {},
     incomingConfig: String? = null
 ) {
@@ -378,7 +379,7 @@ fun ThroughputCalculatorScreen(
                         }
                     }
                 )
-                GeoTowerNavigationBreadcrumbBar(
+                if (showBreadcrumb) GeoTowerNavigationBreadcrumbBar(
                     navController = navController,
                     currentItem = GeoTowerBreadcrumbItem(
                         label = txtThroughputCalculatorTitle,

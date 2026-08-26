@@ -31,7 +31,7 @@
     <string name="settings_database_online_title">Online-Betreiberdatenbank</string>
     <string name="settings_search_placeholder">Einstellung suchen</string>
     <string name="settings_search_no_results">Keine Einstellung gefunden</string>
-    <string name="settings_app_language">App-Sprache</string>
+    <string name="settings_app_language">Sprache der Anwendung</string>
     <string name="language_system">Systemsprache</string>
     <string name="language_french_name">Französisch</string>
     <string name="language_english_name">Englisch</string>
@@ -49,12 +49,12 @@
     <string name="settings_units_title">Maßeinheiten</string>
     <string name="settings_units_desc">Entfernung und Geschwindigkeit</string>
     <string name="settings_pages_customization_title">Seiten anpassen</string>
-    <string name="settings_pages_customization_desc">Passe die Anzeige der verschiedenen App-Seiten an</string>
+    <string name="settings_pages_customization_desc">Passe die Anzeige der verschiedenen Seiten der Anwendung an</string>
     <string name="settings_pages_group_main">Hauptseiten</string>
     <string name="settings_pages_group_details">Detailseiten</string>
     <string name="settings_pages_group_tools">Werkzeuge</string>
     <string name="settings_pages_group_all">Alle Seiten</string>
-    <string name="settings_page_startup_desc">Seite, mit der die App startet</string>
+    <string name="settings_page_startup_desc">Seite, mit der die Anwendung startet</string>
     <string name="settings_page_home_desc">Menüreihenfolge, angezeigte Seiten, Hilfe-Schaltfläche</string>
     <string name="settings_page_nearby_desc">Suchleiste, Vorschläge, Radius</string>
     <string name="settings_page_map_desc">Position, Azimute, Werkzeugkasten, Standardfilter</string>
@@ -87,7 +87,7 @@
     <string name="live_database_warning_desc">GeoTower verwendet derzeit die Online-Datenbank, weil die lokale Datenbank fehlt oder ungültig ist. Dieser Bildschirm kann Netzwerkanfragen ausführen. Bitte behalten Sie Ihren mobilen Datenverbrauch im Blick.</string>
     <string name="onboarding_start_configuration">Einrichtung starten</string>
     <string name="onboarding_lets_go">Los geht\'s!</string>
-    <string name="onboarding_welcome_desc">Willkommen bei GeoTower, der App zum Finden nahegelegener Mobilfunkmasten und Informationen dazu.</string>
+    <string name="onboarding_welcome_desc">Willkommen bei GeoTower, der Anwendung zum Finden nahegelegener Mobilfunkmasten und Informationen dazu.</string>
     <string name="onboarding_welcome_nearby_title">In der Nähe finden</string>
     <string name="onboarding_welcome_nearby_desc">Liste schnell die nächsten Funkstandorte und Träger rund um deine Position auf.</string>
     <string name="onboarding_welcome_map_title">Auf der Karte erkunden</string>
@@ -107,7 +107,7 @@
     <string name="onboarding_notifications_download_title">Sichtbare Downloads</string>
     <string name="onboarding_notifications_download_desc">GeoTower kann den Fortschritt von Datenbank- und Offline-Kartendownloads anzeigen, während sie laufen.</string>
     <string name="onboarding_notifications_update_title">Aktuelle Daten</string>
-    <string name="onboarding_notifications_update_desc">Du kannst informiert werden, wenn eine neue Datenbank verfügbar ist, ohne die App zu öffnen.</string>
+    <string name="onboarding_notifications_update_desc">Du kannst informiert werden, wenn eine neue Datenbank verfügbar ist, ohne die Anwendung zu öffnen.</string>
     <string name="onboarding_notifications_control_title">Nur nützliche Hinweise</string>
     <string name="onboarding_notifications_control_desc">Keine sozialen Benachrichtigungen oder Werbung: nur längere Vorgänge und wichtige Datenaktualisierungen.</string>
     <string name="onboarding_live_notifications_title">Live-Tracking</string>
@@ -136,10 +136,10 @@
     <string name="onboarding_warning_live_notifications_suffix">, weil sie einen Standardbetreiber erfordern.</string>
     <string name="onboarding_choose_operator">Betreiber wählen</string>
     <string name="onboarding_database_warning_title">Datenbank nicht heruntergeladen</string>
-    <string name="onboarding_database_warning_desc">Du hast die App-Datenbank nicht heruntergeladen, daher werden keine Elemente auf dem Bildschirm angezeigt.</string>
+    <string name="onboarding_database_warning_desc">Du hast die Datenbank der Anwendung nicht heruntergeladen, daher werden keine Elemente auf dem Bildschirm angezeigt.</string>
     <string name="onboarding_database_warning_question">Möchtest du wirklich fortfahren?</string>
     <string name="onboarding_database_success_title">Download abgeschlossen!</string>
-    <string name="onboarding_database_success_desc">Die Offline-Datenbank wurde erfolgreich installiert. Die App ist bereit, mit voller Geschwindigkeit zu laufen.</string>
+    <string name="onboarding_database_success_desc">Die Offline-Datenbank wurde erfolgreich installiert. Die Anwendung ist bereit, mit voller Geschwindigkeit zu laufen.</string>
     <string name="onboarding_theme_desc">Wähle den Stil, der zu dir passt.</string>
     <string name="onboarding_offline_desc">Lade die gesamte Datenbank herunter, um die Liste ohne Netzwerk zu nutzen. Warnung: große Datei.</string>
     <string name="onboarding_offline_desc_local_build">Ihre Wahl der Datenherkunft erstellt die Datenbank auf diesem Gerät: Hier gibt es nichts herunterzuladen.</string>
@@ -147,7 +147,7 @@
     <string name="settings_database_hidden_by_local_build">Die Downloads für Mobilfunk und Rundfunk sind hier ausgeblendet: Ihre Wahl der Datenherkunft erstellt diese Datenbanken auf dem Gerät. Bereits installierte Datenbanken bleiben auf dem Gerät: Wählen Sie eine andere Datenherkunft, um ihre Karte samt Löschen-Schaltfläche zurückzuholen.</string>
     <string name="settings_database_hidden_by_max_autonomy">Maximale Autonomie: Die eNB-/gNB-Datenbank wird hier entfernt (sie lässt sich auf dem Gerät nicht erstellen), ebenso alle Downloads, die durch die lokale Erstellung ersetzt werden. Bereits installierte Datenbanken bleiben auf dem Gerät: Wählen Sie eine andere Datenherkunft, um ihre Karte samt Löschen-Schaltfläche zurückzuholen.</string>
     <string name="onboarding_display_mode_title">Wie möchten Sie GeoTower nutzen?</string>
-    <string name="onboarding_display_mode_desc">Zwei Arten, die App zu durchstöbern. Sie können jederzeit in den Einstellungen wechseln.</string>
+    <string name="onboarding_display_mode_desc">Zwei Arten, die Anwendung zu durchstöbern. Sie können jederzeit in den Einstellungen wechseln.</string>
     <string name="onboarding_display_mode_simple_desc">Empfohlen, wenn Funkmasten ein neues Thema für Sie sind: die Karte, das Wesentliche, mehr nicht.</string>
     <string name="onboarding_display_mode_full_title">Vollständiger Modus</string>
     <string name="onboarding_display_mode_simple_tagline">Das Wesentliche, auf der Karte</string>
@@ -155,7 +155,7 @@
     <string name="onboarding_display_mode_full_desc">Startseite, alle Seiten und Werkzeuge, ein Blatt je Betreiber. Für alle, die sich schon auskennen.</string>
     <string name="onboarding_display_mode_details_title">Was der vereinfachte Modus ändert</string>
     <string name="onboarding_display_mode_start_title">Der vereinfachte Modus startet auf der Karte</string>
-    <string name="onboarding_display_mode_start_desc">Die App öffnet direkt die Karte statt einer Startseite voller Menüs.</string>
+    <string name="onboarding_display_mode_start_desc">Die Anwendung öffnet direkt die Karte statt einer Startseite voller Menüs.</string>
     <string name="onboarding_display_mode_menu_title">Ein Seitenmenü statt der Startseite</string>
     <string name="onboarding_display_mode_menu_desc">Die übrigen Seiten bleiben griffbereit, in einem Menü, das vom Bildschirmrand aufgezogen wird.</string>
     <string name="onboarding_display_mode_reversible_title">Nichts geht verloren</string>
@@ -172,8 +172,8 @@
     <string name="appearance_one_ui_desc">One-UI-Darstellung verwenden (runde Blasen)</string>
     <string name="appearance_scroll_blur_title">Scroll-Unschärfe</string>
     <string name="appearance_scroll_blur_desc">Unschärfe aktivieren oder deaktivieren (verbraucht mehr Akku)</string>
-    <string name="appearance_app_icon_title">App-Symbol</string>
-    <string name="appearance_in_app_logo_title">Logo in der App</string>
+    <string name="appearance_app_icon_title">Symbol der Anwendung</string>
+    <string name="appearance_in_app_logo_title">Logo in der Anwendung</string>
     <string name="appearance_menu_size_title">Größe des Hauptmenüs</string>
     <string name="appearance_menu_size_small">Klein</string>
     <string name="appearance_menu_size_normal">Normal</string>
@@ -192,7 +192,7 @@
     <string name="common_no">Nein</string>
     <string name="settings_reset">Einstellungen zurücksetzen</string>
     <string name="settings_reset_warning_title">Warnung</string>
-    <string name="settings_reset_warning_desc">Möchtest du wirklich die Standardeinstellungen wiederherstellen? Dadurch werden alle Einstellungen gelöscht, die du in der App vorgenommen hast.</string>
+    <string name="settings_reset_warning_desc">Möchtest du wirklich die Standardeinstellungen wiederherstellen? Dadurch werden alle Einstellungen gelöscht, die du in der Anwendung vorgenommen hast.</string>
     <string name="settings_navigation_mode_title">Navigationsmodus in den Einstellungen</string>
     <string name="settings_navigation_scroll_desc">Alle Optionen auf einer Seite</string>
     <string name="settings_navigation_pages_desc">Bereichsübersicht, dann eine Kategorie auf einmal</string>
@@ -203,6 +203,7 @@
     <string name="operators_share_all">Alle Betreiber teilen (PDF)</string>
     <string name="settings_simple_mode_desc">Startet auf der Karte, ersetzt den Startbildschirm durch ein Seitenmenü und fasst alle Betreiber auf einer Seite zusammen.</string>
     <string name="simple_mode_open_menu">Menü öffnen</string>
+    <string name="simple_mode_disable">Einfachen Modus deaktivieren</string>
     <string name="simple_mode_update_banner_title">Update verfügbar</string>
     <string name="simple_mode_update_banner_desc">GeoTower %1$s · zum Öffnen tippen</string>
     <string name="settings_display_fullscreen_title">Vollbild</string>
@@ -230,7 +231,7 @@
     <string name="appstrings_site_network_ids_option">Netzkennungen (eNB / gNB)</string>
     <string name="appstrings_site_network_ids_source">Quelle: eNB Analytics</string>
     <string name="appstrings_site_network_ids_about_action">Über eNB Analytics</string>
-    <string name="appstrings_site_network_ids_about">eNB Analytics ist ein unabhängiges, ehrenamtliches Projekt zur automatisierten Analyse von 4G- und 5G-Netzen. Die Mitwirkenden erfassen die unterwegs angetroffenen Zellen über die zugehörige Android-App; die Messungen werden mit den ANFR-Daten abgeglichen.\n\nDas Projekt veröffentlicht 4G- und 5G-Karten je Betreiber, Werkzeuge zur Antennensuche sowie Auswertungen zu Funklöchern und TAC-Bereichen. Abgedeckt sind Frankreich (einschließlich Überseegebiete), Monaco, Spanien, Portugal, Luxemburg und die Schweiz.\n\nUnabhängiges Projekt ohne Verbindung zu den erfassten Betreibern. GeoTower gibt dessen eNB- und gNB-Kennungen mit seiner Zustimmung weiter.</string>
+    <string name="appstrings_site_network_ids_about">eNB Analytics ist ein unabhängiges, ehrenamtliches Projekt zur automatisierten Analyse von 4G- und 5G-Netzen. Die Mitwirkenden erfassen die unterwegs angetroffenen Zellen über die zugehörige Android-Anwendung; die Messungen werden mit den ANFR-Daten abgeglichen.\n\nDas Projekt veröffentlicht 4G- und 5G-Karten je Betreiber, Werkzeuge zur Antennensuche sowie Auswertungen zu Funklöchern und TAC-Bereichen. Abgedeckt sind Frankreich (einschließlich Überseegebiete), Monaco, Spanien, Portugal, Luxemburg und die Schweiz.\n\nUnabhängiges Projekt ohne Verbindung zu den erfassten Betreibern. GeoTower gibt dessen eNB- und gNB-Kennungen mit seiner Zustimmung weiter.</string>
     <string name="enb_database_download_action">Kennungen herunterladen</string>
     <string name="enb_database_row_count">Kennungen: %1$s</string>
     <string name="enb_database_source_attribution">Quelle: eNB Analytics</string>
@@ -244,13 +245,14 @@
     <string name="database_delete_warning_desc">Möchtest du die Datenbank wirklich löschen?</string>
     <string name="database_download_success_title">Download abgeschlossen</string>
     <string name="database_download_success_desc">Die Datenbank wurde erfolgreich heruntergeladen!</string>
-    <string name="notification_database_channel_name">Datenbankaktualisierung</string>
-    <string name="notification_database_download_title">Datenbankaktualisierung</string>
+    <string name="notification_database_channel_name">Datenbanken</string>
+    <string name="notification_database_download_title">Datenbankaktualisierung: %1$s</string>
+    <string name="notification_database_first_download_title">Datenbank wird heruntergeladen: %1$s</string>
     <string name="notification_database_download_progress">Download läuft... %1$d%%</string>
-    <string name="notification_database_downloaded_title">Datenbank</string>
-    <string name="notification_database_downloaded_content">Datenbank heruntergeladen. Zum Öffnen tippen.</string>
-    <string name="notification_database_download_failed_title">Fehler</string>
-    <string name="notification_database_download_failed_content">Download fehlgeschlagen. Bitte überprüfe deine Verbindung.</string>
+    <string name="notification_database_downloaded_title">Download abgeschlossen: %1$s</string>
+    <string name="notification_database_downloaded_content">Offline verfügbar: %1$s. Zum Öffnen tippen.</string>
+    <string name="notification_database_download_failed_title">Download fehlgeschlagen: %1$s</string>
+    <string name="notification_database_download_failed_content">Überprüfe deine Verbindung und versuche es erneut.</string>
     <string name="notification_map_channel_name">Kartendownload</string>
     <string name="notification_map_download_title">Karte: %1$s</string>
     <string name="notification_map_download_progress">Download... %1$d%%</string>
@@ -259,9 +261,16 @@
     <string name="map_file_size_mb">%1$d MB</string>
     <string name="map_download_progress_inline">Download: %1$d%%</string>
     <string name="notification_db_updates_channel_name">Datenbankaktualisierungen</string>
-    <string name="notification_db_update_available_title">Neue Datenbank</string>
-    <string name="notification_db_update_available_desc">Ein Antennenupdate ist verfügbar. Tippe, um den Downloadbereich zu öffnen.</string>
-    <string name="notification_db_update_available_desc_rebuild">Ein Antennenupdate ist verfügbar. Tippe, um deine Datenbank auf dem Gerät neu zu erstellen.</string>
+    <string name="notification_db_update_available_title">Update verfügbar: %1$s</string>
+    <string name="notification_db_update_available_desc">Ein Update ist für %1$s verfügbar. Zum Öffnen der Download-Karte tippen.</string>
+    <string name="notification_db_update_available_desc_rebuild">Ein Update ist für %1$s verfügbar. Tippe, um die Daten auf diesem Gerät neu zu erstellen.</string>
+    <string name="database_update_all_title">Datenbanken aktualisieren</string>
+    <string name="database_update_all_desc">Prüft die Mobilfunk-, Radio- und eNB/gNB-Datenbank und lädt nur notwendige Aktualisierungen herunter.</string>
+    <string name="database_update_all_action">Verfügbare Datenbanken aktualisieren</string>
+    <string name="database_update_all_checking">Updates werden gesucht…</string>
+    <string name="database_update_all_running">Updates werden installiert…</string>
+    <string name="database_update_all_none">Alle verfügbaren Datenbanken sind aktuell.</string>
+    <string name="database_update_all_queued">Aktualisierungen in Warteschlange: %1$d</string>
     <string name="notification_app_updates_channel_name">GeoTower-Updates</string>
     <string name="notification_app_update_available_title">Neue GeoTower-Version</string>
     <string name="notification_app_update_available_desc">GeoTower %1$s ist verfügbar. Tippe, um den Download zu öffnen.</string>
@@ -380,10 +389,10 @@
     <string name="appstrings_antennas_table_title">Antennen</string>
     <string name="appstrings_api_detail_incident">Laufender Vorfall</string>
     <string name="appstrings_api_detail_maintenance">Wartungsarbeiten</string>
-    <string name="appstrings_app_icon">App-Symbol</string>
-    <string name="appstrings_app_language_label">App-Sprache</string>
+    <string name="appstrings_app_icon">Symbol der Anwendung</string>
+    <string name="appstrings_app_language_label">Sprache der Anwendung</string>
     <string name="appstrings_app_logo_drawing_subtitle">Wählt die Grafik für Startseite, Splash und Über.</string>
-    <string name="appstrings_app_logo_drawing_title">Logo in der App</string>
+    <string name="appstrings_app_logo_drawing_title">Logo in der Anwendung</string>
     <string name="appstrings_appearance">Darstellung</string>
     <string name="appstrings_apply">Anwenden</string>
     <string name="appstrings_awesome">Super!</string>
@@ -401,7 +410,7 @@
     <string name="appstrings_bearing_label">Peilung von der Antenne gemessen:\u0020</string>
     <string name="appstrings_bg_location_perm_desc">"Immer" erlauben, damit das Widget aktualisiert wird</string>
     <string name="appstrings_battery_opt_title">Akku-Optimierung deaktivieren</string>
-    <string name="appstrings_battery_opt_desc">Auf manchen Geräten (Samsung…) wird das Live-Tracking im Hintergrund eingefroren. Erlaube der App, die Akku-Optimierung zu ignorieren, für unterbrechungsfreies Tracking.</string>
+    <string name="appstrings_battery_opt_desc">Auf manchen Geräten (Samsung…) wird das Live-Tracking im Hintergrund eingefroren. Erlaube der Anwendung, die Akku-Optimierung zu ignorieren, für unterbrechungsfreies Tracking.</string>
     <string name="appstrings_bg_location_perm_title">Widget-Berechtigung</string>
     <string name="appstrings_blur_subtitle">Weichzeichnung aktivieren oder deaktivieren (verbraucht mehr Akku)</string>
     <string name="appstrings_blur_title">Scroll-Weichzeichnung</string>
@@ -488,7 +497,7 @@
     <string name="appstrings_pdf_downloaded">PDF heruntergeladen</string>
     <string name="appstrings_pdf_downloaded_desc">Unter Downloads/GeoTower als %1$s gespeichert.</string>
     <string name="appstrings_pdf_open_folder">Speicherort öffnen</string>
-    <string name="appstrings_pdf_open_error">Keine App kann dieses PDF öffnen</string>
+    <string name="appstrings_pdf_open_error">Keine Anwendung kann dieses PDF öffnen</string>
     <string name="appstrings_pdf_report_generating">PDF-Bericht wird erstellt</string>
     <string name="appstrings_pdf_report_channel_name">GeoTower PDF-Bericht</string>
     <string name="appstrings_photo_copied_to_clipboard">Bild in die Zwischenablage kopiert</string>
@@ -540,7 +549,7 @@
     <string name="appstrings_db_download_termine">Fertig</string>
     <string name="appstrings_db_success_desc">Die Offline-Datenbank wurde erfolgreich installiert. Die Anwendung ist vollständig bereit.</string>
     <string name="appstrings_db_success_title">Download abgeschlossen!</string>
-    <string name="appstrings_db_warning_desc">Du hast die App-Datenbank nicht heruntergeladen, daher werden keine Einträge angezeigt.</string>
+    <string name="appstrings_db_warning_desc">Du hast die Datenbank der Anwendung nicht heruntergeladen, daher werden keine Einträge angezeigt.</string>
     <string name="appstrings_db_warning_question">Möchtest du wirklich fortfahren?</string>
     <string name="appstrings_db_warning_title">Datenbank nicht heruntergeladen</string>
     <string name="appstrings_default_operator">Standardbetreiber</string>
@@ -651,9 +660,9 @@
     <string name="appstrings_full_screen_photo_desc">Vollbildfoto</string>
     <string name="appstrings_gallery">Galerie</string>
     <string name="appstrings_generate_image">Bild erstellen</string>
-    <string name="appstrings_generated_by">Erstellt mit der GeoTower-App</string>
+    <string name="appstrings_generated_by">Erstellt mit der GeoTower-Anwendung</string>
     <string name="appstrings_share_generated_datetime">%1$s um %2$s</string>
-    <string name="appstrings_geo_tower_app">der GeoTower-App</string>
+    <string name="appstrings_geo_tower_app">der GeoTower-Anwendung</string>
     <string name="appstrings_geoportail_ign">Geoportal (IGN)</string>
     <string name="appstrings_gps_coords_copy">GPS-Koordinaten</string>
     <string name="appstrings_gps_label">GPS:\u0020</string>
@@ -684,8 +693,8 @@
     <string name="appstrings_implementation">Implementierung:\u0020</string>
     <string name="appstrings_in_service">In Betrieb</string>
     <string name="appstrings_init_error">Initialisierungsfehler</string>
-    <string name="appstrings_install_app">App installieren</string>
-    <string name="appstrings_installed_app">Installierte App</string>
+    <string name="appstrings_install_app">Anwendung installieren</string>
+    <string name="appstrings_installed_app">Installierte Anwendung</string>
     <string name="appstrings_installed_app_desc">Mit Waze, Maps, OsmAnd öffnen...</string>
     <string name="appstrings_invalid_db_banner_desc">Die lokale Datenbank ist inkompatibel. Lade eine gültige Datenbank herunter, um fortzufahren.</string>
     <string name="appstrings_invalid_db_banner_title">Ungültige Datenbank</string>
@@ -710,7 +719,7 @@
     <string name="appstrings_live_notification_desc_nearest">Verfolge die nächstgelegene Antenne in Echtzeit, unabhängig vom Betreiber.</string>
     <string name="appstrings_live_notification_requires_op">Erfordert einen Standardbetreiber</string>
     <string name="appstrings_live_notification_title">Live-Tracking</string>
-    <string name="appstrings_app_notifications_title">App-Benachrichtigungen</string>
+    <string name="appstrings_app_notifications_title">Benachrichtigungen der Anwendung</string>
     <string name="appstrings_app_notifications_desc">GeoTower darf benachrichtigen: Datenbank geladen oder Update verfügbar, Störungen aktualisiert, PDF-Bericht fertig, Fotoupload beendet, Offlinekarte geladen. Unabhängig vom Live-Tracking.</string>
     <string name="appstrings_live_location_refresh_title">Live-GPS-Aktualisierung</string>
     <string name="appstrings_live_location_refresh_footer">Kürzere Intervalle machen die Verfolgung reaktionsschneller, können aber mehr Akku verbrauchen.</string>
@@ -729,7 +738,7 @@
     <string name="appstrings_logo_app">Anwendung</string>
     <string name="appstrings_logo_bouygues">Bouygues</string>
     <string name="appstrings_logo_drawing_auto">Automatisch</string>
-    <string name="appstrings_logo_drawing_auto_desc">Folgt dem aktiven App-Symbol und Design.</string>
+    <string name="appstrings_logo_drawing_auto_desc">Folgt dem aktiven Symbol der Anwendung und Design.</string>
     <string name="appstrings_logo_drawing_color_on_dark">Farbe auf dunkel</string>
     <string name="appstrings_logo_drawing_color_on_light">Farbe auf hell</string>
     <string name="appstrings_logo_drawing_mono_dark">Dunkles Monochrom</string>
@@ -779,7 +788,7 @@
     <string name="appstrings_menu_size_title">Größe des Hauptmenüs</string>
     <string name="appstrings_min_one_freq_warning">Du musst mindestens eine Frequenz behalten.</string>
     <string name="appstrings_min_one_techno_warning">Du musst mindestens eine Mobilfunktechnologie behalten (2G, 3G, 4G oder 5G).</string>
-    <string name="appstrings_missing_db_banner_desc">Lade die Datenbank herunter, um die App zu nutzen.</string>
+    <string name="appstrings_missing_db_banner_desc">Lade die Datenbank herunter, um die Anwendung zu nutzen.</string>
     <string name="appstrings_missing_db_banner_title">Datenbank fehlt</string>
     <string name="appstrings_mobile_telephony">Mobiltelefonie</string>
     <string name="appstrings_move">Verschieben</string>
@@ -822,7 +831,7 @@
     <string name="appstrings_no">Nein</string>
     <string name="appstrings_no_data_found">Keine Daten gefunden.</string>
     <string name="appstrings_no_database_installed">Keine Datenbank installiert</string>
-    <string name="appstrings_no_gps_app">Keine GPS-App gefunden.</string>
+    <string name="appstrings_no_gps_app">Keine GPS-Anwendung gefunden.</string>
     <string name="appstrings_no_offline_maps_installed">(Keine Offline-Karte installiert)</string>
     <string name="appstrings_no_sites_found">Keine Standorte gefunden.</string>
     <string name="appstrings_none">Keine</string>
@@ -870,9 +879,9 @@
     <string name="appstrings_onboarding_notifications_download_desc">GeoTower kann den Fortschritt von Datenbank- und Offline-Kartendownloads anzeigen.</string>
     <string name="appstrings_onboarding_notifications_download_title">Sichtbare Downloads</string>
     <string name="appstrings_onboarding_notifications_title">Benachrichtigungen</string>
-    <string name="appstrings_onboarding_notifications_update_desc">Du kannst benachrichtigt werden, wenn eine neue Datenbank verfügbar ist, ohne die App zu öffnen.</string>
+    <string name="appstrings_onboarding_notifications_update_desc">Du kannst benachrichtigt werden, wenn eine neue Datenbank verfügbar ist, ohne die Anwendung zu öffnen.</string>
     <string name="appstrings_onboarding_notifications_update_title">Aktuelle Daten</string>
-    <string name="appstrings_onboarding_welcome_desc">Willkommen bei GeoTower, der App zum Finden von Mobilfunkstandorten in deiner Nähe und ihren Informationen.</string>
+    <string name="appstrings_onboarding_welcome_desc">Willkommen bei GeoTower, der Anwendung zum Finden von Mobilfunkstandorten in deiner Nähe und ihren Informationen.</string>
     <string name="appstrings_onboarding_welcome_map_desc">Durchsuche Antennen, Filter, Ebenen und technische Informationen direkt auf der Karte.</string>
     <string name="appstrings_onboarding_welcome_map_title">Auf der Karte erkunden</string>
     <string name="appstrings_onboarding_welcome_nearby_desc">Liste schnell die nächsten Funkstandorte und Träger um deine Position auf.</string>
@@ -931,7 +940,7 @@
     <string name="appstrings_exploitant">Betreiber</string>
     <string name="appstrings_page_compass">Kompass</string>
     <string name="appstrings_page_compass_settings">Kompass</string>
-    <string name="appstrings_page_home_logo_settings">App-Logo</string>
+    <string name="appstrings_page_home_logo_settings">Logo der Anwendung</string>
     <string name="appstrings_page_home_settings">Startseite</string>
     <string name="appstrings_page_map_settings">Antennenkarte</string>
     <string name="appstrings_page_nearby_settings">Antennen in der Nähe</string>
@@ -939,7 +948,7 @@
     <string name="appstrings_page_site_embedded_settings">Standortdetails (Betreiberabschnitte)</string>
     <string name="appstrings_page_speedtests_settings">Speedtests</string>
     <string name="appstrings_page_support_settings">Supportdetails</string>
-    <string name="appstrings_pages_customization_desc">Passe die Anzeige der verschiedenen App-Seiten an</string>
+    <string name="appstrings_pages_customization_desc">Passe die Anzeige der verschiedenen Seiten der Anwendung an</string>
     <string name="appstrings_pages_customization_title">Seiten anpassen</string>
     <string name="appstrings_panel_heights_title">Panelhöhen</string>
     <string name="appstrings_panel_identifier">Panelkennung</string>
@@ -964,7 +973,7 @@
     <string name="appstrings_release_community_exif_setting">Einstellung zum Ein- oder Ausblenden von EXIF-Informationen hinzugefügt</string>
     <string name="appstrings_release_community_photo_localization">Bessere Lokalisierung fotobezogener Informationen</string>
     <string name="appstrings_release_language_additions">Italienisch, Deutsch und Spanisch hinzugefügt</string>
-    <string name="appstrings_release_multilingual_management">Mehrsprachige Verwaltung in der gesamten App verbessert</string>
+    <string name="appstrings_release_multilingual_management">Mehrsprachige Verwaltung in der gesamten Anwendung verbessert</string>
     <string name="appstrings_release_notifications_widget_auto_translations">Neue Übersetzungen für Benachrichtigungen, Widget und Android Auto hinzugefügt</string>
     <string name="appstrings_release_section_community_photos">Community-Fotos</string>
     <string name="appstrings_release_section_interface">Oberfläche</string>
@@ -1017,7 +1026,7 @@
     <string name="appstrings_release_statistics_readable_charts">Diagramme sind lesbarer, animiert und leichter zu durchstöbern</string>
     <string name="appstrings_release_statistics_translations">Übersetzungen der Statistiktexte verbessert</string>
     <string name="appstrings_release_external_photo_history_complete">Vollständigere Historie externer Foto-Uploads</string>
-    <string name="appstrings_release_global_flexible_features">Flexiblere Verwaltung einiger App-Funktionen</string>
+    <string name="appstrings_release_global_flexible_features">Flexiblere Verwaltung einiger Funktionen der Anwendung</string>
     <string name="appstrings_release_global_home_announcement">Ankündigungsbanner auf der Startseite in der gewählten Sprache hinzugefügt</string>
     <string name="appstrings_release_global_unavailable_pages">Bessere Behandlung vorübergehend nicht verfügbarer Seiten</string>
     <string name="appstrings_release_global_localized_update_notes">Versionshinweise und Update-Benachrichtigungen besser lokalisiert</string>
@@ -1025,7 +1034,7 @@
     <string name="appstrings_release_statistics_declared_active_sites">Statistiken mit gemeldeten und aktiven Standorten überarbeitet</string>
     <string name="appstrings_release_statistics_weekly_trends">Wöchentliche Trends hinzugefügt</string>
     <string name="appstrings_release_statistics_custom_frequency_display">Anpassbarere Anzeige mit Details nach Frequenz</string>
-    <string name="appstrings_release_settings_shortcuts_across_screens">Schneller Zugriff auf Einstellungen aus mehreren App-Bildschirmen hinzugefügt</string>
+    <string name="appstrings_release_settings_shortcuts_across_screens">Schneller Zugriff auf Einstellungen aus mehreren Bildschirmen der Anwendung hinzugefügt</string>
     <string name="appstrings_release_community_cellularfr_availability">Bessere Verwaltung von CellularFR-Fotos und Links je nach Verfügbarkeit</string>
     <string name="appstrings_release_speedtests_all_page">Seite zum Anzeigen aller Speedtests hinzugefügt</string>
     <string name="appstrings_release_speedtests_sort_filters_details">Vollständigere Sortierung, Filter und Details für jedes Ergebnis</string>
@@ -1038,7 +1047,7 @@
     <string name="appstrings_release_live_tracking_compact_display">Kompaktere und besser lesbare Anzeige</string>
     <string name="appstrings_release_live_tracking_tracker_icon">Tracking-Symbol je nach Entfernung verbessert</string>
     <string name="appstrings_release_live_tracking_site_photo_focus">Standortfoto wird besser hervorgehoben</string>
-    <string name="appstrings_release_global_feature_availability">Flexiblere Verwaltung einiger Funktionen je nach App-Verfügbarkeit</string>
+    <string name="appstrings_release_global_feature_availability">Flexiblere Verwaltung einiger Funktionen je nach Verfügbarkeit der Anwendung</string>
     <string name="appstrings_release_global_internal_stability_update">Internes Update zur Verbesserung von Stabilität und Android-Kompatibilität</string>
     <string name="appstrings_release_global_reliable_network_background_services">Zuverlässigere Netzwerkverwaltung und Hintergrunddienste</string>
     <string name="appstrings_release_global_permissions_gps_compass_adjusted">Berechtigungen und GPS/Kompass-Kompatibilität angepasst</string>
@@ -1094,13 +1103,13 @@
     <string name="appstrings_release_community_photo_filters">Fotos werden nach aktivem Betreiber und aktivierten Quellen gefiltert</string>
     <string name="appstrings_release_signalquest_photo_order">Reihenfolge des Foto-Uploads verbessert</string>
     <string name="appstrings_release_signalquest_upload_checks">Prüfungen hinzugefügt, um Uploads zuverlässiger zu machen</string>
-    <string name="appstrings_release_signalquest_connection_simplified">SignalQuest-Verbindung vereinfacht und besser in die App integriert</string>
+    <string name="appstrings_release_signalquest_connection_simplified">SignalQuest-Verbindung vereinfacht und besser in die Anwendung integriert</string>
     <string name="appstrings_release_signalquest_features_accessible">SignalQuest-Fotos, Uploads und Speedtests sind leichter zugänglich</string>
     <string name="appstrings_release_signalquest_live_photos_available">Live-Fotos sind ohne besondere lokale SignalQuest-Einstellung verfügbar</string>
-    <string name="appstrings_release_languages_complete_management">Vollständige Verbesserung der Sprachverwaltung in der gesamten App</string>
+    <string name="appstrings_release_languages_complete_management">Vollständige Verbesserung der Sprachverwaltung in der gesamten Anwendung</string>
     <string name="appstrings_release_languages_expanded_translations">Erweiterte Übersetzungen auf Französisch, Englisch, Portugiesisch, Italienisch, Deutsch und Spanisch</string>
     <string name="appstrings_release_interface_better_translation">Bessere Übersetzung von Bildschirmen, Widgets, Benachrichtigungen, Android Auto, Hilfe, Karten und Teilen</string>
-    <string name="appstrings_release_interface_consistent_texts">Konsistentere Texte in der gesamten App</string>
+    <string name="appstrings_release_interface_consistent_texts">Konsistentere Texte in der gesamten Anwendung</string>
     <string name="appstrings_release_signalquest_reliable_uploads">Zuverlässigerer Foto-Upload</string>
     <string name="appstrings_release_signalquest_failure_recovery">Bessere Wiederaufnahme von Uploads nach einem Fehler</string>
     <string name="appstrings_release_signalquest_photo_status">Klarere Statusverfolgung für jedes Foto</string>
@@ -1113,9 +1122,9 @@
     <string name="appstrings_release_widget_localization">Lokalisierung des Widgets verbessert</string>
     <string name="appstrings_reset_settings">Einstellungen zurücksetzen</string>
     <string name="appstrings_reset_to_default">Standardeinstellungen wiederherstellen</string>
-    <string name="appstrings_reset_warning_desc">Möchtest du wirklich die Standardeinstellungen wiederherstellen? Dadurch werden alle App-Einstellungen gelöscht, die du vorgenommen hast.</string>
+    <string name="appstrings_reset_warning_desc">Möchtest du wirklich die Standardeinstellungen wiederherstellen? Dadurch werden alle Einstellungen der Anwendung gelöscht, die du vorgenommen hast.</string>
     <string name="appstrings_reset_warning_title">Warnung</string>
-    <string name="appstrings_restart_to_apply">Die App startet neu, um die Änderung anzuwenden.</string>
+    <string name="appstrings_restart_to_apply">Die Anwendung startet neu, um die Änderung anzuwenden.</string>
     <string name="appstrings_retry">Erneut versuchen</string>
     <string name="appstrings_ruler">Lineal</string>
     <string name="appstrings_scan_to_open">Scannen zum Öffnen in</string>
@@ -1319,8 +1328,8 @@
     <string name="appstrings_src_ign_services">Kartenhintergründe, Geländehöhe (RGE ALTI), Gebäude und Routen (BD TOPO) über die Géoplateforme.</string>
     <string name="appstrings_src_inspo">Inspiration und externe Quellen</string>
     <!-- CellularFR masqué — voir CellularFrApi.ENABLED. Valeur originale :
-         "• © CellularFR entwickelt von Luis Baker\n• © Signal Quest entwickelt von Alexandre Germain\n• © RNC Mobile entwickelt von Cédric\n• © eNB-Analytics entwickelt von Tristan\n• © GeoRadio - Das alternative Symbol stammt aus der von Hugo Martin entwickelten iOS-App GéoRadio.\n• Ursprüngliches Konzept auf Basis der GéoRadio-App\n• Fun-Symbol von Johan gestaltet" -->
-    <string name="appstrings_src_inspo_desc">• © Signal Quest entwickelt von Alexandre Germain\n• © RNC Mobile entwickelt von Cédric\n• © eNB-Analytics entwickelt von Tristan\n• © GeoRadio - Das alternative Symbol stammt aus der von Hugo Martin entwickelten iOS-App GéoRadio.\n• Ursprüngliches Konzept auf Basis der GéoRadio-App\n• Fun-Symbol von Johan gestaltet</string>
+         "• © CellularFR entwickelt von Luis Baker\n• © Signal Quest entwickelt von Alexandre Germain\n• © RNC Mobile entwickelt von Cédric\n• © eNB-Analytics entwickelt von Tristan\n• © GeoRadio - Das alternative Symbol stammt aus der von Hugo Martin entwickelten iOS-Anwendung GéoRadio.\n• Ursprüngliches Konzept auf Basis der GéoRadio-Anwendung\n• Fun-Symbol von Johan gestaltet" -->
+    <string name="appstrings_src_inspo_desc">• © Signal Quest entwickelt von Alexandre Germain\n• © RNC Mobile entwickelt von Cédric\n• © eNB-Analytics entwickelt von Tristan\n• © GeoRadio - Das alternative Symbol stammt aus der von Hugo Martin entwickelten iOS-Anwendung GéoRadio.\n• Ursprüngliches Konzept auf Basis der GéoRadio-Anwendung\n• Fun-Symbol von Johan gestaltet</string>
     <string name="appstrings_src_offline_maps_label">Karten-Downloads</string>
     <string name="appstrings_src_osm">OSM-Basiskarte</string>
     <string name="appstrings_src_osm_desc">© OpenStreetMap-Mitwirkende.</string>
@@ -1331,7 +1340,7 @@
     <string name="appstrings_src_reference">Administrative Referenzdaten</string>
     <string name="appstrings_src_reference_desc">Namen der Gemeinden und Departements, Einwohnerzahl und Fläche.</string>
     <string name="appstrings_src_server">GeoTower-Server</string>
-    <string name="appstrings_src_server_desc">Download der Datenbank, Störungsdatei, Online-Datenbank, Community-Fotos und App-Updates.</string>
+    <string name="appstrings_src_server_desc">Download der Datenbank, Störungsdatei, Online-Datenbank, Community-Fotos und Updates der Anwendung.</string>
     <string name="appstrings_src_server_mirror">Spiegelserver</string>
     <string name="appstrings_src_server_primary">Hauptserver</string>
     <string name="appstrings_src_tiles">Weitere Kartenhintergründe</string>
@@ -1509,7 +1518,7 @@
     <string name="appstrings_uploading_title">Upload läuft</string>
     <string name="appstrings_validate">Bestätigen</string>
     <string name="appstrings_version">Version</string>
-    <string name="appstrings_version_app_label">App-\nVersion</string>
+    <string name="appstrings_version_app_label">Version der\nAnwendung</string>
     <string name="appstrings_version_db_label">Datenbank-\nversion</string>
     <string name="appstrings_version_radio_db_label">Zusatz-\nRadiodatenbank</string>
     <string name="appstrings_version_enb_db_label">eNB-/gNB-\nKennungen</string>
@@ -1787,7 +1796,7 @@
     <string name="help_topic_subtitle_data">Downloads, progress notifications, updates and local storage.</string>
     <string name="help_topic_subtitle_about">Version, data sources, development information and useful links.</string>
     <string name="help_topic_subtitle_glossary">Meaning of common icons and solutions to frequent issues.</string>
-    <string name="help_section_title_start_prepare">Prepare the app</string>
+    <string name="help_section_title_start_prepare">Prepare the Anwendung</string>
     <string name="help_section_title_start_search">Search for an antenna</string>
     <string name="help_section_title_start_cards">Understand detail pages</string>
     <string name="help_section_title_home_buttons">Navigation buttons</string>
@@ -1823,7 +1832,7 @@
     <string name="help_section_body_start_prepare">On first launch, make sure the database is downloaded, location is allowed and your main operator is set in settings. Without the local database, antenna screens cannot show ANFR sites.</string>
     <string name="help_section_body_start_search">From Home, open Nearby antennas for a list around you or Antenna map to explore visually. Both paths then lead to support details and site details.</string>
     <string name="help_section_body_start_cards">A support is the tower, roof or building. A site is an operator installation on that support. Technical details, frequencies, azimuths and advanced tools are mostly on the site detail page.</string>
-    <string name="help_section_body_home_buttons">Home groups the app\'s main shortcuts. Some buttons can be hidden or moved from Settings &gt; Page customization.</string>
+    <string name="help_section_body_home_buttons">Home groups the Anwendung\'s main shortcuts. Some buttons can be hidden or moved from Settings &gt; Page customization.</string>
     <string name="help_section_body_home_banners">If the database is missing, outdated or downloading, a banner appears at the top. If the network is unavailable, an offline banner warns that some features cannot update.</string>
     <string name="help_section_body_nearby_search">Search accepts free text and codes. For a city, GeoTower can use the same logic as the map: find the municipality area, then filter sites across the full ANFR address.</string>
     <string name="help_section_body_nearby_codes">Use prefixes when a search may be ambiguous: ville:Paris, cp:75015, gps:48.8566,2.3522, support:123456, anfr:987654, tech:5G, type:pylon, op:Orange. Accents, uppercase letters and hyphens are normalized to make city searches easier.</string>
@@ -1904,7 +1913,7 @@
     <string name="help_action_desc_live_search">Updates the target antenna or site based on your position.</string>
     <string name="help_action_desc_quit">Stops active tracking and returns to normal mode.</string>
     <string name="help_action_desc_open_map">Centers the GeoTower map on this support.</string>
-    <string name="help_action_desc_navigate">Opens the phone navigation app toward the coordinates.</string>
+    <string name="help_action_desc_navigate">Opens the phone navigation Anwendung toward the coordinates.</string>
     <string name="help_action_desc_share">Opens sharing and image generation options.</string>
     <string name="help_action_desc_photos">Shows community photos and diagrams if available.</string>
     <string name="help_action_desc_operator_site">Opens the detail page for an operator installed on the support.</string>
@@ -1951,13 +1960,13 @@
     <string name="help_visual_label_share_2">Generated image preview.</string>
     <string name="help_visual_label_share_3">Export or Android sharing.</string>
     <string name="help_visual_label_settings_1">Side sections or page mode.</string>
-    <string name="help_visual_label_settings_2">Quick app preferences.</string>
+    <string name="help_visual_label_settings_2">Quick Anwendung preferences.</string>
     <string name="help_visual_label_settings_3">Page and button customization.</string>
     <string name="help_visual_label_data_1">ANFR database download.</string>
     <string name="help_visual_label_data_2">Available offline maps.</string>
     <string name="help_visual_label_data_3">Notifications leading to the right section.</string>
     <string name="help_visual_label_about_1">Section navigation.</string>
-    <string name="help_visual_label_about_2">App and data version.</string>
+    <string name="help_visual_label_about_2">Anwendung and data version.</string>
     <string name="help_visual_label_about_3">Sources, development and useful links.</string>
     <string name="appstrings_warning_choose_op">Betreiber wählen</string>
     <string name="appstrings_warning_continue">Trotzdem fortfahren</string>
@@ -2001,7 +2010,7 @@
     <string name="appstrings_release_map_nearby_emitters_dark_readability">Bessere Lesbarkeit der Karten für nahe Sender im dunklen Design</string>
     <string name="appstrings_release_signalquest_upload_privacy_clearer">Klarere Foto-Datenschutzeinstellung auf dem Upload-Bildschirm</string>
     <string name="appstrings_release_signalquest_exif_removal_default_off">Entfernen von EXIF-Daten standardmäßig deaktiviert</string>
-    <string name="appstrings_release_interface_orientation_adapted">App passt sich besser an die Bildschirmausrichtung an</string>
+    <string name="appstrings_release_interface_orientation_adapted">Anwendung passt sich besser an die Bildschirmausrichtung an</string>
     <string name="appstrings_release_interface_large_screens">Startseite, Info und Einstellungen besser an große Bildschirme angepasst</string>
     <string name="appstrings_release_interface_two_pane_large_screens">Verbesserte Zwei-Spalten-Anzeige auf echten Großbildschirmen</string>
     <string name="appstrings_release_compass_rotation_reliable">Zuverlässigerer Kompass bei Bildschirmdrehung</string>
@@ -2012,7 +2021,7 @@
     <string name="appstrings_release_notifications_live_visual">Visuellere Live-Benachrichtigungen mit Standortfoto oder Betreiberlogo</string>
     <string name="appstrings_release_notifications_live_text_clearer">Klarerer Benachrichtigungstext</string>
     <string name="appstrings_release_notifications_live_compatibility">Bessere Kompatibilität je nach Gerät</string>
-    <string name="appstrings_release_global_outage_label_down">Bezeichnung „Außer Betrieb“ in App und Übersetzungen durch „Gestört“ ersetzt</string>
+    <string name="appstrings_release_global_outage_label_down">Bezeichnung „Außer Betrieb“ in Anwendung und Übersetzungen durch „Gestört“ ersetzt</string>
     <string name="appstrings_release_search_coverage_better">Bessere Verwaltung der von der Adresssuche abgedeckten Gebiete</string>
     <string name="appstrings_release_search_unavailable_message_clearer">Klarere Meldung, wenn Daten für ein Gebiet nicht verfügbar sind</string>
     <string name="appstrings_release_map_measurement_enriched">Erweiterte Entfernungsmessung direkt auf der Karte</string>
@@ -2041,7 +2050,7 @@
     <string name="appstrings_release_online_data_fallback_mode">Fallback-Modus hinzugefügt, wenn die lokale Datenbank fehlt oder ungültig ist</string>
     <string name="appstrings_release_online_data_map_nearby_compass">Karte, Umgebung und Kompass können mit Online-Daten weiter funktionieren</string>
     <string name="appstrings_release_online_data_warning">Warnung wird angezeigt, wenn Online-Daten verwendet werden</string>
-    <string name="appstrings_release_home_onboarding_local_db_access">Die App blockiert den Zugriff nicht mehr, wenn die lokale Datenbank ungültig ist</string>
+    <string name="appstrings_release_home_onboarding_local_db_access">Die Anwendung blockiert den Zugriff nicht mehr, wenn die lokale Datenbank ungültig ist</string>
     <string name="appstrings_release_home_onboarding_radio_db_download">Das Onboarding bietet auch den Download der ANFR-Radiodatenbank an</string>
     <string name="appstrings_release_map_details_special_support_ids">Bessere Behandlung einiger Träger mit besonderen Kennungen</string>
     <string name="appstrings_release_map_details_online_results">Online-Ergebnisse werden in Standort- und Trägerdetails besser unterstützt</string>
@@ -2050,7 +2059,7 @@
     <string name="appstrings_release_section_live_notification">Live-Tracking-Benachrichtigung</string>
     <string name="appstrings_release_live_notification_nowbar_oneui85">Anzeige in der Now Bar auf neueren Samsung-Geräten korrigiert (One UI 8.5)</string>
     <string name="appstrings_release_live_notification_operator_logo">Betreiberlogo in der reduzierten Benachrichtigung angezeigt (Samsung)</string>
-    <string name="appstrings_release_live_notification_orientation_i18n">Himmelsrichtungen der Ausrichtung folgen jetzt der App-Sprache</string>
+    <string name="appstrings_release_live_notification_orientation_i18n">Himmelsrichtungen der Ausrichtung folgen jetzt der Sprache der Anwendung</string>
     <string name="appstrings_release_widget_add_button">Neue Schaltfläche in den Einstellungen, um ein GeoTower-Widget (kompakt, mittel, groß oder Karte) zum Startbildschirm hinzuzufügen</string>
     <string name="appstrings_release_widget_frequency_gated">Die Aktualisierungsfrequenz lässt sich jetzt nur einstellen, wenn ein Widget installiert ist</string>
     <string name="appstrings_release_widget_battery">Akkuschonung: Die Standortermittlung im Hintergrund läuft nicht mehr, wenn kein Widget platziert ist</string>
@@ -2161,7 +2170,7 @@
     <string name="appstrings_release_profiles_create_customize">Profil aus aktuellen Einstellungen erstellen, mit Farbe, Symbol oder Bild</string>
     <string name="appstrings_release_profiles_preview_before_apply">Vorschau der Änderungen vor dem Anwenden eines Profils</string>
     <string name="appstrings_release_profiles_import_export_share">Profile löschen, importieren, exportieren, teilen und speichern</string>
-    <string name="appstrings_release_profiles_active_sync">Aktives Profil bleibt synchronisiert und übernimmt wichtige Einstellungen ohne App-Neustart</string>
+    <string name="appstrings_release_profiles_active_sync">Aktives Profil bleibt synchronisiert und übernimmt wichtige Einstellungen ohne Neustart der Anwendung</string>
     <string name="appstrings_release_settings_menu_sizing_consistency">Einstellungsoberfläche konsistenter mit der gewählten Menügröße</string>
     <string name="appstrings_release_settings_controls_aligned">Karten, Panels, Auswahlfelder, Startseiten-Buttons und One UI-Optionen besser ausgerichtet</string>
     <string name="appstrings_release_statistics_operator_regions">Klarere Betreiberanzeige mit Unterscheidung zwischen Festland und Übersee</string>
@@ -2197,7 +2206,7 @@
     <string name="appstrings_diagnostic_section_permissions">Berechtigungen</string>
     <string name="appstrings_diagnostic_section_notifications">Benachrichtigungen</string>
     <string name="appstrings_diagnostic_section_storage">Speicher und Cache</string>
-    <string name="appstrings_diagnostic_section_environment">App und Gerät</string>
+    <string name="appstrings_diagnostic_section_environment">Anwendung und Gerät</string>
     <string name="appstrings_diagnostic_section_api_server">GeoTower-Server</string>
     <string name="appstrings_diagnostic_summary_api_primary">Hauptserver: %1$s</string>
     <string name="appstrings_diagnostic_summary_api_mirror">Ersatz-Spiegelserver aktiv: %1$s</string>
@@ -2221,14 +2230,14 @@
     <string name="appstrings_diagnostic_api_dialog_desc">GeoTower wird von zwei identischen Servern bereitgestellt. Im Automatikmodus wird der Hauptserver verwendet und bei Ausfall auf den Spiegelserver gewechselt.</string>
     <string name="appstrings_diagnostic_action_open_database_settings">Dateneinstellungen öffnen</string>
     <string name="appstrings_diagnostic_action_open_offline_maps">Offline-Karten öffnen</string>
-    <string name="appstrings_diagnostic_action_open_app_settings">Android-App-Einstellungen öffnen</string>
+    <string name="appstrings_diagnostic_action_open_app_settings">Android-Einstellungen der Anwendung öffnen</string>
     <string name="appstrings_diagnostic_action_open_notification_settings">Benachrichtigungseinstellungen öffnen</string>
     <string name="appstrings_diagnostic_details_cd">Details für %1$s</string>
     <string name="appstrings_diagnostic_details_open">Details geöffnet</string>
     <string name="appstrings_diagnostic_details_closed">Details geschlossen</string>
     <string name="appstrings_diagnostic_report_title">GeoTower-Diagnose</string>
     <string name="appstrings_diagnostic_report_date">Datum: %1$s</string>
-    <string name="appstrings_diagnostic_report_app">App: %1$s (Code %2$s)</string>
+    <string name="appstrings_diagnostic_report_app">Anwendung: %1$s (Code %2$s)</string>
     <string name="appstrings_diagnostic_report_android">Android: %1$s (API %2$d)</string>
     <string name="appstrings_diagnostic_report_global">Gesamt: %1$s</string>
     <string name="appstrings_diagnostic_summary_antennas_ok">Antennendatenbank installiert, Version %1$s</string>
@@ -2274,7 +2283,7 @@
     <string name="appstrings_diagnostic_detail_location_background">Hintergrundstandort: %1$s</string>
     <string name="appstrings_diagnostic_detail_notification_permission">Android-13-Benachrichtigungsberechtigung: %1$s</string>
     <string name="appstrings_diagnostic_detail_notifications_android">Benachrichtigungen von Android erlaubt: %1$s</string>
-    <string name="appstrings_diagnostic_detail_notifications_app">App-Benachrichtigungen: %1$s</string>
+    <string name="appstrings_diagnostic_detail_notifications_app">Benachrichtigungen der Anwendung: %1$s</string>
     <string name="appstrings_diagnostic_detail_notifications_update">Update-Benachrichtigungen: %1$s</string>
     <string name="appstrings_diagnostic_detail_notifications_live">Live-Benachrichtigung: %1$s</string>
     <string name="appstrings_diagnostic_detail_notifications_live_interval">Live-Intervall: %1$d s</string>
@@ -2285,8 +2294,8 @@
     <string name="appstrings_diagnostic_detail_storage_outages">Netzstörungen: %1$s</string>
     <string name="appstrings_diagnostic_detail_storage_maps">Offline-Karten: %1$s</string>
     <string name="appstrings_diagnostic_detail_storage_cache">Cache: %1$s</string>
-    <string name="appstrings_diagnostic_detail_storage_available">Verfügbarer App-Speicher: %1$s</string>
-    <string name="appstrings_diagnostic_detail_app_version">App-Version: %1$s</string>
+    <string name="appstrings_diagnostic_detail_storage_available">Verfügbarer Speicher der Anwendung: %1$s</string>
+    <string name="appstrings_diagnostic_detail_app_version">Version der Anwendung: %1$s</string>
     <string name="appstrings_diagnostic_detail_app_code">Versionscode: %1$s</string>
     <string name="appstrings_diagnostic_detail_android">Android: %1$s</string>
     <string name="appstrings_diagnostic_detail_device">Gerät: %1$s</string>
@@ -2366,7 +2375,7 @@
     <string name="appstrings_release_v196_cancel_downloads">Ein laufender Download (Datenbank, Offline-Karte, Funkdatenbank) kann jetzt abgebrochen werden</string>
     <string name="appstrings_release_v196_cancel_uploads">Ein laufender Foto-Upload kann jetzt abgebrochen werden, mit dem Status „Abgebrochen“ im Verlauf</string>
     <string name="appstrings_release_v196_db_indexes">Datenbank indiziert, um Karte und Filter zu beschleunigen</string>
-    <string name="appstrings_release_v196_baseline_profile">Schnellerer App-Start (Startprofil)</string>
+    <string name="appstrings_release_v196_baseline_profile">Schnellerer Start der Anwendung (Startprofil)</string>
     <string name="appstrings_release_section_location">Standort</string>
     <string name="appstrings_release_v1961_location_banner">Neues Banner, wenn der Standort deaktiviert ist (Berechtigung verweigert oder GPS aus), mit einer Schaltfläche zum Aktivieren, auf Startseite, Karte, Kompass und Standorten in der Nähe</string>
     <string name="appstrings_release_v1961_support_picker">Wenn mehrere Träger dieselben Koordinaten teilen, kann über eine Auswahl gewählt werden, welcher geöffnet wird</string>
@@ -2433,7 +2442,7 @@
     <string name="appstrings_db_time_downloaded">Heruntergeladen in %1$s</string>
     <string name="appstrings_local_build_running">Wird erzeugt…</string>
     <string name="appstrings_local_build_unavailable">Dieses Gerät kann die ausgewählten Daten nicht erzeugen.</string>
-    <string name="appstrings_local_build_need_memory">App-Speicher: %1$s verfügbar, %2$s erforderlich.</string>
+    <string name="appstrings_local_build_need_memory">Speicher der Anwendung: %1$s verfügbar, %2$s erforderlich.</string>
     <string name="appstrings_local_build_need_storage">Freier Speicher: %1$s verfügbar, %2$s erforderlich.</string>
     <string name="appstrings_local_build_try_anyway">Trotzdem versuchen</string>
     <string name="appstrings_local_build_try_anyway_warning">Die Erzeugung kann mangels Speicher oder Platz fehlschlagen. Die aktuelle Datenbank wird nie verändert: Sie riskieren nur Zeit und Daten.</string>
@@ -2463,7 +2472,7 @@
     <string name="appstrings_local_build_packs_hint">Die ANFR-Datei (erforderlich) wird geteilt. Ohne \"Mobilfunk\" entfällt zudem der ~500 MB große Observatorium-Download.</string>
     <string name="appstrings_local_build_phase_radio">Radio-Datenbank wird erstellt</string>
     <string name="appstrings_release_v1963_db_provenance">Die Einstellungen unterscheiden jetzt eine auf dem Gerät generierte Datenbank von einer online heruntergeladenen, mit dem Erstellungsdatum und einer Schaltfläche zum Austauschen</string>
-    <string name="appstrings_release_v1963_offline_maps_catalog">Die Liste der Offline-Karten erscheint jetzt sofort (in die App eingebetteter Katalog, kein Warten auf den Server)</string>
+    <string name="appstrings_release_v1963_offline_maps_catalog">Die Liste der Offline-Karten erscheint jetzt sofort (in die Anwendung eingebetteter Katalog, kein Warten auf den Server)</string>
     <string name="appstrings_release_v1963_site_panel_table">Standortdetails: neue Tabelle des Paneltyps (All-in-One / Schüssel) nach Azimut mit der AER-Kennung, passend zum PDF-Bericht</string>
     <string name="appstrings_release_v1964_map_filters_defaults">Standard-Kartenfilter: über Seitenanpassung > Antennenkarte > Filter einstellen; das Banner „Aktive Filter“ erscheint dann nur, wenn die Karte von deinem Standard abweicht</string>
     <string name="appstrings_release_v1964_db_timings">Auf den Datenbanken angezeigte Zeiten: verstrichene Zeit während des Vorgangs, dann „Erstellt in…“ oder „Heruntergeladen in…“</string>
@@ -2473,7 +2482,7 @@
     <string name="outage_source_frequency_unit">%1$d Std.</string>
     <string name="outage_source_frequency_footer">Gültigkeitsdauer der zwischengespeicherten gestörten Standorte und Hintergrundintervall, falls aktiviert.</string>
     <string name="outage_source_background_title">Gestörte Standorte im Hintergrund aktualisieren</string>
-    <string name="outage_source_background_desc">Ruft gestörte Standorte regelmäßig ab, auch wenn die App geschlossen ist (verbraucht Akku und Daten).</string>
+    <string name="outage_source_background_desc">Ruft gestörte Standorte regelmäßig ab, auch wenn die Anwendung geschlossen ist (verbraucht Akku und Daten).</string>
     <string name="outage_source_generate_now">Jetzt aktualisieren</string>
     <string name="outage_source_generating">Wird aktualisiert…</string>
     <string name="outage_source_last_generated">Zuletzt aktualisiert: %1$s</string>
@@ -2544,8 +2553,8 @@
     <string name="local_mode_maps_note">Karten, Höhendaten und Adresssuche nutzen weiterhin ihre Online-Dienste.</string>
     <string name="local_mode_db_ineligible">Dieses Gerät kann die Datenbank nicht lokal erstellen (RAM/Speicher): Sie bleibt vom Server heruntergeladen.</string>
     <string name="local_mode_db_ineligible_title">Erstellung auf diesem Gerät nicht möglich</string>
-    <string name="local_mode_db_ineligible_measured">Nötig sind %1$s App-Speicher und %2$s frei. Hier: %3$s und %4$s frei.</string>
-    <string name="local_mode_max_partial_on_this_device">Auf diesem Gerät ist die maximale Autonomie unvollständig: Fotos, Update-Prüfung, Live-API und die eNB-/gNB-Datenbank werden abgeschaltet, die Hauptdatenbanken (Mobilfunk, Rundfunk) kommen aber weiterhin vom GeoTower-Server — sonst hätte die App überhaupt keine Daten.</string>
+    <string name="local_mode_db_ineligible_measured">Nötig sind %1$s Speicher der Anwendung und %2$s frei. Hier: %3$s und %4$s frei.</string>
+    <string name="local_mode_max_partial_on_this_device">Auf diesem Gerät ist die maximale Autonomie unvollständig: Fotos, Update-Prüfung, Live-API und die eNB-/gNB-Datenbank werden abgeschaltet, die Hauptdatenbanken (Mobilfunk, Rundfunk) kommen aber weiterhin vom GeoTower-Server — sonst hätte die Anwendung überhaupt keine Daten.</string>
     <string name="enb_database_local_mode_unavailable">Maximale Autonomie: Diese Datenbank lässt sich auf dem Gerät nicht erstellen und wird daher weder heruntergeladen noch aktualisiert, solange diese Stufe aktiv ist.</string>
     <string name="local_mode_download_disabled">Daten werden auf dem Gerät aufbereitet – Server-Download deaktiviert.</string>
 
@@ -2565,15 +2574,15 @@
     <string name="appstrings_server_unreachable_dialog_title">GeoTower-Server nicht erreichbar</string>
     <string name="appstrings_server_unreachable_dialog_intro">Dein Gerät ist mit dem Internet verbunden, aber der GeoTower-Server antwortet nicht: Wartung, eine vorübergehende Störung oder ein Netzwerk, das ihn blockiert (VPN, Firmen-WLAN, DNS…).</string>
     <string name="appstrings_server_unreachable_dialog_unavailable_title">Nicht verfügbar, solange er nicht antwortet</string>
-    <string name="appstrings_server_unreachable_dialog_unavailable_list">• Herunterladen und Aktualisieren der Antennen-Datenbank\n• Prüfung auf App-Updates\n• Störungsstandorte (außer die lokale Verarbeitung holt sie auf dem Gerät)\n• Community-Fotos, Foto-Uploads und Speedtests\n• Herunterladen der Offline-Karten\n• Ankündigungen und Ferneinstellungen (die zuletzt empfangenen bleiben aktiv)\n• Die „Live“-Datenbank, die genutzt wird, wenn keine Datenbank installiert ist</string>
+    <string name="appstrings_server_unreachable_dialog_unavailable_list">• Herunterladen und Aktualisieren der Antennen-Datenbank\n• Prüfung auf Updates der Anwendung\n• Störungsstandorte (außer die lokale Verarbeitung holt sie auf dem Gerät)\n• Community-Fotos, Foto-Uploads und Speedtests\n• Herunterladen der Offline-Karten\n• Ankündigungen und Ferneinstellungen (die zuletzt empfangenen bleiben aktiv)\n• Die „Live“-Datenbank, die genutzt wird, wenn keine Datenbank installiert ist</string>
     <string name="appstrings_server_unreachable_dialog_available_title">Funktioniert weiterhin</string>
     <string name="appstrings_server_unreachable_dialog_available_list">• Die bereits installierte Datenbank: Suche, Standortdetails, Statistiken, Favoriten\n• Karte, Kompass, Messungen und Live-Verfolgung\n• Kartenhintergründe, Höhendaten und Adresssuche (unabhängige Dienste)\n• Bereits heruntergeladene Offline-Karten und die lokale Erstellung der Datenbank</string>
-    <string name="appstrings_server_unreachable_dialog_retry_hint">Die App versucht es automatisch jede Minute und bei jeder Rückkehr zum Startbildschirm erneut.</string>
+    <string name="appstrings_server_unreachable_dialog_retry_hint">Die Anwendung versucht es automatisch jede Minute und bei jeder Rückkehr zum Startbildschirm erneut.</string>
 
     <!-- Historique des sites/supports partagés ou exportés -->
     <string name="share_history_title">Freigabeverlauf</string>
-    <string name="share_history_desc">Alles, was Sie aus der App geteilt, kopiert oder exportiert haben</string>
-    <string name="share_history_empty">Noch nichts gespeichert. Alles, was Sie aus der App teilen, kopieren oder exportieren, erscheint hier.</string>
+    <string name="share_history_desc">Alles, was Sie aus der Anwendung geteilt, kopiert oder exportiert haben</string>
+    <string name="share_history_empty">Noch nichts gespeichert. Alles, was Sie aus der Anwendung teilen, kopieren oder exportieren, erscheint hier.</string>
     <string name="share_history_clear">Verlauf löschen</string>
     <string name="share_history_clear_title">Freigabeverlauf löschen?</string>
     <string name="share_history_clear_desc">Alle gespeicherten Freigaben werden von diesem Gerät gelöscht.</string>
@@ -2621,18 +2630,18 @@
     <string name="page_customization_footer_option">Hinweis am Seitenende</string>
     <string name="page_customization_footer_option_desc">Ein dezenter Link zu den Einstellungen der aktuellen Seite</string>
     <string name="page_customization_reset_hints">Tipps erneut anzeigen</string>
-    <string name="appstrings_release_v1966_simple_mode">Neuer „Einfacher Modus“: Die App startet auf der Karte, die Startseite wird durch ein Seitenmenü ersetzt und alle Betreiber stehen auf einer einzigen Seite</string>
+    <string name="appstrings_release_v1966_simple_mode">Neuer „Einfacher Modus“: Die Anwendung startet auf der Karte, die Startseite wird durch ein Seitenmenü ersetzt und alle Betreiber stehen auf einer einzigen Seite</string>
     <string name="appstrings_release_v1966_simple_mode_banner">Im einfachen Modus weist ein Banner auf ein verfügbares Update hin</string>
     <string name="appstrings_release_v1966_notifications_master">Neuer Schalter „GeoTower-Benachrichtigungen“, unabhängig von der Live-Verfolgung: Datenbank heruntergeladen oder aktuell, Störungen aktualisiert, PDF-Bericht fertig, Foto-Upload abgeschlossen, Offline-Karte heruntergeladen</string>
     <string name="appstrings_release_v1966_live_without_notif">Die Live-Verfolgung funktioniert jetzt auch, wenn Benachrichtigungen abgelehnt sind: Nur ihre Benachrichtigung bleibt ausgeblendet</string>
-    <string name="appstrings_release_v1966_onboarding_notifications">Klarerer erster Start: App-Benachrichtigungen und Live-Verfolgung werden jetzt in zwei getrennten Schritten vorgestellt</string>
+    <string name="appstrings_release_v1966_onboarding_notifications">Klarerer erster Start: Benachrichtigungen der Anwendung und Live-Verfolgung werden jetzt in zwei getrennten Schritten vorgestellt</string>
     <string name="appstrings_release_v1966_page_customization_discovery">Die Seitenanpassung ist leichter zu entdecken: eine Sprechblase erklärt das Zahnrad (einmal pro Seite), ein dezenter Hinweis erscheint am Seitenende und ein langer Druck auf einen Block öffnet dessen Einstellung – alles abschaltbar</string>
     <string name="appstrings_release_v1966_outage_source_merged">Die Seite „Störungsquelle“ ist jetzt Teil des Bildschirms „Lokale Verarbeitung“, und der Datenbankbereich lässt sich per Schaltfläche aktualisieren</string>
     <string name="appstrings_release_v1966_operators_actions">Betreiberliste: Schaltflächen zum vollständigen Auf- und Zuklappen sowie zum Teilen aller Betreiber als PDF</string>
 
     <!-- Von Google Play geforderter deutlicher Hinweis vor jeder Standortabfrage im Hintergrund. -->
     <string name="bg_location_disclosure_title">Standort im Hintergrund</string>
-    <string name="bg_location_disclosure_body">Damit das GeoTower-Widget die nächstgelegene Antenne anzeigen und sich selbst aktualisieren kann, benötigt es Zugriff auf deinen Standort im Hintergrund – auch wenn die App geschlossen ist.\n\nDieser Standort wird ausschließlich auf deinem Gerät verwendet, um die nächstgelegene Station zu berechnen. Er wird weder gespeichert noch an Dritte weitergegeben.\n\nDu kannst diese Berechtigung jederzeit widerrufen: Dann aktualisiert sich lediglich das Widget nicht mehr.</string>
+    <string name="bg_location_disclosure_body">Damit das GeoTower-Widget die nächstgelegene Antenne anzeigen und sich selbst aktualisieren kann, benötigt es Zugriff auf deinen Standort im Hintergrund – auch wenn die Anwendung geschlossen ist.\n\nDieser Standort wird ausschließlich auf deinem Gerät verwendet, um die nächstgelegene Station zu berechnen. Er wird weder gespeichert noch an Dritte weitergegeben.\n\nDu kannst diese Berechtigung jederzeit widerrufen: Dann aktualisiert sich lediglich das Widget nicht mehr.</string>
     <string name="bg_location_disclosure_option">Wähle im nächsten Bildschirm „%1$s“.</string>
 
     <!-- Versionshinweise 2.0 -->
@@ -2719,7 +2728,7 @@
     <string name="appstrings_release_v206_local_mode_coherence">Die Download-Karten der Datenbanken richten sich nach deiner Stufe der lokalen Verarbeitung: Was durch die Erzeugung auf dem Gerät ersetzt wird, wird samt Erklärung ausgeblendet</string>
     <string name="appstrings_release_v206_max_autonomy_partial">Die maximale Autonomie nennt jetzt, was sie auf deinem Gerät tatsächlich abschaltet und warum die Hauptdatenbanken weiterhin vom Server kommen können</string>
     <string name="appstrings_release_v206_outage_controls">Einstellungen zu ausgefallenen Standorten neu geordnet: Aktualisierungsintervall und Aktualisierung im Hintergrund</string>
-    <string name="appstrings_release_v2012_startup_crash">Ein unerwartetes Beenden der App wurde behoben, sowohl beim Start als auch beim Öffnen der Karte oder eines Standorts</string>
+    <string name="appstrings_release_v2012_startup_crash">Ein unerwartetes Beenden der Anwendung wurde behoben, sowohl beim Start als auch beim Öffnen der Karte oder eines Standorts</string>
     <string name="appstrings_release_v2014_smooth_location">Die Positionsmarkierung gleitet jetzt zwischen zwei GPS-Punkten, statt zu springen, und bewegt sich per Schrittzählung weiter, wenn das GPS ausfällt. In den Kartenoptionen abschaltbar</string>
     <string name="appstrings_release_v2014_announced_bands">Von der ANFR angekündigte Systeme, deren Frequenzbänder noch nicht veröffentlicht sind, werden nun als solche gekennzeichnet, statt leere Tabellen zu hinterlassen</string>
     <string name="appstrings_release_v2014_azimuth_placeholder">Der interne Hinweis „Azimut nicht angegeben“ erscheint nicht mehr in den Antennendetails</string>
@@ -2740,7 +2749,7 @@
 
     <!-- Versionshinweise 2.0.16 -->
     <string name="appstrings_release_v2016_share_frequency_pages">Ein voll belegter Standort wird jetzt auf so viele nummerierte Bilder verteilt wie nötig, statt auf zwei</string>
-    <string name="appstrings_release_v2016_share_many_bands_hint">Werden es zu viele Bilder, schlägt die App den PDF-Bericht vor, der alles in einer lesbaren Datei behält</string>
+    <string name="appstrings_release_v2016_share_many_bands_hint">Werden es zu viele Bilder, schlägt die Anwendung den PDF-Bericht vor, der alles in einer lesbaren Datei behält</string>
     <string name="appstrings_release_v2016_photo_orientation">Gesendete Fotos stehen jetzt immer aufrecht: Die Drehung steckt in den Pixeln, statt von Metadaten abzuhängen, die der Empfänger ignoriert</string>
 
     <!-- Versionshinweise 2.0.17 -->
@@ -2819,7 +2828,7 @@
     <string name="trips_duration_hour_short">Std.</string>
     <string name="trips_duration_minute_short">Min.</string>
     <string name="trips_empty_title">Keine Route</string>
-    <string name="trips_empty_desc">Setzen Sie Ihre Etappen auf der Karte: die App berechnet die Strecke und speichert die Tour.</string>
+    <string name="trips_empty_desc">Setzen Sie Ihre Etappen auf der Karte: die Anwendung berechnet die Strecke und speichert die Tour.</string>
     <string name="trips_empty_filter_title">Keine Route in diesem Filter</string>
     <string name="trips_copy_pattern">%1$s (Kopie)</string>
     <string name="trips_default_name_pattern">Tour vom %1$s</string>
@@ -2864,7 +2873,7 @@
     <string name="trips_schedule_reminder_day">Am Vortag</string>
     <string name="trips_schedule_reminder_3h">3 Stunden vorher</string>
     <string name="trips_schedule_reminder_1h">1 Stunde vorher</string>
-    <string name="trips_schedule_approximate">Erinnerungen sind ungefähr: Android kann sie verzögern, mitunter deutlich, wenn das Telefon die App schlafen legt.</string>
+    <string name="trips_schedule_approximate">Erinnerungen sind ungefähr: Android kann sie verzögern, mitunter deutlich, wenn das Telefon die Anwendung schlafen legt.</string>
     <string name="trips_schedule_stop_duration">Standzeit pro Etappe</string>
     <string name="trips_schedule_stop_minutes">%1$d Min.</string>
     <string name="trips_action_follow">Route verfolgen</string>
@@ -2884,7 +2893,7 @@
     <string name="trips_save_dialog_title">Route speichern</string>
 
     <!-- Versionshinweise 2.0.26 -->
-    <string name="appstrings_release_v2026_trip_planner">Neue Seite „Touren“: Plane eine Messrunde, indem du deine Stopps auf der Karte setzt – die App berechnet die Route, zu Fuß oder mit dem Auto, und kann die Reihenfolge optimieren oder zum Start zurückführen</string>
+    <string name="appstrings_release_v2026_trip_planner">Neue Seite „Touren“: Plane eine Messrunde, indem du deine Stopps auf der Karte setzt – die Anwendung berechnet die Route, zu Fuß oder mit dem Auto, und kann die Reihenfolge optimieren oder zum Start zurückführen</string>
     <string name="appstrings_release_v2026_trip_steps">Jeder Stopp lässt sich umsortieren, einfügen oder als erfasst markieren; die Liste zeigt den Fortschritt und filtert nach Status</string>
     <string name="appstrings_release_v2026_trip_follow">Ein Verfolgungsmodus nennt den nächsten Stopp und die Restdistanz und warnt, wenn du von der Strecke abkommst</string>
     <string name="appstrings_release_v2026_trip_reminders">Eine Tour kann ein Startdatum und Erinnerungen tragen: am Vortag, 3 Stunden oder 1 Stunde vorher</string>
@@ -2929,7 +2938,7 @@
     <string name="notification_history_option_counter">Zähler anzeigen</string>
     <string name="notification_history_option_detail">Nicht angezeigte Benachrichtigungen markieren</string>
     <string name="notification_history_filter_all">Alle</string>
-    <string name="notification_history_muted">Die Benachrichtigungen der App sind ausgeschaltet: Ereignisse werden hier weiter aufgezeichnet, erscheinen aber nicht mehr in der Statusleiste.</string>
+    <string name="notification_history_muted">Die Benachrichtigungen der Anwendung sind ausgeschaltet: Ereignisse werden hier weiter aufgezeichnet, erscheinen aber nicht mehr in der Statusleiste.</string>
     <string name="notification_history_not_shown">Nicht angezeigt</string>
     <string name="notification_history_open_unavailable">Für diese Benachrichtigung gibt es nichts zu öffnen.</string>
     <string name="notification_history_type_db_mobile">Mobilfunk-Datenbank</string>
@@ -2937,7 +2946,7 @@
     <string name="notification_history_type_db_enb">eNB/gNB-Kennungen</string>
     <string name="notification_history_type_db_local_build">Aufbau der Datenbank</string>
     <string name="notification_history_type_db_update">Datenbank-Update</string>
-    <string name="notification_history_type_app_update">App-Update</string>
+    <string name="notification_history_type_app_update">Update der Anwendung</string>
     <string name="notification_history_type_map_download">Offline-Karte</string>
     <string name="notification_history_type_outages">Ausgefallene Standorte</string>
     <string name="notification_history_type_photo_upload">Fotoversand</string>
@@ -2947,7 +2956,7 @@
     <string name="notification_history_type_pdf_report">PDF-Bericht</string>
 
     <!-- Versionshinweise 2.0.32 -->
-    <string name="appstrings_release_v2032_notification_history">Eine Seite „Benachrichtigungen“ hält fest, was die App dir melden wollte, nach Art sortiert und filterbar</string>
+    <string name="appstrings_release_v2032_notification_history">Eine Seite „Benachrichtigungen“ hält fest, was die Anwendung dir melden wollte, nach Art sortiert und filterbar</string>
     <string name="appstrings_release_v2032_notification_not_shown">Ereignisse werden auch dann festgehalten, wenn die Benachrichtigung nicht erscheinen konnte – Benachrichtigungen aus, Berechtigung verweigert – und das Protokoll sagt es</string>
     <string name="appstrings_release_v2032_routing_choice">Eine Einstellung wählt zwischen schnellster und kürzester Route, für Messungen „entlang der Straße“ und geplante Touren; zu Fuß ohne Wirkung, da der Dienst dann dieselbe Strecke liefert</string>
 
@@ -2992,5 +3001,54 @@
     <string name="appstrings_release_v2033_backup">Eine Seite „Sicherung und Wiederherstellung“ exportiert deine Verläufe, Touren, Lieblingsfotos und Einstellungsprofile in eine einzige Datei, die sich auf einem anderen Telefon importieren lässt</string>
     <string name="appstrings_release_v2033_backup_additive">Ein Import ergänzt nur, was fehlt: Nichts wird gelöscht oder ersetzt, und dieselbe Datei erneut zu importieren ändert beim zweiten Mal nichts</string>
     <string name="appstrings_release_v2033_backup_preview">Eine Vorschau zeigt vor dem Bestätigen, was die Sicherung ergänzen würde</string>
-    <string name="appstrings_release_v2033_trip_arrival">Bei Ankunft an einem Stopp bietet die App an, Fotos des Masts zu senden: Sie sucht den Standort um dich herum, fragt nach den Betreibern und nimmt eine Notiz auf</string>
+    <string name="appstrings_release_v2033_trip_arrival">Bei Ankunft an einem Stopp bietet die Anwendung an, Fotos des Masts zu senden: Sie sucht den Standort um dich herum, fragt nach den Betreibern und nimmt eine Notiz auf</string>
+    <!-- Gemeinsame Bezeichnungen und lokale Datenbankgenerierung -->
+    <string name="app_name">GeoTower</string>
+    <string name="brand_geotower">GeoTower</string>
+    <string name="brand_anfr">ANFR</string>
+    <string name="brand_signalquest">SignalQuest</string>
+    <string name="brand_qr_code">QR-Code</string>
+    <string name="network_2g">2G</string>
+    <string name="network_3g">3G</string>
+    <string name="network_4g">4G</string>
+    <string name="network_5g">5G</string>
+    <string name="mapping_provider_osm">OpenStreetMap</string>
+    <string name="mapping_provider_maplibre">MapLibre</string>
+    <string name="mapping_provider_topo">OpenTopoMap</string>
+    <string name="car_error_detail">%1$s\n%2$s</string>
+    <string name="appstrings_map_map_libre">MapLibre</string>
+    <string name="appstrings_map_osm">OpenStreetMap</string>
+    <string name="appstrings_map_osm_layer">OpenStreetMap</string>
+    <string name="appstrings_map_topo">OpenTopoMap</string>
+    <string name="appstrings_onboarding_welcome_title">GeoTower</string>
+    <string name="appstrings_local_build_overall_progress">Gesamtfortschritt der Generierung: %1$d %%</string>
+    <string name="appstrings_local_build_current_step">Aktueller Schritt: %1$s</string>
+    <string name="appstrings_local_build_waiting_network">Warten auf eine Internetverbindung vor dem Herunterladen der Quellen</string>
+    <string name="appstrings_local_build_steps_title">Generierungsschritte</string>
+    <string name="appstrings_local_build_step_done">Abgeschlossen</string>
+    <string name="appstrings_local_build_step_active">In Bearbeitung</string>
+    <string name="appstrings_local_build_step_pending">Ausstehend</string>
+    <string name="appstrings_local_build_cancelled_state">Die Generierung wurde vor Abschluss beendet.</string>
+    <string name="appstrings_local_build_unexpected_stop">Die Generierung wurde ohne von Android gemeldete Ursache beendet.</string>
+    <string name="appstrings_local_build_last_step">Letzter bekannter Schritt: %1$s</string>
+    <string name="appstrings_local_build_step_reading_sup_sources">SUP-Stationen und -Quellen werden gelesen</string>
+    <string name="appstrings_local_build_step_reading_antenna_sources">Antennendaten werden gelesen</string>
+    <string name="appstrings_local_build_step_reading_support_sources">Adressen der Träger werden gelesen</string>
+    <string name="appstrings_local_build_download_in_progress">Download läuft</string>
+    <string name="appstrings_local_build_import_monthly">Monatlicher Import</string>
+    <string name="appstrings_local_build_import_weekly">Wöchentlicher Import</string>
+    <string name="appstrings_local_build_import_quarterly">Vierteljährlicher Import</string>
+    <string name="appstrings_local_build_download_file">Datei: %1$s</string>
+    <string name="appstrings_local_build_download_size">Heruntergeladen: %1$s / %2$s</string>
+    <string name="appstrings_local_build_download_size_unknown">Heruntergeladen: %1$s</string>
+    <string name="appstrings_local_build_counting_sources">Zeilen in lokalen Quellen werden gezählt…</string>
+    <string name="appstrings_local_build_source_progress">Quelle %1$s: %2$s / %3$s Zeilen</string>
+    <string name="appstrings_local_build_source_processed">Quelle %1$s: %2$s Zeilen verarbeitet</string>
+    <string name="appstrings_local_build_source_started">Quelle %1$s: Lesen läuft</string>
+    <string name="outage_tech_breakdown_unpublished">—</string>
+    <string name="trips_route_calculating">Route wird berechnet…</string>
+    <!-- Versionshinweise 2.0.34 -->
+    <string name="appstrings_release_v2034_database_updates">Eine Schaltfläche prüft die Mobilfunk-, Radio- und eNB/gNB-Datenbanken und stellt nur nötige Updates in die Warteschlange</string>
+    <string name="appstrings_release_v2034_local_build_progress">Die lokale Datenbankerstellung zeigt jetzt Gesamtfortschritt, aktuellen Schritt, gelesene Quelle sowie Zeilen- und Downloadzahlen</string>
+    <string name="appstrings_release_v2034_database_storage">Downloads erkennen die installierten Daten zuverlässig, räumen temporäre Dateien auf und nennen jede Datenbank in den Benachrichtigungen</string>
 </resources>

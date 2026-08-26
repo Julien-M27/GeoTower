@@ -2,6 +2,8 @@ package fr.geotower.data.build
 
 import java.sql.Connection
 import java.sql.DriverManager
+import java.sql.PreparedStatement
+import java.sql.Types
 
 /**
  * Implementation JDBC (sqlite-jdbc) de [SqlDatabase] pour les tests JVM. Sur l'appareil,
@@ -40,6 +42,22 @@ class JdbcSqlDatabase(path: String, stagingPath: String? = null) : SqlDatabase {
         return count
     }
 
+    override fun insertInTransaction(sql: String, block: (SqlInsertStatement) -> Unit) {
+        val previousAutoCommit = connection.autoCommit
+        connection.autoCommit = false
+        try {
+            connection.prepareStatement(sql).use { statement ->
+                block(JdbcInsertStatement(statement))
+            }
+            connection.commit()
+        } catch (error: Throwable) {
+            connection.rollback()
+            throw error
+        } finally {
+            connection.autoCommit = previousAutoCommit
+        }
+    }
+
     override fun query(sql: String, onRow: (SqlRow) -> Unit) {
         connection.createStatement().use { statement ->
             statement.executeQuery(sql).use { rs ->
@@ -67,5 +85,23 @@ class JdbcSqlDatabase(path: String, stagingPath: String? = null) : SqlDatabase {
     private companion object {
         /** Meme alias que sur l'appareil (`AndroidSqlDatabase.STAGING_SCHEMA`). */
         const val STAGING_SCHEMA = "stg"
+    }
+
+    private class JdbcInsertStatement(
+        private val statement: PreparedStatement,
+    ) : SqlInsertStatement {
+        override fun clearBindings() = statement.clearParameters()
+
+        override fun bindNull(index: Int) = statement.setNull(index, Types.NULL)
+
+        override fun bindString(index: Int, value: String) = statement.setString(index, value)
+
+        override fun bindLong(index: Int, value: Long) = statement.setLong(index, value)
+
+        override fun bindDouble(index: Int, value: Double) = statement.setDouble(index, value)
+
+        override fun executeInsert() {
+            statement.executeUpdate()
+        }
     }
 }

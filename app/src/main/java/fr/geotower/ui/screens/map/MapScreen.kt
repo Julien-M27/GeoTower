@@ -133,6 +133,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.geometry.Offset
@@ -299,6 +300,8 @@ private const val TRIP_FRAME_BORDER_DP = 28f
 private class TripLegDrawing(
     val ordinal: Int,
     val points: List<DoubleArray>,
+    /** Faux tracé direct affiché en pointillés : il ne doit pas alimenter le suivi GPS. */
+    val isRouted: Boolean,
     val polyline: Polyline
 )
 
@@ -2112,6 +2115,10 @@ fun MapScreen(
     var tripArrivalStepIndex by remember { mutableStateOf<Int?>(null) }
     var tripArrivalSupports by remember { mutableStateOf<List<TripArrivalSupport>>(emptyList()) }
     var tripArrivalLoading by remember { mutableStateOf(false) }
+    // Calcul transitoire de la route entre la position courante et la prochaine étape. Un trait
+    // direct peut rester affiché en pointillés pendant ou après un échec, mais il ne doit jamais
+    // commander l'orientation du curseur.
+    var plannerApproachLoading by remember { mutableStateOf(false) }
     // La note se saisit en mémoire et n'est écrite qu'en fermant la feuille : `savePlan` réécrit le
     // fichier de TOUS les trajets, et le faire à chaque frappe se sentirait au clavier.
     var tripArrivalNote by remember { mutableStateOf("") }
@@ -2295,7 +2302,12 @@ fun MapScreen(
                 setPoints(legPoints.map { GeoPoint(it[0], it[1]) })
             }
             tripOverlay.add(polyline)
-            tripLegDrawings += TripLegDrawing(ordinal, legPoints, polyline)
+            tripLegDrawings += TripLegDrawing(
+                ordinal = ordinal,
+                points = legPoints,
+                isRouted = computed != null,
+                polyline = polyline
+            )
 
             // Flèches de sens fixes, posées par-dessus le trait mais sous les pastilles d'étapes.
             // Réservées au suivi : ailleurs, c'est le fil animé qui porte le sens, et superposer
@@ -2506,6 +2518,7 @@ fun MapScreen(
         val plan = plannerPlan
         val location = myCurrentLoc
         if (tripMode != TRIP_MODE_FOLLOW || plan == null || location == null) {
+            plannerApproachLoading = false
             plannerFollowStatus = null
             // Hors suivi, le tracé se montre entier : on ne rejoue pas une tournée en consultation.
             if (tripProgress != null) {
@@ -2521,7 +2534,11 @@ fun MapScreen(
         // Où l'on en est sur le tracé : c'est ce qui l'efface derrière nous. On repart des points
         // déjà décodés pour le calque plutôt que de redécoder toutes les géométries à chaque relevé.
         tripProgress = tripRouteProgress(
-            legs = tripLegDrawings.map { it.points },
+            // Les lignes directes en pointillés ne sont que des indicateurs d'itinéraire manquant.
+            // Les inclure ferait croire au GPS qu'il suit une route qui n'a jamais été calculée.
+            legs = tripLegDrawings.map { drawing ->
+                drawing.points.takeIf { drawing.isRouted }.orEmpty()
+            },
             latitude = location.latitude,
             longitude = location.longitude,
             previousDistanceFromStartMeters = tripProgress?.distanceFromStartMeters
@@ -2535,6 +2552,7 @@ fun MapScreen(
         val nextIndex = status.nextStepIndex
         val nextStep = nextIndex?.let { plan.steps.getOrNull(it) }
         if (nextStep == null || (status.distanceToNextMeters ?: 0.0) <= NAV_APPROACH_MIN_METERS) {
+            plannerApproachLoading = false
             if (plannerApproachPoints != null) {
                 plannerApproachPoints = null
                 plannerApproachForStep = null
@@ -2559,11 +2577,18 @@ fun MapScreen(
                     doubleArrayOf(location.latitude, location.longitude),
                     doubleArrayOf(nextStep.latitude, nextStep.longitude)
                 )
-                val routed = runCatching {
+                plannerApproachLoading = true
+                val routed = try {
                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                         RouteApi.getRoutePortions(direct, plan.profile, optimization)
                     }
-                }.getOrNull()?.firstOrNull()?.points
+                } catch (cancellation: kotlinx.coroutines.CancellationException) {
+                    throw cancellation
+                } catch (_: Throwable) {
+                    null
+                } finally {
+                    plannerApproachLoading = false
+                }?.firstOrNull()?.points
 
                 // Comme pour un segment de tournée : faute de route connue, trait direct en
                 // pointillés plutôt qu'une route inventée.
@@ -3038,26 +3063,25 @@ fun MapScreen(
      *
      * Sans lui la carte reste au nord et le trajet à parcourir barre l'écran en travers — ce n'est
      * pas ce que montre une appli de guidage à l'arrêt. On lit donc la direction du **tracé** :
-     * d'abord celle de l'approche, qui part exactement d'où l'on est ; à défaut celle du segment qui
-     * mène à l'étape suivante ; en dernier recours la ligne droite qui y va.
+     * d'abord celle de l'approche réellement calculée, qui part exactement d'où l'on est ; à défaut
+     * celle du segment déjà calculé qui mène à l'étape suivante. Une ligne directe en pointillés ne
+     * sert qu'à montrer ce qui reste à calculer : elle ne doit pas orienter le curseur.
      */
     fun navRouteHeadingOrNull(): Double? {
-        plannerApproachPoints?.let { approach -> routeHeadingAhead(approach)?.let { return it } }
+        if (plannerApproachLoading) return null
+        plannerApproachPoints?.let { approach ->
+            if (!plannerApproachRouted) return null
+            routeHeadingAhead(approach)?.let { return it }
+            return null
+        }
 
         val plan = plannerPlan ?: return null
         val nextIndex = plannerFollowStatus?.nextStepIndex ?: return null
-        val next = plan.steps.getOrNull(nextIndex) ?: return null
-        val previous = plan.steps.getOrNull(nextIndex - 1) ?: return null
-
         plan.legBetween(nextIndex - 1, nextIndex)?.points()?.takeIf { it.size >= 2 }
             ?.let { leg -> routeHeadingAhead(leg)?.let { return it } }
 
-        return routeHeadingAhead(
-            listOf(
-                doubleArrayOf(previous.latitude, previous.longitude),
-                doubleArrayOf(next.latitude, next.longitude)
-            )
-        )
+        // Pas de cap de repli à vol d'oiseau : une ligne droite pointillée n'est pas un itinéraire.
+        return null
     }
 
     /**
@@ -5838,16 +5862,31 @@ fun MapScreen(
 
         // Mesure ouverte, chaîne encore vide : rien à l'écran ne dit qu'il faut toucher la carte
         // pour choisir d'où l'on part, ni que toucher son propre repère fait démarrer la mesure de
-        // là. Le mode d'emploi prend donc le haut de l'écran en entier — barre du haut (retour,
-        // titre, filtres) et bouton de partage s'effacent derrière lui, c'est la seule place qui se
-        // lise d'un coup d'œil — et il rend le tout dès le premier point posé.
-        //
-        // Un suivi du site le plus proche le retire aussi : la carte trace déjà quelque chose, plus
-        // personne n'attend qu'on lui explique comment commencer.
+        // là. Le mode d'emploi reste dans l'en-tête, mais ne doit retirer le bouton Partager que
+        // s'il le recouvre réellement.
         val showMeasureFirstPointHint = isMeasuringMode && measuredVertices.isEmpty() &&
             !trackNearestAll && !trackNearestFav &&
             !hideMapControlsForSuggestions
-        val showShareButton = !hideMapChrome && !showMeasureFirstPointHint
+
+        var shareBoundsInRoot by remember { mutableStateOf<Rect?>(null) }
+        var measureHintBoundsInRoot by remember { mutableStateOf<Rect?>(null) }
+        var measureDrawerBoundsInRoot by remember { mutableStateOf<Rect?>(null) }
+        val measureUiCoversShare = if (isMeasuringMode) {
+            listOfNotNull(
+                measureHintBoundsInRoot.takeIf { showMeasureFirstPointHint },
+                measureDrawerBoundsInRoot
+            ).any { measureBounds ->
+                shareBoundsInRoot?.let { shareBounds ->
+                    measureBounds.left < shareBounds.right &&
+                        measureBounds.right > shareBounds.left &&
+                        measureBounds.top < shareBounds.bottom &&
+                        measureBounds.bottom > shareBounds.top
+                } == true
+            }
+        } else {
+            false
+        }
+        val showShareButton = !hideMapChrome && !measureUiCoversShare
 
         AnimatedVisibility(
             visible = hideMapControlsForSuggestions,
@@ -5893,12 +5932,40 @@ fun MapScreen(
         val showCompactCompass = showCompass && AppConfig.hasCompass.value &&
             useCompactCompassPlacement && !showCompassInMapHeader && !isPlannerMode
 
-        // Boîte à outils dépliée : elle prend tout le côté droit, jusqu'en haut de l'écran sur un
-        // téléphone. La boussole s'efface alors, quelle que soit sa place — sinon elle passe derrière
-        // la colonne d'outils, ou la pousse hors de l'écran quand elle est empilée au-dessus. Elle
-        // revient dès qu'on referme la boîte. Le choix de l'emplacement, lui, n'est pas touché : ce
-        // sont les trois points d'affichage qui se taisent, pas la logique qui les répartit.
-        val hideCompassForToolbox = showToolbox && isToolboxExpanded && !isPlannerMode
+        // La toolbox et la boussole changent de place selon l'orientation et la taille de l'écran.
+        // On garde donc leurs emprises réelles plutôt que de masquer la boussole dès que la
+        // toolbox est ouverte : elle ne doit disparaître que si la toolbox la recouvre vraiment.
+        var compassBoundsInRoot by remember { mutableStateOf<Rect?>(null) }
+        var toolboxBoundsInRoot by remember { mutableStateOf<Rect?>(null) }
+        val toolboxCoversCompass = compassBoundsInRoot?.let { compassBounds ->
+            toolboxBoundsInRoot?.let { toolboxBounds ->
+                compassBounds.left < toolboxBounds.right &&
+                    compassBounds.right > toolboxBounds.left &&
+                    compassBounds.top < toolboxBounds.bottom &&
+                    compassBounds.bottom > toolboxBounds.top
+            }
+        } ?: false
+        val hideCompassForToolbox = showToolbox && isToolboxExpanded &&
+            toolboxCoversCompass && !isPlannerMode
+
+        val recordCompassBounds = Modifier.onGloballyPositioned { coordinates ->
+            val position = coordinates.positionInRoot()
+            compassBoundsInRoot = Rect(
+                left = position.x,
+                top = position.y,
+                right = position.x + coordinates.size.width,
+                bottom = position.y + coordinates.size.height
+            )
+        }
+        val recordToolboxBounds = Modifier.onGloballyPositioned { coordinates ->
+            val position = coordinates.positionInRoot()
+            toolboxBoundsInRoot = Rect(
+                left = position.x,
+                top = position.y,
+                right = position.x + coordinates.size.width,
+                bottom = position.y + coordinates.size.height
+            )
+        }
 
         /**
          * Écran trajet : la boussole quitte ses trois emplacements habituels — bandeau en paysage,
@@ -5935,8 +6002,29 @@ fun MapScreen(
         // au lieu de le laisser chevaucher la boussole faute de place.
         val measureDrawerPortraitLeft = !useCompactCompassPlacement &&
             !trackingDrawerTopLeft && showToolbox && isToolboxExpanded
-        val measureDrawerOnLeft = trackingDrawerTopLeft || measureDrawerPortraitLeft
-        val measureDrawerModifier = if (measureDrawerOnLeft) {
+        val measureDrawerCoversShare = if (isMeasuringMode && !hideMapControlsForSuggestions) {
+            measureDrawerBoundsInRoot?.let { measureBounds ->
+                shareBoundsInRoot?.let { shareBounds ->
+                    measureBounds.left < shareBounds.right &&
+                        measureBounds.right > shareBounds.left &&
+                        measureBounds.top < shareBounds.bottom &&
+                        measureBounds.bottom > shareBounds.top
+                }
+            } == true
+        } else {
+            false
+        }
+        // Si le tiroir arrive sur Partager, il prend directement sa place. Au prochain passage de
+        // layout, son emprise est alors stable à cet endroit et Partager reste masqué sans laisser
+        // un espace vide entre le bouton Retour et les contrôles de mesure.
+        val measureDrawerUsesShareSlot = isMeasuringMode && measureDrawerCoversShare
+        val measureDrawerOnLeft = trackingDrawerTopLeft || measureDrawerPortraitLeft ||
+            measureDrawerUsesShareSlot
+        val measureDrawerModifier = if (measureDrawerUsesShareSlot) {
+            Modifier
+                .align(Alignment.TopStart)
+                .padding(start = sizing.spacing(16.dp), top = compassTopPadding)
+        } else if (measureDrawerOnLeft) {
             // Tablette paysage OU portrait toolbox dépliée : en haut à gauche,
             // dans la zone dégagée sous le bouton de partage.
             Modifier
@@ -6031,7 +6119,14 @@ fun MapScreen(
                 .align(Alignment.TopStart)
                 .padding(start = sizing.spacing(16.dp), top = compassTopPadding)
                 .onGloballyPositioned {
-                    shareButtonBottomPx = it.positionInRoot().y + it.size.height
+                    val position = it.positionInRoot()
+                    shareBoundsInRoot = Rect(
+                        left = position.x,
+                        top = position.y,
+                        right = position.x + it.size.width,
+                        bottom = position.y + it.size.height
+                    )
+                    shareButtonBottomPx = position.y + it.size.height
                 }
         ) {
             val isMi = fr.geotower.utils.AppConfig.distanceUnit.intValue == 1
@@ -6080,23 +6175,35 @@ fun MapScreen(
             )
         }
 
-        AnimatedVisibility(
-            visible = showCompass && AppConfig.hasCompass.value && !useCompactCompassPlacement &&
-                !showCompassInMapHeader && !hideMapChrome && !hideCompassForToolbox,
-            enter = fadeIn(),
-            exit = fadeOut(),
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(end = compassEndPadding, top = compassTopPadding)
+        if (showCompass && AppConfig.hasCompass.value && !useCompactCompassPlacement &&
+            !showCompassInMapHeader && !hideMapChrome
         ) {
-            MapCompassButton(
-                azimuth = azimuth,
-                mapOrientation = { mapOrientationState.floatValue },
-                followActive = followOrientation,
-                onToggleFollow = if (PowerProfile.isEco) null else toggleFollowOrientation,
-                modifier = Modifier.size(mapControlButtonDiameter)
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(end = compassEndPadding, top = compassTopPadding)
             ) {
-                safeClick { resetMapOrientation() }
+                Box(
+                    modifier = Modifier
+                        .size(mapControlButtonDiameter)
+                        .then(recordCompassBounds)
+                ) {
+                    AnimatedVisibility(
+                        visible = !hideCompassForToolbox,
+                        enter = fadeIn(),
+                        exit = fadeOut()
+                    ) {
+                        MapCompassButton(
+                            azimuth = azimuth,
+                            mapOrientation = { mapOrientationState.floatValue },
+                            followActive = followOrientation,
+                            onToggleFollow = if (PowerProfile.isEco) null else toggleFollowOrientation,
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            safeClick { resetMapOrientation() }
+                        }
+                    }
+                }
             }
         }
 
@@ -6126,6 +6233,12 @@ fun MapScreen(
                 .padding(top = measureDrawerDrop)
                 .onGloballyPositioned {
                     val position = it.positionInRoot()
+                    measureDrawerBoundsInRoot = Rect(
+                        left = position.x,
+                        top = position.y,
+                        right = position.x + it.size.width,
+                        bottom = position.y + it.size.height
+                    )
                     measureDrawerLeftPx = position.x
                     measureDrawerRightPx = position.x + it.size.width
                 }
@@ -6317,7 +6430,16 @@ fun MapScreen(
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = sizing.spacing(16.dp)),
+                        .padding(horizontal = sizing.spacing(16.dp))
+                        .onGloballyPositioned {
+                            val position = it.positionInRoot()
+                            measureHintBoundsInRoot = Rect(
+                                left = position.x,
+                                top = position.y,
+                                right = position.x + it.size.width,
+                                bottom = position.y + it.size.height
+                            )
+                        },
                     shape = RoundedCornerShape(24.dp),
                     color = MaterialTheme.colorScheme.surface,
                     shadowElevation = 4.dp,
@@ -6396,15 +6518,23 @@ fun MapScreen(
                     horizontalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp)),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (showCompassInMapHeader && !hideCompassForToolbox) {
-                        MapCompassButton(
-                            azimuth = azimuth,
-                            mapOrientation = { mapOrientationState.floatValue },
-                            followActive = followOrientation,
-                            onToggleFollow = if (PowerProfile.isEco) null else toggleFollowOrientation,
-                            modifier = Modifier.size(mapControlButtonDiameter)
+                    if (showCompassInMapHeader) {
+                        Box(
+                            modifier = Modifier
+                                .size(mapControlButtonDiameter)
+                                .then(recordCompassBounds)
                         ) {
-                            safeClick { resetMapOrientation() }
+                            if (!hideCompassForToolbox) {
+                                MapCompassButton(
+                                    azimuth = azimuth,
+                                    mapOrientation = { mapOrientationState.floatValue },
+                                    followActive = followOrientation,
+                                    onToggleFollow = if (PowerProfile.isEco) null else toggleFollowOrientation,
+                                    modifier = Modifier.fillMaxSize()
+                                ) {
+                                    safeClick { resetMapOrientation() }
+                                }
+                            }
                         }
                     }
 
@@ -6631,31 +6761,40 @@ fun MapScreen(
             horizontalAlignment = Alignment.End,
             verticalArrangement = Arrangement.spacedBy(sizing.spacing(16.dp))
         ) {
-            if (showCompactCompass && !hideCompassForToolbox) {
-                MapCompassButton(
-                    azimuth = azimuth,
-                    mapOrientation = { mapOrientationState.floatValue },
-                    followActive = followOrientation,
-                    onToggleFollow = if (PowerProfile.isEco) null else toggleFollowOrientation,
-                    modifier = Modifier.size(mapControlButtonDiameter)
+            if (showCompactCompass) {
+                Box(
+                    modifier = Modifier
+                        .size(mapControlButtonDiameter)
+                        .then(recordCompassBounds)
                 ) {
-                    safeClick { resetMapOrientation() }
+                    if (!hideCompassForToolbox) {
+                        MapCompassButton(
+                            azimuth = azimuth,
+                            mapOrientation = { mapOrientationState.floatValue },
+                            followActive = followOrientation,
+                            onToggleFollow = if (PowerProfile.isEco) null else toggleFollowOrientation,
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            safeClick { resetMapOrientation() }
+                        }
+                    }
                 }
             }
 
             if (showToolbox && !isPlannerMode) {
                 val toolboxContent: @Composable () -> Unit = {
-                AntennaMapToolBox(
-                    isToolboxExpanded = isToolboxExpanded,
-                    onToggleToolbox = {
+                    Box(modifier = recordToolboxBounds) {
+                        AntennaMapToolBox(
+                            isToolboxExpanded = isToolboxExpanded,
+                            onToggleToolbox = {
                         // On se contente de replier/déplier la toolbox : les éléments
                         // actifs (recherche, filtre ville, mesure, suivi, time slider…)
                         // restent ouverts. Leur fermeture propre passe désormais
                         // uniquement par leurs boutons respectifs.
                         isToolboxExpanded = !isToolboxExpanded
-                    },
-                    isSearchActive = isSearchActive,
-                    onToggleSearch = {
+                            },
+                            isSearchActive = isSearchActive,
+                            onToggleSearch = {
                         if (!isSearchActive && showMeasureFirstPointHint) {
                             // Le mode d'emploi de la mesure tient toute la barre du haut, juste où
                             // la recherche viendrait s'ouvrir. Plutôt que de les empiler, on dit
@@ -6684,8 +6823,8 @@ fun MapScreen(
                         }
                         }
                     },
-                    isMeasuringMode = isMeasuringMode,
-                    onToggleMeasure = {
+                            isMeasuringMode = isMeasuringMode,
+                            onToggleMeasure = {
                         if (canUseMapMeasure) {
                             isMeasuringMode = !isMeasuringMode
                             if (!isMeasuringMode) {
@@ -6696,8 +6835,8 @@ fun MapScreen(
                             }
                         }
                     },
-                    isTimeSliderActive = isTimeSliderVisible,
-                    onToggleTimeSlider = {
+                            isTimeSliderActive = isTimeSliderVisible,
+                            onToggleTimeSlider = {
                         isTimeSliderVisible = !isTimeSliderVisible
                         AppConfig.timeSliderActive.value = isTimeSliderVisible
                         if (isTimeSliderVisible) {
@@ -6707,21 +6846,22 @@ fun MapScreen(
                         }
                         mapViewRef?.loadVisibleAntennas(viewModel)
                     },
-                    onOpenLayers = { safeClick { if (canUseLayerSelector) showLayerSheet = true } },
-                    onOpenSettings = { safeClick { showMapPageSettingsSheet = true } },
-                    onOpenTrips = { safeClick { if (canUseTrips) navController.navigate("trips") } },
-                    onOpenCompassPage = { safeClick { if (canUseCompassPage) navController.navigate("compass") } },
-                    showSearch = canUseMapSearch,
+                            onOpenLayers = { safeClick { if (canUseLayerSelector) showLayerSheet = true } },
+                            onOpenSettings = { safeClick { showMapPageSettingsSheet = true } },
+                            onOpenTrips = { safeClick { if (canUseTrips) navController.navigate("trips") } },
+                            onOpenCompassPage = { safeClick { if (canUseCompassPage) navController.navigate("compass") } },
+                            showSearch = canUseMapSearch,
                     // La mesure disparaît pendant l'édition d'un trajet : les deux posent des
                     // points, et le planificateur passe devant dans le gestionnaire de tap. Laisser
                     // le bouton donnerait un mode qui s'allume sans rien faire.
-                    showMeasure = canUseMapMeasure && !isPlannerMode,
-                    showTrips = canUseTrips,
-                    showCompassPage = canUseCompassPage,
-                    showTimeSlider = timeSliderAvailable && !isPlannerMode,
-                    showLayers = canUseLayerSelector,
-                    expandLeft = toolboxExpandsLeft
-                )
+                            showMeasure = canUseMapMeasure && !isPlannerMode,
+                            showTrips = canUseTrips,
+                            showCompassPage = canUseCompassPage,
+                            showTimeSlider = timeSliderAvailable && !isPlannerMode,
+                            showLayers = canUseLayerSelector,
+                            expandLeft = toolboxExpandsLeft
+                        )
+                    }
                 }
 
                 if (toolboxExpandsLeft && isSearchActive) {
@@ -6973,6 +7113,7 @@ fun MapScreen(
                 TRIP_MODE_FOLLOW -> TripFollowBar(
                     plan = plan,
                     status = plannerFollowStatus,
+                    routeLoading = plannerApproachLoading,
                     distanceUnit = AppConfig.distanceUnit.intValue,
                     onCheckNext = {
                         val index = plannerFollowStatus?.nextStepIndex

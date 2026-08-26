@@ -129,6 +129,7 @@ fun ElevationProfileScreen(
     repository: AnfrRepository,
     antennaId: String,
     isSplitScreen: Boolean = false,
+    showBreadcrumb: Boolean = true,
     onCloseSplitScreen: () -> Unit = {}
 ) {
     SecureScreenEffect(RemoteFeatureFlags.SecureScreens.ELEVATION_PROFILE)
@@ -351,7 +352,7 @@ fun ElevationProfileScreen(
                         }
                     }
                 )
-                GeoTowerNavigationBreadcrumbBar(
+                if (showBreadcrumb) GeoTowerNavigationBreadcrumbBar(
                     navController = navController,
                     currentItem = GeoTowerBreadcrumbItem(
                         label = txtElevationProfileTitle,

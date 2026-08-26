@@ -40,6 +40,13 @@ interface SqlDatabase : Closeable {
     fun insertBatch(sql: String, rows: Iterable<List<Any?>>): Int
 
     /**
+     * Execute many inserts through one prepared statement and one transaction. This is intended
+     * for very large source streams where allocating a `List<Any?>` for every row would dominate
+     * the build cost.
+     */
+    fun insertInTransaction(sql: String, block: (SqlInsertStatement) -> Unit)
+
+    /**
      * Execute une requete `SELECT` et invoque `onRow` pour chaque ligne, en flux (pas de
      * materialisation complete). Utilise par [AnfrStatsBuilder] pour recalculer les stats
      * a partir de la base construite.
@@ -47,6 +54,16 @@ interface SqlDatabase : Closeable {
     fun query(sql: String, onRow: (SqlRow) -> Unit)
 
     override fun close()
+}
+
+/** Minimal portable prepared-statement API shared by Android SQLite and JDBC tests. */
+interface SqlInsertStatement {
+    fun clearBindings()
+    fun bindNull(index: Int)
+    fun bindString(index: Int, value: String)
+    fun bindLong(index: Int, value: Long)
+    fun bindDouble(index: Int, value: Double)
+    fun executeInsert()
 }
 
 /** Acces en lecture a une ligne de resultat, par nom de colonne. */

@@ -1,5 +1,6 @@
 package fr.geotower.data.db
 
+import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import java.io.File
 import java.util.Locale
@@ -111,6 +112,24 @@ object EnbDatabaseValidator {
             validateOpenDatabase(db)
         } catch (e: Exception) {
             ValidationResult(false, e.message ?: "Base eNB SQLite illisible")
+        } finally {
+            db?.close()
+        }
+    }
+
+    /** Version brute de la base installee, lue legerement pour les alertes de mise a jour. */
+    fun getInstalledDatabaseVersion(context: Context): String? {
+        val file = context.getDatabasePath(DB_NAME)
+        if (!file.isFile || file.length() <= 0L) return null
+
+        var db: SQLiteDatabase? = null
+        return try {
+            db = SQLiteDatabase.openDatabase(file.absolutePath, null, SQLiteDatabase.OPEN_READONLY)
+            db.rawQuery("SELECT version FROM metadata LIMIT 1", null).use { cursor ->
+                if (cursor.moveToFirst()) DatabaseVersionPolicy.normalizedVersion(cursor.getString(0)) else null
+            }
+        } catch (_: Exception) {
+            null
         } finally {
             db?.close()
         }

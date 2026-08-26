@@ -93,12 +93,6 @@ fun TripPlannerBar(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
                 )
-                if (busy) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(sizing.component(16.dp)),
-                        strokeWidth = 2.dp
-                    )
-                }
             }
 
             Text(
@@ -118,6 +112,24 @@ fun TripPlannerBar(
                 },
                 modifier = Modifier.padding(top = sizing.spacing(2.dp))
             )
+
+            if (busy) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(top = sizing.spacing(6.dp))
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(sizing.component(16.dp)),
+                        strokeWidth = 2.dp
+                    )
+                    Text(
+                        text = stringResource(R.string.trips_route_calculating),
+                        fontSize = sizing.text(12.sp),
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(start = sizing.spacing(8.dp))
+                    )
+                }
+            }
 
             Row(
                 modifier = Modifier

@@ -16,24 +16,265 @@ import fr.geotower.data.models.RadioFilterMasks
  */
 object GeoTowerDbBuilder {
 
-    private class StationAcc(
-        val operateurId: Int,
-        val operatorLabel: String,
-        val latitude: Double,
-        val longitude: Double,
-        val statutId: Int,
-        val statutLabel: String,
-    ) {
-        var admId: Int? = null
-        var dateImp: String? = null
-        var dateSer: String? = null
-        var dateMod: String? = null
-        var adresse: String? = null
-        var codeInsee: String? = null
-        val masks = StationMasks()
-        var hasActive = 0
-        var azimuts: String? = null
-        var azimutsFh: String? = null
+    /**
+     * Accumulateur compact des stations connues par l'observatoire hebdomadaire.
+     *
+     * L'ancienne implementation gardait un objet mutable par station, avec un objet
+     * [StationMasks], les champs Kotlin et les noeuds d'une [LinkedHashMap]. Sur un export national,
+     * cette representation coute beaucoup plus que les seules donnees utiles. Les identifiants et
+     * libelles restent necessairement des chaines, mais les valeurs numeriques vivent ici dans des
+     * tableaux primitifs. Le resultat est ecrit dans `stg_station_final` une fois les cinq sources
+     * consommees, comme auparavant.
+     */
+    private class StationAccumulator(initialCapacity: Int = 16_384) {
+        // Les identifiants ANFR sont numeriques dans l'immense majorite des cas. Cette table ouverte
+        // evite un noeud HashMap et le boxing d'un Int par station. Les rares identifiants textuels
+        // restent couverts par le repli [textIndexes].
+        private var numericKeys = LongArray(32_768) { EMPTY_KEY }
+        private var numericValues = IntArray(32_768) { NO_INDEX }
+        private var numericCount = 0
+        private val textIndexes = HashMap<String, Int>(initialCapacity / 16)
+        private var ids = arrayOfNulls<String>(initialCapacity)
+        private var operatorIds = IntArray(initialCapacity)
+        private var operatorLabels = arrayOfNulls<String>(initialCapacity)
+        private var latitudes = DoubleArray(initialCapacity)
+        private var longitudes = DoubleArray(initialCapacity)
+        private var statusIds = IntArray(initialCapacity)
+        private var statusLabels = arrayOfNulls<String>(initialCapacity)
+        private var admIds = IntArray(initialCapacity) { NO_INT }
+        private var dateImplantations = arrayOfNulls<String>(initialCapacity)
+        private var dateServices = arrayOfNulls<String>(initialCapacity)
+        private var dateModifications = arrayOfNulls<String>(initialCapacity)
+        private var addresses = arrayOfNulls<String>(initialCapacity)
+        private var inseeCodes = arrayOfNulls<String>(initialCapacity)
+        private var masks = LongArray(initialCapacity)
+        private var active = ByteArray(initialCapacity)
+        private var azimuths = arrayOfNulls<String>(initialCapacity)
+        private var fhAzimuths = arrayOfNulls<String>(initialCapacity)
+        private var size = 0
+
+        fun indexOf(idAnfr: String): Int {
+            val numericKey = idAnfr.toLongOrNull()
+            return if (numericKey != null) findNumeric(numericKey) else textIndexes[idAnfr] ?: NO_INDEX
+        }
+
+        /**
+         * Recherche directe pour les lignes SUP brutes. Les identifiants numeriques sont indexes
+         * par leur valeur, donc les zeros de remplissage n'ont pas besoin d'etre construits avant
+         * la recherche. Cela evite `normalizeIdAnfr` sur plusieurs millions de lignes dont la
+         * station n'est finalement pas conservee.
+         */
+        fun indexOfRaw(idAnfr: String?): Int {
+            val raw = idAnfr?.trim().orEmpty()
+            if (raw.isEmpty()) return NO_INDEX
+            val numericKey = raw.toLongOrNull()
+            return if (numericKey != null) findNumeric(numericKey) else textIndexes[raw] ?: NO_INDEX
+        }
+
+        fun add(
+            idAnfr: String,
+            operatorId: Int,
+            operatorLabel: String,
+            latitude: Double,
+            longitude: Double,
+            statusId: Int,
+            statusLabel: String,
+        ): Int {
+            check(indexOf(idAnfr) == NO_INDEX) { "Station deja presente: $idAnfr" }
+            ensureCapacity(size + 1)
+            val index = size++
+            val numericKey = idAnfr.toLongOrNull()
+            if (numericKey != null) {
+                ensureNumericCapacity(numericCount + 1)
+                putNumeric(numericKey, index)
+                numericCount++
+            } else {
+                textIndexes[idAnfr] = index
+            }
+            ids[index] = idAnfr
+            operatorIds[index] = operatorId
+            operatorLabels[index] = operatorLabel
+            latitudes[index] = latitude
+            longitudes[index] = longitude
+            statusIds[index] = statusId
+            statusLabels[index] = statusLabel
+            return index
+        }
+
+        fun size(): Int = size
+
+        fun setActive(index: Int) {
+            active[index] = 1
+        }
+
+        fun updateGeneration(index: Int, generation: String?) {
+            masks[index] = RadioMaskComputer.updateMasksFromGeneration(masks[index], generation)
+        }
+
+        fun updateSystemAndBand(index: Int, system: String?, fStartMhz: Double?, fEndMhz: Double?) {
+            masks[index] = RadioMaskComputer.updateMasksFromSystemAndBand(masks[index], system, fStartMhz, fEndMhz)
+        }
+
+        fun addFhMask(index: Int) {
+            masks[index] = masks[index] or packMasks(RadioFilterMasks.TECH_FH, RadioFilterMasks.BAND_FH)
+        }
+
+        fun setAdmId(index: Int, value: Int?) {
+            admIds[index] = value ?: NO_INT
+        }
+
+        fun setDates(index: Int, implantation: String?, service: String?, modification: String?) {
+            dateImplantations[index] = implantation
+            dateServices[index] = service
+            dateModifications[index] = modification
+        }
+
+        fun setAddress(index: Int, value: String?) {
+            addresses[index] = value
+        }
+
+        fun setInseeCode(index: Int, value: String?) {
+            inseeCodes[index] = value
+        }
+
+        fun setAzimuths(index: Int, mobile: String?, fh: String?) {
+            azimuths[index] = mobile
+            fhAzimuths[index] = fh
+        }
+
+        fun id(index: Int): String = ids[index] ?: error("Station sans identifiant")
+        fun operatorId(index: Int): Int = operatorIds[index]
+        fun operatorLabel(index: Int): String = operatorLabels[index].orEmpty()
+        fun latitude(index: Int): Double = latitudes[index]
+        fun longitude(index: Int): Double = longitudes[index]
+        fun statusId(index: Int): Int = statusIds[index]
+        fun statusLabel(index: Int): String = statusLabels[index].orEmpty()
+        fun admId(index: Int): Int? = admIds[index].takeUnless { it == NO_INT }
+        fun dateImplantation(index: Int): String? = dateImplantations[index]
+        fun dateService(index: Int): String? = dateServices[index]
+        fun dateModification(index: Int): String? = dateModifications[index]
+        fun address(index: Int): String? = addresses[index]
+        fun inseeCode(index: Int): String? = inseeCodes[index]
+        fun techMask(index: Int): Int = masks[index].toInt()
+        fun bandMask(index: Int): Int = (masks[index] ushr 32).toInt()
+        fun hasActive(index: Int): Int = active[index].toInt()
+        fun azimuths(index: Int): String? = azimuths[index]
+        fun fhAzimuths(index: Int): String? = fhAzimuths[index]
+
+        fun clear() {
+            numericKeys.fill(EMPTY_KEY)
+            numericValues.fill(NO_INDEX)
+            numericCount = 0
+            textIndexes.clear()
+            ids.fill(null)
+            operatorLabels.fill(null)
+            statusLabels.fill(null)
+            dateImplantations.fill(null)
+            dateServices.fill(null)
+            dateModifications.fill(null)
+            addresses.fill(null)
+            inseeCodes.fill(null)
+            azimuths.fill(null)
+            fhAzimuths.fill(null)
+            size = 0
+
+            // The accumulator is not reused after the final staging insert. Drop
+            // its backing arrays so later statistics phases do not retain memory
+            // that was needed only while merging station sources.
+            numericKeys = LongArray(0)
+            numericValues = IntArray(0)
+            ids = emptyArray()
+            operatorIds = IntArray(0)
+            operatorLabels = emptyArray()
+            latitudes = DoubleArray(0)
+            longitudes = DoubleArray(0)
+            statusIds = IntArray(0)
+            statusLabels = emptyArray()
+            admIds = IntArray(0)
+            dateImplantations = emptyArray()
+            dateServices = emptyArray()
+            dateModifications = emptyArray()
+            addresses = emptyArray()
+            inseeCodes = emptyArray()
+            masks = LongArray(0)
+            active = ByteArray(0)
+            azimuths = emptyArray()
+            fhAzimuths = emptyArray()
+        }
+
+        private fun ensureCapacity(required: Int) {
+            if (required <= ids.size) return
+            val oldCapacity = ids.size
+            val newCapacity = maxOf(required, oldCapacity * 2)
+            ids = ids.copyOf(newCapacity)
+            operatorIds = operatorIds.copyOf(newCapacity)
+            operatorLabels = operatorLabels.copyOf(newCapacity)
+            latitudes = latitudes.copyOf(newCapacity)
+            longitudes = longitudes.copyOf(newCapacity)
+            statusIds = statusIds.copyOf(newCapacity)
+            statusLabels = statusLabels.copyOf(newCapacity)
+            admIds = admIds.copyOf(newCapacity).also { it.fill(NO_INT, oldCapacity, newCapacity) }
+            dateImplantations = dateImplantations.copyOf(newCapacity)
+            dateServices = dateServices.copyOf(newCapacity)
+            dateModifications = dateModifications.copyOf(newCapacity)
+            addresses = addresses.copyOf(newCapacity)
+            inseeCodes = inseeCodes.copyOf(newCapacity)
+            masks = masks.copyOf(newCapacity)
+            active = active.copyOf(newCapacity)
+            azimuths = azimuths.copyOf(newCapacity)
+            fhAzimuths = fhAzimuths.copyOf(newCapacity)
+        }
+
+        private fun findNumeric(key: Long): Int {
+            var slot = hashSlot(key)
+            while (true) {
+                val stored = numericKeys[slot]
+                if (stored == EMPTY_KEY) return NO_INDEX
+                if (stored == key) return numericValues[slot]
+                slot = (slot + 1) and (numericKeys.size - 1)
+            }
+        }
+
+        private fun putNumeric(key: Long, value: Int) {
+            var slot = hashSlot(key)
+            while (numericKeys[slot] != EMPTY_KEY) {
+                if (numericKeys[slot] == key) {
+                    numericValues[slot] = value
+                    return
+                }
+                slot = (slot + 1) and (numericKeys.size - 1)
+            }
+            numericKeys[slot] = key
+            numericValues[slot] = value
+        }
+
+        private fun ensureNumericCapacity(required: Int) {
+            if (required * 10 < numericKeys.size * 7) return
+            val oldKeys = numericKeys
+            val oldValues = numericValues
+            numericKeys = LongArray(oldKeys.size * 2) { EMPTY_KEY }
+            numericValues = IntArray(oldValues.size * 2) { NO_INDEX }
+            for (slot in oldKeys.indices) {
+                if (oldKeys[slot] != EMPTY_KEY) putNumeric(oldKeys[slot], oldValues[slot])
+            }
+        }
+
+        private fun hashSlot(key: Long): Int {
+            var value = key
+            value = (value xor (value ushr 33)) * -49064778989728563L
+            value = (value xor (value ushr 33)) * -4265267296055464877L
+            value = value xor (value ushr 33)
+            return value.toInt() and (numericKeys.size - 1)
+        }
+
+        private companion object {
+            const val NO_INDEX = -1
+            const val NO_INT = Int.MIN_VALUE
+            const val EMPTY_KEY = Long.MIN_VALUE
+
+            fun packMasks(techMask: Int, bandMask: Int): Long =
+                (bandMask.toLong() shl 32) or (techMask.toLong() and 0xffffffffL)
+        }
     }
 
     /** Insertion par lots reutilisable (borne la RAM a un lot). */
@@ -73,6 +314,8 @@ object GeoTowerDbBuilder {
          * lourdes, ou se situe le pic de stockage.
          */
         onWeeklyConsumed: () -> Unit = {},
+        sourceCounts: AnfrSourceCounts = AnfrSourceCounts(),
+        onProgressDetail: ((BuildProgressDetail) -> Unit)? = null,
     ): BuildResult {
         val operateurIds = IdRegistry()
         val systemeIds = IdRegistry()
@@ -81,7 +324,7 @@ object GeoTowerDbBuilder {
         systemeIds.getId("Inconnu")
         statutIds.getId("Inconnu")
 
-        val stations = LinkedHashMap<String, StationAcc>()
+        val stations = StationAccumulator()
         val usedNat = HashSet<Int>()
         val usedTpo = HashSet<Int>()
         val usedAdm = HashSet<Int>()
@@ -89,32 +332,52 @@ object GeoTowerDbBuilder {
         val usedCommunes = HashSet<String>()
         var dateMajAnfr = "Inconnue"
 
+        fun report(
+            phase: BuildPhase,
+            processed: Long = 0L,
+            source: String? = null,
+            total: Long = -1L,
+        ) {
+            onProgress(phase, processed)
+            onProgressDetail?.invoke(BuildProgressDetail(phase, source, processed, total))
+        }
+
         db.execSql("PRAGMA journal_mode = OFF")
         db.execSql("PRAGMA synchronous = OFF")
         db.execSql("PRAGMA temp_store = FILE")
         GeoTowerDbSchema.CREATE_TABLE_STATEMENTS.forEach { db.execSql(it) }
         db.execSql(GeoTowerDbSchema.CREATE_ROOM_MASTER_TABLE)
         stagingStatements(db.stagingPrefix).forEach { db.execSql(it) }
-        onProgress(BuildPhase.READING_STATIONS, 0L)
+        report(BuildPhase.READING_STATIONS, source = SOURCE_OBSERVATOIRE, total = sourceCounts.weekly)
 
         // 1/ CSV hebdomadaire : construit l'accumulateur station (RAM) + statuts par systeme (disque).
         val sysInserter = BatchInserter(db, "INSERT OR REPLACE INTO stg_sysstatus VALUES (?, ?, ?, ?, ?)")
         var weeklyRows = 0L
         for (row in sources.weekly) {
+            val currentRow = ++weeklyRows
             if (dateMajAnfr == "Inconnue") {
                 val d = AnfrParsing.cleanText(row.get("date_maj"))
                 if (d.isNotEmpty()) dateMajAnfr = d
             }
             val idAnfr = AnfrParsing.normalizeIdAnfr(row.get("sta_nm_anfr"))
             if (idAnfr.isEmpty()) continue
-            val acc = stations.getOrPut(idAnfr) {
+            var stationIndex = stations.indexOf(idAnfr)
+            if (stationIndex == -1) {
                 val (lat, lon) = AnfrParsing.parseCoordinates(row.get("coordonnees"))
                 val operateurId = operateurIds.getId(row.get("adm_lb_nom"))
                 val statutId = statutIds.getId(row.get("statut"))
-                StationAcc(operateurId, operateurIds.getLabel(operateurId), lat, lon, statutId, statutIds.getLabel(statutId))
+                stationIndex = stations.add(
+                    idAnfr,
+                    operateurId,
+                    operateurIds.getLabel(operateurId),
+                    lat,
+                    lon,
+                    statutId,
+                    statutIds.getLabel(statutId),
+                )
             }
-            if (AnfrParsing.isActiveStatus(row.get("statut"))) acc.hasActive = 1
-            RadioMaskComputer.updateMasksFromGeneration(acc.masks, row.get("generation"))
+            if (AnfrParsing.isActiveStatus(row.get("statut"))) stations.setActive(stationIndex)
+            stations.updateGeneration(stationIndex, row.get("generation"))
             val sysName = AnfrParsing.cleanText(row.get("emr_lb_systeme"))
             if (sysName.isNotEmpty()) {
                 val statutId = statutIds.getId(row.get("statut"))
@@ -125,29 +388,44 @@ object GeoTowerDbBuilder {
                     ),
                 )
             }
-            if (++weeklyRows % EMIT_EVERY == 0L) onProgress(BuildPhase.READING_STATIONS, weeklyRows)
+            if (currentRow % EMIT_EVERY == 0L) {
+                report(BuildPhase.READING_STATIONS, currentRow, SOURCE_OBSERVATOIRE, sourceCounts.weekly)
+            }
         }
         sysInserter.flush()
+        report(BuildPhase.READING_STATIONS, weeklyRows, SOURCE_OBSERVATOIRE, sourceCounts.weekly)
         onWeeklyConsumed()
 
-        onProgress(BuildPhase.READING_SUPPORTS, 0L)
+        report(BuildPhase.READING_SUPPORTS, source = SOURCE_SUP_STATION, total = sourceCounts.stations)
         // 2/ SUP_STATION : dates + exploitant.
+        var stationRows = 0L
         for (row in sources.stations) {
+            val currentRow = ++stationRows
             supSink.station(row)
             val idAnfr = AnfrParsing.normalizeIdAnfr(row.get("sta_nm_anfr"))
-            val acc = stations[idAnfr] ?: continue
+            val stationIndex = stations.indexOf(idAnfr)
+            if (stationIndex == -1) continue
             val admId = AnfrParsing.intOrNone(row.get("adm_id"))
-            acc.admId = admId
-            acc.dateImp = AnfrParsing.cleanText(row.get("dte_implantation")).ifEmpty { null }
-            acc.dateMod = AnfrParsing.cleanText(row.get("dte_modif")).ifEmpty { null }
-            acc.dateSer = AnfrParsing.cleanText(row.get("dte_en_service")).ifEmpty { null }
+            stations.setAdmId(stationIndex, admId)
+            stations.setDates(
+                stationIndex,
+                AnfrParsing.cleanText(row.get("dte_implantation")).ifEmpty { null },
+                AnfrParsing.cleanText(row.get("dte_en_service")).ifEmpty { null },
+                AnfrParsing.cleanText(row.get("dte_modif")).ifEmpty { null },
+            )
             if (admId != null) usedAdm.add(admId)
+            if (currentRow % EMIT_EVERY == 0L) {
+                report(BuildPhase.READING_SUPPORTS, currentRow, SOURCE_SUP_STATION, sourceCounts.stations)
+            }
         }
+        report(BuildPhase.READING_SUPPORTS, stationRows, SOURCE_SUP_STATION, sourceCounts.stations)
 
         // 3/ SUP_BANDE -> staging, puis frequences pre-formatees par emetteur.
+        report(BuildPhase.READING_SUPPORTS, source = SOURCE_SUP_BANDE, total = sourceCounts.bandes)
         val bandeInserter = BatchInserter(db, "INSERT INTO stg_bande VALUES (?, ?, ?, ?, ?, ?)")
         var bandeRows = 0L
         for (row in sources.bandes) {
+            val currentRow = ++bandeRows
             supSink.bande(row)
             val emrId = AnfrParsing.cleanText(row.get("emr_id"))
             val fDebRaw = AnfrParsing.cleanText(row.get("ban_nb_f_deb"))
@@ -158,29 +436,37 @@ object GeoTowerDbBuilder {
             if (emrId.isNotEmpty() && fDeb != null && fFin != null) {
                 bandeInserter.add(listOf(emrId, fDeb, fFin, unite, fDebRaw, fFinRaw))
             }
-            if (++bandeRows % EMIT_EVERY == 0L) onProgress(BuildPhase.READING_SUPPORTS, bandeRows)
+            if (currentRow % EMIT_EVERY == 0L) {
+                report(BuildPhase.READING_SUPPORTS, currentRow, SOURCE_SUP_BANDE, sourceCounts.bandes)
+            }
         }
         bandeInserter.flush()
+        report(BuildPhase.READING_SUPPORTS, bandeRows, SOURCE_SUP_BANDE, sourceCounts.bandes)
         // Index cree APRES le chargement (perf) : requis par buildEmrFreqs (ORDER BY emr_id) et le scan masques.
         db.execSql("CREATE INDEX ${db.stagingPrefix}ix_stg_bande_emr ON stg_bande(emr_id)")
         buildEmrFreqs(db)
 
         // 4/ SUP_EMETTEUR -> staging (filtre aux stations connues), enregistre les systemes.
+        report(BuildPhase.READING_SUPPORTS, source = SOURCE_SUP_EMETTEUR, total = sourceCounts.emetteurs)
         val emetteurInserter = BatchInserter(db, "INSERT INTO stg_emetteur VALUES (?, ?, ?, ?)")
         var emetteurRows = 0L
         for (row in sources.emetteurs) {
+            val currentRow = ++emetteurRows
             supSink.emetteur(row)
             val idAnfr = AnfrParsing.normalizeIdAnfr(row.get("sta_nm_anfr"))
-            if (!stations.containsKey(idAnfr)) continue
+            if (stations.indexOf(idAnfr) == -1) continue
             val emrId = AnfrParsing.cleanText(row.get("emr_id"))
             if (emrId.isEmpty()) continue
             val aerId = AnfrParsing.cleanText(row.get("aer_id")).ifEmpty { null }
             val systeme = AnfrParsing.cleanText(row.get("emr_lb_systeme")).ifEmpty { "Inconnu" }
             systemeIds.getId(systeme)
             emetteurInserter.add(listOf(idAnfr, emrId, aerId, systeme))
-            if (++emetteurRows % EMIT_EVERY == 0L) onProgress(BuildPhase.READING_SUPPORTS, emetteurRows)
+            if (currentRow % EMIT_EVERY == 0L) {
+                report(BuildPhase.READING_SUPPORTS, currentRow, SOURCE_SUP_EMETTEUR, sourceCounts.emetteurs)
+            }
         }
         emetteurInserter.flush()
+        report(BuildPhase.READING_SUPPORTS, emetteurRows, SOURCE_SUP_EMETTEUR, sourceCounts.emetteurs)
         // Index crees APRES le chargement (perf) : requis par le scan masques, applyDetails et applyAzimuts.
         db.execSql("CREATE INDEX ${db.stagingPrefix}ix_stg_emetteur_emr ON stg_emetteur(emr_id)")
         db.execSql("CREATE INDEX ${db.stagingPrefix}ix_stg_emetteur_aer ON stg_emetteur(aer_id)")
@@ -193,40 +479,43 @@ object GeoTowerDbBuilder {
                 "WHERE aer_id IS NOT NULL AND aer_id != '' AND UPPER(systeme) LIKE '%FH%'",
         )
 
-        onProgress(BuildPhase.COMPUTING_FREQUENCIES, 0L)
+        report(BuildPhase.COMPUTING_FREQUENCIES, source = SOURCE_FREQUENCIES)
         // 5/ Masques technologie/bande : scan emetteur (x bande) -> accumulateur RAM.
         var maskRows = 0L
         db.query(
             "SELECT e.id_anfr AS id_anfr, e.systeme AS systeme, b.f_deb AS f_deb, b.f_fin AS f_fin, b.unite AS unite " +
                 "FROM stg_emetteur e LEFT JOIN stg_bande b ON e.emr_id = b.emr_id",
         ) { row ->
-            val acc = stations[row.getString("id_anfr")]
-            if (acc != null) {
+            val stationIndex = stations.indexOf(row.getString("id_anfr").orEmpty())
+            if (stationIndex != -1) {
                 val systeme = row.getString("systeme")
                 val fDeb = row.getDouble("f_deb")
                 if (fDeb == null) {
                     if (AnfrParsing.cleanText(systeme).uppercase().contains("FH")) {
-                        acc.masks.techMask = acc.masks.techMask or RadioFilterMasks.TECH_FH
-                        acc.masks.bandMask = acc.masks.bandMask or RadioFilterMasks.BAND_FH
+                        stations.addFhMask(stationIndex)
                     }
                 } else {
                     val unite = row.getString("unite") ?: "M"
-                    RadioMaskComputer.updateMasksFromSystemAndBand(
-                        acc.masks, systeme,
+                    stations.updateSystemAndBand(
+                        stationIndex,
+                        systeme,
                         AnfrParsing.frequencyToMhz(fDeb, unite),
                         AnfrParsing.frequencyToMhz(row.getDouble("f_fin"), unite),
                     )
                 }
             }
-            if (++maskRows % EMIT_EVERY == 0L) onProgress(BuildPhase.COMPUTING_FREQUENCIES, maskRows)
+            if (++maskRows % EMIT_EVERY == 0L) {
+                report(BuildPhase.COMPUTING_FREQUENCIES, maskRows, SOURCE_FREQUENCIES)
+            }
         }
+        report(BuildPhase.COMPUTING_FREQUENCIES, maskRows, SOURCE_FREQUENCIES)
 
         // stg_bande n'est plus utile apres le calcul des masques (les frequences pre-formatees
         // sont deja dans stg_emr_freqs) : on la supprime tot pour liberer du disque (SUP_BANDE
         // ~200 Mo decompresse). Les pages liberees seront reutilisees par les inserts suivants.
         db.execSql("DROP TABLE IF EXISTS ${db.staging("stg_bande")}")
 
-        onProgress(BuildPhase.READING_SUPPORTS, 0L)
+        report(BuildPhase.READING_SUPPORTS, source = SOURCE_SUP_ANTENNE, total = sourceCounts.antennes)
         // 6/ SUP_ANTENNE -> staging (physique pre-formatee), puis marquage FH.
         val antenneInserter = BatchInserter(db, "INSERT OR REPLACE INTO stg_antenne VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
         // Lien station <-> azimut : sur un site MUTUALISE, l'ANFR declare le MEME aer_id sur les deux
@@ -236,9 +525,10 @@ object GeoTowerDbBuilder {
         val azimutStaInserter = BatchInserter(db, "INSERT INTO stg_antenne_sta VALUES (?, ?, ?, ?)")
         var antenneRows = 0L
         for (row in sources.antennes) {
+            val currentRow = ++antenneRows
             supSink.antenne(row)
             val idAnfr = AnfrParsing.normalizeIdAnfr(row.get("sta_nm_anfr"))
-            if (!stations.containsKey(idAnfr)) continue
+            if (stations.indexOf(idAnfr) == -1) continue
             val aerId = AnfrParsing.cleanText(row.get("aer_id"))
             if (aerId.isEmpty()) continue
             val supId = AnfrParsing.cleanText(row.get("sup_id")).ifEmpty { null }
@@ -260,59 +550,75 @@ object GeoTowerDbBuilder {
             if (taeId != null) usedTae.add(taeId)
             antenneInserter.add(listOf(aerId, idAnfr, supId, taeId, azimut, hauteurBas, 0, physique))
             if (azimut != null) azimutStaInserter.add(listOf(idAnfr, aerId, azimut, 0))
-            if (++antenneRows % EMIT_EVERY == 0L) onProgress(BuildPhase.READING_SUPPORTS, antenneRows)
+            if (currentRow % EMIT_EVERY == 0L) {
+                report(BuildPhase.READING_SUPPORTS, currentRow, SOURCE_SUP_ANTENNE, sourceCounts.antennes)
+            }
         }
         antenneInserter.flush()
         azimutStaInserter.flush()
+        report(BuildPhase.READING_SUPPORTS, antenneRows, SOURCE_SUP_ANTENNE, sourceCounts.antennes)
         db.execSql("UPDATE stg_antenne SET is_fh = 1 WHERE aer_id IN (SELECT aer_id FROM stg_fh_aer)")
         db.execSql("UPDATE stg_antenne_sta SET is_fh = 1 WHERE aer_id IN (SELECT aer_id FROM stg_fh_aer)")
         // Index COUVRANT cree APRES le chargement (perf) : applyAzimuts scanne (id_anfr, azimut, is_fh)
         // en flux, sans tri temporaire malgre le ORDER BY id_anfr.
         db.execSql("CREATE INDEX ${db.stagingPrefix}ix_stg_antenne_sta ON stg_antenne_sta(id_anfr, azimut, is_fh)")
 
-        onProgress(BuildPhase.COMPUTING_ANTENNAS, 0L)
+        report(BuildPhase.COMPUTING_ANTENNAS, source = SOURCE_ANTENNA_STAGING)
         // 7/ Azimuts (mobile / FH) par station : scan ordonne -> accumulateur RAM.
-        applyAzimuts(db, stations)
+        applyAzimuts(db, stations) { processed ->
+            report(BuildPhase.COMPUTING_ANTENNAS, processed, SOURCE_ANTENNA_STAGING)
+        }
         // Le lien station <-> azimut ne sert plus : on libere le disque avant la suite du build.
         db.execSql("DROP TABLE IF EXISTS ${db.staging("stg_antenne_sta")}")
 
-        onProgress(BuildPhase.READING_SUPPORTS, 0L)
+        report(BuildPhase.READING_SUPPORTS, source = SOURCE_SUP_SUPPORT, total = sourceCounts.supports)
         // 8/ SUP_SUPPORT -> staging + adresses/communes sur l'accumulateur station.
-        val supportInserter = BatchInserter(db, "INSERT OR REPLACE INTO stg_support VALUES (?, ?, ?, ?, ?)")
         var supportRows = 0L
-        for (row in sources.supports) {
-            supSink.support(row)
-            val idAnfr = AnfrParsing.normalizeIdAnfr(row.get("sta_nm_anfr"))
-            val supId = AnfrParsing.cleanText(row.get("sup_id"))
-            val acc = stations[idAnfr]
-            if (acc == null || supId.isEmpty()) continue
-            val natId = AnfrParsing.intOrNone(row.get("nat_id"))
-            val tpoId = AnfrParsing.intOrNone(row.get("tpo_id"))
-            val hauteur = AnfrParsing.floatOrNone(row.get("sup_nm_haut"))
-            val codeInsee = AnfrParsing.cleanText(row.get("com_cd_insee")).ifEmpty { null }
-            if (natId != null) usedNat.add(natId)
-            if (tpoId != null) usedTpo.add(tpoId)
-            if (codeInsee != null) usedCommunes.add(codeInsee)
+        db.insertInTransaction("INSERT OR REPLACE INTO stg_support VALUES (?, ?, ?, ?, ?)") { statement ->
+            for (row in sources.supports) {
+                val currentRow = ++supportRows
+                if (supSink !== SupRowSink.None) supSink.support(row)
+                val stationIndex = stations.indexOfRaw(row.get("sta_nm_anfr"))
+                if (stationIndex == -1) continue
+                val idAnfr = stations.id(stationIndex)
+                val supId = AnfrParsing.cleanText(row.get("sup_id"))
+                if (supId.isEmpty()) continue
+                val natId = AnfrParsing.intOrNone(row.get("nat_id"))
+                val tpoId = AnfrParsing.intOrNone(row.get("tpo_id"))
+                val hauteur = AnfrParsing.floatOrNone(row.get("sup_nm_haut"))
+                val codeInsee = AnfrParsing.cleanText(row.get("com_cd_insee")).ifEmpty { null }
+                if (natId != null) usedNat.add(natId)
+                if (tpoId != null) usedTpo.add(tpoId)
+                if (codeInsee != null) usedCommunes.add(codeInsee)
 
-            val lieu = AnfrParsing.cleanText(row.get("adr_lb_lieu"))
-            val add1 = AnfrParsing.cleanText(row.get("adr_lb_add1"))
-            val add2 = AnfrParsing.cleanText(row.get("adr_lb_add2"))
-            val add3 = AnfrParsing.cleanText(row.get("adr_lb_add3"))
-            val cp = AnfrParsing.cleanText(row.get("adr_nm_cp"))
-            val ville = if (codeInsee != null) references.communes[codeInsee] ?: "" else ""
-            val rue = listOf(lieu, add1, add2, add3).filter { it.isNotEmpty() }.joinToString(", ")
-            var adresse = rue
-            if (cp.isNotEmpty() || ville.isNotEmpty()) {
-                adresse = if (adresse.isNotEmpty()) "$adresse, " else ""
-                adresse += "$cp $ville".trim()
+                val lieu = AnfrParsing.cleanText(row.get("adr_lb_lieu"))
+                val add1 = AnfrParsing.cleanText(row.get("adr_lb_add1"))
+                val add2 = AnfrParsing.cleanText(row.get("adr_lb_add2"))
+                val add3 = AnfrParsing.cleanText(row.get("adr_lb_add3"))
+                val cp = AnfrParsing.cleanText(row.get("adr_nm_cp"))
+                val ville = if (codeInsee != null) references.communes[codeInsee] ?: "" else ""
+                val rue = listOf(lieu, add1, add2, add3).filter { it.isNotEmpty() }.joinToString(", ")
+                var adresse = rue
+                if (cp.isNotEmpty() || ville.isNotEmpty()) {
+                    adresse = if (adresse.isNotEmpty()) "$adresse, " else ""
+                    adresse += "$cp $ville".trim()
+                }
+                if (adresse.isNotEmpty()) stations.setAddress(stationIndex, adresse)
+                if (codeInsee != null) stations.setInseeCode(stationIndex, codeInsee)
+
+                statement.clearBindings()
+                statement.bindString(1, idAnfr)
+                statement.bindString(2, supId)
+                if (natId == null) statement.bindNull(3) else statement.bindLong(3, natId.toLong())
+                if (tpoId == null) statement.bindNull(4) else statement.bindLong(4, tpoId.toLong())
+                if (hauteur == null) statement.bindNull(5) else statement.bindDouble(5, hauteur)
+                statement.executeInsert()
+                if (currentRow % EMIT_EVERY == 0L) {
+                    report(BuildPhase.READING_SUPPORTS, currentRow, SOURCE_SUP_SUPPORT, sourceCounts.supports)
+                }
             }
-            if (adresse.isNotEmpty()) acc.adresse = adresse
-            if (codeInsee != null) acc.codeInsee = codeInsee
-
-            supportInserter.add(listOf(idAnfr, supId, natId, tpoId, hauteur))
-            if (++supportRows % EMIT_EVERY == 0L) onProgress(BuildPhase.READING_SUPPORTS, supportRows)
         }
-        supportInserter.flush()
+        report(BuildPhase.READING_SUPPORTS, supportRows, SOURCE_SUP_SUPPORT, sourceCounts.supports)
         supSink.finish()
 
         // 9/ Fige l'accumulateur station et l'ARCEP sur disque, puis libere la RAM.
@@ -320,17 +626,32 @@ object GeoTowerDbBuilder {
             db,
             "INSERT OR REPLACE INTO stg_station_final VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
-        for ((idAnfr, acc) in stations) {
+        for (stationIndex in 0 until stations.size()) {
             stationInserter.add(
                 listOf(
-                    idAnfr, acc.operateurId, acc.operatorLabel, acc.latitude, acc.longitude, acc.statutId,
-                    acc.statutLabel, acc.admId, acc.dateImp, acc.dateSer, acc.dateMod, acc.adresse, acc.codeInsee,
-                    acc.masks.techMask, acc.masks.bandMask, acc.hasActive, acc.azimuts, acc.azimutsFh,
+                    stations.id(stationIndex),
+                    stations.operatorId(stationIndex),
+                    stations.operatorLabel(stationIndex),
+                    stations.latitude(stationIndex),
+                    stations.longitude(stationIndex),
+                    stations.statusId(stationIndex),
+                    stations.statusLabel(stationIndex),
+                    stations.admId(stationIndex),
+                    stations.dateImplantation(stationIndex),
+                    stations.dateService(stationIndex),
+                    stations.dateModification(stationIndex),
+                    stations.address(stationIndex),
+                    stations.inseeCode(stationIndex),
+                    stations.techMask(stationIndex),
+                    stations.bandMask(stationIndex),
+                    stations.hasActive(stationIndex),
+                    stations.azimuths(stationIndex),
+                    stations.fhAzimuths(stationIndex),
                 ),
             )
         }
         stationInserter.flush()
-        val stationCount = stations.size
+        val stationCount = stations.size()
         stations.clear()
 
         val arcepInserter = BatchInserter(db, "INSERT OR REPLACE INTO stg_arcep VALUES (?, ?, ?, ?)")
@@ -339,11 +660,13 @@ object GeoTowerDbBuilder {
         }
         arcepInserter.flush()
 
-        onProgress(BuildPhase.BUILDING_DETAILS, 0L)
+        report(BuildPhase.BUILDING_DETAILS, source = SOURCE_DETAILS, total = stationCount.toLong())
         // 10/ details_frequences par station : group_concat en flux (une ligne par station).
         //     10a d'abord : les systemes annonces par le seul CSV hebdomadaire, que 10b fusionne.
         applyAnnouncedDetails(db)
-        applyDetails(db, onProgress)
+        applyDetails(db) { processed ->
+            report(BuildPhase.BUILDING_DETAILS, processed, SOURCE_DETAILS, stationCount.toLong())
+        }
 
         // Ces tables de staging ne servent plus a l'emission finale (SUP_EMETTEUR ~120 Mo) :
         // on libere avant d'ecrire les tables definitives.
@@ -351,7 +674,7 @@ object GeoTowerDbBuilder {
             db.execSql("DROP TABLE IF EXISTS ${db.staging(it)}")
         }
 
-        onProgress(BuildPhase.INSERTING, 0L)
+        report(BuildPhase.INSERTING, source = SOURCE_FINAL_TABLES)
         // 11/ Emission des tables finales depuis le staging (pur SQL, sans RAM).
         db.execSql(
             "INSERT INTO localisation SELECT sf.id_anfr, sf.operateur_id, sf.latitude, sf.longitude, sf.azimuts, " +
@@ -407,14 +730,14 @@ object GeoTowerDbBuilder {
         sourceVersions.add(listOf("provenance", "local_build"))
         db.insertBatch("INSERT OR REPLACE INTO source_versions (source_key, source_value) VALUES (?, ?)", sourceVersions)
 
-        onProgress(BuildPhase.COMPUTING_STATS, 0L)
+        report(BuildPhase.COMPUTING_STATS, source = SOURCE_STATS)
         // 13/ Stats courantes (radio_stat_current), exigees non vides par le validateur.
         AnfrStatsBuilder.populateCurrentStats(db)
         // 13bis/ Stats par departement. Sans referentiel joignable, les compteurs sont ecrits
         // quand meme et seuls les ratios de densite/population restent vides.
         DepartmentStatsBuilder.populateDepartmentStats(db, references.departments)
 
-        onProgress(BuildPhase.FINALIZING, 0L)
+        report(BuildPhase.FINALIZING, source = SOURCE_FINALIZING)
         // 14/ Nettoyage du staging (libere le disque avant finalisation).
         STAGING_TABLES.forEach { db.execSql("DROP TABLE IF EXISTS ${db.staging(it)}") }
 
@@ -455,23 +778,26 @@ object GeoTowerDbBuilder {
     }
 
     /** Azimuts mobiles / FH par station (tries par valeur) + masque FH si azimut FH present. */
-    private fun applyAzimuts(db: SqlDatabase, stations: Map<String, StationAcc>) {
+    private fun applyAzimuts(
+        db: SqlDatabase,
+        stations: StationAccumulator,
+        onProgress: (Long) -> Unit = {},
+    ) {
         var currentId: String? = null
         val mobile = LinkedHashSet<String>()
         val fh = LinkedHashSet<String>()
         fun flush() {
-            val acc = currentId?.let { stations[it] }
-            if (acc != null) {
-                acc.azimuts = azimutsToString(mobile)
-                acc.azimutsFh = azimutsToString(fh)
+            val stationIndex = currentId?.let { stations.indexOf(it) } ?: -1
+            if (stationIndex != -1) {
+                stations.setAzimuths(stationIndex, azimutsToString(mobile), azimutsToString(fh))
                 if (fh.isNotEmpty()) {
-                    acc.masks.techMask = acc.masks.techMask or RadioFilterMasks.TECH_FH
-                    acc.masks.bandMask = acc.masks.bandMask or RadioFilterMasks.BAND_FH
+                    stations.addFhMask(stationIndex)
                 }
             }
             mobile.clear()
             fh.clear()
         }
+        var processed = 0L
         db.query("SELECT id_anfr, azimut, is_fh FROM stg_antenne_sta WHERE azimut IS NOT NULL ORDER BY id_anfr") { row ->
             val id = row.getString("id_anfr") ?: ""
             if (id != currentId) {
@@ -482,24 +808,21 @@ object GeoTowerDbBuilder {
             if (azimut != null) {
                 if (row.getInt("is_fh") == 1) fh.add(azimut.toString()) else mobile.add(azimut.toString())
             }
+            if (++processed % EMIT_EVERY == 0L) onProgress(processed)
         }
         flush()
+        onProgress(processed)
     }
 
     /**
      * Construit `details_frequences` par station (emetteur x bandes x physique x statut).
      *
-     * PERF (phase la plus longue du build on-device) : `group_concat` avec `GROUP BY id_anfr` renvoie
-     * UNE ligne par station (~100 k) au lieu de renvoyer chaque ligne emetteur (~2-3 M) a Kotlin. Le
-     * GROUP BY se fait EN FLUX sur l'ordre de l'index couvrant `ix_stg_emetteur_id` (id_anfr en tete),
-     * donc SANS tri temporaire (cf. EXPLAIN QUERY PLAN : aucun "USE TEMP B-TREE"). C'est la difference
-     * cruciale avec une variante `SELECT DISTINCT ... ORDER BY line` qui, elle, force un tri de ~2,5 M
-     * lignes catastrophique sur Android.
-     *
-     * group_concat renvoie les lignes dans l'ordre du scan (avec doublons possibles) ; la dedup + le tri
-     * alphabetique d'origine sont refaits en Kotlin sur la petite liste de chaque station (~10-25 lignes).
-     * Sortie identique au sortedSet d'origine, cf. tests `aggregatesMultipleEmittersBandsAndAzimutsPerStation`
-     * (tri) et `deduplicatesIdenticalDetailLines` (dedup).
+     * Le premier port utilisait `group_concat` avec `GROUP BY id_anfr`. Sur un stockage lent,
+     * SQLite devait maintenir de gros agregats et faire de nombreux acces indexes aux tables
+     * attachees ; la phase montait a 25 minutes alors que la meme base passait en 13 minutes sur
+     * un autre appareil. La requete ci-dessous ne fait qu'un parcours ordonne par station : la
+     * deduplication et le tri, deja necessaires pour reproduire le builder serveur, restent en
+     * memoire pour UNE station seulement.
      */
     /**
      * Requete d'agregation de [applyDetails]. `internal` pour que le test puisse verifier son PLAN
@@ -526,6 +849,23 @@ object GeoTowerDbBuilder {
             "GROUP BY e.id_anfr"
     }
 
+    /**
+     * Flux brut des lignes de details, ordonne par la cle de l'index couvrant des emetteurs.
+     * L'ordre secondaire n'est pas necessaire : l'agregateur Kotlin trie les lignes de la station.
+     */
+    internal fun detailsStreamSql(): String =
+        "SELECT e.id_anfr AS id_anfr, e.systeme AS systeme, " +
+            "COALESCE(f.freqs_text, '') AS freqs, " +
+            "COALESCE(s.statut, sf.statut_label, 'Inconnu') AS statut, " +
+            "COALESCE(s.emr_dt, '') AS emr_dt, " +
+            "COALESCE(ap.physique, 'Azimut non specifie') AS physique " +
+            "FROM stg_emetteur e " +
+            "LEFT JOIN stg_emr_freqs f ON e.emr_id = f.emr_id " +
+            "LEFT JOIN stg_antenne ap ON e.aer_id = ap.aer_id " +
+            "LEFT JOIN stg_sysstatus s ON e.id_anfr = s.id_anfr AND s.systeme_upper = UPPER(e.systeme) " +
+            "JOIN stg_station_final sf ON e.id_anfr = sf.id_anfr " +
+            "ORDER BY e.id_anfr"
+
     /** Requete d'agregation de [applyAnnouncedDetails], exposee pour la meme raison. */
     internal fun announcedDetailsSql(): String {
         val line = "s.systeme || ' :  | ' || COALESCE(s.statut, 'Inconnu') || ' | ' || " +
@@ -537,27 +877,60 @@ object GeoTowerDbBuilder {
             "GROUP BY s.id_anfr"
     }
 
-    private fun applyDetails(db: SqlDatabase, onProgress: (phase: BuildPhase, processed: Long) -> Unit) {
+    private fun applyDetails(db: SqlDatabase, onProgress: (processed: Long) -> Unit) {
         val inserter = BatchInserter(db, "INSERT OR REPLACE INTO stg_details VALUES (?, ?)")
+        val encoder = FrequencyDetailsEncoder.Session()
+        // Une seule valeur par station. La joindre au flux emetteur la repetait pour chaque ligne
+        // et gonflait inutilement les CursorWindow Android, avec un cout tres variable selon le
+        // stockage du telephone.
+        val announcedByStation = HashMap<String, String>()
+        val lines = sortedSetOf<String>()
+        var currentId: String? = null
+        var announced: String? = null
         var emitted = 0L
-        db.query(detailsSql()) { row ->
-            val id = row.getString("id_anfr")
-            val details = row.getString("details")
-            if (id != null && details != null) {
-                encodeDetails(details, row.getString("annonces"))?.let { inserter.add(listOf(id, it)) }
-                if (++emitted % EMIT_EVERY == 0L) onProgress(BuildPhase.BUILDING_DETAILS, emitted)
+
+        fun flushStation() {
+            val id = currentId ?: return
+            normalizeDetailLines(lines, announced)?.let { text ->
+                encoder.encode(text)?.let { inserter.add(listOf(id, it)) }
             }
+            lines.clear()
+            announced = null
+            if (++emitted % EMIT_EVERY == 0L) onProgress(emitted)
         }
-        // Stations que le CSV hebdomadaire connait alors que le ZIP mensuel n'a AUCUN emetteur pour
-        // elles (site tout juste declare) : la requete ci-dessus, pilotee par stg_emetteur, les ignore.
-        db.query(
-            "SELECT x.id_anfr AS id_anfr, x.details AS annonces FROM stg_details_extra x " +
-                "WHERE NOT EXISTS (SELECT 1 FROM stg_emetteur e WHERE e.id_anfr = x.id_anfr)",
-        ) { row ->
-            val id = row.getString("id_anfr")
-            if (id != null) {
-                encodeDetails(null, row.getString("annonces"))?.let { inserter.add(listOf(id, it)) }
+
+        try {
+            db.query("SELECT id_anfr, details FROM stg_details_extra") { row ->
+                val id = row.getString("id_anfr")
+                val details = row.getString("details")
+                if (id != null && details != null) announcedByStation[id] = details
             }
+            db.query(detailsStreamSql()) { row ->
+                val id = row.getString("id_anfr") ?: return@query
+                if (id != currentId) {
+                    flushStation()
+                    currentId = id
+                    announced = announcedByStation.remove(id)
+                }
+                val line = (row.getString("systeme") ?: "Inconnu") + " : " +
+                    (row.getString("freqs") ?: "") + " | " +
+                    (row.getString("statut") ?: "Inconnu") + " | " +
+                    (row.getString("emr_dt") ?: "") + " | " +
+                    (row.getString("physique") ?: "Azimut non specifie")
+                lines.add(line)
+            }
+            flushStation()
+
+            // Stations que le CSV hebdomadaire connait alors que le ZIP mensuel n'a AUCUN emetteur pour
+            // elles (site tout juste declare) : elles restent dans la map car aucun emetteur ne les
+            // a retirees pendant le scan principal.
+            for ((id, details) in announcedByStation) {
+                normalizeDetails(null, details)?.let { text ->
+                    encoder.encode(text)?.let { inserter.add(listOf(id, it)) }
+                }
+            }
+        } finally {
+            encoder.close()
         }
         inserter.flush()
     }
@@ -566,9 +939,23 @@ object GeoTowerDbBuilder {
      * Lignes des emetteurs du ZIP et lignes annoncees par le CSV, fusionnees comme le `set()` unique
      * du builder serveur : dedup + tri alphabetique sur l'ensemble des lignes de la station.
      */
-    private fun encodeDetails(details: String?, annonces: String?): String? {
-        val all = listOfNotNull(details, annonces).joinToString("\n").ifEmpty { return null }
-        return FrequencyDetailsEncoder.encode(all.split('\n').toSortedSet().joinToString("\n"))
+    private fun normalizeDetails(
+        details: String?,
+        annonces: String?,
+    ): String? {
+        if (details.isNullOrEmpty() && annonces.isNullOrEmpty()) return null
+        val lines = sortedSetOf<String>()
+        details?.split('\n')?.forEach { lines.add(it) }
+        return normalizeDetailLines(lines, annonces)
+    }
+
+    private fun normalizeDetailLines(
+        lines: MutableSet<String>,
+        annonces: String?,
+    ): String? {
+        annonces?.split('\n')?.forEach { lines.add(it) }
+        if (lines.isEmpty()) return null
+        return lines.joinToString("\n")
     }
 
     /**
@@ -606,6 +993,19 @@ object GeoTowerDbBuilder {
 
     // Frequence d'emission des compteurs de progression (1 notif par tranche de lignes).
     private const val EMIT_EVERY = 50_000L
+
+    private const val SOURCE_OBSERVATOIRE = "observatoire.csv"
+    private const val SOURCE_SUP_STATION = "SUP_STATION.txt (ZIP ANFR)"
+    private const val SOURCE_SUP_BANDE = "SUP_BANDE.txt (ZIP ANFR)"
+    private const val SOURCE_SUP_EMETTEUR = "SUP_EMETTEUR.txt (ZIP ANFR)"
+    private const val SOURCE_SUP_ANTENNE = "SUP_ANTENNE.txt (ZIP ANFR)"
+    private const val SOURCE_SUP_SUPPORT = "SUP_SUPPORT.txt (ZIP ANFR)"
+    private const val SOURCE_FREQUENCIES = "stg_emetteur x stg_bande"
+    private const val SOURCE_ANTENNA_STAGING = "stg_antenne_sta"
+    private const val SOURCE_DETAILS = "stg_emetteur -> details_frequences"
+    private const val SOURCE_FINAL_TABLES = "stg_station_final -> tables finales"
+    private const val SOURCE_STATS = "tables finales -> statistiques"
+    private const val SOURCE_FINALIZING = "staging SQLite -> base finale"
 
     private val STAGING_TABLES = listOf(
         "stg_bande", "stg_emr_freqs", "stg_emetteur", "stg_fh_aer", "stg_antenne", "stg_antenne_sta",

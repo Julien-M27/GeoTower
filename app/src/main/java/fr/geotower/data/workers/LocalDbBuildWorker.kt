@@ -7,14 +7,15 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.graphics.drawable.Icon
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.os.Build
 import android.os.PowerManager
 import androidx.core.app.NotificationCompat
-import androidx.work.Constraints
+import androidx.work.BackoffPolicy
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
 import androidx.work.ForegroundInfo
-import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
@@ -22,6 +23,7 @@ import androidx.work.workDataOf
 import fr.geotower.MainActivity
 import fr.geotower.R
 import fr.geotower.data.build.BuildPhase
+import fr.geotower.data.build.BuildProgressUpdate
 import fr.geotower.data.build.LocalDbBuildPipeline
 import fr.geotower.data.build.labelRes
 import fr.geotower.data.db.DbOperationTimings
@@ -29,8 +31,8 @@ import fr.geotower.utils.AppLogger
 import fr.geotower.data.notifications.NotificationHistoryStore
 import fr.geotower.utils.AppNotifications
 import fr.geotower.utils.NotificationIconResources
-import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -47,31 +49,68 @@ class LocalDbBuildWorker(
     params: WorkerParameters,
 ) : CoroutineWorker(context, params) {
 
+    private data class ProgressSnapshot(
+        val percent: Int,
+        val phaseOrdinal: Int,
+        val detail: String,
+        val importOrdinal: Int,
+        val fileName: String,
+        val downloadedBytes: Long,
+        val totalBytes: Long,
+    )
+
     private val notificationManager =
         context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
     private val channelId = "db_download_channel"
 
     override suspend fun doWork(): Result = coroutineScope {
         createChannel()
+        // Le réseau est nécessaire pour récupérer les sources, mais pas pour le traitement local.
+        // Une contrainte WorkManager CONNECTED sur toute la tâche ferait arrêter un build d'une
+        // heure dès qu'un téléphone perd brièvement le Wi-Fi ou le réseau mobile pendant le calcul.
+        if (!hasUsableNetwork()) {
+            setProgress(
+                workDataOf(
+                    KEY_PROGRESS to 0,
+                    KEY_PHASE to BuildPhase.RESOLVING.ordinal,
+                    KEY_DETAIL to context.getString(R.string.appstrings_local_build_waiting_network),
+                ),
+            )
+            AppLogger.i(TAG, "Local build postponed: no validated network for source download")
+            return@coroutineScope Result.retry()
+        }
         // Chrono de generation (live pendant, duree finale apres) affiche par LocalDbBuildCard.
         DbOperationTimings.markStart(context, DbOperationTimings.LOCAL_BUILD)
         setForeground(createForegroundInfo(BuildPhase.RESOLVING, 0, null))
 
-        val phaseOrdinal = AtomicInteger(BuildPhase.RESOLVING.ordinal)
-        val percentValue = AtomicInteger(0)
-        // Detail « live » de l'etape en cours (ex. compteur de lignes) pousse aussi vers la carte,
-        // afin qu'une phase longue (calcul des masques) affiche un mouvement continu, pas un % fige.
-        val detailValue = AtomicReference("")
+        // Un seul objet atomique evite de publier un ancien fichier avec une nouvelle phase pendant
+        // la fenetre ou le ticker lit les donnees de progression.
+        val progressSnapshot = AtomicReference(
+            ProgressSnapshot(
+                percent = 0,
+                phaseOrdinal = BuildPhase.RESOLVING.ordinal,
+                detail = "",
+                importOrdinal = -1,
+                fileName = "",
+                downloadedBytes = 0L,
+                totalBytes = -1L,
+            ),
+        )
 
         // Pousse la progression vers la carte (setProgress est suspend -> coroutine dediee).
         val ticker = launch {
             try {
                 while (true) {
+                    val snapshot = progressSnapshot.get()
                     setProgress(
                         workDataOf(
-                            KEY_PROGRESS to percentValue.get(),
-                            KEY_PHASE to phaseOrdinal.get(),
-                            KEY_DETAIL to detailValue.get(),
+                            KEY_PROGRESS to snapshot.percent,
+                            KEY_PHASE to snapshot.phaseOrdinal,
+                            KEY_DETAIL to snapshot.detail,
+                            KEY_IMPORT to snapshot.importOrdinal,
+                            KEY_FILE to snapshot.fileName,
+                            KEY_DOWNLOADED_BYTES to snapshot.downloadedBytes,
+                            KEY_TOTAL_BYTES to snapshot.totalBytes,
                         ),
                     )
                     delay(500)
@@ -98,14 +137,23 @@ class LocalDbBuildWorker(
                 nonMobileTech = inputData.getBoolean(KEY_PACK_NONMOBILE, true),
             )
             val force = inputData.getBoolean(KEY_FORCE, false)
-            val result = LocalDbBuildPipeline().run(context, packs, force) { phase, percent, detail ->
-                phaseOrdinal.set(phase.ordinal)
-                percentValue.set(percent)
-                detailValue.set(detail.orEmpty())
-                notifyLive(phase, percent, detail)
+            val result = LocalDbBuildPipeline().run(context, packs, force) { update: BuildProgressUpdate ->
+                val previous = progressSnapshot.get()
+                val snapshot = ProgressSnapshot(
+                    percent = maxOf(previous.percent, update.percent.coerceIn(0, 100)),
+                    phaseOrdinal = update.phase.ordinal,
+                    detail = update.detail.orEmpty(),
+                    importOrdinal = update.importType?.ordinal ?: -1,
+                    fileName = update.fileName.orEmpty(),
+                    downloadedBytes = update.downloadedBytes,
+                    totalBytes = update.totalBytes,
+                )
+                progressSnapshot.set(snapshot)
+                notifyLive(update.phase, snapshot.percent, update.detail)
             }
 
             ticker.cancel()
+            ticker.join()
             cancelSafely(PROGRESS_NOTIFICATION_ID)
             if (result.success) {
                 DbOperationTimings.finish(context, DbOperationTimings.LOCAL_BUILD)
@@ -116,7 +164,7 @@ class LocalDbBuildWorker(
                 DbOperationTimings.clearStart(context, DbOperationTimings.LOCAL_BUILD)
                 AppLogger.w(TAG, "Local DB build failed: ${result.reason}")
                 showResult(success = false, reason = result.reason)
-                Result.failure()
+                Result.failure(workDataOf(KEY_ERROR to (result.reason ?: "Cause inconnue")))
             }
         } catch (e: CancellationException) {
             DbOperationTimings.clearStart(context, DbOperationTimings.LOCAL_BUILD)
@@ -129,10 +177,19 @@ class LocalDbBuildWorker(
             AppLogger.w(TAG, "Local DB build worker crashed", e)
             cancelSafely(PROGRESS_NOTIFICATION_ID)
             showResult(success = false, reason = e.message)
-            Result.failure()
+            Result.failure(workDataOf(KEY_ERROR to (e.message ?: e.javaClass.simpleName)))
         } finally {
             runCatching { if (wakeLock.isHeld) wakeLock.release() }
         }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun hasUsableNetwork(): Boolean {
+        val manager = context.getSystemService(ConnectivityManager::class.java) ?: return false
+        val network = manager.activeNetwork ?: return false
+        val capabilities = manager.getNetworkCapabilities(network) ?: return false
+        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+            capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
     }
 
     private fun notifyLive(phase: BuildPhase, percent: Int, detail: String?) {
@@ -278,6 +335,11 @@ class LocalDbBuildWorker(
         const val KEY_PROGRESS = "progress"
         const val KEY_PHASE = "phase"
         const val KEY_DETAIL = "detail"
+        const val KEY_IMPORT = "import"
+        const val KEY_FILE = "file"
+        const val KEY_DOWNLOADED_BYTES = "downloaded_bytes"
+        const val KEY_TOTAL_BYTES = "total_bytes"
+        const val KEY_ERROR = "error"
         const val KEY_PACK_MOBILE = "pack_mobile"
         const val KEY_PACK_RADIO_BROADCAST = "pack_radio_broadcast"
         const val KEY_PACK_NONMOBILE = "pack_nonmobile"
@@ -300,11 +362,6 @@ class LocalDbBuildWorker(
             force: Boolean = false,
         ) =
             OneTimeWorkRequestBuilder<LocalDbBuildWorker>()
-                .setConstraints(
-                    Constraints.Builder()
-                        .setRequiredNetworkType(NetworkType.CONNECTED)
-                        .build(),
-                )
                 .setInputData(
                     workDataOf(
                         KEY_PACK_MOBILE to mobile,
@@ -313,6 +370,9 @@ class LocalDbBuildWorker(
                         KEY_FORCE to force,
                     ),
                 )
+                // Le réseau est vérifié au démarrage, puis le traitement peut continuer hors ligne.
+                // Ce backoff sert uniquement à attendre une connexion avant les téléchargements.
+                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30L, TimeUnit.SECONDS)
                 .apply {
                     if (mobile) addTag(TAG_PACK_MOBILE)
                     // Les deux packs non-mobiles alimentent la meme base radio.

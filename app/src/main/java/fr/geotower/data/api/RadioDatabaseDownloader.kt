@@ -2,6 +2,8 @@ package fr.geotower.data.api
 
 import android.content.Context
 import fr.geotower.data.config.RemoteFeatureFlags
+import fr.geotower.data.db.DatabaseStorageCleanup
+import fr.geotower.data.db.LocalDbProvenance
 import fr.geotower.data.db.RadioDatabaseValidator
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
@@ -151,12 +153,14 @@ object RadioDatabaseDownloader {
                     return@withContext false
                 }
 
-                deleteSqliteSidecars(dbFile)
+                DatabaseStorageCleanup.clearSqliteSidecars(dbFile)
                 if (!installValidatedDatabase(tempFile, dbFile, backupFile)) {
                     tempFile.delete()
                     return@withContext false
                 }
 
+                DatabaseStorageCleanup.clearTransientArtifacts(context, DB_NAME)
+                LocalDbProvenance.clearRadioLocalBuildMarker(context)
                 true
             } catch (e: CancellationException) {
                 if (tempFile.exists()) tempFile.delete()
@@ -165,6 +169,8 @@ object RadioDatabaseDownloader {
                 AppLogger.w(TAG, "Radio database download failed", e)
                 if (tempFile.exists()) tempFile.delete()
                 false
+            } finally {
+                DatabaseStorageCleanup.clearDownloadArtifacts(context, DB_NAME)
             }
         }
     }
@@ -190,11 +196,12 @@ object RadioDatabaseDownloader {
             dbFile.parentFile?.mkdirs()
             val backupFile = context.getDatabasePath("$DB_NAME.backup")
 
-            deleteSqliteSidecars(dbFile)
+            DatabaseStorageCleanup.clearSqliteSidecars(dbFile)
             if (!installValidatedDatabase(builtFile, dbFile, backupFile)) {
                 if (builtFile.exists()) builtFile.delete()
                 return@withContext false
             }
+            DatabaseStorageCleanup.clearTransientArtifacts(context, DB_NAME)
             true
         }
 
@@ -336,15 +343,6 @@ object RadioDatabaseDownloader {
 
         if (backupFile.exists()) backupFile.delete()
         return true
-    }
-
-    private fun deleteSqliteSidecars(dbFile: File) {
-        listOf(
-            File(dbFile.path + "-wal"),
-            File(dbFile.path + "-shm")
-        ).forEach { sidecar ->
-            if (sidecar.exists()) sidecar.delete()
-        }
     }
 
     private const val TAG = "GeoTowerRadioDb"

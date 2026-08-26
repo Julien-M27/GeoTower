@@ -86,12 +86,15 @@ fun EnbDatabaseDownloadCard(
     val safeClick = onSafeClick ?: rememberSafeClick()
     val featureFlags by RemoteFeatureFlags.config
     val workInfos by workManager
-        .getWorkInfosForUniqueWorkFlow(EnbDatabaseDownloadWorker.UNIQUE_WORK_NAME)
+        .getWorkInfosByTagFlow(EnbDatabaseDownloadWorker.WORK_TAG)
         .collectAsState(initial = emptyList())
-    val currentWork = workInfos.firstOrNull()
+    val currentWork = workInfos.firstOrNull { workInfo ->
+        workInfo.state == androidx.work.WorkInfo.State.RUNNING ||
+            workInfo.state == androidx.work.WorkInfo.State.ENQUEUED ||
+            workInfo.state == androidx.work.WorkInfo.State.BLOCKED
+    }
 
-    val isSyncing = currentWork?.state == androidx.work.WorkInfo.State.RUNNING ||
-        currentWork?.state == androidx.work.WorkInfo.State.ENQUEUED
+    val isSyncing = currentWork != null
     val downloadProgress = currentWork?.progress?.getInt(EnbDatabaseDownloadWorker.KEY_PROGRESS, 0)?.div(100f) ?: 0f
 
     val txtSearching = stringResource(R.string.database_searching)
@@ -279,7 +282,7 @@ fun EnbDatabaseDownloadCard(
                     OutlinedButton(
                         onClick = {
                             safeClick("enb_database_cancel_download") {
-                                workManager.cancelUniqueWork(EnbDatabaseDownloadWorker.UNIQUE_WORK_NAME)
+                                currentWork?.id?.let(workManager::cancelWorkById)
                             }
                         },
                         modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = sizing.component(50.dp)),

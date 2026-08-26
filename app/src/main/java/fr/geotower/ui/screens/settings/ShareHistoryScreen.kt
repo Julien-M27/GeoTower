@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBars
@@ -25,7 +24,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -86,8 +85,8 @@ import fr.geotower.R
 import fr.geotower.data.share.ShareHistoryEntry
 import fr.geotower.data.share.ShareHistoryStore
 import fr.geotower.ui.components.GeoTowerBackTopBar
-import fr.geotower.ui.components.GeoTowerDateScrollbar
 import fr.geotower.ui.components.PageScrollEdgeButtons
+import fr.geotower.ui.components.formatHistoryDay
 import fr.geotower.ui.components.formatHistoryDateTime
 import fr.geotower.ui.components.formatHistoryStorageBytes
 import fr.geotower.ui.components.geoTowerLazyListFadingEdge
@@ -177,7 +176,6 @@ fun ShareHistoryScreen(
     var showCounter by remember { mutableStateOf(HistoryPagePreferences.read(prefs, HistoryPagePreferences.SHARE_COUNTER)) }
     var showAddress by remember { mutableStateOf(HistoryPagePreferences.read(prefs, HistoryPagePreferences.SHARE_ADDRESS)) }
     var showContents by remember { mutableStateOf(HistoryPagePreferences.read(prefs, HistoryPagePreferences.SHARE_CONTENTS)) }
-    var showDateBar by remember { mutableStateOf(HistoryPagePreferences.read(prefs, HistoryPagePreferences.SHARE_DATE_BAR)) }
     var showClearDialog by rememberSaveable { mutableStateOf(false) }
     var historyItems by remember { mutableStateOf<List<ShareHistoryEntry>>(emptyList()) }
     var selectedIds by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
@@ -367,7 +365,21 @@ fun ShareHistoryScreen(
                         }
                     }
 
-                    items(visibleItems, key = { it.id }) { item ->
+                    itemsIndexed(visibleItems, key = { _, item -> item.id }) { index, item ->
+                        val day = formatHistoryDay(item.createdAtMillis)
+                        val previousDay = visibleItems.getOrNull(index - 1)?.createdAtMillis?.let(::formatHistoryDay)
+                        if (index == 0 || day != previousDay) {
+                            Text(
+                                text = day,
+                                style = sizing.textStyle(MaterialTheme.typography.titleMedium),
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = sizing.spacing(2.dp), vertical = sizing.spacing(6.dp))
+                            )
+                        }
+
                         val isSelected = item.id in selectedIdSet
                         Card(
                             colors = CardDefaults.cardColors(
@@ -433,29 +445,6 @@ fun ShareHistoryScreen(
             }
 
             PageScrollEdgeButtons(PageScrollPrefs.SHARE_HISTORY, listState)
-
-            GeoTowerDateScrollbar(
-                listState = listState,
-                timestamps = remember(visibleItems, availableFamilies, showCounter, showDateBar) {
-                    // La barre de filtres et le compteur occupent les premiers index de la liste :
-                    // on les aligne sur la première entrée pour que la bulle donne la bonne date
-                    // dès le haut, sinon tout l'index est décalé d'un cran par élément en tête.
-                    val timestamps = visibleItems.map { it.createdAtMillis }
-                    val leading = (if (availableFamilies.size > 1) 1 else 0) + (if (showCounter) 1 else 0)
-                    when {
-                        !showDateBar || timestamps.isEmpty() -> emptyList()
-                        else -> List(leading) { timestamps.first() } + timestamps
-                    }
-                },
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .fillMaxHeight()
-                    .padding(
-                        top = sizing.spacing(12.dp),
-                        bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() +
-                            sizing.spacing(12.dp)
-                    )
-            )
 
             if (isSelectionMode) {
                 Box(
@@ -524,24 +513,14 @@ fun ShareHistoryScreen(
                         HistoryPagePreferences.write(prefs, HistoryPagePreferences.SHARE_CONTENTS, it)
                     }
                 ),
-                HistoryPageOption(
-                    title = stringResource(R.string.history_option_date_bar),
-                    checked = showDateBar,
-                    onCheckedChange = {
-                        showDateBar = it
-                        HistoryPagePreferences.write(prefs, HistoryPagePreferences.SHARE_DATE_BAR, it)
-                    }
-                )
             ),
             onReset = {
                 showCounter = HistoryPagePreferences.DEFAULT_ENABLED
                 showAddress = HistoryPagePreferences.DEFAULT_ENABLED
                 showContents = HistoryPagePreferences.DEFAULT_ENABLED
-                showDateBar = HistoryPagePreferences.DEFAULT_ENABLED
                 HistoryPagePreferences.write(prefs, HistoryPagePreferences.SHARE_COUNTER, HistoryPagePreferences.DEFAULT_ENABLED)
                 HistoryPagePreferences.write(prefs, HistoryPagePreferences.SHARE_ADDRESS, HistoryPagePreferences.DEFAULT_ENABLED)
                 HistoryPagePreferences.write(prefs, HistoryPagePreferences.SHARE_CONTENTS, HistoryPagePreferences.DEFAULT_ENABLED)
-                HistoryPagePreferences.write(prefs, HistoryPagePreferences.SHARE_DATE_BAR, HistoryPagePreferences.DEFAULT_ENABLED)
             },
             onDismiss = { showSettingsSheet = false },
             onBack = { showSettingsSheet = false },

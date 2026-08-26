@@ -16,8 +16,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CellTower
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Memory
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Radio
 import androidx.compose.material.icons.filled.SettingsInputAntenna
 import androidx.compose.material3.Button
@@ -48,11 +52,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import androidx.annotation.StringRes
 import fr.geotower.R
 import fr.geotower.data.build.BuildPhase
+import fr.geotower.data.build.BuildImportType
 import fr.geotower.data.build.labelRes
 import fr.geotower.data.build.LocalBuildCapability
 import fr.geotower.data.db.DbOperationTimings
@@ -87,14 +94,36 @@ fun LocalDbBuildCard(
         .getWorkInfosForUniqueWorkFlow(LocalDbBuildWorker.UNIQUE_WORK_NAME)
         .collectAsState(initial = emptyList())
     val downloadInfos by workManager
-        .getWorkInfosForUniqueWorkFlow(DatabaseDownloadWorker.UNIQUE_WORK_NAME)
+        .getWorkInfosByTagFlow(DatabaseDownloadWorker.WORK_TAG)
         .collectAsState(initial = emptyList())
 
     val currentBuild = buildInfos.firstOrNull()
     val isBuilding = currentBuild?.state == WorkInfo.State.RUNNING || currentBuild?.state == WorkInfo.State.ENQUEUED
-    val downloadState = downloadInfos.firstOrNull()?.state
-    val isDownloading = downloadState == WorkInfo.State.RUNNING || downloadState == WorkInfo.State.ENQUEUED
+    val buildWasCancelled = currentBuild?.state == WorkInfo.State.CANCELLED
+    val buildFailureReason = currentBuild
+        ?.takeIf { it.state == WorkInfo.State.FAILED }
+        ?.outputData
+        ?.getString(LocalDbBuildWorker.KEY_ERROR)
+        ?.takeIf { it.isNotBlank() }
+    val downloadState = downloadInfos.firstOrNull { workInfo ->
+        workInfo.state == WorkInfo.State.RUNNING ||
+            workInfo.state == WorkInfo.State.ENQUEUED ||
+            workInfo.state == WorkInfo.State.BLOCKED
+    }?.state
+    val isDownloading = downloadState != null
     val progress = (currentBuild?.progress?.getInt(LocalDbBuildWorker.KEY_PROGRESS, 0) ?: 0) / 100f
+    val currentImport = currentBuild?.progress
+        ?.getInt(LocalDbBuildWorker.KEY_IMPORT, -1)
+        ?.let { BuildImportType.values().getOrNull(it) }
+    val currentFileName = currentBuild?.progress
+        ?.getString(LocalDbBuildWorker.KEY_FILE)
+        ?.takeIf { it.isNotBlank() }
+    val downloadedBytes = currentBuild?.progress
+        ?.getLong(LocalDbBuildWorker.KEY_DOWNLOADED_BYTES, 0L)
+        ?: 0L
+    val totalBytes = currentBuild?.progress
+        ?.getLong(LocalDbBuildWorker.KEY_TOTAL_BYTES, -1L)
+        ?: -1L
 
     // Packs a generer : Mobile coche par defaut (cas le plus courant + le plus utile).
     var packMobile by remember { mutableStateOf(true) }
@@ -163,6 +192,15 @@ fun LocalDbBuildCard(
 
             when {
                 isBuilding -> {
+                    Text(
+                        text = stringResource(
+                            R.string.appstrings_local_build_overall_progress,
+                            (progress * 100).toInt().coerceIn(0, 100),
+                        ),
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    Spacer(modifier = Modifier.height(sizing.spacing(6.dp)))
                     LinearWavyProgressIndicator(
                         progress = { progress },
                         modifier = Modifier.fillMaxWidth().height(sizing.component(8.dp)),
@@ -170,25 +208,105 @@ fun LocalDbBuildCard(
                         trackColor = MaterialTheme.colorScheme.surfaceVariant,
                     )
                     Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
-                    val phaseOrdinal = currentBuild?.progress?.getInt(LocalDbBuildWorker.KEY_PHASE, -1) ?: -1
-                    val phaseText = BuildPhase.values().getOrNull(phaseOrdinal)
+                    val phaseOrdinal = currentBuild.progress.getInt(LocalDbBuildWorker.KEY_PHASE, -1)
+                    val currentPhase = BuildPhase.values().getOrNull(phaseOrdinal)
+                    val phaseText = currentPhase
                         ?.let { stringResource(it.labelRes()) }
                         ?: stringResource(R.string.appstrings_local_build_running)
                     Text(
-                        text = "$phaseText ${(progress * 100).toInt()}%",
-                        fontWeight = FontWeight.Bold,
+                        text = stringResource(R.string.appstrings_local_build_current_step, phaseText),
+                        fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.primary,
                     )
-                    // Detail « live » de l'etape en cours (compteur de lignes) : evite l'impression de
-                    // blocage quand le % de phase reste fige pendant un long calcul.
-                    val phaseDetail = currentBuild?.progress?.getString(LocalDbBuildWorker.KEY_DETAIL).orEmpty()
-                    if (phaseDetail.isNotBlank()) {
+                    val phaseDetail = currentBuild.progress.getString(LocalDbBuildWorker.KEY_DETAIL).orEmpty()
+                    if (currentImport != null) {
+                        val fileProgress = if (totalBytes > 0L) {
+                            (downloadedBytes.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f)
+                        } else {
+                            0f
+                        }
+                        Spacer(modifier = Modifier.height(sizing.spacing(10.dp)))
+                        Surface(
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                            shape = RoundedCornerShape(sizing.component(12.dp)),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Column(modifier = Modifier.padding(sizing.spacing(12.dp))) {
+                                Row(verticalAlignment = Alignment.Top) {
+                                    Icon(
+                                        imageVector = Icons.Default.CloudDownload,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(sizing.component(22.dp)),
+                                    )
+                                    Spacer(modifier = Modifier.width(sizing.spacing(10.dp)))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = stringResource(R.string.appstrings_local_build_download_in_progress),
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.colorScheme.primary,
+                                        )
+                                        Text(
+                                            text = stringResource(currentImport.labelRes()),
+                                            fontWeight = FontWeight.Bold,
+                                            style = sizing.textStyle(MaterialTheme.typography.bodyLarge),
+                                        )
+                                        currentFileName?.let { fileName ->
+                                            Text(
+                                                text = stringResource(R.string.appstrings_local_build_download_file, fileName),
+                                                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                            )
+                                        }
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(sizing.spacing(10.dp)))
+                                if (totalBytes > 0L) {
+                                    LinearWavyProgressIndicator(
+                                        progress = { fileProgress },
+                                        modifier = Modifier.fillMaxWidth().height(sizing.component(6.dp)),
+                                        color = MaterialTheme.colorScheme.primary,
+                                        trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                                    )
+                                    Spacer(modifier = Modifier.height(sizing.spacing(6.dp)))
+                                    Text(
+                                        text = stringResource(
+                                            R.string.appstrings_local_build_download_size,
+                                            Formatter.formatShortFileSize(context, downloadedBytes),
+                                            Formatter.formatShortFileSize(context, totalBytes),
+                                        ),
+                                        style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                } else {
+                                    Text(
+                                        text = stringResource(
+                                            R.string.appstrings_local_build_download_size_unknown,
+                                            Formatter.formatShortFileSize(context, downloadedBytes),
+                                        ),
+                                        style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        }
+                    } else if (phaseDetail.isNotBlank()) {
+                        // Detail « live » de l'etape en cours (compteur de lignes) : evite l'impression
+                        // de blocage quand le % de phase reste fige pendant un long calcul.
                         Text(
                             text = phaseDetail,
                             style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
+                    LocalBuildStepList(
+                        steps = localBuildSteps(currentBuild.tags),
+                        currentPhase = currentPhase ?: BuildPhase.RESOLVING,
+                        overallPercent = (progress * 100f).toInt().coerceIn(0, 100),
+                        detail = phaseDetail.takeUnless { currentImport != null },
+                    )
                     // Chrono live du temps de generation en cours.
                     DbOperationTimingText(
                         timingKey = DbOperationTimings.LOCAL_BUILD,
@@ -218,6 +336,52 @@ fun LocalDbBuildCard(
                 }
 
                 else -> {
+                    if (buildWasCancelled || currentBuild?.state == WorkInfo.State.FAILED) {
+                        val lastPhase = currentBuild.progress
+                            .getInt(LocalDbBuildWorker.KEY_PHASE, -1)
+                            .let { BuildPhase.values().getOrNull(it) }
+                        val lastDetail = currentBuild.progress
+                            .getString(LocalDbBuildWorker.KEY_DETAIL)
+                            ?.takeIf { it.isNotBlank() }
+                        Surface(
+                            color = MaterialTheme.colorScheme.error.copy(alpha = 0.08f),
+                            shape = RoundedCornerShape(sizing.component(12.dp)),
+                            modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(12.dp)),
+                        ) {
+                            Column(modifier = Modifier.padding(sizing.spacing(12.dp))) {
+                                Text(
+                                    text = when {
+                                        buildWasCancelled -> stringResource(R.string.appstrings_local_build_cancelled_state)
+                                        buildFailureReason != null -> stringResource(
+                                            R.string.appstrings_local_build_notif_failed,
+                                            buildFailureReason,
+                                        )
+                                        else -> stringResource(R.string.appstrings_local_build_unexpected_stop)
+                                    },
+                                    fontWeight = FontWeight.Bold,
+                                    style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
+                                    color = MaterialTheme.colorScheme.error,
+                                )
+                                lastPhase?.let { phase ->
+                                    Text(
+                                        text = stringResource(
+                                            R.string.appstrings_local_build_last_step,
+                                            stringResource(phase.labelRes()),
+                                        ),
+                                        style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                lastDetail?.let { detail ->
+                                    Text(
+                                        text = detail,
+                                        style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        }
+                    }
                     // Recap « genere sur ce telephone » : quelle base a ete generee localement, et quand
                     // (horodatage = metadata.version du dernier build local encore installe).
                     val generatedMobile = mobileInfo.takeIf { it.locallyBuilt }
@@ -392,6 +556,165 @@ fun LocalDbBuildCard(
             }
         }
     }
+}
+
+/**
+ * Liste lisible du pipeline local. Le pourcentage principal reste celui du pipeline global ; les
+ * lignes indiquent sans ambiguite ce qui est deja termine, ce qui tourne et ce qui attend. Les
+ * trois passages historiquement regroupes sous READING_SUPPORTS sont separes ici, car ils n'ont
+ * ni le meme cout ni le meme diagnostic (sources SUP, antennes, puis adresses des supports).
+ */
+@Composable
+private fun LocalBuildStepList(
+    steps: List<LocalBuildStepSpec>,
+    currentPhase: BuildPhase,
+    overallPercent: Int,
+    detail: String?,
+) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    val activeIndex = localBuildActiveStepIndex(steps, currentPhase, overallPercent)
+    val accent = MaterialTheme.colorScheme.primary
+
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+        shape = RoundedCornerShape(sizing.component(12.dp)),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(modifier = Modifier.padding(sizing.spacing(12.dp))) {
+            Text(
+                text = stringResource(R.string.appstrings_local_build_steps_title),
+                fontWeight = FontWeight.Bold,
+                style = sizing.textStyle(MaterialTheme.typography.labelLarge),
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
+
+            steps.forEachIndexed { index, step ->
+                val completed = index < activeIndex
+                val active = index == activeIndex
+                val icon = when {
+                    completed -> Icons.Default.CheckCircle
+                    active -> Icons.Default.PlayArrow
+                    else -> Icons.Default.Circle
+                }
+                val iconTint = when {
+                    completed -> MaterialTheme.colorScheme.tertiary
+                    active -> accent
+                    else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = sizing.spacing(4.dp)),
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = iconTint,
+                        modifier = Modifier.size(sizing.component(20.dp)),
+                    )
+                    Spacer(modifier = Modifier.width(sizing.spacing(10.dp)))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.Top,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Text(
+                                text = stringResource(step.labelRes),
+                                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                                fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
+                                color = if (active) accent else MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
+                            Text(
+                                text = when {
+                                    completed -> stringResource(R.string.appstrings_local_build_step_done)
+                                    active -> stringResource(R.string.appstrings_local_build_step_active)
+                                    else -> stringResource(R.string.appstrings_local_build_step_pending)
+                                },
+                                style = sizing.textStyle(MaterialTheme.typography.labelSmall),
+                                color = if (active) accent else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        if (active && !detail.isNullOrBlank()) {
+                            Text(
+                                text = detail,
+                                style = sizing.textStyle(MaterialTheme.typography.labelSmall),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private data class LocalBuildStepSpec(
+    val phase: BuildPhase,
+    @get:StringRes val labelRes: Int,
+)
+
+private fun localBuildSteps(tags: Set<String>): List<LocalBuildStepSpec> {
+    // WorkInfo tags identify the selected packs before the first progress update. Le repli mobile
+    // conserve un affichage utile pour les anciens travaux créés avant l'ajout de ces tags.
+    val hasKnownPackTag = tags.any {
+        it == LocalDbBuildWorker.TAG_PACK_MOBILE || it == LocalDbBuildWorker.TAG_PACK_RADIO
+    }
+    val hasMobile = !hasKnownPackTag || LocalDbBuildWorker.TAG_PACK_MOBILE in tags
+    val hasRadio = LocalDbBuildWorker.TAG_PACK_RADIO in tags
+    return buildList {
+        add(LocalBuildStepSpec(BuildPhase.RESOLVING, R.string.appstrings_local_build_phase_resolving))
+        add(LocalBuildStepSpec(BuildPhase.DOWNLOADING, R.string.appstrings_local_build_phase_downloading))
+        if (hasMobile) {
+            add(LocalBuildStepSpec(BuildPhase.READING_STATIONS, R.string.appstrings_local_build_phase_reading))
+            add(LocalBuildStepSpec(BuildPhase.READING_SUPPORTS, R.string.appstrings_local_build_step_reading_sup_sources))
+            add(LocalBuildStepSpec(BuildPhase.COMPUTING_FREQUENCIES, R.string.appstrings_local_build_phase_processing))
+            add(LocalBuildStepSpec(BuildPhase.READING_SUPPORTS, R.string.appstrings_local_build_step_reading_antenna_sources))
+            add(LocalBuildStepSpec(BuildPhase.COMPUTING_ANTENNAS, R.string.appstrings_local_build_phase_antennas))
+            add(LocalBuildStepSpec(BuildPhase.READING_SUPPORTS, R.string.appstrings_local_build_step_reading_support_sources))
+            add(LocalBuildStepSpec(BuildPhase.BUILDING_DETAILS, R.string.appstrings_local_build_phase_details))
+            add(LocalBuildStepSpec(BuildPhase.INSERTING, R.string.appstrings_local_build_phase_inserting))
+            add(LocalBuildStepSpec(BuildPhase.COMPUTING_STATS, R.string.appstrings_local_build_phase_stats))
+            add(LocalBuildStepSpec(BuildPhase.FINALIZING, R.string.appstrings_local_build_phase_finalizing))
+        }
+        if (hasMobile) {
+            add(LocalBuildStepSpec(BuildPhase.INSTALLING, R.string.appstrings_local_build_phase_installing))
+        }
+        if (hasRadio) {
+            add(LocalBuildStepSpec(BuildPhase.RADIO_BUILDING, R.string.appstrings_local_build_phase_radio))
+        }
+        // En mode radio seul, l'installation arrive après RADIO_BUILDING. En mode mobile, elle a
+        // déjà été ajoutée juste avant la génération radio éventuelle.
+        if (!hasMobile) {
+            add(LocalBuildStepSpec(BuildPhase.INSTALLING, R.string.appstrings_local_build_phase_installing))
+        }
+    }
+}
+
+private fun localBuildActiveStepIndex(
+    steps: List<LocalBuildStepSpec>,
+    currentPhase: BuildPhase,
+    overallPercent: Int,
+): Int {
+    val matching = steps.indices.filter { steps[it].phase == currentPhase }
+    return matching.lastOrNull { index ->
+        // Les occurrences répétées de READING_SUPPORTS sont désambiguïsées par la progression
+        // globale : 1er passage avant 62 %, 2e avant 70 %, 3e avant BUILDING_DETAILS.
+        when (matching.size) {
+            1 -> true
+            else -> when {
+                overallPercent >= 70 -> index == matching.last()
+                overallPercent >= 62 -> index == matching.getOrNull(1)
+                else -> index == matching.first()
+            }
+        }
+    } ?: steps.indexOfFirst { it.phase == currentPhase }.coerceAtLeast(0)
 }
 
 /** Option de pack : icone + libelle + sous-titre + case, dans une surface cliquable surlignee si cochee. */

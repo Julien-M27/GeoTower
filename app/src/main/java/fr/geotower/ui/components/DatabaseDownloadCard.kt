@@ -29,9 +29,9 @@ import androidx.compose.ui.unit.sp
 import fr.geotower.R
 import fr.geotower.data.build.LocalDbRebuildOffer
 import fr.geotower.data.config.RemoteFeatureFlags
-import fr.geotower.data.db.DatabaseVersionPolicy
 import fr.geotower.data.db.DbOperationTimings
 import fr.geotower.data.db.GeoTowerDatabaseValidator
+import fr.geotower.data.db.InstalledDatabaseArtifactIdentity
 import fr.geotower.data.db.LocalDbProvenance
 import fr.geotower.data.workers.DatabaseDownloadWorker
 import fr.geotower.data.workers.LocalDbBuildWorker
@@ -56,10 +56,14 @@ fun DatabaseDownloadCard(
     val workManager = remember { androidx.work.WorkManager.getInstance(context) }
     val safeClick = onSafeClick ?: rememberSafeClick()
     val featureFlags by RemoteFeatureFlags.config
-    val workInfos by workManager.getWorkInfosForUniqueWorkFlow(DatabaseDownloadWorker.UNIQUE_WORK_NAME).collectAsState(initial = emptyList())
-    val currentWork = workInfos.firstOrNull()
+    val workInfos by workManager.getWorkInfosByTagFlow(DatabaseDownloadWorker.WORK_TAG).collectAsState(initial = emptyList())
+    val currentWork = workInfos.firstOrNull { workInfo ->
+        workInfo.state == androidx.work.WorkInfo.State.RUNNING ||
+            workInfo.state == androidx.work.WorkInfo.State.ENQUEUED ||
+            workInfo.state == androidx.work.WorkInfo.State.BLOCKED
+    }
 
-    val isSyncing = currentWork?.state == androidx.work.WorkInfo.State.RUNNING || currentWork?.state == androidx.work.WorkInfo.State.ENQUEUED
+    val isSyncing = currentWork != null
     val downloadProgress = currentWork?.progress?.getInt(DatabaseDownloadWorker.KEY_PROGRESS, 0)?.div(100f) ?: 0f
 
     // Génération locale en cours : la base mobile n'est installée qu'à la toute fin du build, donc
@@ -85,6 +89,7 @@ fun DatabaseDownloadCard(
     var localDbVersionRaw by remember { mutableStateOf<String?>(null) }
     var remoteDbVersion by remember { mutableStateOf(txtSearching) }
     var remoteDbVersionRaw by remember { mutableStateOf<String?>(null) }
+    var remoteDbUpdateInfo by remember { mutableStateOf<fr.geotower.data.api.DatabaseDownloader.UpdateInfo?>(null) }
     var localAnfrDate by remember { mutableStateOf("") }
     var localAntennaCount by remember { mutableStateOf<Int?>(null) }
     // Provenance : la base installée a-t-elle été GÉNÉRÉE sur l'appareil (build local) plutôt que téléchargée ?
@@ -206,10 +211,12 @@ fun DatabaseDownloadCard(
             canRebuildLocally = LocalDbRebuildOffer.forMobile(context, mobileProvenance)
 
             remoteDbVersion = try {
-                val remote = fr.geotower.data.api.DatabaseDownloader.getLatestDatabaseVersion()
-                remoteDbVersionRaw = remote
-                if (remote != null) formatVersion(remote) else txtUnknown
+                val remote = fr.geotower.data.api.DatabaseDownloader.getLatestDatabaseUpdateInfo()
+                remoteDbUpdateInfo = remote
+                remoteDbVersionRaw = remote?.version
+                if (remote?.version != null) formatVersion(remote.version) else txtUnknown
             } catch (e: Exception) {
+                remoteDbUpdateInfo = null
                 remoteDbVersionRaw = null
                 txtUnknown
             }
@@ -402,7 +409,7 @@ fun DatabaseDownloadCard(
                     OutlinedButton(
                         onClick = {
                             safeClick("database_cancel_download") {
-                                workManager.cancelUniqueWork(DatabaseDownloadWorker.UNIQUE_WORK_NAME)
+                                currentWork?.id?.let(workManager::cancelWorkById)
                             }
                         },
                         modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = sizing.component(50.dp)),
@@ -416,16 +423,14 @@ fun DatabaseDownloadCard(
                     }
                 }
             } else {
-                val isUpToDate = DatabaseVersionPolicy.isLocalCurrentOrNewer(
-                    remoteDbVersionRaw,
-                    localDbVersionRaw
-                )
+                val isUpToDate = fr.geotower.data.api.DatabaseDownloader
+                    .isInstalledDatabaseCurrent(context, remoteDbUpdateInfo, localDbVersionRaw)
                 val isSearchingDatabaseInfo = localDbVersion == txtSearching || remoteDbVersion == txtSearching
                 // La version distante est désormais connue même quand la génération locale est
                 // imposée (elle sert à annoncer « du neuf à régénérer ») : le bouton doit donc
                 // refuser explicitement, sinon il paraîtrait actif pour un téléchargement bloqué
                 // plus bas dans DatabaseDownloader.
-                val canDownloadRemoteDatabase = remoteDbVersionRaw != null &&
+                val canDownloadRemoteDatabase = remoteDbUpdateInfo != null &&
                     canStartDatabaseDownload &&
                     !AppConfig.dbForcedLocal()
                 // Une base générée sur l'appareil n'est jamais « à jour » vis-à-vis de l'en ligne : on
@@ -439,7 +444,7 @@ fun DatabaseDownloadCard(
                 // ici : la mise à jour se fait en la régénérant (mêmes données ANFR, sans
                 // télécharger le fichier du serveur). Le téléchargement reste offert, en second.
                 val offerRebuild = canRebuildLocally &&
-                    remoteDbVersionRaw != null &&
+                    remoteDbUpdateInfo != null &&
                     !isUpToDate &&
                     !isSearchingDatabaseInfo &&
                     !isGeneratingMobile
@@ -616,6 +621,7 @@ fun DatabaseDownloadCard(
 
                     // 2. Supprimer la base et ses fichiers temporaires
                     context.deleteDatabase(GeoTowerDatabaseValidator.DB_NAME)
+                    InstalledDatabaseArtifactIdentity.clearMobile(context)
                     AppConfig.localDatabaseState.value = GeoTowerDatabaseValidator.LocalDatabaseState.MISSING
 
                     // 3. Déclencher le rafraîchissement visuel instantanément

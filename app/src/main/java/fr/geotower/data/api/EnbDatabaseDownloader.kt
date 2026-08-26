@@ -2,6 +2,7 @@ package fr.geotower.data.api
 
 import android.content.Context
 import fr.geotower.data.config.RemoteFeatureFlags
+import fr.geotower.data.db.DatabaseStorageCleanup
 import fr.geotower.data.db.EnbDatabaseValidator
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
@@ -161,12 +162,13 @@ object EnbDatabaseDownloader {
                     return@withContext false
                 }
 
-                deleteSqliteSidecars(dbFile)
+                DatabaseStorageCleanup.clearSqliteSidecars(dbFile)
                 if (!installValidatedDatabase(tempFile, dbFile, backupFile)) {
                     tempFile.delete()
                     return@withContext false
                 }
 
+                DatabaseStorageCleanup.clearTransientArtifacts(context, DB_NAME)
                 true
             } catch (e: CancellationException) {
                 if (tempFile.exists()) tempFile.delete()
@@ -175,6 +177,8 @@ object EnbDatabaseDownloader {
                 AppLogger.w(TAG, "eNB database download failed", e)
                 if (tempFile.exists()) tempFile.delete()
                 false
+            } finally {
+                DatabaseStorageCleanup.clearDownloadArtifacts(context, DB_NAME)
             }
         }
     }
@@ -336,15 +340,6 @@ object EnbDatabaseDownloader {
 
         if (backupFile.exists()) backupFile.delete()
         return true
-    }
-
-    private fun deleteSqliteSidecars(dbFile: File) {
-        listOf(
-            File(dbFile.path + "-wal"),
-            File(dbFile.path + "-shm")
-        ).forEach { sidecar ->
-            if (sidecar.exists()) sidecar.delete()
-        }
     }
 
     private const val TAG = "GeoTowerEnbDb"

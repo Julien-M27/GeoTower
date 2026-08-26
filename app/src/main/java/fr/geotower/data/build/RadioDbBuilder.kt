@@ -83,14 +83,66 @@ object RadioDbBuilder {
         config: RadioBuildConfig,
         onProgress: (percent: Int, processed: Long) -> Unit = { _, _ -> },
         allowedServiceMask: Int = -1,
+        sourceCounts: AnfrSourceCounts = AnfrSourceCounts(),
+        onProgressDetail: ((BuildProgressDetail) -> Unit)? = null,
     ): RadioBuildResult {
         prepareSchema(db)
         val sink = RadioStagingSink(db, references.typeAntenne)
-        for (row in sources.stations) sink.station(row)
-        for (row in sources.supports) sink.support(row)
-        for (row in sources.antennes) sink.antenne(row)
-        for (row in sources.emetteurs) sink.emetteur(row)
-        for (row in sources.bandes) sink.bande(row)
+        fun reportRead(source: String, processed: Long, total: Long) {
+            onProgressDetail?.invoke(
+                BuildProgressDetail(BuildPhase.RADIO_BUILDING, source, processed, total),
+            )
+        }
+        fun readStations() {
+            reportRead(SOURCE_SUP_STATION, 0L, sourceCounts.stations)
+            var processed = 0L
+            for (row in sources.stations) {
+                sink.station(row)
+                if (++processed % EMIT_EVERY == 0L) reportRead(SOURCE_SUP_STATION, processed, sourceCounts.stations)
+            }
+            reportRead(SOURCE_SUP_STATION, processed, sourceCounts.stations)
+        }
+        fun readSupports() {
+            reportRead(SOURCE_SUP_SUPPORT, 0L, sourceCounts.supports)
+            var processed = 0L
+            for (row in sources.supports) {
+                sink.support(row)
+                if (++processed % EMIT_EVERY == 0L) reportRead(SOURCE_SUP_SUPPORT, processed, sourceCounts.supports)
+            }
+            reportRead(SOURCE_SUP_SUPPORT, processed, sourceCounts.supports)
+        }
+        fun readAntennas() {
+            reportRead(SOURCE_SUP_ANTENNE, 0L, sourceCounts.antennes)
+            var processed = 0L
+            for (row in sources.antennes) {
+                sink.antenne(row)
+                if (++processed % EMIT_EVERY == 0L) reportRead(SOURCE_SUP_ANTENNE, processed, sourceCounts.antennes)
+            }
+            reportRead(SOURCE_SUP_ANTENNE, processed, sourceCounts.antennes)
+        }
+        fun readEmitters() {
+            reportRead(SOURCE_SUP_EMETTEUR, 0L, sourceCounts.emetteurs)
+            var processed = 0L
+            for (row in sources.emetteurs) {
+                sink.emetteur(row)
+                if (++processed % EMIT_EVERY == 0L) reportRead(SOURCE_SUP_EMETTEUR, processed, sourceCounts.emetteurs)
+            }
+            reportRead(SOURCE_SUP_EMETTEUR, processed, sourceCounts.emetteurs)
+        }
+        fun readBands() {
+            reportRead(SOURCE_SUP_BANDE, 0L, sourceCounts.bandes)
+            var processed = 0L
+            for (row in sources.bandes) {
+                sink.bande(row)
+                if (++processed % EMIT_EVERY == 0L) reportRead(SOURCE_SUP_BANDE, processed, sourceCounts.bandes)
+            }
+            reportRead(SOURCE_SUP_BANDE, processed, sourceCounts.bandes)
+        }
+        readStations()
+        readSupports()
+        readAntennas()
+        readEmitters()
+        readBands()
         sink.finish()
         return buildFromStaging(db, references, config, onProgress, allowedServiceMask)
     }
@@ -320,34 +372,39 @@ object RadioDbBuilder {
         val usedAdm = HashSet<Int>()
         val usedNat = HashSet<Int>()
         val usedTpo = HashSet<Int>()
+        val encoder = FrequencyDetailsEncoder.Session()
         var emitted = 0L
-        db.query(
-            "SELECT sta, sup, lat_e6, lon_e6, nat_id, tpo_id, height_dm, code_insee, address FROM stg_r_support",
-        ) { row ->
-            val sta = row.getString("sta") ?: ""
-            val sup = row.getString("sup") ?: ""
-            val agg = aggregates[compositeKey(sta, sup)]
-            // Filtre par categorie de service : un site avec au moins un service demande est emis.
-            if (agg != null && (agg.serviceMask and allowedServiceMask) != 0) {
-                val natId = row.getIntOrNull("nat_id")
-                val tpoId = row.getIntOrNull("tpo_id")
-                val heightDm = row.getIntOrNull("height_dm")
-                val info = antennaInfo[compositeKey(sta, sup)]
-                siteInserter.add(
-                    listOf(
-                        sta, sup, agg.admId, row.getIntOrNull("lat_e6"), row.getIntOrNull("lon_e6"),
-                        natId, tpoId, heightDm, row.getString("code_insee"),
-                        agg.serviceMask, agg.systemMask, agg.emitterCount, info?.count ?: 0,
-                        agg.freqRangeCount, agg.minKhz, agg.maxKhz,
-                    ),
-                )
-                val detail = detailText(agg, natId, tpoId, heightDm, row.getString("address"), info, actorLabels, natureLabels, ownerLabels)
-                FrequencyDetailsEncoder.encode(detail)?.let { detailInserter.add(listOf(sta, sup, it)) }
-                agg.admId?.let { usedAdm.add(it) }
-                natId?.let { usedNat.add(it) }
-                tpoId?.let { usedTpo.add(it) }
+        try {
+            db.query(
+                "SELECT sta, sup, lat_e6, lon_e6, nat_id, tpo_id, height_dm, code_insee, address FROM stg_r_support",
+            ) { row ->
+                val sta = row.getString("sta") ?: ""
+                val sup = row.getString("sup") ?: ""
+                val agg = aggregates[compositeKey(sta, sup)]
+                // Filtre par categorie de service : un site avec au moins un service demande est emis.
+                if (agg != null && (agg.serviceMask and allowedServiceMask) != 0) {
+                    val natId = row.getIntOrNull("nat_id")
+                    val tpoId = row.getIntOrNull("tpo_id")
+                    val heightDm = row.getIntOrNull("height_dm")
+                    val info = antennaInfo[compositeKey(sta, sup)]
+                    siteInserter.add(
+                        listOf(
+                            sta, sup, agg.admId, row.getIntOrNull("lat_e6"), row.getIntOrNull("lon_e6"),
+                            natId, tpoId, heightDm, row.getString("code_insee"),
+                            agg.serviceMask, agg.systemMask, agg.emitterCount, info?.count ?: 0,
+                            agg.freqRangeCount, agg.minKhz, agg.maxKhz,
+                        ),
+                    )
+                    val detail = detailText(agg, natId, tpoId, heightDm, row.getString("address"), info, actorLabels, natureLabels, ownerLabels)
+                    encoder.encode(detail)?.let { detailInserter.add(listOf(sta, sup, it)) }
+                    agg.admId?.let { usedAdm.add(it) }
+                    natId?.let { usedNat.add(it) }
+                    tpoId?.let { usedTpo.add(it) }
+                }
+                if (++emitted % EMIT_EVERY == 0L) onProgress(96, emitted)
             }
-            if (++emitted % EMIT_EVERY == 0L) onProgress(96, emitted)
+        } finally {
+            encoder.close()
         }
         siteInserter.flush()
         detailInserter.flush()
@@ -435,4 +492,10 @@ object RadioDbBuilder {
 
     /** Cle composite (sta, sup) pour les accumulateurs RAM ; separateur absent des identifiants ANFR. */
     private fun compositeKey(sta: String, sup: String): String = "$sta\u0001$sup"
+
+    private const val SOURCE_SUP_STATION = "SUP_STATION.txt (ZIP ANFR)"
+    private const val SOURCE_SUP_SUPPORT = "SUP_SUPPORT.txt (ZIP ANFR)"
+    private const val SOURCE_SUP_ANTENNE = "SUP_ANTENNE.txt (ZIP ANFR)"
+    private const val SOURCE_SUP_EMETTEUR = "SUP_EMETTEUR.txt (ZIP ANFR)"
+    private const val SOURCE_SUP_BANDE = "SUP_BANDE.txt (ZIP ANFR)"
 }

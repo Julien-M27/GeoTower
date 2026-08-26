@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -45,6 +46,7 @@ import java.util.Date
 fun TripFollowBar(
     plan: TripPlan,
     status: TripFollowStatus?,
+    routeLoading: Boolean = false,
     distanceUnit: Int,
     onCheckNext: () -> Unit,
     onStop: () -> Unit,
@@ -65,6 +67,24 @@ fun TripFollowBar(
                 .navigationBarsPadding()
                 .padding(horizontal = sizing.spacing(14.dp), vertical = sizing.spacing(10.dp))
         ) {
+            if (routeLoading) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(bottom = sizing.spacing(6.dp))
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(sizing.component(16.dp)),
+                        strokeWidth = 2.dp
+                    )
+                    Text(
+                        text = stringResource(R.string.trips_route_calculating),
+                        fontSize = sizing.text(12.sp),
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(start = sizing.spacing(8.dp))
+                    )
+                }
+            }
+
             if (status?.isOffRoute == true) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,

@@ -24,6 +24,39 @@ enum class BuildPhase {
     RADIO_BUILDING,        // Generation de la base radio annexe (ajoutee en fin : ordinaux stables)
 }
 
+/** Import de donnees actuellement transfere pendant la generation locale. */
+enum class BuildImportType {
+    MONTHLY,
+    WEEKLY,
+    QUARTERLY,
+}
+
+@StringRes
+fun BuildImportType.labelRes(): Int = when (this) {
+    BuildImportType.MONTHLY -> R.string.appstrings_local_build_import_monthly
+    BuildImportType.WEEKLY -> R.string.appstrings_local_build_import_weekly
+    BuildImportType.QUARTERLY -> R.string.appstrings_local_build_import_quarterly
+}
+
+/** Etat de progression partage entre le pipeline, le worker et la carte Compose. */
+data class BuildProgressUpdate(
+    val phase: BuildPhase,
+    val percent: Int,
+    val detail: String? = null,
+    val importType: BuildImportType? = null,
+    val fileName: String? = null,
+    val downloadedBytes: Long = 0L,
+    val totalBytes: Long = -1L,
+)
+
+/** Progression detaillee d'une lecture ou d'un calcul, avec sa source et son denominateur. */
+data class BuildProgressDetail(
+    val phase: BuildPhase,
+    val source: String? = null,
+    val processed: Long = 0L,
+    val total: Long = -1L,
+)
+
 @StringRes
 fun BuildPhase.labelRes(): Int = when (this) {
     BuildPhase.RESOLVING -> R.string.appstrings_local_build_phase_resolving

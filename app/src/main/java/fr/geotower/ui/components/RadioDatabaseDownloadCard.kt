@@ -79,11 +79,14 @@ fun RadioDatabaseDownloadCard(
     val workManager = remember { androidx.work.WorkManager.getInstance(context) }
     val safeClick = onSafeClick ?: rememberSafeClick()
     val featureFlags by RemoteFeatureFlags.config
-    val workInfos by workManager.getWorkInfosForUniqueWorkFlow(RadioDatabaseDownloadWorker.UNIQUE_WORK_NAME).collectAsState(initial = emptyList())
-    val currentWork = workInfos.firstOrNull()
+    val workInfos by workManager.getWorkInfosByTagFlow(RadioDatabaseDownloadWorker.WORK_TAG).collectAsState(initial = emptyList())
+    val currentWork = workInfos.firstOrNull { workInfo ->
+        workInfo.state == androidx.work.WorkInfo.State.RUNNING ||
+            workInfo.state == androidx.work.WorkInfo.State.ENQUEUED ||
+            workInfo.state == androidx.work.WorkInfo.State.BLOCKED
+    }
 
-    val isSyncing = currentWork?.state == androidx.work.WorkInfo.State.RUNNING ||
-        currentWork?.state == androidx.work.WorkInfo.State.ENQUEUED
+    val isSyncing = currentWork != null
     val downloadProgress = currentWork?.progress?.getInt(RadioDatabaseDownloadWorker.KEY_PROGRESS, 0)?.div(100f) ?: 0f
 
     // Génération locale en cours (packs radio) : la base n'est installée qu'à la fin du build, on
@@ -272,7 +275,7 @@ fun RadioDatabaseDownloadCard(
                     OutlinedButton(
                         onClick = {
                             safeClick("radio_database_cancel_download") {
-                                workManager.cancelUniqueWork(RadioDatabaseDownloadWorker.UNIQUE_WORK_NAME)
+                                currentWork?.id?.let(workManager::cancelWorkById)
                             }
                         },
                         modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = sizing.component(50.dp)),

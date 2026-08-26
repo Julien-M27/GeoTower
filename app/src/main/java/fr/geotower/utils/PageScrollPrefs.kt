@@ -8,9 +8,9 @@ import androidx.compose.runtime.mutableStateMapOf
  * « haut de page » / « bas de page ».
  *
  * Une clé booléenne par (aide, page) — `<préfixe>_page_<id>` — désactivée par défaut : ce sont
- * des ajouts optionnels, l'affichage historique reste inchangé tant que rien n'est activé. Seule
- * exception : la page « À proximité » avait déjà ses deux boutons en dur, ils restent donc actifs
- * par défaut (voir [defaultEnabled]).
+ * des ajouts optionnels, l'affichage historique reste inchangé tant que rien n'est activé. Seules
+ * exceptions : la page « À proximité » avait déjà ses deux boutons en dur, et les listes
+ * d'historiques gardent leur barre standard active par défaut (voir [defaultEnabled]).
  *
  * Les pages de [customizablePages] ont leurs propres interrupteurs dans « Personnalisation des
  * pages » ; celles de [otherPages] n'en ont pas et ne sont touchées que par l'interrupteur global
@@ -73,7 +73,7 @@ object PageScrollPrefs {
 
     /**
      * Pages absentes de « Personnalisation des pages » : l'interrupteur global les touche toujours,
-     * et les trois pages d'historiques ont en plus leur propre roue dentée dans leur barre du haut.
+     * et les pages d'historiques ont en plus leur propre roue dentée dans leur barre du haut.
      */
     val otherPages = listOf(
         SETTINGS,
@@ -84,7 +84,8 @@ object PageScrollPrefs {
         TRIPS,
         HISTORIES,
         PHOTO_UPLOAD_HISTORY,
-        SHARE_HISTORY
+        SHARE_HISTORY,
+        NOTIFICATION_HISTORY
     )
 
     val allPages = customizablePages + otherPages
@@ -93,11 +94,14 @@ object PageScrollPrefs {
 
     /**
      * Défaut d'usine. Tout est désactivé, sauf les deux boutons de la page « À proximité » qui
-     * existaient déjà en dur avant que le réglage n'apparaisse : les retirer silencieusement
-     * serait une régression pour les utilisateurs en place.
+     * existaient déjà en dur avant que le réglage n'apparaisse, et la barre standard des listes
+     * d'historique qui remplace leur ancienne barre datée.
      */
-    fun defaultEnabled(aid: Aid, page: String): Boolean =
-        page == NEARBY && (aid == Aid.TOP || aid == Aid.BOTTOM)
+    fun defaultEnabled(aid: Aid, page: String): Boolean = when {
+        page == NEARBY && (aid == Aid.TOP || aid == Aid.BOTTOM) -> true
+        page in setOf(PHOTO_UPLOAD_HISTORY, SHARE_HISTORY, NOTIFICATION_HISTORY) && aid == Aid.BAR -> true
+        else -> false
+    }
 
     private val states = mutableStateMapOf<String, Boolean>()
 

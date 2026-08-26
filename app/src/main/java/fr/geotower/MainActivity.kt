@@ -573,7 +573,7 @@ class MainActivity : ComponentActivity() {
 
             // ✅ NOUVEAU : On écoute la fin du téléchargement globalement
             val workManager = remember { androidx.work.WorkManager.getInstance(context) }
-            val workInfos by workManager.getWorkInfosForUniqueWorkFlow(DatabaseDownloadWorker.UNIQUE_WORK_NAME).collectAsState(initial = emptyList())
+            val workInfos by workManager.getWorkInfosByTagFlow(DatabaseDownloadWorker.WORK_TAG).collectAsState(initial = emptyList())
             val currentWork = workInfos.firstOrNull()
 
             LaunchedEffect(currentWork?.state) {

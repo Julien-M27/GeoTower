@@ -258,9 +258,13 @@ fun FirstStartScreen(
     var wasSyncing by remember { mutableStateOf(false) }
 
     val workManager = remember { androidx.work.WorkManager.getInstance(context) }
-    val workInfos by workManager.getWorkInfosForUniqueWorkFlow(DatabaseDownloadWorker.UNIQUE_WORK_NAME).collectAsState(initial = emptyList())
-    val currentWork = workInfos.firstOrNull()
-    val isDownloading = currentWork?.state == androidx.work.WorkInfo.State.RUNNING || currentWork?.state == androidx.work.WorkInfo.State.ENQUEUED
+    val workInfos by workManager.getWorkInfosByTagFlow(DatabaseDownloadWorker.WORK_TAG).collectAsState(initial = emptyList())
+    val currentWork = workInfos.firstOrNull { workInfo ->
+        workInfo.state == androidx.work.WorkInfo.State.RUNNING ||
+            workInfo.state == androidx.work.WorkInfo.State.ENQUEUED ||
+            workInfo.state == androidx.work.WorkInfo.State.BLOCKED
+    }
+    val isDownloading = currentWork != null
     // La base peut aussi arriver par génération locale (étape 6) : on surveille les deux chemins,
     // sinon le pop-up de succès ne s'afficherait jamais pour un utilisateur qui génère au lieu de
     // télécharger.

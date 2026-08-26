@@ -6,6 +6,7 @@ import fr.geotower.R
 import fr.geotower.data.api.DatabaseDownloader
 import fr.geotower.data.api.RadioDatabaseDownloader
 import fr.geotower.data.db.GeoTowerDatabaseValidator
+import fr.geotower.data.db.DatabaseStorageCleanup
 import fr.geotower.data.db.LocalDbProvenance
 import fr.geotower.data.db.RadioDatabaseValidator
 import fr.geotower.data.models.RadioServiceMasks
@@ -16,6 +17,7 @@ import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -25,10 +27,9 @@ import kotlinx.coroutines.withContext
  * pas saturer le disque), construit `geotower_fr.db` via [GeoTowerDbBuilder] (staging SQLite) et
  * l'installe par le meme chemin atomique que le telechargement.
  *
- * La progression est signalee via un unique callback non-suspend `onProgress(phase, percent,
- * detail)`, appele a chaque etape (y compris pendant le telechargement — avec les Mo — et pendant
- * la construction — le builder emet ses sous-phases). Le worker s'en sert pour la notification
- * live et pour la barre de la carte.
+ * La progression est signalee via un unique callback non-suspend. Il porte aussi, lorsqu'un import
+ * reseau est actif, le type de donnees et les octets transferes afin que la carte puisse afficher
+ * le fichier en cours et sa taille courante.
  */
 class LocalDbBuildPipeline(
     private val downloader: RawSourceDownloader = RawSourceDownloader(),
@@ -72,7 +73,7 @@ class LocalDbBuildPipeline(
         context: Context,
         packs: Packs,
         force: Boolean = false,
-        onProgress: (phase: BuildPhase, percent: Int, detail: String?) -> Unit,
+        onProgress: (BuildProgressUpdate) -> Unit,
     ): Result {
         val metrics = LocalBuildMetrics()
         val device = BuildDeviceProfiles.read(context)
@@ -88,13 +89,37 @@ class LocalDbBuildPipeline(
         packs: Packs,
         force: Boolean,
         metrics: LocalBuildMetrics,
-        onProgress: (phase: BuildPhase, percent: Int, detail: String?) -> Unit,
+        onProgress: (BuildProgressUpdate) -> Unit,
     ): Result = withContext(Dispatchers.IO) {
         // Chaque progression alimente aussi les mesures : `processed` (lignes de la sous-etape) sert
         // a cumuler le debit par phase, il reste a 0 pour les phases reseau.
-        fun emit(phase: BuildPhase, percent: Int, detail: String?, processed: Long = 0L) {
+        var lastPublishedPercent = 0
+        fun emit(
+            phase: BuildPhase,
+            percent: Int,
+            detail: String?,
+            processed: Long = 0L,
+            importType: BuildImportType? = null,
+            fileName: String? = null,
+            downloadedBytes: Long = 0L,
+            totalBytes: Long = -1L,
+        ) {
+            // Un retry reseau recommence les octets a zero, et certaines phases emettent plusieurs
+            // sous-etapes. Le pourcentage global ne doit jamais repartir en arriere a l'ecran.
+            val normalizedPercent = maxOf(lastPublishedPercent, percent.coerceIn(0, 100))
+            lastPublishedPercent = normalizedPercent
             metrics.onProgress(phase, processed)
-            onProgress(phase, percent, detail)
+            onProgress(
+                BuildProgressUpdate(
+                    phase = phase,
+                    percent = normalizedPercent,
+                    detail = detail,
+                    importType = importType,
+                    fileName = fileName,
+                    downloadedBytes = downloadedBytes,
+                    totalBytes = totalBytes,
+                )
+            )
         }
 
         // Budgets mesures pour LES packs demandes (le stockage en depend fortement, pas le tas).
@@ -152,11 +177,21 @@ class LocalDbBuildPipeline(
                         val pct = if (total > 0) (5 + copied * 30 / total).toInt().coerceIn(5, 35) else 20
                         if (pct != lastPct) {
                             lastPct = pct
-                            emit(BuildPhase.DOWNLOADING, pct, "$mb Mo (essai $attempt)")
+                            emit(
+                                phase = BuildPhase.DOWNLOADING,
+                                percent = pct,
+                                detail = "$mb Mo (essai $attempt)",
+                                importType = BuildImportType.MONTHLY,
+                                fileName = monthlyFileVersion,
+                                downloadedBytes = copied,
+                                totalBytes = total,
+                            )
                         }
                     }
                     zipError = verifyMonthlyZip(dataZip)
                     if (zipError == null) break
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
                     zipError = "Telechargement du ZIP mensuel : ${e.message ?: e.javaClass.simpleName}"
                 }
@@ -164,20 +199,45 @@ class LocalDbBuildPipeline(
             if (zipError != null) return@withContext Result(false, zipError)
             metrics.noteFile("sup_data.zip", dataZip.length())
 
-            // Le ZIP de references est optionnel (le builder a des valeurs par defaut).
-            monthly.refUrl?.let { runCatching { downloader.downloadToFile(it, refZip, MAX_REF_ZIP_BYTES) } }
+            // Le ZIP de references est optionnel (le builder a des valeurs par defaut), mais il
+            // reste un import mensuel : on le laisse visible dans la carte tant qu'il est transfere.
+            monthly.refUrl?.let { refUrl ->
+                var refPct = -1
+                runBuildCatching {
+                    downloader.downloadToFile(refUrl, refZip, MAX_REF_ZIP_BYTES) { copied, total ->
+                        val pct = if (total > 0L) {
+                            (copied * 100L / total).toInt().coerceIn(0, 100)
+                        } else {
+                            0
+                        }
+                        if (pct != refPct) {
+                            refPct = pct
+                            emit(
+                                phase = BuildPhase.DOWNLOADING,
+                                percent = 35,
+                                detail = "Références mensuelles",
+                                importType = BuildImportType.MONTHLY,
+                                fileName = refUrl.substringAfterLast('/').substringBefore('?')
+                                    .ifBlank { refZip.name },
+                                downloadedBytes = copied,
+                                totalBytes = total,
+                            )
+                        }
+                    }
+                }
+            }
             metrics.noteFile("sup_ref.zip", refZip.length())
 
             // Un seul telechargement des communes : le meme JSON sert aux noms (`ref_commune`) et a
             // l'agregation superficie/population des stats departementales.
-            val communesJson = runCatching {
+            val communesJson = runBuildCatching {
                 downloader.fetchText(OfficialSources.COMMUNES_URL, MAX_JSON_BYTES)
             }.getOrDefault("")
             val communes = RawSourceDownloader.parseCommunesJson(communesJson)
             val departments = if (communesJson.isEmpty()) {
                 emptyMap()
             } else {
-                runCatching {
+                runBuildCatching {
                     RawSourceDownloader.parseDepartmentReference(
                         departementsJson = downloader.fetchText(OfficialSources.DEPARTEMENTS_URL, MAX_JSON_BYTES),
                         communesJson = communesJson,
@@ -214,11 +274,22 @@ class LocalDbBuildPipeline(
                             val pct = if (total > 0) (36 + copied * 8 / total).toInt().coerceIn(36, 44) else 40
                             if (pct != obsPct) {
                                 obsPct = pct
-                                emit(BuildPhase.READING_STATIONS, pct, "$mb Mo (essai $obsAttempt)")
+                                emit(
+                                    phase = BuildPhase.READING_STATIONS,
+                                    percent = pct,
+                                    detail = "$mb Mo (essai $obsAttempt)",
+                                    importType = BuildImportType.WEEKLY,
+                                    fileName = observatoireUrl.substringAfterLast('/').substringBefore('?')
+                                        .ifBlank { observatoireCsv.name },
+                                    downloadedBytes = copied,
+                                    totalBytes = total,
+                                )
                             }
                         }
                         obsError = if (observatoireCsv.length() > 1000L) null else "Observatoire vide"
                         if (obsError == null) break
+                    } catch (e: CancellationException) {
+                        throw e
                     } catch (e: Exception) {
                         obsError = "Telechargement de l'observatoire : ${e.message ?: e.javaClass.simpleName}"
                     }
@@ -229,13 +300,35 @@ class LocalDbBuildPipeline(
                 // ARCEP trimestriel : resout le listing "last/" (trimestre courant) et telecharge les
                 // CSV de sites (Metropole + Outremer). Entierement best-effort : source d'enrichissement
                 // OPTIONNELLE (arcep_nidt/is_zb), un echec ne doit jamais interrompre la generation.
-                runCatching {
+                runBuildCatching {
                     emit(BuildPhase.READING_STATIONS, 44, "ARCEP")
                     val listingHtml = downloader.fetchText(OfficialSources.ARCEP_SITES_LAST_URL, MAX_JSON_BYTES)
                     OfficialSources.resolveArcepSitesCsvUrls(listingHtml).forEachIndexed { index, url ->
                         arcepQuarter = arcepQuarter ?: OfficialSources.extractQuarter(url.substringAfterLast('/'))
                         val dest = File(arcepDir, "arcep_$index.csv")
-                        runCatching { downloader.downloadToFile(url, dest, MAX_ARCEP_BYTES) }
+                        var arcepPct = -1
+                        runBuildCatching {
+                            downloader.downloadToFile(url, dest, MAX_ARCEP_BYTES) { copied, total ->
+                                val pct = if (total > 0L) {
+                                    (copied * 100L / total).toInt().coerceIn(0, 100)
+                                } else {
+                                    0
+                                }
+                                if (pct != arcepPct) {
+                                    arcepPct = pct
+                                    emit(
+                                        phase = BuildPhase.READING_STATIONS,
+                                        percent = 44,
+                                        detail = "ARCEP",
+                                        importType = BuildImportType.QUARTERLY,
+                                        fileName = url.substringAfterLast('/').substringBefore('?')
+                                            .ifBlank { dest.name },
+                                        downloadedBytes = copied,
+                                        totalBytes = total,
+                                    )
+                                }
+                            }
+                        }
                             .onSuccess { if (dest.length() > 100L) arcepFiles.add(dest) }
                             .onFailure { AppLogger.w("GeoTowerDb", "ARCEP CSV download failed (non-fatal): $url", it) }
                     }
@@ -265,6 +358,19 @@ class LocalDbBuildPipeline(
                     if (packs.anyRadio && !refZip.exists() && !packs.mobile) {
                         return@withContext Result(false, "References ANFR indisponibles pour la base radio")
                     }
+                    emit(
+                        BuildPhase.RESOLVING,
+                        35,
+                        context.getString(R.string.appstrings_local_build_counting_sources),
+                    )
+                    val sourceCounts = AnfrSourceCounts(
+                        weekly = if (packs.mobile) countCsvDataRows(observatoireCsv) else -1L,
+                        stations = data.countRows("SUP_STATION.txt"),
+                        bandes = data.countRows("SUP_BANDE.txt"),
+                        emetteurs = data.countRows("SUP_EMETTEUR.txt"),
+                        antennes = data.countRows("SUP_ANTENNE.txt"),
+                        supports = data.countRows("SUP_SUPPORT.txt"),
+                    )
 
                     if (packs.mobile) {
                         // === MOBILE (+ radio mutualise si demande) : le ZIP SUP est parse UNE fois,
@@ -298,8 +404,19 @@ class LocalDbBuildPipeline(
                                 staged, sources, references, arcep,
                                 BuildConfig(version = buildVersion(), zipVersion = monthlyFileVersion, quarterlyVersion = arcepQuarter),
                                 onProgress = { phase, processed ->
+                                    // Fallback conserve pour les appels historiques du builder : le
+                                    // callback detaille ci-dessous emet le texte lisible une seule fois.
                                     buildPercent = maxOf(buildPercent, percentFor(phase))
-                                    emit(phase, buildPercent, detailFor(context, processed), processed)
+                                },
+                                sourceCounts = sourceCounts,
+                                onProgressDetail = { progressDetail ->
+                                    buildPercent = maxOf(buildPercent, percentFor(progressDetail.phase))
+                                    emit(
+                                        progressDetail.phase,
+                                        buildPercent,
+                                        detailFor(context, progressDetail),
+                                        progressDetail.processed,
+                                    )
                                 },
                                 supSink = radioSink,
                                 // L'observatoire (~173 Mo) n'est lu QUE par la premiere phase : le rendre
@@ -330,7 +447,7 @@ class LocalDbBuildPipeline(
                         // Base radio : staging DEJA peuple par le sink -> calcul/emission seulement, filtre par
                         // categorie(s) choisie(s). Best-effort (base radio optionnelle).
                         radioDb?.let { rdb ->
-                            runCatching {
+                            runBuildCatching {
                                 val radioVersion = buildVersion()
                                 RadioDbBuilder.buildFromStaging(
                                     rdb, references,
@@ -371,6 +488,15 @@ class LocalDbBuildPipeline(
                                 emit(BuildPhase.RADIO_BUILDING, percent, detailFor(context, processed), processed)
                             },
                             packs.allowedServiceMask,
+                            sourceCounts,
+                            onProgressDetail = { progressDetail ->
+                                emit(
+                                    BuildPhase.RADIO_BUILDING,
+                                    45,
+                                    detailFor(context, progressDetail),
+                                    progressDetail.processed,
+                                )
+                            },
                         )
                         rdb.close()
 
@@ -396,6 +522,8 @@ class LocalDbBuildPipeline(
 
             emit(BuildPhase.DONE, 100, null)
             Result(true)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             if (builtFile.exists()) builtFile.delete()
             Result(false, e.message ?: "Échec de la génération locale")
@@ -403,13 +531,13 @@ class LocalDbBuildPipeline(
             // Avant tout nettoyage : le pic de stockage doit etre mesure sources encore presentes.
             recorder.stop()
             runCatching { radioDb?.close() }
-            dataZip.delete()
-            refZip.delete()
-            observatoireCsv.delete()
-            arcepDir.deleteRecursively()
-            stagingFile.delete()
-            radioStagingFile.delete()
-            if (builtRadioFile.exists()) builtRadioFile.delete()
+            DatabaseStorageCleanup.clearLocalBuildWorkspace(workDir)
+            if (packs.mobile) {
+                DatabaseStorageCleanup.clearTransientArtifacts(context, GeoTowerDatabaseValidator.DB_NAME)
+            }
+            if (packs.anyRadio) {
+                DatabaseStorageCleanup.clearTransientArtifacts(context, RadioDatabaseValidator.DB_NAME)
+            }
         }
     }
 
@@ -439,7 +567,7 @@ class LocalDbBuildPipeline(
         val result = LinkedHashMap<String, DepartmentReferenceRow>()
         for (code in OfficialSources.OVERSEAS_DEPARTMENT_CODES) {
             if (code in alreadyKnown) continue
-            runCatching {
+            runBuildCatching {
                 RawSourceDownloader.parseSingleDepartmentReference(
                     departementJson = downloader.fetchText(OfficialSources.departementUrl(code), MAX_JSON_BYTES),
                     communesJson = downloader.fetchText(OfficialSources.departementCommunesUrl(code), MAX_JSON_BYTES),
@@ -451,6 +579,19 @@ class LocalDbBuildPipeline(
             }.getOrNull()?.let { result[code] = it }
         }
         return result
+    }
+
+    /**
+     * Les blocs optionnels du pipeline peuvent ignorer une erreur réseau, mais jamais une
+     * annulation WorkManager : avaler CancellationException donne l'impression que la génération
+     * « continue toute seule » ou s'arrête sans état cohérent.
+     */
+    private inline fun <T> runBuildCatching(block: () -> T): kotlin.Result<T> = try {
+        kotlin.Result.success(block())
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        kotlin.Result.failure(e)
     }
 
     /**
@@ -527,7 +668,28 @@ class LocalDbBuildPipeline(
 
     private fun formatCount(count: Long): String = NumberFormat.getIntegerInstance().format(count)
 
-    /** Detail « live » (compteur de lignes) pour la carte, ou null si rien a afficher. */
+    /** Detail « live » : source effectivement lue + compteur traite/total quand il est connu. */
+    private fun detailFor(context: Context, progress: BuildProgressDetail): String? {
+        val source = progress.source ?: return progress.processed
+            .takeIf { it > 0L }
+            ?.let { context.getString(R.string.appstrings_local_build_lines, formatCount(it)) }
+        return when {
+            progress.total >= 0L -> context.getString(
+                R.string.appstrings_local_build_source_progress,
+                source,
+                formatCount(progress.processed),
+                formatCount(progress.total),
+            )
+            progress.processed > 0L -> context.getString(
+                R.string.appstrings_local_build_source_processed,
+                source,
+                formatCount(progress.processed),
+            )
+            else -> context.getString(R.string.appstrings_local_build_source_started, source)
+        }
+    }
+
+    /** Compatibilite pour les phases radio existantes qui ne portent pas encore de source. */
     private fun detailFor(context: Context, processed: Long): String? =
         if (processed > 0L) context.getString(R.string.appstrings_local_build_lines, formatCount(processed)) else null
 

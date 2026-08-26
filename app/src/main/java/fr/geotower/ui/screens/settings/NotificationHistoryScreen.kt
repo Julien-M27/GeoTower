@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBars
@@ -24,7 +23,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -86,8 +85,8 @@ import fr.geotower.R
 import fr.geotower.data.notifications.NotificationHistoryEntry
 import fr.geotower.data.notifications.NotificationHistoryStore
 import fr.geotower.ui.components.GeoTowerBackTopBar
-import fr.geotower.ui.components.GeoTowerDateScrollbar
 import fr.geotower.ui.components.PageScrollEdgeButtons
+import fr.geotower.ui.components.formatHistoryDay
 import fr.geotower.ui.components.formatHistoryDateTime
 import fr.geotower.ui.components.formatHistoryStorageBytes
 import fr.geotower.ui.components.geoTowerLazyListFadingEdge
@@ -184,7 +183,6 @@ fun NotificationHistoryScreen(
     val settingsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var showCounter by remember { mutableStateOf(HistoryPagePreferences.read(prefs, HistoryPagePreferences.NOTIF_COUNTER)) }
     var showDetail by remember { mutableStateOf(HistoryPagePreferences.read(prefs, HistoryPagePreferences.NOTIF_DETAIL)) }
-    var showDateBar by remember { mutableStateOf(HistoryPagePreferences.read(prefs, HistoryPagePreferences.NOTIF_DATE_BAR)) }
     var showClearDialog by rememberSaveable { mutableStateOf(false) }
     var historyItems by remember { mutableStateOf<List<NotificationHistoryEntry>>(emptyList()) }
     var selectedIds by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
@@ -414,7 +412,21 @@ fun NotificationHistoryScreen(
                         }
                     }
 
-                    items(visibleItems, key = { it.id }) { item ->
+                    itemsIndexed(visibleItems, key = { _, item -> item.id }) { index, item ->
+                        val day = formatHistoryDay(item.createdAtMillis)
+                        val previousDay = visibleItems.getOrNull(index - 1)?.createdAtMillis?.let(::formatHistoryDay)
+                        if (index == 0 || day != previousDay) {
+                            Text(
+                                text = day,
+                                style = sizing.textStyle(MaterialTheme.typography.titleMedium),
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = sizing.spacing(2.dp), vertical = sizing.spacing(6.dp))
+                            )
+                        }
+
                         val isSelected = item.id in selectedIdSet
                         Card(
                             colors = CardDefaults.cardColors(
@@ -479,31 +491,6 @@ fun NotificationHistoryScreen(
 
             PageScrollEdgeButtons(PageScrollPrefs.NOTIFICATION_HISTORY, listState)
 
-            GeoTowerDateScrollbar(
-                listState = listState,
-                timestamps = remember(visibleItems, availableTypes, showCounter, showDateBar, notificationsMuted) {
-                    // Le bandeau, la barre de filtres et le compteur occupent les premiers index de
-                    // la liste : on les aligne sur la première entrée pour que la bulle donne la
-                    // bonne date dès le haut, sinon tout l'index est décalé.
-                    val timestamps = visibleItems.map { it.createdAtMillis }
-                    val leading = (if (notificationsMuted) 1 else 0) +
-                        (if (availableTypes.size > 1) 1 else 0) +
-                        (if (showCounter) 1 else 0)
-                    when {
-                        !showDateBar || timestamps.isEmpty() -> emptyList()
-                        else -> List(leading) { timestamps.first() } + timestamps
-                    }
-                },
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .fillMaxHeight()
-                    .padding(
-                        top = sizing.spacing(12.dp),
-                        bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() +
-                            sizing.spacing(12.dp)
-                    )
-            )
-
             if (isSelectionMode) {
                 Box(
                     modifier = Modifier
@@ -563,22 +550,12 @@ fun NotificationHistoryScreen(
                         HistoryPagePreferences.write(prefs, HistoryPagePreferences.NOTIF_DETAIL, it)
                     }
                 ),
-                HistoryPageOption(
-                    title = stringResource(R.string.history_option_date_bar),
-                    checked = showDateBar,
-                    onCheckedChange = {
-                        showDateBar = it
-                        HistoryPagePreferences.write(prefs, HistoryPagePreferences.NOTIF_DATE_BAR, it)
-                    }
-                )
             ),
             onReset = {
                 showCounter = HistoryPagePreferences.DEFAULT_ENABLED
                 showDetail = HistoryPagePreferences.DEFAULT_ENABLED
-                showDateBar = HistoryPagePreferences.DEFAULT_ENABLED
                 HistoryPagePreferences.write(prefs, HistoryPagePreferences.NOTIF_COUNTER, HistoryPagePreferences.DEFAULT_ENABLED)
                 HistoryPagePreferences.write(prefs, HistoryPagePreferences.NOTIF_DETAIL, HistoryPagePreferences.DEFAULT_ENABLED)
-                HistoryPagePreferences.write(prefs, HistoryPagePreferences.NOTIF_DATE_BAR, HistoryPagePreferences.DEFAULT_ENABLED)
             },
             onDismiss = { showSettingsSheet = false },
             onBack = { showSettingsSheet = false },
@@ -818,12 +795,21 @@ private fun notificationEntryDescription(item: NotificationHistoryEntry): String
     return when (item.type) {
         NotificationHistoryStore.TYPE_DB_MOBILE,
         NotificationHistoryStore.TYPE_DB_RADIO,
-        NotificationHistoryStore.TYPE_DB_ENB ->
-            if (isError) {
-                stringResource(R.string.notification_database_download_failed_content)
-            } else {
-                stringResource(R.string.notification_database_downloaded_content)
+        NotificationHistoryStore.TYPE_DB_ENB -> {
+            val databaseName = notificationTypeLabel(item.type)
+            when {
+                isError -> stringResource(R.string.notification_database_download_failed_content)
+                item.status == NotificationHistoryStore.STATUS_INFO -> stringResource(
+                    if (item.detail == NotificationHistoryStore.DETAIL_DB_UPDATE_REBUILD) {
+                        R.string.notification_db_update_available_desc_rebuild
+                    } else {
+                        R.string.notification_db_update_available_desc
+                    },
+                    databaseName
+                )
+                else -> stringResource(R.string.notification_database_downloaded_content, databaseName)
             }
+        }
 
         NotificationHistoryStore.TYPE_DB_LOCAL_BUILD ->
             if (isError) {
@@ -834,9 +820,15 @@ private fun notificationEntryDescription(item: NotificationHistoryEntry): String
 
         NotificationHistoryStore.TYPE_DB_UPDATE ->
             if (item.detail == NotificationHistoryStore.DETAIL_DB_UPDATE_REBUILD) {
-                stringResource(R.string.notification_db_update_available_desc_rebuild)
+                stringResource(
+                    R.string.notification_db_update_available_desc_rebuild,
+                    stringResource(R.string.notification_history_type_db_mobile)
+                )
             } else {
-                stringResource(R.string.notification_db_update_available_desc)
+                stringResource(
+                    R.string.notification_db_update_available_desc,
+                    stringResource(R.string.notification_history_type_db_mobile)
+                )
             }
 
         NotificationHistoryStore.TYPE_APP_UPDATE ->

@@ -59,7 +59,8 @@ data class GeoTowerBreadcrumbItem(
 fun GeoTowerBreadcrumbBar(
     items: List<GeoTowerBreadcrumbItem>,
     modifier: Modifier = Modifier,
-    backgroundColor: Color = MaterialTheme.colorScheme.surfaceContainer
+    backgroundColor: Color = MaterialTheme.colorScheme.surfaceContainer,
+    separatorBeforeKeys: Set<String> = emptySet()
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
     if (items.isEmpty()) return
@@ -108,12 +109,21 @@ fun GeoTowerBreadcrumbBar(
         ) {
             items.forEachIndexed { index, item ->
                 if (index > 0) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                        modifier = Modifier.size(sizing.component(16.dp))
-                    )
+                    if (item.resolvedKey in separatorBeforeKeys) {
+                        Text(
+                            text = "/",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                            fontSize = sizing.text(18.sp),
+                            fontWeight = FontWeight.Bold
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            modifier = Modifier.size(sizing.component(16.dp))
+                        )
+                    }
                 }
 
                 val isCurrent = index == items.lastIndex || item.onClick == null
@@ -206,6 +216,38 @@ fun GeoTowerNavigationBreadcrumbBar(
     )
 }
 
+/**
+ * Fil d'ariane commun aux deux volets d'une vue fractionnée.
+ *
+ * Les éléments de [leftItems] décrivent le parcours du volet gauche, ceux de [rightItems] le
+ * contenu du volet droit. Un séparateur « / » rend la frontière entre les deux volets explicite,
+ * tout en conservant le comportement cliquable habituel de chaque étape.
+ */
+@Composable
+fun GeoTowerSplitNavigationBreadcrumbBar(
+    leftItems: List<GeoTowerBreadcrumbItem>,
+    rightItems: List<GeoTowerBreadcrumbItem>,
+    modifier: Modifier = Modifier,
+    backgroundColor: Color = MaterialTheme.colorScheme.surfaceContainer
+) {
+    if (leftItems.isEmpty() || rightItems.isEmpty()) return
+
+    val splitRightItems = rightItems.mapIndexed { index, item ->
+        item.copy(
+            onClick = if (index == rightItems.lastIndex) null else item.onClick,
+            key = "split-right-$index-${item.resolvedKey}"
+        )
+    }
+    val separatorKey = splitRightItems.first().resolvedKey
+
+    GeoTowerBreadcrumbBar(
+        items = leftItems + splitRightItems,
+        modifier = modifier,
+        backgroundColor = backgroundColor,
+        separatorBeforeKeys = setOf(separatorKey)
+    )
+}
+
 @Composable
 private fun BreadcrumbContent(
     item: GeoTowerBreadcrumbItem,
@@ -291,7 +333,9 @@ private fun NavBackStackEntry.toGeoTowerBreadcrumbItem(
 ): GeoTowerBreadcrumbItem? {
     return when (destination.route) {
         "home" -> GeoTowerBreadcrumbItem(labels.home, Icons.Default.Home, onClick, "home")
-        "map?photoDraftId={photoDraftId}" -> GeoTowerBreadcrumbItem(labels.map, Icons.Default.Map, onClick, "map")
+        "map?photoDraftId={photoDraftId}",
+        "map?photoDraftId={photoDraftId}&tripId={tripId}&tripMode={tripMode}" ->
+            GeoTowerBreadcrumbItem(labels.map, Icons.Default.Map, onClick, "map")
         "emitters" -> GeoTowerBreadcrumbItem(labels.emitters, Icons.Default.MyLocation, onClick, "emitters")
         "compass" -> GeoTowerBreadcrumbItem(labels.compass, Icons.Default.Explore, onClick, "compass")
         "stats" -> GeoTowerBreadcrumbItem(labels.stats, Icons.Default.BarChart, onClick, "stats")
@@ -309,11 +353,15 @@ private fun NavBackStackEntry.toGeoTowerBreadcrumbItem(
         "share_history" -> GeoTowerBreadcrumbItem(labels.shareHistory, Icons.Default.History, onClick, "share_history")
         "notification_history" -> GeoTowerBreadcrumbItem(labels.notificationHistory, Icons.Default.History, onClick, "notification_history")
         "histories" -> GeoTowerBreadcrumbItem(labels.histories, Icons.Default.History, onClick, "histories")
-        "support_detail/{id}?operator={operator}&fromMap={fromMap}&photoDraftId={photoDraftId}" -> GeoTowerBreadcrumbItem(labels.support, Icons.Default.VerticalAlignTop, onClick, "support_detail")
+        "support_detail/{id}?operator={operator}&fromMap={fromMap}&photoDraftId={photoDraftId}",
+        "support_detail/{id}?operator={operator}&fromMap={fromMap}&photoDraftId={photoDraftId}&expand={expand}" ->
+            GeoTowerBreadcrumbItem(labels.support, Icons.Default.VerticalAlignTop, onClick, "support_detail")
         "site_detail/{id}" -> GeoTowerBreadcrumbItem(labels.site, Icons.Default.Tag, onClick, "site_detail")
         "site_detail_from_map/{id}" -> GeoTowerBreadcrumbItem(labels.site, Icons.Default.Tag, onClick, "site_detail_from_map")
         "elevation_profile/{id}" -> GeoTowerBreadcrumbItem(labels.elevationProfile, Icons.Default.Terrain, onClick, "elevation_profile")
-        "throughput_calculator/{id}" -> GeoTowerBreadcrumbItem(labels.throughputCalculator, Icons.Default.Speed, onClick, "throughput_calculator")
+        "throughput_calculator/{id}",
+        "throughput_calculator/{id}?cfg={cfg}" ->
+            GeoTowerBreadcrumbItem(labels.throughputCalculator, Icons.Default.Speed, onClick, "throughput_calculator")
         "site_speedtests?siteId={siteId}&anfrCode={anfrCode}&operator={operator}&market={market}&mcc={mcc}&mnc={mnc}" -> GeoTowerBreadcrumbItem(labels.speedtests, Icons.Default.Timer, onClick, "site_speedtests")
         "radio_site_detail/{stationId}/{supportId}" -> GeoTowerBreadcrumbItem(labels.radio, Icons.Default.VerticalAlignTop, onClick, "radio_site_detail")
         else -> null

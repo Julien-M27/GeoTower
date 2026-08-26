@@ -4,9 +4,13 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import fr.geotower.data.config.RemoteFeatureFlags
+import fr.geotower.data.db.DatabaseStorageCleanup
 import fr.geotower.data.db.AppDatabase
+import fr.geotower.data.db.DatabaseArtifactIdentity
+import fr.geotower.data.db.DatabaseVersionPolicy
 import fr.geotower.data.db.GeoTowerDatabaseIndexes
 import fr.geotower.data.db.GeoTowerDatabaseValidator
+import fr.geotower.data.db.InstalledDatabaseArtifactIdentity
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
 import kotlinx.coroutines.CancellationException
@@ -36,6 +40,14 @@ object DatabaseDownloader {
             .build()
     }
 
+    /** Identite de la base mobile proposee par le manifeste signe actuellement lu. */
+    data class UpdateInfo(
+        val version: String?,
+        val sha256: String
+    ) {
+        val identity: DatabaseArtifactIdentity get() = DatabaseArtifactIdentity(version, sha256)
+    }
+
     fun getDatabaseSize(): Double {
         if (!RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.DATABASE_UPDATE_CHECK)) {
             return 0.0
@@ -49,17 +61,47 @@ object DatabaseDownloader {
     }
 
     suspend fun getLatestDatabaseVersion(): String? {
+        return getLatestDatabaseUpdateInfo()?.version
+    }
+
+    suspend fun getLatestDatabaseUpdateInfo(): UpdateInfo? {
         if (!RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.DATABASE_UPDATE_CHECK)) {
             return null
         }
         return withContext(Dispatchers.IO) {
             try {
-                readVerifiedDatabaseInfo()?.value?.version
+                readVerifiedDatabaseInfo()?.value?.let { database ->
+                    UpdateInfo(version = database.version, sha256 = database.sha256)
+                }
             } catch (e: Exception) {
                 null
             }
         }
     }
+
+    /**
+     * Verifie d'abord l'identite du manifeste ayant installe le fichier. Ainsi, le meme jeu de
+     * donnees ne redevient pas une mise a jour apres un passage principal <-> miroir. Les bases
+     * installees avant cette memorisation conservent le comparateur historique de version.
+     */
+    fun isInstalledDatabaseCurrent(
+        context: Context,
+        remote: UpdateInfo?,
+        localVersion: String?
+    ): Boolean {
+        remote ?: return false
+        val databaseFile = context.getDatabasePath(DB_NAME)
+        if (InstalledDatabaseArtifactIdentity.matchesInstalledMobile(context, databaseFile, remote.identity)) {
+            return true
+        }
+        return DatabaseVersionPolicy.isLocalCurrentOrNewer(remote.version, localVersion)
+    }
+
+    fun isRemoteDatabaseUpdateAvailable(
+        context: Context,
+        remote: UpdateInfo?,
+        localVersion: String?
+    ): Boolean = remote != null && !isInstalledDatabaseCurrent(context, remote, localVersion)
 
     suspend fun downloadUpdate(context: Context, onProgress: suspend (Int) -> Unit): Boolean {
         if (!RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.DATABASE_DOWNLOAD)) {
@@ -162,7 +204,7 @@ object DatabaseDownloader {
                 }
 
                 AppDatabase.closeDatabase()
-                deleteSqliteSidecars(dbFile)
+                DatabaseStorageCleanup.clearSqliteSidecars(dbFile)
 
                 if (!installValidatedDatabase(tempFile, dbFile, backupFile)) {
                     tempFile.delete()
@@ -175,6 +217,14 @@ object DatabaseDownloader {
 
                 GeoTowerDatabaseValidator.clearInstalledDatabaseInvalid(context)
                 updateCachedDatabaseState(GeoTowerDatabaseValidator.LocalDatabaseState.VALID)
+                // A enregistrer apres les index : ils modifient le fichier SQLite et donc son
+                // empreinte de presence. L'identite reste celle du manifeste verifie.
+                InstalledDatabaseArtifactIdentity.recordMobileServerDownload(
+                    context,
+                    dbFile,
+                    DatabaseArtifactIdentity(remoteInfo.version, remoteInfo.sha256)
+                )
+                DatabaseStorageCleanup.clearTransientArtifacts(context, DB_NAME)
                 true
             } catch (e: CancellationException) {
                 if (tempFile.exists()) tempFile.delete()
@@ -183,6 +233,8 @@ object DatabaseDownloader {
                 AppLogger.w(TAG, "Database download failed", e)
                 if (tempFile.exists()) tempFile.delete()
                 false
+            } finally {
+                DatabaseStorageCleanup.clearDownloadArtifacts(context, DB_NAME)
             }
         }
     }
@@ -207,7 +259,7 @@ object DatabaseDownloader {
             val backupFile = context.getDatabasePath("$DB_NAME.backup")
 
             AppDatabase.closeDatabase()
-            deleteSqliteSidecars(dbFile)
+            DatabaseStorageCleanup.clearSqliteSidecars(dbFile)
 
             if (!installValidatedDatabase(builtFile, dbFile, backupFile)) {
                 if (builtFile.exists()) builtFile.delete()
@@ -217,6 +269,8 @@ object DatabaseDownloader {
             GeoTowerDatabaseIndexes.applyToFile(dbFile)
             GeoTowerDatabaseValidator.clearInstalledDatabaseInvalid(context)
             updateCachedDatabaseState(GeoTowerDatabaseValidator.LocalDatabaseState.VALID)
+            InstalledDatabaseArtifactIdentity.clearMobile(context)
+            DatabaseStorageCleanup.clearTransientArtifacts(context, DB_NAME)
             true
         }
 
@@ -392,15 +446,6 @@ object DatabaseDownloader {
 
         if (backupFile.exists()) backupFile.delete()
         return true
-    }
-
-    private fun deleteSqliteSidecars(dbFile: File) {
-        listOf(
-            File(dbFile.path + "-wal"),
-            File(dbFile.path + "-shm")
-        ).forEach { sidecar ->
-            if (sidecar.exists()) sidecar.delete()
-        }
     }
 
     private fun updateCachedDatabaseState(state: GeoTowerDatabaseValidator.LocalDatabaseState) {

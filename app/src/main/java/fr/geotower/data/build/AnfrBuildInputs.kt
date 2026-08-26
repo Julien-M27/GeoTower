@@ -15,6 +15,16 @@ class AnfrSources(
     val supports: Iterable<AnfrCsvRow>,
 )
 
+/** Nombre de lignes physiques de donnees (hors en-tete) de chaque source ANFR. */
+data class AnfrSourceCounts(
+    val weekly: Long = -1L,
+    val stations: Long = -1L,
+    val bandes: Long = -1L,
+    val emetteurs: Long = -1L,
+    val antennes: Long = -1L,
+    val supports: Long = -1L,
+)
+
 /**
  * Referentiels `id -> libelle` (issus du ZIP mensuel) et communes `code_insee -> nom`
  * (issues de geo.api.gouv.fr). Cles sous forme de chaine, comme le builder serveur.

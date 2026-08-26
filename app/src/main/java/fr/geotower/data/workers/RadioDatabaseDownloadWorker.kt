@@ -24,6 +24,7 @@ import fr.geotower.R
 import fr.geotower.data.api.RadioDatabaseDownloader
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.db.DbOperationTimings
+import fr.geotower.data.db.RadioDatabaseValidator
 import fr.geotower.utils.AppLogger
 import fr.geotower.data.notifications.NotificationHistoryStore
 import fr.geotower.utils.AppNotifications
@@ -39,6 +40,7 @@ class RadioDatabaseDownloadWorker(
     private val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
     private val channelId = "db_download_channel"
     private val notificationId = DownloadNotificationCenter.RADIO_DB_DOWNLOAD_PROGRESS_NOTIFICATION_ID
+    private var isUpdatingExistingDatabase = false
 
     override suspend fun doWork(): Result {
         if (
@@ -52,6 +54,9 @@ class RadioDatabaseDownloadWorker(
         // Chrono de telechargement (live pendant, duree finale apres) affiche par RadioDatabaseDownloadCard.
         DbOperationTimings.markStart(context, DbOperationTimings.RADIO_DOWNLOAD)
         return try {
+            isUpdatingExistingDatabase = RadioDatabaseValidator.validateDatabaseFile(
+                context.getDatabasePath(RadioDatabaseValidator.DB_NAME)
+            ).isValid
             setForeground(createForegroundInfo(0))
 
             val success = RadioDatabaseDownloader.downloadUpdate(context) { progress ->
@@ -67,7 +72,7 @@ class RadioDatabaseDownloadWorker(
             } else {
                 DbOperationTimings.clearStart(context, DbOperationTimings.RADIO_DOWNLOAD)
                 showErrorNotification()
-                Result.failure()
+                failureResult()
             }
         } catch (e: CancellationException) {
             DbOperationTimings.clearStart(context, DbOperationTimings.RADIO_DOWNLOAD)
@@ -86,9 +91,13 @@ class RadioDatabaseDownloadWorker(
         } else {
             DbOperationTimings.clearStart(context, DbOperationTimings.RADIO_DOWNLOAD)
             showErrorNotification()
-            Result.failure()
+            failureResult()
         }
     }
+
+    /** Dans une mise a jour groupee, une erreur est deja notifiee et ne doit pas bloquer la suite. */
+    private fun failureResult(): Result =
+        if (inputData.getBoolean(KEY_CONTINUE_AFTER_FAILURE, false)) Result.success() else Result.failure()
 
     private fun notifySafely(id: Int, notification: android.app.Notification) {
         // Voir DatabaseDownloadWorker : seule la notification de progression (service de premier
@@ -128,7 +137,12 @@ class RadioDatabaseDownloadWorker(
     }
 
     private fun createNotification(progress: Int): android.app.Notification {
-        val title = context.getString(R.string.notification_database_download_title)
+        val databaseName = context.getString(R.string.notification_history_type_db_radio)
+        val title = context.getString(
+            if (isUpdatingExistingDatabase) R.string.notification_database_download_title
+            else R.string.notification_database_first_download_title,
+            databaseName
+        )
         val content = context.getString(R.string.notification_database_download_progress, progress)
         val pendingIntent = settingsPendingIntent(0, showSuccessPopup = false)
         val cancelLabel = context.getString(R.string.appstrings_download_cancel)
@@ -190,9 +204,10 @@ class RadioDatabaseDownloadWorker(
 
     private fun showSuccessNotification() {
         recordHistory(NotificationHistoryStore.STATUS_SUCCESS)
+        val databaseName = context.getString(R.string.notification_history_type_db_radio)
         val notification = NotificationCompat.Builder(context, channelId)
-            .setContentTitle(context.getString(R.string.notification_database_downloaded_title))
-            .setContentText(context.getString(R.string.notification_database_downloaded_content))
+            .setContentTitle(context.getString(R.string.notification_database_downloaded_title, databaseName))
+            .setContentText(context.getString(R.string.notification_database_downloaded_content, databaseName))
             .setContentIntent(settingsPendingIntent(1, showSuccessPopup = true))
             .setAutoCancel(true)
             .let { NotificationIconResources.applyTo(it, context) }
@@ -204,7 +219,12 @@ class RadioDatabaseDownloadWorker(
     private fun showErrorNotification() {
         recordHistory(NotificationHistoryStore.STATUS_ERROR)
         val notification = NotificationCompat.Builder(context, channelId)
-            .setContentTitle(context.getString(R.string.notification_database_download_failed_title))
+            .setContentTitle(
+                context.getString(
+                    R.string.notification_database_download_failed_title,
+                    context.getString(R.string.notification_history_type_db_radio)
+                )
+            )
             .setContentText(context.getString(R.string.notification_database_download_failed_content))
             .setAutoCancel(true)
             .let { NotificationIconResources.applyTo(it, context) }
@@ -241,18 +261,22 @@ class RadioDatabaseDownloadWorker(
 
     companion object {
         const val UNIQUE_WORK_NAME = "radio_db_download"
+        const val WORK_TAG = "database_download_radio"
         const val KEY_PROGRESS = "progress"
+        private const val KEY_CONTINUE_AFTER_FAILURE = "continue_after_failure"
 
         private const val TAG = "GeoTowerRadioDb"
         private const val MAX_RETRY_ATTEMPTS = 3
 
-        fun buildRequest() = OneTimeWorkRequestBuilder<RadioDatabaseDownloadWorker>()
+        fun buildRequest(continueAfterFailure: Boolean = false) = OneTimeWorkRequestBuilder<RadioDatabaseDownloadWorker>()
             .setConstraints(
                 Constraints.Builder()
                     .setRequiredNetworkType(NetworkType.CONNECTED)
                     .build()
             )
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
+            .setInputData(workDataOf(KEY_CONTINUE_AFTER_FAILURE to continueAfterFailure))
+            .addTag(WORK_TAG)
             .build()
 
         fun enqueue(workManager: WorkManager) {

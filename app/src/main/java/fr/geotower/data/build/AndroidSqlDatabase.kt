@@ -2,7 +2,9 @@ package fr.geotower.data.build
 
 import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
+import android.database.sqlite.SQLiteCursor
 import android.database.sqlite.SQLiteStatement
+import android.os.Build
 
 /**
  * Implementation on-device de [SqlDatabase] via le SQLite du framework Android. Contrat
@@ -70,6 +72,18 @@ class AndroidSqlDatabase(
         return count
     }
 
+    override fun insertInTransaction(sql: String, block: (SqlInsertStatement) -> Unit) {
+        val statement = db.compileStatement(sql)
+        db.beginTransaction()
+        try {
+            block(AndroidInsertStatement(statement))
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+            statement.close()
+        }
+    }
+
     override fun query(sql: String, onRow: (SqlRow) -> Unit) {
         db.rawQuery(sql, null).use { cursor ->
             enableForwardOnlyWindow(cursor)
@@ -86,6 +100,10 @@ class AndroidSqlDatabase(
      * masquee selon l'API -> appel reflexif tolerant (no-op si absente).
      */
     private fun enableForwardOnlyWindow(cursor: Cursor) {
+        if (Build.VERSION.SDK_INT >= 28 && cursor is SQLiteCursor) {
+            cursor.setFillWindowForwardOnly(true)
+            return
+        }
         runCatching {
             cursor.javaClass
                 .getMethod("setFillWindowForwardOnly", Boolean::class.javaPrimitiveType)
@@ -109,6 +127,24 @@ class AndroidSqlDatabase(
                 is ByteArray -> statement.bindBlob(position, value)
                 else -> statement.bindString(position, value.toString())
             }
+        }
+    }
+
+    private class AndroidInsertStatement(
+        private val statement: SQLiteStatement,
+    ) : SqlInsertStatement {
+        override fun clearBindings() = statement.clearBindings()
+
+        override fun bindNull(index: Int) = statement.bindNull(index)
+
+        override fun bindString(index: Int, value: String) = statement.bindString(index, value)
+
+        override fun bindLong(index: Int, value: Long) = statement.bindLong(index, value)
+
+        override fun bindDouble(index: Int, value: Double) = statement.bindDouble(index, value)
+
+        override fun executeInsert() {
+            statement.executeInsert()
         }
     }
 

@@ -38,7 +38,8 @@ object DatabaseVersionPolicy {
         return 1
     }
 
-    private fun areEquivalent(firstVersion: String?, secondVersion: String?): Boolean {
+    /** Same logical version, including equivalent date formats (for example ISO vs `yyyyMMdd_HHmm`). */
+    fun areEquivalent(firstVersion: String?, secondVersion: String?): Boolean {
         val first = normalizedVersion(firstVersion) ?: return false
         val second = normalizedVersion(secondVersion) ?: return false
         return compareVersions(first, second) == 0

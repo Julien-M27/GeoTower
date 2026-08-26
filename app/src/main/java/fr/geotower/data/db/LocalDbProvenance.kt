@@ -80,6 +80,11 @@ object LocalDbProvenance {
         prefs(context).edit().putString(RADIO_LOCAL_VERSION_KEY, version).apply()
     }
 
+    /** Efface explicitement le marqueur apres l'installation d'une base radio distante. */
+    fun clearRadioLocalBuildMarker(context: Context) {
+        prefs(context).edit().remove(RADIO_LOCAL_VERSION_KEY).apply()
+    }
+
     /** `yyyyMMdd_HHmm` -> `dd/MM/yyyy - HH:mm` (renvoie l'entree brute si non parsable, ou null). */
     fun formatBuildTime(versionRaw: String?): String? {
         if (versionRaw == null) return null

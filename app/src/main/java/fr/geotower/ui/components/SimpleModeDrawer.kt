@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SystemUpdateAlt
+import androidx.compose.material.icons.filled.ToggleOff
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -186,8 +187,8 @@ private fun SimpleModeDrawerContent(
     // au-dessus du pied — c'est le trou qui rendait le tiroir bancal.
     Column(modifier = Modifier.fillMaxSize()) {
     Column(modifier = Modifier.fillMaxWidth()) {
-        // --- L'espace du haut dégage la barre d'état et fait descendre l'ensemble du tiroir. ---
-        Spacer(Modifier.height(sizing.spacing(32.dp)))
+        // --- La feuille gère déjà la barre d'état : une petite marge suffit avant le titre. ---
+        Spacer(Modifier.height(sizing.spacing(8.dp)))
 
         // --- Bandeau de mise à jour : une alerte, elle passe avant tout le reste. ---
         newerRelease?.let { release ->
@@ -286,6 +287,36 @@ private fun SimpleModeDrawerContent(
                 )
             }
 
+            // Le mode simplifié change la racine de navigation : on reconstruit la pile après
+            // sa désactivation pour ramener l'utilisateur sur l'accueil du mode complet.
+            NavigationDrawerItem(
+                icon = {
+                    Icon(
+                        Icons.Default.ToggleOff,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                },
+                label = {
+                    Text(
+                        text = stringResource(R.string.simple_mode_disable),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                },
+                selected = false,
+                onClick = {
+                    safeClick {
+                        AppConfig.setSimpleMode(context, false)
+                        onCloseDrawer()
+                        navController.navigate(AppConfig.homeRoute()) {
+                            launchSingleTop = true
+                            popUpTo(navController.graph.id) { inclusive = true }
+                        }
+                    }
+                },
+                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+            )
+
             // --- Quitter : le tiroir remplace l'accueil, il doit reprendre son bouton de sortie.
             // Détaché de la liste, ce n'est pas une page.
             Spacer(Modifier.height(sizing.spacing(12.dp)))
@@ -333,14 +364,14 @@ private fun SimpleModeDrawerContent(
     HorizontalDivider(
         modifier = Modifier
             .padding(horizontal = sizing.spacing(28.dp))
-            .padding(bottom = sizing.spacing(20.dp))
+            .padding(bottom = sizing.spacing(4.dp))
     )
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = sizing.spacing(24.dp))
-            .padding(bottom = sizing.spacing(16.dp))
+            .padding(bottom = sizing.spacing(4.dp))
             .navigationBarsPadding(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
@@ -353,7 +384,7 @@ private fun SimpleModeDrawerContent(
                     .size(sizing.component(180.dp))
                     .clip(RoundedCornerShape(sizing.component(36.dp)))
             )
-            Spacer(Modifier.height(sizing.spacing(10.dp)))
+            Spacer(Modifier.height(sizing.spacing(4.dp)))
         }
 
         // « À propos » entre le logo et la version, comme sur l'accueil (cf. AboutSection).

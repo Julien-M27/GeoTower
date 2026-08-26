@@ -277,6 +277,7 @@ fun SiteDetailScreen(
     antennaId: String,
     applyMapFilters: Boolean = false,
     isSplitScreen: Boolean = false,
+    showBreadcrumb: Boolean = true,
     onCloseSplitScreen: () -> Unit = {},
     onOpenElevationProfile: ((String) -> Unit)? = null,
     onOpenThroughputCalculator: ((String) -> Unit)? = null,
@@ -1092,15 +1093,16 @@ fun SiteDetailScreen(
                         }.padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(4.dp))
                     )
                 }
-                GeoTowerNavigationBreadcrumbBar(
-                    navController = navController,
-                    currentItem = GeoTowerBreadcrumbItem(
-                        label = txtSiteDetailsTitle,
-                        icon = Icons.Default.Tag,
-                        key = "site_detail"
-                    ),
-                    currentRouteKeys = setOf("site_detail", "site_detail_from_map"),
-                    impliedParentItems = listOfNotNull(
+                if (showBreadcrumb) {
+                    GeoTowerNavigationBreadcrumbBar(
+                        navController = navController,
+                        currentItem = GeoTowerBreadcrumbItem(
+                            label = txtSiteDetailsTitle,
+                            icon = Icons.Default.Tag,
+                            key = "site_detail"
+                        ),
+                        currentRouteKeys = setOf("site_detail", "site_detail_from_map"),
+                        impliedParentItems = listOfNotNull(
                         // Le mode simplifié n'a pas d'accueil : le fil d'Ariane commence à la
                         // carte (ou à « À proximité »), pas sur une page qui n'existe plus.
                         if (AppConfig.simpleModeActive()) {
@@ -1134,12 +1136,13 @@ fun SiteDetailScreen(
                             onClick = { navigateToBreadcrumbParent(supportDetailRoute) },
                             key = "support_detail"
                         )
-                    ),
-                    onBackStackItemClick = {
-                        if (isSplitScreen) onCloseSplitScreen()
-                    },
-                    backgroundColor = if (useOneUi) cardBgColor else MaterialTheme.colorScheme.surfaceContainer
-                )
+                        ),
+                        onBackStackItemClick = {
+                            if (isSplitScreen) onCloseSplitScreen()
+                        },
+                        backgroundColor = if (useOneUi) cardBgColor else MaterialTheme.colorScheme.surfaceContainer
+                    )
+                }
             }
         }
     ) { padding ->

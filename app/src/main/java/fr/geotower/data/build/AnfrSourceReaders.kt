@@ -37,6 +37,26 @@ object AnfrCsvParser {
         return CsvRowIterator(InputStreamReader(buffered, detectCharset(buffered)).buffered(), delimiter)
     }
 
+    /** Compte les lignes de donnees sans decouper ni allouer les champs CSV. */
+    fun countDataRows(input: InputStream): Long {
+        val buffer = ByteArray(64 * 1024)
+        var newlineCount = 0L
+        var byteCount = 0L
+        var lastByte = -1
+        while (true) {
+            val read = input.read(buffer)
+            if (read <= 0) break
+            byteCount += read
+            for (index in 0 until read) {
+                val value = buffer[index].toInt() and 0xFF
+                if (value == '\n'.code) newlineCount++
+                lastByte = value
+            }
+        }
+        val physicalLines = newlineCount + if (byteCount > 0L && lastByte != '\n'.code) 1L else 0L
+        return (physicalLines - 1L).coerceAtLeast(0L)
+    }
+
     /**
      * Detecte l'encodage du flux (UTF-8 vs Windows-1252). Les exports ANFR sont normalement UTF-8, mais
      * data.gouv heberge aussi de vieux exports en Latin-1. On echantillonne le debut du flux : si une
@@ -242,6 +262,12 @@ class AnfrMonthlyZip(file: File) : Closeable {
         return csvRows { zip.getInputStream(entry) }
     }
 
+    /** Compte les lignes d'un fichier du ZIP sans parser les colonnes. */
+    fun countRows(vararg nameCandidates: String): Long {
+        val entry = findEntry(nameCandidates) ?: return 0L
+        return zip.getInputStream(entry).use(AnfrCsvParser::countDataRows)
+    }
+
     /** Charge un referentiel `id -> libelle` (petit fichier lu entierement). Vide si absent. */
     fun reference(keyColumn: String, valueColumn: String, vararg nameCandidates: String): Map<String, String> {
         val entry = findEntry(nameCandidates) ?: return emptyMap()
@@ -284,6 +310,10 @@ fun anfrSourcesFrom(weeklyCsv: File, monthlyZip: AnfrMonthlyZip): AnfrSources = 
     antennes = monthlyZip.rows("SUP_ANTENNE.txt"),
     supports = monthlyZip.rows("SUP_SUPPORT.txt"),
 )
+
+/** Compte les lignes de donnees d'un CSV local, hors en-tete. */
+fun countCsvDataRows(file: File): Long =
+    if (file.isFile) file.inputStream().use(AnfrCsvParser::countDataRows) else 0L
 
 /** Charge les referentiels `id -> libelle` du ZIP mensuel ; `communes` vient de geo.api.gouv.fr (Slice 3). */
 fun anfrReferencesFrom(

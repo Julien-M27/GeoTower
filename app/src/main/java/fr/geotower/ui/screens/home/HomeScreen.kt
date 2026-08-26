@@ -95,7 +95,6 @@ import fr.geotower.BuildConfig
 import fr.geotower.R
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.config.RemoteHomeAnnouncement
-import fr.geotower.data.db.DatabaseVersionPolicy
 import fr.geotower.data.notifications.NotificationHistoryStore
 import fr.geotower.data.db.GeoTowerDatabaseValidator
 import fr.geotower.services.LiveTrackingController
@@ -258,9 +257,13 @@ fun HomeScreen(navController: NavController) {
     val workManager = remember { androidx.work.WorkManager.getInstance(context) }
 
     // ✅ NOUVEAU : On écoute si un téléchargement est déjà en cours
-    val workInfos by workManager.getWorkInfosForUniqueWorkFlow(DatabaseDownloadWorker.UNIQUE_WORK_NAME).collectAsState(initial = emptyList())
-    val currentWork = workInfos.firstOrNull()
-    val isSyncing = currentWork?.state == androidx.work.WorkInfo.State.RUNNING || currentWork?.state == androidx.work.WorkInfo.State.ENQUEUED
+    val workInfos by workManager.getWorkInfosByTagFlow(DatabaseDownloadWorker.WORK_TAG).collectAsState(initial = emptyList())
+    val currentWork = workInfos.firstOrNull { workInfo ->
+        workInfo.state == androidx.work.WorkInfo.State.RUNNING ||
+            workInfo.state == androidx.work.WorkInfo.State.ENQUEUED ||
+            workInfo.state == androidx.work.WorkInfo.State.BLOCKED
+    }
+    val isSyncing = currentWork != null
     // ✅ NOUVEAU : On récupère la progression de 0 à 100
     val downloadProgress = currentWork?.progress?.getInt(DatabaseDownloadWorker.KEY_PROGRESS, 0) ?: 0
 
@@ -362,10 +365,11 @@ fun HomeScreen(navController: NavController) {
             ) {
                 scope.launch(kotlinx.coroutines.Dispatchers.IO) {
                     try {
-                        val remoteVersion = fr.geotower.data.api.DatabaseDownloader.getLatestDatabaseVersion()
+                        val remote = fr.geotower.data.api.DatabaseDownloader.getLatestDatabaseUpdateInfo()
 
                         val localVersion = GeoTowerDatabaseValidator.getInstalledDatabaseVersion(context)
-                        val hasRemoteUpdate = DatabaseVersionPolicy.isRemoteNewer(remoteVersion, localVersion)
+                        val hasRemoteUpdate = fr.geotower.data.api.DatabaseDownloader
+                            .isRemoteDatabaseUpdateAvailable(context, remote, localVersion)
                         // Base générée sur l'appareil : la nouvelle version se propose en
                         // régénération, la même donnée ANFR étant à portée de build local.
                         val rebuildOffer = hasRemoteUpdate && LocalDbRebuildOffer.forMobile(context)
@@ -527,6 +531,9 @@ fun HomeScreen(navController: NavController) {
                 val isCompactExpanded = !isLandscape && (maxWidth < 720.dp || maxHeight < 900.dp)
                 // Hauteur minimale pour forcer l'espace entre le titre, les boutons et le "À propos"
                 val minHeight = maxHeight
+                val hasHomeBanner = !isOnline || hideHomeLogo
+                val landscapeFallbackMinHeight = sizing.component(if (isCompactLandscape) 520.dp else 680.dp)
+                val landscapeMenuUsesGrid = hasHomeBanner && minHeight < landscapeFallbackMinHeight
                 val showHelpButton = prefs.getBoolean("show_home_help", true)
                 // Le lien « À propos » est un élément du menu (voir MenuButtonsList) sauf en
                 // paysage, où il garde sa place sous le titre : la disposition n'y a pas de pied de
@@ -583,7 +590,10 @@ fun HomeScreen(navController: NavController) {
                             .zIndex(3f)
                     )
 
-                    if (isLandscape) {
+                    // Un Fold compact peut avoir une largeur légèrement supérieure à sa hauteur
+                    // tout en restant un grand écran. Il doit conserver la disposition Fold
+                    // (logo à gauche + colonne), contrairement au vrai paysage d'un téléphone.
+                    if (isLandscape && (!isExpanded || !isCompactLandscape)) {
                         Row(
                             modifier = Modifier
                                 .fillMaxSize()
@@ -650,7 +660,7 @@ fun HomeScreen(navController: NavController) {
                                         isOnline = isOnline && !hideHomeLogo,
                                         logoResId = displayLogoResId,
                                         isExpanded = true,
-                                        isGrid = true,
+                                         isGrid = landscapeMenuUsesGrid,
                                         compact = true,
                                         // Le lien « À propos » est déjà sous le titre, à gauche.
                                         includeAbout = false
@@ -663,9 +673,22 @@ fun HomeScreen(navController: NavController) {
                         // --- DISPOSITION FOLD (TABLETTE) ---
                         val prefsFold = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
                         val showLogo = prefsFold.getBoolean("show_home_logo", true)
+                        val isFoldCompact = isCompactExpanded || isCompactLandscape
+                        val foldViewportHeight = minHeight
+                        val hasFoldBanner = hasHomeBanner
+                        // La disposition latérale normale tient avec une marge confortable sur un
+                        // Fold. On ne revient à la grille que si un bandeau laisse réellement une
+                        // hauteur trop faible ; la simple présence fugace d'un bandeau ne suffit pas.
+                        val foldFallbackMinHeight = sizing.component(if (isFoldCompact) 640.dp else 760.dp)
+                        val bannerActuallyCrowdsFold = hasFoldBanner &&
+                            foldViewportHeight < foldFallbackMinHeight
 
-                        // ✅ CORRECTION : Si pas de logo OU pas de réseau OU BANDEAU AFFICHE, on passe en mode Grille
-                        val isGrid = !showLogo || !isOnline || hideHomeLogo
+                        // Disposition par défaut : logo à gauche, tous les menus en colonne à droite.
+                        // Le logo reste optionnel : s'il est masqué, le menu reprend simplement la
+                        // colonne centrée du téléphone. La grille est réservée au seul cas où un
+                        // bandeau gêne réellement la hauteur de la disposition normale.
+                        val isGrid = bannerActuallyCrowdsFold
+                        val hasFoldSideContent = showLogo && !isGrid
 
                         Column(
                             modifier = Modifier
@@ -675,7 +698,7 @@ fun HomeScreen(navController: NavController) {
                                 .verticalScroll(foldScrollState)
                                 .padding(
                                     horizontal = sizing.spacing(if (isCompactExpanded) 24.dp else 32.dp),
-                                    vertical = sizing.spacing(if (isCompactExpanded) 12.dp else 24.dp)
+                                    vertical = sizing.spacing(if (isFoldCompact) 12.dp else 24.dp)
                                 ),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
@@ -688,41 +711,55 @@ fun HomeScreen(navController: NavController) {
                                     style = sizing.textStyle(MaterialTheme.typography.displayLarge),
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.primary,
-                                    fontSize = sizing.text(if (isCompactExpanded) 46.sp else 64.sp),
+                                    fontSize = sizing.text(if (isFoldCompact) 46.sp else 64.sp),
                                     textAlign = TextAlign.Center,
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(bottom = sizing.spacing(if (isCompactExpanded) 20.dp else 32.dp))
+                                        .padding(bottom = sizing.spacing(if (isFoldCompact) 20.dp else 32.dp))
                                 )
 
                                 if (isGrid) {
                                     // --- DISPOSITION EN GRILLE ---
                                     MenuButtonsList(navController, useOneUi, buttonBgColor, paleColor, onPaleColor, isOnline && !hideHomeLogo, displayLogoResId, isExpanded, isGrid = true, compact = isCompactExpanded)
-                                } else {
+                                } else if (hasFoldSideContent) {
                                     // --- DISPOSITION CÔTE À CÔTE (Classique) ---
                                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                         // Sur Fold, les colonnes ne sont pas à 50/50 : les boutons ont une
                                         // largeur fixe (métriques compactes) qui ne rentre pas dans la moitié
                                         // d'un écran de ~674.dp, on donne donc la part large au menu.
-                                        Column(modifier = Modifier.weight(if (isCompactExpanded) 0.75f else 1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Column(modifier = Modifier.weight(if (isFoldCompact) 0.75f else 1f), horizontalAlignment = Alignment.CenterHorizontally) {
                                             DrawableImage(
                                                 resId = displayLogoResId,
                                                 modifier = Modifier
-                                                    .size(sizing.component(if (isCompactExpanded) 190.dp else 280.dp))
-                                                    .clip(RoundedCornerShape(if (isCompactExpanded) 24.dp else 32.dp))
+                                                    .size(sizing.component(if (isFoldCompact) 190.dp else 280.dp))
+                                                    .clip(RoundedCornerShape(if (isFoldCompact) 24.dp else 32.dp))
                                             )
                                         }
-                                        Column(modifier = Modifier.weight(if (isCompactExpanded) 1.25f else 1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Column(modifier = Modifier.weight(if (isFoldCompact) 1.25f else 1f), horizontalAlignment = Alignment.CenterHorizontally) {
                                             // ✅ CORRECTION : On passe "isOnline && !hideHomeLogo" pour forcer le masquage du logo sur tous les appareils si besoin
                                             MenuButtonsList(navController, useOneUi, buttonBgColor, paleColor, onPaleColor, isOnline && !hideHomeLogo, displayLogoResId, isExpanded, isGrid = false, compact = isCompactExpanded)
                                         }
                                     }
+                                } else {
+                                    // --- DISPOSITION EN COLONNE (logo masqué) ---
+                                    MenuButtonsList(
+                                        navController,
+                                        useOneUi,
+                                        buttonBgColor,
+                                        paleColor,
+                                        onPaleColor,
+                                        isOnline && !hideHomeLogo,
+                                        displayLogoResId,
+                                        isExpanded,
+                                        isGrid = false,
+                                        compact = isFoldCompact
+                                    )
                                 }
                             }
 
                             Spacer(modifier = Modifier.weight(1f))
 
-                            Spacer(modifier = Modifier.height(sizing.spacing(if (isCompactExpanded) 16.dp else 32.dp)))
+                            Spacer(modifier = Modifier.height(sizing.spacing(if (isFoldCompact) 16.dp else 32.dp)))
                             AboutSection(version = appVersion)
                         }
                     } else {

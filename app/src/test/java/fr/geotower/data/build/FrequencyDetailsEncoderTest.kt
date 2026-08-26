@@ -40,6 +40,21 @@ class FrequencyDetailsEncoderTest {
         assertNull(FrequencyDetailsEncoder.encode(""))
     }
 
+    @Test
+    fun reusableSessionMatchesOneShotEncoder() {
+        val values = listOf(
+            "LTE 800",
+            "Systemes: LTE, NR\nFrequences: 791-801 MHz\nAntennes: 120 deg",
+            "FM x2\nFrequences: 87.5-108 MHz\n".repeat(8),
+        )
+
+        FrequencyDetailsEncoder.Session().use { session ->
+            values.forEach { value ->
+                assertEquals(FrequencyDetailsEncoder.encode(value), session.encode(value))
+            }
+        }
+    }
+
     /**
      * Non-regression API 26 : l'encodeur utilisait `java.util.Base64`, indisponible sous Android
      * 8.0 alors que le `minSdk` de l'app est 24 — la generation locale plantait en

@@ -23,6 +23,7 @@ import fr.geotower.R
 import fr.geotower.data.api.DatabaseDownloader
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.db.DbOperationTimings
+import fr.geotower.data.db.GeoTowerDatabaseValidator
 import android.content.pm.ServiceInfo
 import fr.geotower.utils.AppLogger
 import fr.geotower.data.notifications.NotificationHistoryStore
@@ -39,6 +40,7 @@ class DatabaseDownloadWorker(
     private val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
     private val channelId = "db_download_channel"
     private val notificationId = DownloadNotificationCenter.DB_DOWNLOAD_PROGRESS_NOTIFICATION_ID
+    private var isUpdatingExistingDatabase = false
 
     override suspend fun doWork(): Result {
         if (
@@ -51,6 +53,9 @@ class DatabaseDownloadWorker(
         // Chrono de telechargement (live pendant, duree finale apres) affiche par DatabaseDownloadCard.
         DbOperationTimings.markStart(context, DbOperationTimings.MOBILE_DOWNLOAD)
         return try {
+            isUpdatingExistingDatabase = GeoTowerDatabaseValidator
+                .getInstalledDatabaseStatus(context)
+                .state == GeoTowerDatabaseValidator.LocalDatabaseState.VALID
 
             // 1. Démarrer en premier plan
             setForeground(createForegroundInfo(0))
@@ -70,7 +75,7 @@ class DatabaseDownloadWorker(
             } else {
                 DbOperationTimings.clearStart(context, DbOperationTimings.MOBILE_DOWNLOAD)
                 showErrorNotification()
-                Result.failure()
+                failureResult()
             }
         } catch (e: CancellationException) {
             DbOperationTimings.clearStart(context, DbOperationTimings.MOBILE_DOWNLOAD)
@@ -89,9 +94,13 @@ class DatabaseDownloadWorker(
         } else {
             DbOperationTimings.clearStart(context, DbOperationTimings.MOBILE_DOWNLOAD)
             showErrorNotification()
-            Result.failure()
+            failureResult()
         }
     }
+
+    /** Dans une mise a jour groupee, une erreur est deja notifiee et ne doit pas bloquer la suite. */
+    private fun failureResult(): Result =
+        if (inputData.getBoolean(KEY_CONTINUE_AFTER_FAILURE, false)) Result.success() else Result.failure()
 
     private fun notifySafely(id: Int, notification: android.app.Notification) {
         // Les notifications de fin obéissent à l'interrupteur maître des notifications ; celle de
@@ -138,7 +147,12 @@ class DatabaseDownloadWorker(
     }
 
     private fun createNotification(progress: Int): android.app.Notification {
-        val title = context.getString(R.string.notification_database_download_title)
+        val databaseName = context.getString(R.string.notification_history_type_db_mobile)
+        val title = context.getString(
+            if (isUpdatingExistingDatabase) R.string.notification_database_download_title
+            else R.string.notification_database_first_download_title,
+            databaseName
+        )
         val content = context.getString(R.string.notification_database_download_progress, progress)
 
         // ✅ AJOUT : Intent pour ouvrir les paramètres DB au clic
@@ -205,8 +219,9 @@ class DatabaseDownloadWorker(
         recordHistory(NotificationHistoryStore.STATUS_SUCCESS)
         val pendingIntent = settingsPendingIntent(1, showSuccessPopup = true)
 
-        val title = context.getString(R.string.notification_database_downloaded_title)
-        val content = context.getString(R.string.notification_database_downloaded_content)
+        val databaseName = context.getString(R.string.notification_history_type_db_mobile)
+        val title = context.getString(R.string.notification_database_downloaded_title, databaseName)
+        val content = context.getString(R.string.notification_database_downloaded_content, databaseName)
 
         val notification = NotificationCompat.Builder(context, channelId)
             .setContentTitle(title)
@@ -221,7 +236,10 @@ class DatabaseDownloadWorker(
 
     private fun showErrorNotification() {
         recordHistory(NotificationHistoryStore.STATUS_ERROR)
-        val title = context.getString(R.string.notification_database_download_failed_title)
+        val title = context.getString(
+            R.string.notification_database_download_failed_title,
+            context.getString(R.string.notification_history_type_db_mobile)
+        )
         val content = context.getString(R.string.notification_database_download_failed_content)
 
         val notification = NotificationCompat.Builder(context, channelId)
@@ -272,17 +290,21 @@ class DatabaseDownloadWorker(
 
     companion object {
         const val UNIQUE_WORK_NAME = "db_download"
+        const val WORK_TAG = "database_download_mobile"
         const val KEY_PROGRESS = "progress"
+        private const val KEY_CONTINUE_AFTER_FAILURE = "continue_after_failure"
 
         private const val TAG = "GeoTowerDb"
         private const val MAX_RETRY_ATTEMPTS = 3
-        fun buildRequest() = OneTimeWorkRequestBuilder<DatabaseDownloadWorker>()
+        fun buildRequest(continueAfterFailure: Boolean = false) = OneTimeWorkRequestBuilder<DatabaseDownloadWorker>()
             .setConstraints(
                 Constraints.Builder()
                     .setRequiredNetworkType(NetworkType.CONNECTED)
                     .build()
             )
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
+            .setInputData(workDataOf(KEY_CONTINUE_AFTER_FAILURE to continueAfterFailure))
+            .addTag(WORK_TAG)
             .build()
 
         fun enqueue(workManager: WorkManager) {

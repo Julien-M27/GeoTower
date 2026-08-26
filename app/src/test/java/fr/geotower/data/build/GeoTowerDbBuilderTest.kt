@@ -484,15 +484,19 @@ class GeoTowerDbBuilderTest {
 
     @Test
     fun detailQueriesAggregateWithoutATemporarySort() {
-        // La propriete PERF des deux agregations : le GROUP BY se fait EN FLUX sur un index dont
-        // id_anfr est en tete. Un « USE TEMP B-TREE » ici, c'est un tri de ~2,5 M de lignes sur le
-        // telephone. C'est ce qu'il faut re-verifier apres toute retouche de ces requetes.
+        // La propriete PERF des requetes : elles doivent exploiter les cles id_anfr des tables de
+        // staging sans « USE TEMP B-TREE ». Un tri de ~2,5 M de lignes sur le telephone est
+        // precisement ce qui rend BUILDING_DETAILS lent sur les appareils modestes.
         // Le staging est supprime en fin de build : on le recree a vide, seul le PLAN compte ici.
         val file = File.createTempFile("geotower_plan_test", ".db").apply { deleteOnExit() }
         JdbcSqlDatabase(file.absolutePath).use { db ->
             GeoTowerDbBuilder.stagingStatements(db.stagingPrefix).forEach { db.execSql(it) }
             db.execSql("CREATE INDEX ix_stg_emetteur_id ON stg_emetteur(id_anfr, systeme, emr_id, aer_id)")
-            listOf(GeoTowerDbBuilder.detailsSql(), GeoTowerDbBuilder.announcedDetailsSql()).forEach { sql ->
+            listOf(
+                GeoTowerDbBuilder.detailsSql(),
+                GeoTowerDbBuilder.detailsStreamSql(),
+                GeoTowerDbBuilder.announcedDetailsSql(),
+            ).forEach { sql ->
                 val plan = StringBuilder()
                 db.query("EXPLAIN QUERY PLAN $sql") { row -> plan.append(row.getString("detail")).append('\n') }
                 assertFalse("tri temporaire dans le plan de :\n$sql\n$plan", plan.contains("TEMP B-TREE"))

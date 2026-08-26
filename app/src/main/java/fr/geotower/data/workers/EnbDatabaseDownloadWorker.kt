@@ -24,6 +24,7 @@ import fr.geotower.R
 import fr.geotower.data.api.EnbDatabaseDownloader
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.db.DbOperationTimings
+import fr.geotower.data.db.EnbDatabaseValidator
 import fr.geotower.utils.AppLogger
 import fr.geotower.data.notifications.NotificationHistoryStore
 import fr.geotower.utils.AppNotifications
@@ -40,6 +41,7 @@ class EnbDatabaseDownloadWorker(
     private val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
     private val channelId = "db_download_channel"
     private val notificationId = DownloadNotificationCenter.ENB_DB_DOWNLOAD_PROGRESS_NOTIFICATION_ID
+    private var isUpdatingExistingDatabase = false
 
     override suspend fun doWork(): Result {
         if (
@@ -54,6 +56,9 @@ class EnbDatabaseDownloadWorker(
         // Chrono de telechargement (live pendant, duree finale apres) affiche par EnbDatabaseDownloadCard.
         DbOperationTimings.markStart(context, DbOperationTimings.ENB_DOWNLOAD)
         return try {
+            isUpdatingExistingDatabase = EnbDatabaseValidator.validateDatabaseFile(
+                context.getDatabasePath(EnbDatabaseValidator.DB_NAME)
+            ).isValid
             setForeground(createForegroundInfo(0))
 
             val success = EnbDatabaseDownloader.downloadUpdate(context) { progress ->
@@ -69,7 +74,7 @@ class EnbDatabaseDownloadWorker(
             } else {
                 DbOperationTimings.clearStart(context, DbOperationTimings.ENB_DOWNLOAD)
                 showErrorNotification()
-                Result.failure()
+                failureResult()
             }
         } catch (e: CancellationException) {
             DbOperationTimings.clearStart(context, DbOperationTimings.ENB_DOWNLOAD)
@@ -88,9 +93,13 @@ class EnbDatabaseDownloadWorker(
         } else {
             DbOperationTimings.clearStart(context, DbOperationTimings.ENB_DOWNLOAD)
             showErrorNotification()
-            Result.failure()
+            failureResult()
         }
     }
+
+    /** Dans une mise a jour groupee, une erreur est deja notifiee et ne doit pas bloquer la suite. */
+    private fun failureResult(): Result =
+        if (inputData.getBoolean(KEY_CONTINUE_AFTER_FAILURE, false)) Result.success() else Result.failure()
 
     private fun notifySafely(id: Int, notification: android.app.Notification) {
         // Voir DatabaseDownloadWorker : seule la notification de progression (service de premier
@@ -130,7 +139,12 @@ class EnbDatabaseDownloadWorker(
     }
 
     private fun createNotification(progress: Int): android.app.Notification {
-        val title = context.getString(R.string.notification_database_download_title)
+        val databaseName = context.getString(R.string.notification_history_type_db_enb)
+        val title = context.getString(
+            if (isUpdatingExistingDatabase) R.string.notification_database_download_title
+            else R.string.notification_database_first_download_title,
+            databaseName
+        )
         val content = context.getString(R.string.notification_database_download_progress, progress)
         val pendingIntent = settingsPendingIntent(0, showSuccessPopup = false)
         val cancelLabel = context.getString(R.string.appstrings_download_cancel)
@@ -192,9 +206,10 @@ class EnbDatabaseDownloadWorker(
 
     private fun showSuccessNotification() {
         recordHistory(NotificationHistoryStore.STATUS_SUCCESS)
+        val databaseName = context.getString(R.string.notification_history_type_db_enb)
         val notification = NotificationCompat.Builder(context, channelId)
-            .setContentTitle(context.getString(R.string.notification_database_downloaded_title))
-            .setContentText(context.getString(R.string.notification_database_downloaded_content))
+            .setContentTitle(context.getString(R.string.notification_database_downloaded_title, databaseName))
+            .setContentText(context.getString(R.string.notification_database_downloaded_content, databaseName))
             .setContentIntent(settingsPendingIntent(1, showSuccessPopup = true))
             .setAutoCancel(true)
             .let { NotificationIconResources.applyTo(it, context) }
@@ -206,7 +221,12 @@ class EnbDatabaseDownloadWorker(
     private fun showErrorNotification() {
         recordHistory(NotificationHistoryStore.STATUS_ERROR)
         val notification = NotificationCompat.Builder(context, channelId)
-            .setContentTitle(context.getString(R.string.notification_database_download_failed_title))
+            .setContentTitle(
+                context.getString(
+                    R.string.notification_database_download_failed_title,
+                    context.getString(R.string.notification_history_type_db_enb)
+                )
+            )
             .setContentText(context.getString(R.string.notification_database_download_failed_content))
             .setAutoCancel(true)
             .let { NotificationIconResources.applyTo(it, context) }
@@ -243,18 +263,22 @@ class EnbDatabaseDownloadWorker(
 
     companion object {
         const val UNIQUE_WORK_NAME = "enb_db_download"
+        const val WORK_TAG = "database_download_enb"
         const val KEY_PROGRESS = "progress"
+        private const val KEY_CONTINUE_AFTER_FAILURE = "continue_after_failure"
 
         private const val TAG = "GeoTowerEnbDb"
         private const val MAX_RETRY_ATTEMPTS = 3
 
-        fun buildRequest() = OneTimeWorkRequestBuilder<EnbDatabaseDownloadWorker>()
+        fun buildRequest(continueAfterFailure: Boolean = false) = OneTimeWorkRequestBuilder<EnbDatabaseDownloadWorker>()
             .setConstraints(
                 Constraints.Builder()
                     .setRequiredNetworkType(NetworkType.CONNECTED)
                     .build()
             )
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
+            .setInputData(workDataOf(KEY_CONTINUE_AFTER_FAILURE to continueAfterFailure))
+            .addTag(WORK_TAG)
             .build()
 
         fun enqueue(workManager: WorkManager) {

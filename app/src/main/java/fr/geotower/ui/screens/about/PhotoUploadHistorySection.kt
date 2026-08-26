@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -76,8 +75,8 @@ import fr.geotower.data.upload.ExternalPhotoUploadHistoryEntry
 import fr.geotower.data.upload.ExternalPhotoUploadHistoryStore
 import fr.geotower.data.upload.ExternalPhotoUploadHistoryValidator
 import fr.geotower.ui.components.GeoTowerBackTopBar
-import fr.geotower.ui.components.GeoTowerDateScrollbar
 import fr.geotower.ui.components.PageScrollEdgeButtons
+import fr.geotower.ui.components.formatHistoryDay
 import fr.geotower.ui.components.pageScrollbar
 import fr.geotower.ui.components.formatHistoryDateTime
 import fr.geotower.ui.components.formatHistoryStorageBytes
@@ -173,7 +172,6 @@ fun PhotoUploadHistoryScreen(
     var showSettingsSheet by remember { mutableStateOf(false) }
     val settingsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var showThumbnails by remember { mutableStateOf(HistoryPagePreferences.read(prefs, HistoryPagePreferences.UPLOAD_THUMBNAILS)) }
-    var showDateBar by remember { mutableStateOf(HistoryPagePreferences.read(prefs, HistoryPagePreferences.UPLOAD_DATE_BAR)) }
     var showClearDialog by rememberSaveable { mutableStateOf(false) }
     var historyItems by remember { mutableStateOf<List<ExternalPhotoUploadHistoryEntry>>(emptyList()) }
     var selectedIds by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
@@ -330,7 +328,21 @@ fun PhotoUploadHistoryScreen(
                         }
                     }
                 } else {
-                    itemsIndexed(historyItems, key = { _, item -> item.id }) { _, item ->
+                    itemsIndexed(historyItems, key = { _, item -> item.id }) { index, item ->
+                        val day = formatHistoryDay(item.createdAtMillis)
+                        val previousDay = historyItems.getOrNull(index - 1)?.createdAtMillis?.let(::formatHistoryDay)
+                        if (index == 0 || day != previousDay) {
+                            Text(
+                                text = day,
+                                style = sizing.textStyle(MaterialTheme.typography.titleMedium),
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = sizing.spacing(2.dp), vertical = sizing.spacing(6.dp))
+                            )
+                        }
+
                         val isSelected = item.id in selectedIdSet
                         Card(
                             colors = CardDefaults.cardColors(
@@ -385,20 +397,6 @@ fun PhotoUploadHistoryScreen(
 
             PageScrollEdgeButtons(PageScrollPrefs.PHOTO_UPLOAD_HISTORY, listState)
 
-            GeoTowerDateScrollbar(
-                listState = listState,
-                timestamps = remember(historyItems, showDateBar) {
-                    if (showDateBar) historyItems.map { it.createdAtMillis } else emptyList()
-                },
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .fillMaxHeight()
-                    .padding(
-                        top = sizing.spacing(12.dp),
-                        bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + sizing.spacing(12.dp)
-                    )
-            )
-
             if (isSelectionMode) {
                 Box(
                     modifier = Modifier
@@ -443,20 +441,10 @@ fun PhotoUploadHistoryScreen(
                         HistoryPagePreferences.write(prefs, HistoryPagePreferences.UPLOAD_THUMBNAILS, it)
                     }
                 ),
-                HistoryPageOption(
-                    title = stringResource(R.string.history_option_date_bar),
-                    checked = showDateBar,
-                    onCheckedChange = {
-                        showDateBar = it
-                        HistoryPagePreferences.write(prefs, HistoryPagePreferences.UPLOAD_DATE_BAR, it)
-                    }
-                )
             ),
             onReset = {
                 showThumbnails = HistoryPagePreferences.DEFAULT_ENABLED
-                showDateBar = HistoryPagePreferences.DEFAULT_ENABLED
                 HistoryPagePreferences.write(prefs, HistoryPagePreferences.UPLOAD_THUMBNAILS, HistoryPagePreferences.DEFAULT_ENABLED)
-                HistoryPagePreferences.write(prefs, HistoryPagePreferences.UPLOAD_DATE_BAR, HistoryPagePreferences.DEFAULT_ENABLED)
             },
             onDismiss = { showSettingsSheet = false },
             onBack = { showSettingsSheet = false },

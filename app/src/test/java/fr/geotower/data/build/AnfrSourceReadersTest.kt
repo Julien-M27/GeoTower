@@ -88,6 +88,13 @@ class AnfrSourceReadersTest {
     }
 
     @Test
+    fun countsDataRowsWithoutParsingCsvFields() {
+        val csv = "header1;header2\r\n1;one\r\n2;two"
+
+        assertEquals(2L, AnfrCsvParser.countDataRows(csv.byteInputStream()))
+    }
+
+    @Test
     fun buildsDatabaseFromRawZipAndWeeklyCsv() {
         val weekly = tempFile(
             "anfr_weekly", ".csv",
@@ -130,8 +137,10 @@ class AnfrSourceReadersTest {
         )
 
         val dbFile = tempFile("anfr_reader_db", ".db", "")
+        val progress = ArrayList<BuildProgressDetail>()
 
         AnfrMonthlyZip(zip).use { monthly ->
+            assertEquals(2L, monthly.countRows("SUP_STATION.txt"))
             val sources = anfrSourcesFrom(weekly, monthly)
             val references = anfrReferencesFrom(monthly, mapOf("75056" to "PARIS", "31555" to "TOULOUSE"))
             JdbcSqlDatabase(dbFile.absolutePath).use { db ->
@@ -139,9 +148,17 @@ class AnfrSourceReadersTest {
                     db, sources, references,
                     mapOf(("0000000001" to "ORANGE") to ArcepSiteMeta("NIDT1", 0)),
                     BuildConfig(version = "20260601_1200", zipVersion = "sup.zip"),
+                    sourceCounts = AnfrSourceCounts(weekly = 2, stations = 2, bandes = 2, emetteurs = 2, antennes = 2, supports = 2),
+                    onProgressDetail = { progress.add(it) },
                 )
             }
         }
+
+        assertTrue(
+            progress.any {
+                it.source == "SUP_SUPPORT.txt (ZIP ANFR)" && it.processed == 2L && it.total == 2L
+            },
+        )
 
         DriverManager.getConnection("jdbc:sqlite:${dbFile.absolutePath}").use { conn ->
             assertEquals(7, conn.int("PRAGMA user_version"))

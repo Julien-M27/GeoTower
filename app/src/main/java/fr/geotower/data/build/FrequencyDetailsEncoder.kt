@@ -1,5 +1,6 @@
 package fr.geotower.data.build
 
+import java.io.Closeable
 import java.io.ByteArrayOutputStream
 import java.util.zip.Deflater
 import java.util.zip.DeflaterOutputStream
@@ -17,25 +18,50 @@ object FrequencyDetailsEncoder {
 
     /** Retourne null pour une entree vide (comme Python `if not value: return None`). */
     fun encode(value: String?): String? {
-        if (value.isNullOrEmpty()) return null
+        return Session().use { it.encode(value) }
+    }
 
-        val output = ByteArrayOutputStream()
-        // BEST_SPEED (et non BEST_COMPRESSION) : la compression zlib est appelee des centaines de
-        // milliers de fois (une par station/support) pendant le build on-device ; le niveau 9 y est
-        // un point chaud CPU inutile. Le blob est a peine plus gros mais l'app le relit a l'identique
-        // (inflate gere tous les niveaux) -> gain de vitesse sans impact fonctionnel. Serveur = niveau 9.
-        //
-        // IMPORTANT : `Deflater` detient de la memoire NATIVE (zlib) qui n'est liberee que par `end()`.
-        // `DeflaterOutputStream(out, deflater)` (deflater fourni) ne l'appelle PAS a la fermeture ; sans
-        // `end()` explicite, ~700 000 deflaters s'accumulent -> OutOfMemoryError (Deflater.init natif).
-        val deflater = Deflater(Deflater.BEST_SPEED)
-        try {
-            DeflaterOutputStream(output, deflater).use { it.write(value.toByteArray(Charsets.UTF_8)) }
-        } finally {
-            deflater.end()
+    /**
+     * Encodeur reutilisable pour une generation mono-thread.
+     *
+     * Un build mobile encode environ 100 000 stations. Creer puis detruire un [Deflater] natif
+     * pour chaque station coute du temps CPU et provoque une succession d'allocations natives.
+     * [Deflater.reset] conserve le contexte zlib et reutilise ses buffers, tandis que [close]
+     * appelle [Deflater.end] une seule fois a la fin du build.
+     */
+    class Session : Closeable {
+        private val deflater = Deflater(Deflater.BEST_SPEED)
+        private var closed = false
+
+        fun encode(value: String?): String? {
+            check(!closed) { "Encodeur deja ferme" }
+            if (value.isNullOrEmpty()) return null
+
+            deflater.reset()
+            val output = ByteArrayOutputStream()
+            try {
+                // BEST_SPEED (et non BEST_COMPRESSION) : la compression zlib est appelee des centaines de
+                // milliers de fois (une par station/support) pendant le build on-device ; le niveau 9 y est
+                // un point chaud CPU inutile. Le blob est a peine plus gros mais l'app le relit a l'identique
+                // (inflate gere tous les niveaux) -> gain de vitesse sans impact fonctionnel. Serveur = niveau 9.
+                DeflaterOutputStream(output, deflater).use {
+                    it.write(value.toByteArray(Charsets.UTF_8))
+                }
+                val encoded = COMPRESSED_PREFIX + base64(output.toByteArray())
+                return if (encoded.length < value.length) encoded else value
+            } finally {
+                // Le flux ferme termine la compression mais ne libere pas le Deflater fourni.
+                // Le reset garantit que la session repart d'un etat propre au prochain appel.
+                deflater.reset()
+            }
         }
-        val encoded = COMPRESSED_PREFIX + base64(output.toByteArray())
-        return if (encoded.length < value.length) encoded else value
+
+        override fun close() {
+            if (!closed) {
+                closed = true
+                deflater.end()
+            }
+        }
     }
 
     /**
