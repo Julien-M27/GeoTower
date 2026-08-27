@@ -1,6 +1,7 @@
 package fr.geotower.data.api
 
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -26,6 +27,37 @@ class DatabaseDownloaderTest {
         assertFalse(DatabaseDownloader.isOfficialDatabaseDownloadUrl("https://api.geotower.fr/api/v2/download/other"))
     }
 
+    @Test
+    fun newerWeeklyVersionSelectsTheMirror() {
+        val primary = served("api.geotower.fr", "20260827_1200")
+        val mirror = served("api.cajejuma.fr", "20260828_0800")
+
+        assertSame(mirror, DatabaseDownloader.selectPreferredDatabase(primary, mirror))
+    }
+
+    @Test
+    fun equalWeeklyVersionKeepsThePrimaryEvenWhenMirrorPublicationDiffers() {
+        val primary = served("api.geotower.fr", "20260828_0800", sha256 = "a".repeat(64))
+        val mirror = served("api.cajejuma.fr", "20260828_0800", sha256 = "b".repeat(64))
+
+        assertSame(primary, DatabaseDownloader.selectPreferredDatabase(primary, mirror))
+    }
+
+    @Test
+    fun olderMirrorVersionKeepsThePrimary() {
+        val primary = served("api.geotower.fr", "20260828_0800")
+        val mirror = served("api.cajejuma.fr", "20260827_1200")
+
+        assertSame(primary, DatabaseDownloader.selectPreferredDatabase(primary, mirror))
+    }
+
+    @Test
+    fun unavailablePrimaryFallsBackToMirror() {
+        val mirror = served("api.cajejuma.fr", "20260828_0800")
+
+        assertSame(mirror, DatabaseDownloader.selectPreferredDatabase(null, mirror))
+    }
+
     private fun validInfo(
         filename: String = "geotower_fr.db",
         sizeBytes: Long = 1024L,
@@ -41,4 +73,18 @@ class DatabaseDownloaderTest {
             countryCode = countryCode
         )
     }
+
+    private fun served(host: String, version: String, sha256: String = "a".repeat(64)):
+        ServedFrom<DownloadManifestDatabase> = ServedFrom(
+            value = DownloadManifestDatabase(
+                filename = "geotower_fr.db",
+                url = "https://$host/api/v2/download/db",
+                sizeBytes = 1024L,
+                sha256 = sha256,
+                schemaVersion = 7,
+                countryCode = "FR",
+                version = version
+            ),
+            host = host
+        )
 }

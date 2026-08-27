@@ -74,10 +74,11 @@ class LocalDbBuildPipeline(
         packs: Packs,
         force: Boolean = false,
         onProgress: (BuildProgressUpdate) -> Unit,
+        onPause: () -> Unit = {},
     ): Result {
         val metrics = LocalBuildMetrics()
         val device = BuildDeviceProfiles.read(context)
-        val result = runMeasured(context, packs, force, metrics, onProgress)
+        val result = runMeasured(context, packs, force, metrics, onProgress, onPause)
         runCatching {
             LocalBuildReportStore.save(context, metrics.report(device, packs.label, result.success, result.reason))
         }.onFailure { AppLogger.w("GeoTowerDb", "Rapport de mesures non enregistre", it) }
@@ -90,6 +91,7 @@ class LocalDbBuildPipeline(
         force: Boolean,
         metrics: LocalBuildMetrics,
         onProgress: (BuildProgressUpdate) -> Unit,
+        onPause: () -> Unit,
     ): Result = withContext(Dispatchers.IO) {
         // Chaque progression alimente aussi les mesures : `processed` (lignes de la sous-etape) sert
         // a cumuler le debit par phase, il reste a 0 pour les phases reseau.
@@ -104,6 +106,7 @@ class LocalDbBuildPipeline(
             downloadedBytes: Long = 0L,
             totalBytes: Long = -1L,
         ) {
+            onPause()
             // Un retry reseau recommence les octets a zero, et certaines phases emettent plusieurs
             // sous-etapes. Le pourcentage global ne doit jamais repartir en arriere a l'ecran.
             val normalizedPercent = maxOf(lastPublishedPercent, percent.coerceIn(0, 100))
@@ -172,7 +175,7 @@ class LocalDbBuildPipeline(
             while (attempt < MAX_ZIP_ATTEMPTS) {
                 attempt++
                 try {
-                    downloader.downloadToFile(monthly.dataUrl, dataZip, MAX_ZIP_BYTES) { copied, total ->
+                    downloader.downloadToFile(monthly.dataUrl, dataZip, MAX_ZIP_BYTES, onProgress = { copied, total ->
                         val mb = copied / (1024 * 1024)
                         val pct = if (total > 0) (5 + copied * 30 / total).toInt().coerceIn(5, 35) else 20
                         if (pct != lastPct) {
@@ -187,7 +190,7 @@ class LocalDbBuildPipeline(
                                 totalBytes = total,
                             )
                         }
-                    }
+                    }, beforeRead = onPause)
                     zipError = verifyMonthlyZip(dataZip)
                     if (zipError == null) break
                 } catch (e: CancellationException) {
@@ -204,7 +207,7 @@ class LocalDbBuildPipeline(
             monthly.refUrl?.let { refUrl ->
                 var refPct = -1
                 runBuildCatching {
-                    downloader.downloadToFile(refUrl, refZip, MAX_REF_ZIP_BYTES) { copied, total ->
+                    downloader.downloadToFile(refUrl, refZip, MAX_REF_ZIP_BYTES, onProgress = { copied, total ->
                         val pct = if (total > 0L) {
                             (copied * 100L / total).toInt().coerceIn(0, 100)
                         } else {
@@ -223,7 +226,7 @@ class LocalDbBuildPipeline(
                                 totalBytes = total,
                             )
                         }
-                    }
+                    }, beforeRead = onPause)
                 }
             }
             metrics.noteFile("sup_ref.zip", refZip.length())
@@ -269,7 +272,7 @@ class LocalDbBuildPipeline(
                 while (obsAttempt < MAX_ZIP_ATTEMPTS) {
                     obsAttempt++
                     try {
-                        downloader.downloadToFile(observatoireUrl, observatoireCsv, MAX_OBS_BYTES) { copied, total ->
+                        downloader.downloadToFile(observatoireUrl, observatoireCsv, MAX_OBS_BYTES, onProgress = { copied, total ->
                             val mb = copied / (1024 * 1024)
                             val pct = if (total > 0) (36 + copied * 8 / total).toInt().coerceIn(36, 44) else 40
                             if (pct != obsPct) {
@@ -285,7 +288,7 @@ class LocalDbBuildPipeline(
                                     totalBytes = total,
                                 )
                             }
-                        }
+                        }, beforeRead = onPause)
                         obsError = if (observatoireCsv.length() > 1000L) null else "Observatoire vide"
                         if (obsError == null) break
                     } catch (e: CancellationException) {
@@ -308,7 +311,7 @@ class LocalDbBuildPipeline(
                         val dest = File(arcepDir, "arcep_$index.csv")
                         var arcepPct = -1
                         runBuildCatching {
-                            downloader.downloadToFile(url, dest, MAX_ARCEP_BYTES) { copied, total ->
+                            downloader.downloadToFile(url, dest, MAX_ARCEP_BYTES, onProgress = { copied, total ->
                                 val pct = if (total > 0L) {
                                     (copied * 100L / total).toInt().coerceIn(0, 100)
                                 } else {
@@ -327,7 +330,7 @@ class LocalDbBuildPipeline(
                                         totalBytes = total,
                                     )
                                 }
-                            }
+                            }, beforeRead = onPause)
                         }
                             .onSuccess { if (dest.length() > 100L) arcepFiles.add(dest) }
                             .onFailure { AppLogger.w("GeoTowerDb", "ARCEP CSV download failed (non-fatal): $url", it) }

@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+
 package fr.geotower
 
 import android.content.Context
@@ -613,7 +615,10 @@ class MainActivity : ComponentActivity() {
             }
 
             GeoTowerLocaleProvider {
-            MaterialTheme(colorScheme = colorScheme) {
+            MaterialTheme(
+                colorScheme = colorScheme,
+                motionScheme = MotionScheme.expressive()
+            ) {
                 GeoTowerUiStyleProvider {
                 val navController = rememberNavController()
 

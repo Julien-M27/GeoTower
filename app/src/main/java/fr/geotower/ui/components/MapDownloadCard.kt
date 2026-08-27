@@ -16,6 +16,8 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.runtime.*
@@ -43,6 +45,7 @@ import fr.geotower.data.models.OfflineMapCatalog
 import fr.geotower.data.models.OfflineMapDto
 import fr.geotower.data.workers.DownloadNotificationCenter
 import fr.geotower.data.workers.OfflineMapDownloadValidator
+import fr.geotower.data.workers.OperationPauseStore
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.OfflineMapDisplayNames
 import java.io.File
@@ -140,6 +143,7 @@ fun MapDownloadCard(
         }
     }
     var fileRefreshTrigger by remember { mutableIntStateOf(0) }
+    var pauseStateVersion by remember { mutableIntStateOf(0) }
     var mapToDelete by remember { mutableStateOf<OfflineMapDto?>(null) }
     var showDeleteAllDialog by remember { mutableStateOf(false) }
     var isExpanded by rememberSaveable(targetMapFilename) { mutableStateOf(targetMapFilename != null) }
@@ -211,6 +215,7 @@ fun MapDownloadCard(
                                     val isSyncing = currentWork?.state == WorkInfo.State.RUNNING || currentWork?.state == WorkInfo.State.ENQUEUED
 
                                     if (mapFile != null && !isDownloaded && !isSyncing && canDownloadMaps) {
+                                        OperationPauseStore.clear(context, OperationPauseStore.mapDownloadKey(map.mapFilename))
                                         val data = workDataOf(
                                             "map_url" to map.mapUrl,
                                             "map_name" to displayName,
@@ -232,6 +237,7 @@ fun MapDownloadCard(
                                         workManager.enqueueUniqueWork("map_dl_${map.id}", ExistingWorkPolicy.REPLACE, request)
                                     }
                                 }
+                                pauseStateVersion++
                                 isExpanded = true
                             }
                         }
@@ -266,6 +272,9 @@ fun MapDownloadCard(
                     val displayName = mapDisplayName(map)
                     val currentWork = workInfos.find { it.tags.contains("map_id_${map.id}") }
                     val isSyncing = currentWork?.state == WorkInfo.State.RUNNING || currentWork?.state == WorkInfo.State.ENQUEUED
+                    val isPaused = remember(currentWork?.id, pauseStateVersion) {
+                        OperationPauseStore.isPaused(context, OperationPauseStore.mapDownloadKey(map.mapFilename))
+                    }
                     val progressValue = currentWork?.progress?.getInt("progress", 0) ?: 0
                     var rowBounds by remember(map.mapFilename) { mutableStateOf(MapRowViewportBounds()) }
                     val isTargetMap = targetMapFilename == map.mapFilename
@@ -305,7 +314,35 @@ fun MapDownloadCard(
                             }
 
                             if (isSyncing) {
-                                IconButton(onClick = { safeClick("map_cancel_${map.id}") { workManager.cancelUniqueWork("map_dl_${map.id}") } }) {
+                                IconButton(
+                                    onClick = {
+                                        safeClick("map_toggle_pause_${map.id}") {
+                                            OperationPauseStore.setPaused(
+                                                context,
+                                                OperationPauseStore.mapDownloadKey(map.mapFilename),
+                                                paused = !isPaused,
+                                            )
+                                            pauseStateVersion++
+                                        }
+                                    },
+                                ) {
+                                    Icon(
+                                        imageVector = if (isPaused) Icons.Default.PlayArrow else Icons.Default.Pause,
+                                        contentDescription = stringResource(
+                                            if (isPaused) R.string.appstrings_resume else R.string.appstrings_pause,
+                                        ),
+                                        tint = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
+                                IconButton(
+                                    onClick = {
+                                        safeClick("map_cancel_${map.id}") {
+                                            OperationPauseStore.clear(context, OperationPauseStore.mapDownloadKey(map.mapFilename))
+                                            pauseStateVersion++
+                                            workManager.cancelUniqueWork("map_dl_${map.id}")
+                                        }
+                                    },
+                                ) {
                                     Icon(Icons.Default.Close, contentDescription = stringResource(R.string.appstrings_cancel), tint = MaterialTheme.colorScheme.error)
                                 }
                             } else if (isDownloaded) {
@@ -316,6 +353,8 @@ fun MapDownloadCard(
                                 IconButton(
                                     onClick = {
                                         safeClick("map_download_${map.id}") {
+                                            OperationPauseStore.clear(context, OperationPauseStore.mapDownloadKey(map.mapFilename))
+                                            pauseStateVersion++
                                             val data = workDataOf(
                                                 "map_url" to map.mapUrl,
                                                 "map_name" to displayName,
@@ -378,6 +417,10 @@ fun MapDownloadCard(
                     OutlinedButton(
                         onClick = {
                             safeClick("map_cancel_all") {
+                                catalog.forEach { map ->
+                                    OperationPauseStore.clear(context, OperationPauseStore.mapDownloadKey(map.mapFilename))
+                                }
+                                pauseStateVersion++
                                 workManager.cancelAllWorkByTag("map_download")
                             }
                         },

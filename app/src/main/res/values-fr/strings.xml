@@ -223,6 +223,9 @@
     <string name="database_size_warning">Taille du fichier : %1$.1f Mo\nLe téléchargement est recommandé en Wi-Fi.</string>
     <string name="database_download_progress">Téléchargement : %1$d %%</string>
     <string name="database_cancel_download">Annuler le téléchargement</string>
+    <string name="appstrings_pause">Mettre en pause</string>
+    <string name="appstrings_resume">Reprendre</string>
+    <string name="appstrings_operation_paused">En pause</string>
     <string name="database_up_to_date">À jour</string>
     <string name="database_antenna_count">Antennes : %1$s</string>
     <string name="radio_database_site_count">Sites radio : %1$s</string>
@@ -267,10 +270,20 @@
     <string name="database_update_all_title">Mettre à jour les bases</string>
     <string name="database_update_all_desc">Vérifie la base mobile, les données radio et les identifiants eNB/gNB, puis télécharge uniquement les bases à mettre à jour.</string>
     <string name="database_update_all_action">Mettre à jour les bases disponibles</string>
+    <string name="database_download_all_action">Télécharger les bases disponibles</string>
+    <string name="database_download_and_update_all_action">Télécharger et mettre à jour les bases</string>
     <string name="database_update_all_checking">Recherche des mises à jour…</string>
     <string name="database_update_all_running">Mises à jour en cours…</string>
     <string name="database_update_all_none">Toutes les bases disponibles sont à jour.</string>
-    <string name="database_update_all_queued">Mises à jour mises en file : %1$d</string>
+    <string name="database_update_all_queue_title">Bases concernées</string>
+    <string name="database_update_all_download_type">À télécharger</string>
+    <string name="database_update_all_update_type">À mettre à jour</string>
+    <string name="database_update_all_download_waiting">En attente du téléchargement…</string>
+    <string name="database_update_all_download_progress">Téléchargement : %1$d %%</string>
+    <string name="database_update_all_download_ready">Téléchargement à effectuer</string>
+    <string name="database_update_all_update_ready">Mise à jour à effectuer</string>
+    <string name="database_update_all_download_completed">Téléchargement terminé</string>
+    <string name="database_update_all_download_failed">Échec du téléchargement</string>
     <string name="notification_app_updates_channel_name">Mises à jour GeoTower</string>
     <string name="notification_app_update_available_title">Nouvelle version GeoTower</string>
     <string name="notification_app_update_available_desc">GeoTower %1$s est disponible. Touchez pour ouvrir le téléchargement.</string>
@@ -1246,6 +1259,10 @@
     <string name="appstrings_show_speedometer">Compteur de vitesse</string>
     <string name="appstrings_show_speedtest_label">Afficher le meilleur Speedtest</string>
     <string name="appstrings_show_status_option">Afficher le statut</string>
+    <string name="appstrings_site_status_lines_title">Lignes du statut</string>
+    <string name="appstrings_site_status_lines_description">Choisissez les lignes de service à afficher dans le tableau de statut.</string>
+    <string name="appstrings_site_status_voice_option">Ligne Voix</string>
+    <string name="appstrings_site_status_data_option">Ligne Data</string>
     <string name="appstrings_site_address_option">Adresse et Coordonnées</string>
     <string name="appstrings_site_anfr_label">Site ANFR</string>
     <string name="appstrings_site_bearing_option">Cap</string>
@@ -1369,7 +1386,7 @@
     <string name="appstrings_status_legend_project">Technologie déclarée en projet.</string>
     <string name="appstrings_status_legend_title">Légende du tableau</string>
     <string name="appstrings_status_legend_unavailable">Technologie absente, non déclarée ou information non communiquée.</string>
-    <string name="appstrings_status_legend_uncertain">Service non déclaré pour cette génération, alors que la panne signalée peut le toucher.</string>
+    <string name="appstrings_status_legend_uncertain">Service non déclaré pour cette génération : « ? » vert si la génération fonctionne, « ? » rouge si une panne peut la toucher.</string>
     <string name="appstrings_status_outage">En panne</string>
     <string name="appstrings_status_project">En projet</string>
     <string name="appstrings_status_title">Statut du site</string>
@@ -3053,4 +3070,10 @@
     <string name="appstrings_release_v2034_database_updates">Un seul bouton vérifie les bases mobile, radio et eNB/gNB, puis met en file uniquement les mises à jour nécessaires</string>
     <string name="appstrings_release_v2034_local_build_progress">La génération locale affiche désormais l’avancement global, l’étape en cours, la source lue et le détail des lignes et téléchargements</string>
     <string name="appstrings_release_v2034_database_storage">Les téléchargements identifient correctement les données installées, nettoient les fichiers temporaires et détaillent chaque base dans les notifications</string>
+    <!-- Notes de version 2.0.35 -->
+    <string name="appstrings_release_v2035_database_queue">Les téléchargements distinguent désormais les bases manquantes des mises à jour, les mettent clairement en file et affichent la progression de chacune</string>
+    <string name="appstrings_release_v2035_database_servers">Le mode automatique compare maintenant le serveur principal et le miroir, puis conserve la base la plus récente</string>
+    <string name="appstrings_release_v2035_site_status_lines">Le tableau de statut d’un site permet désormais d’afficher ou de masquer séparément les lignes Voix et Data dans la personnalisation des pages</string>
+    <string name="appstrings_release_v2035_status_uncertainty">Les états de panne inconnus affichent des « ? » verts ou rouges plus explicites, et la Data 2G n’est plus présentée comme applicable</string>
+    <string name="appstrings_release_v2035_operation_pause">Les opérations longues — bases, cartes et génération locale — peuvent désormais être mises en pause puis reprises depuis les réglages</string>
 </resources>

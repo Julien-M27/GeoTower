@@ -158,6 +158,7 @@ import fr.geotower.ui.screens.settings.SitePhotosSettingsSheet
 import fr.geotower.ui.screens.settings.SiteSpeedtestsPagePreferences
 import fr.geotower.ui.screens.settings.SiteSpeedtestsSettingsSheet
 import fr.geotower.ui.screens.settings.SiteSettingsSheet
+import fr.geotower.ui.screens.settings.SiteStatusRowsSettingsSheet
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
@@ -720,8 +721,12 @@ fun SiteDetailScreen(
     val photosStandalone by AppConfig.siteShowPhotos
     val statusStandalone by AppConfig.siteShowStatus
     val speedtestStandalone by AppConfig.siteShowSpeedtest
+    val statusVoiceStandalone = SitePagePrefs.statusVoice.read(prefs)
+    val statusDataStandalone = SitePagePrefs.statusData.read(prefs)
     var showPhotosEmbedded by remember(blocksRevision) { mutableStateOf(readBlockVisibility("photos", "site_show_photos", photosStandalone)) }
     var showStatusEmbedded by remember(blocksRevision) { mutableStateOf(readBlockVisibility("status", "site_show_status", statusStandalone)) }
+    var showStatusVoice by remember(blocksRevision) { mutableStateOf(readBlockVisibility("status_voice", SitePagePrefs.statusVoice.key, statusVoiceStandalone)) }
+    var showStatusData by remember(blocksRevision) { mutableStateOf(readBlockVisibility("status_data", SitePagePrefs.statusData.key, statusDataStandalone)) }
     var showSpeedtestEmbedded by remember(blocksRevision) { mutableStateOf(readBlockVisibility("speedtest", "site_show_speedtest", speedtestStandalone)) }
     val showPhotos = if (embedded) showPhotosEmbedded else photosStandalone
     val showStatus = if (embedded) showStatusEmbedded else statusStandalone
@@ -740,6 +745,7 @@ fun SiteDetailScreen(
     var showSiteMiniMapSettingsSheet by remember { mutableStateOf(false) }
     var showSiteFreqSettingsSheet by remember { mutableStateOf(false) }
     var showSitePhotosSettingsSheet by remember { mutableStateOf(false) }
+    var showSiteStatusSettingsSheet by remember { mutableStateOf(false) }
     var showCommunityDataSettingsSheet by remember { mutableStateOf(false) }
     var communityDataSettingsFeatureId by remember { mutableStateOf<String?>(null) }
 
@@ -1507,6 +1513,8 @@ fun SiteDetailScreen(
                                 blockShape = blockShape,
                                 techStatus = realTechStatus,
                                 outageDetails = hsEntity,
+                                showVoiceRow = showStatusVoice,
+                                showDataRow = showStatusData,
                                 onAlertArcep = if (canUseSiteExternalLinks) {
     val sizing = LocalGeoTowerUiSizing.current
                                     { safeClick("alert_arcep_${info.idAnfr}") { openWebsiteUrl(ARCEP_ALERT_URL) } }
@@ -1985,6 +1993,16 @@ fun SiteDetailScreen(
                         }
                         writeBlockVisibility("site_show_status", it)
                     },
+                    showStatusVoice = showStatusVoice,
+                    onStatusVoiceChange = {
+                        showStatusVoice = it
+                        writeBlockVisibility(SitePagePrefs.statusVoice.key, it)
+                    },
+                    showStatusData = showStatusData,
+                    onStatusDataChange = {
+                        showStatusData = it
+                        writeBlockVisibility(SitePagePrefs.statusData.key, it)
+                    },
                     showSpeedtest = showSpeedtest,
                     onSpeedtestChange = {
                         if (embedded) {
@@ -2020,6 +2038,10 @@ fun SiteDetailScreen(
                         showSiteSettingsSheet = false
                         showSpeedtestsSettingsSheet = true
                     },
+                    onOpenStatusSettings = {
+                        showSiteSettingsSheet = false
+                        showSiteStatusSettingsSheet = true
+                    },
                     onDismiss = { showSiteSettingsSheet = false; settingsHighlightBlock = null },
                     onBack = { showSiteSettingsSheet = false; settingsHighlightBlock = null },
                     sheetState = pageSettingsSheetState,
@@ -2029,6 +2051,29 @@ fun SiteDetailScreen(
                     // Inséré, le panneau ne règle que cette section-là : le dire dans le titre, sinon
                     // il se confond avec celui de la fiche site autonome.
                     title = if (embedded) stringResource(R.string.appstrings_page_site_embedded_settings) else null
+                )
+            }
+
+            if (showSiteStatusSettingsSheet) {
+                SiteStatusRowsSettingsSheet(
+                    showVoice = showStatusVoice,
+                    onVoiceChange = {
+                        showStatusVoice = it
+                        writeBlockVisibility(SitePagePrefs.statusVoice.key, it)
+                    },
+                    showData = showStatusData,
+                    onDataChange = {
+                        showStatusData = it
+                        writeBlockVisibility(SitePagePrefs.statusData.key, it)
+                    },
+                    onDismiss = { showSiteStatusSettingsSheet = false },
+                    onBack = {
+                        showSiteStatusSettingsSheet = false
+                        showSiteSettingsSheet = true
+                    },
+                    sheetState = pageSettingsSheetState,
+                    useOneUi = uiStyle.useOneUi,
+                    bubbleColor = uiStyle.bubbleColor
                 )
             }
 

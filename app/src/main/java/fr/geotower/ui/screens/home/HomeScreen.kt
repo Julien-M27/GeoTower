@@ -114,6 +114,7 @@ import fr.geotower.data.build.LocalDbRebuildOffer
 import fr.geotower.data.workers.AppUpdateNotifier
 import fr.geotower.data.workers.DatabaseDownloadWorker
 import fr.geotower.data.workers.LocalDbBuildWorker
+import fr.geotower.data.workers.OperationPauseStore
 import fr.geotower.data.api.ServerStatus
 import fr.geotower.ui.components.LocationUnavailableBanner
 import fr.geotower.ui.components.PageScrollEdgeButtons
@@ -479,6 +480,17 @@ fun HomeScreen(navController: NavController) {
             // « Régénérer » au lieu de « Télécharger ». Seulement quand la base installée est
             // valide (mise à jour disponible) — manquante ou invalide, on repart du téléchargement.
             val isRebuildBanner = isRebuildOffer && isUpdateAvailable && !isDbMissing && !isDbInvalid
+            // Le bandeau est un résumé de l'état de la base : son appui doit retrouver la carte
+            // qui porte réellement cet état dans les réglages, pas seulement ouvrir leur accueil.
+            // Une génération/régénération vise la carte de génération locale ; les autres états
+            // visent la carte de la base mobile téléchargée. Le dernier cas couvre une base
+            // manquante sur un appareil configuré pour la génération locale.
+            val databaseBannerTargetSection = when {
+                isGeneratingDb -> "db_local_build"
+                isDownloading -> "db_mobile"
+                isRebuildBanner || AppConfig.dbForcedLocal() -> "db_local_build"
+                else -> "db_mobile"
+            }
 
             DatabaseWarningBanner(
                 isMissing = isDbMissing,
@@ -488,6 +500,13 @@ fun HomeScreen(navController: NavController) {
                 isGenerating = isGeneratingDb,
                 isRebuildOffer = isRebuildBanner,
                 downloadProgress = if (isGeneratingDb) localBuild.progress else downloadProgress,
+                onBannerClick = {
+                    safeClick("home_database_banner") {
+                        navController.navigate("settings?section=$databaseBannerTargetSection") {
+                            launchSingleTop = true
+                        }
+                    }
+                },
                 onDownloadClick = {
                     // On cache le bandeau et on lance le téléchargement (ou la régénération) manuel
                     isUpdateAvailable = false
@@ -497,6 +516,7 @@ fun HomeScreen(navController: NavController) {
                         // Régénération de la SEULE base annoncée par le bandeau (la base mobile) :
                         // les packs radio se pilotent depuis la carte de génération des réglages.
                         isRebuildStarting = true
+                        OperationPauseStore.clear(context, OperationPauseStore.LOCAL_DB_BUILD)
                         LocalDbBuildWorker.enqueue(
                             workManager,
                             mobile = true,
@@ -511,6 +531,7 @@ fun HomeScreen(navController: NavController) {
                         // Retour visuel immédiat : on bascule le bandeau en « Téléchargement en cours »
                         // sans attendre que WorkManager passe le worker à ENQUEUED.
                         isDownloadStarting = true
+                        OperationPauseStore.clear(context, OperationPauseStore.MOBILE_DB_DOWNLOAD)
                         DatabaseDownloadWorker.enqueue(workManager)
                     }
                 }
@@ -1384,6 +1405,7 @@ fun DatabaseWarningBanner(
     // plutôt qu'en « Télécharger » (le bouton lance alors la génération locale).
     isRebuildOffer: Boolean = false,
     downloadProgress: Int, // ✅ NOUVEAU PARAMÈTRE (progression du téléchargement OU de la génération)
+    onBannerClick: () -> Unit,
     onDownloadClick: () -> Unit
 ) {
     val sizing = LocalGeoTowerUiSizing.current
@@ -1415,6 +1437,7 @@ fun DatabaseWarningBanner(
         }
 
         androidx.compose.material3.Surface(
+            onClick = onBannerClick,
             color = containerColor,
             shape = RoundedCornerShape(16.dp), // ✅ AJOUT DE LA FORME ARRONDIE
             shadowElevation = 2.dp,            // ✅ AJOUT DE L'OMBRE

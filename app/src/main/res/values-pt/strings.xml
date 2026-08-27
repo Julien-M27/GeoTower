@@ -223,6 +223,9 @@
     <string name="database_size_warning">Tamanho do ficheiro: %1$.1f MB\nRecomenda-se a transferência por Wi-Fi.</string>
     <string name="database_download_progress">A transferir: %1$d%%</string>
     <string name="database_cancel_download">Cancelar transferência</string>
+    <string name="appstrings_pause">Pausar</string>
+    <string name="appstrings_resume">Retomar</string>
+    <string name="appstrings_operation_paused">Em pausa</string>
     <string name="database_up_to_date">Atualizado</string>
     <string name="database_antenna_count">Antenas: %1$s</string>
     <string name="radio_database_site_count">Sites de rádio: %1$s</string>
@@ -267,10 +270,20 @@
     <string name="database_update_all_title">Atualizar bases de dados</string>
     <string name="database_update_all_desc">Verifica as bases móvel, de rádio e eNB/gNB e transfere apenas as que precisam de atualização.</string>
     <string name="database_update_all_action">Atualizar bases disponíveis</string>
+    <string name="database_download_all_action">Transferir bases disponíveis</string>
+    <string name="database_download_and_update_all_action">Transferir e atualizar as bases</string>
     <string name="database_update_all_checking">A procurar atualizações…</string>
     <string name="database_update_all_running">Atualizações em curso…</string>
     <string name="database_update_all_none">Todas as bases disponíveis estão atualizadas.</string>
-    <string name="database_update_all_queued">Atualizações na fila: %1$d</string>
+    <string name="database_update_all_queue_title">Bases afetadas</string>
+    <string name="database_update_all_download_type">A transferir</string>
+    <string name="database_update_all_update_type">A atualizar</string>
+    <string name="database_update_all_download_waiting">A aguardar transferência…</string>
+    <string name="database_update_all_download_progress">Transferência: %1$d %%</string>
+    <string name="database_update_all_download_ready">Transferência pendente</string>
+    <string name="database_update_all_update_ready">Atualização pendente</string>
+    <string name="database_update_all_download_completed">Transferência concluída</string>
+    <string name="database_update_all_download_failed">Falha na transferência</string>
     <string name="notification_app_updates_channel_name">Atualizações GeoTower</string>
     <string name="notification_app_update_available_title">Nova versão do GeoTower</string>
     <string name="notification_app_update_available_desc">GeoTower %1$s está disponível. Toque para abrir a transferência.</string>
@@ -1246,6 +1259,10 @@
     <string name="appstrings_show_speedometer">Velocímetro</string>
     <string name="appstrings_show_speedtest_label">Mostrar o melhor Speedtest</string>
     <string name="appstrings_show_status_option">Mostrar status</string>
+    <string name="appstrings_site_status_lines_title">Linhas do estado</string>
+    <string name="appstrings_site_status_lines_description">Escolha as linhas de serviço apresentadas na tabela de estado.</string>
+    <string name="appstrings_site_status_voice_option">Linha de voz</string>
+    <string name="appstrings_site_status_data_option">Linha de dados</string>
     <string name="appstrings_site_address_option">Endereço e Coordonadas</string>
     <string name="appstrings_site_anfr_label">Site ANFR</string>
     <string name="appstrings_site_bearing_option">Rumo</string>
@@ -1372,7 +1389,7 @@
     <string name="appstrings_status_legend_project">Tecnologia declarada em projeto.</string>
     <string name="appstrings_status_legend_title">Legenda da tabela</string>
     <string name="appstrings_status_legend_unavailable">Tecnologia ausente, não declarada ou informação indisponível.</string>
-    <string name="appstrings_status_legend_uncertain">Serviço não declarado para esta geração, embora a avaria comunicada possa afetá-lo.</string>
+    <string name="appstrings_status_legend_uncertain">Serviço não declarado para esta geração: «?» verde significa que a geração funciona; «?» vermelho significa que uma avaria pode afetá-la.</string>
     <string name="appstrings_support_detail_title">Detalhe do suporte</string>
     <string name="appstrings_support_details_option">Detalhes do suporte</string>
     <string name="appstrings_support_details_title">Detalhes do suporte</string>
@@ -3051,4 +3068,10 @@
     <string name="appstrings_release_v2034_database_updates">Um só botão verifica as bases móvel, rádio e eNB/gNB e coloca em fila apenas as atualizações necessárias</string>
     <string name="appstrings_release_v2034_local_build_progress">A geração local mostra agora o progresso global, a etapa atual, a fonte lida e o detalhe de linhas e transferências</string>
     <string name="appstrings_release_v2034_database_storage">As transferências identificam corretamente os dados instalados, limpam os ficheiros temporários e detalham cada base nas notificações</string>
+    <!-- Notas da versão 2.0.35 -->
+    <string name="appstrings_release_v2035_database_queue">As transferências distinguem agora bases em falta de atualizações, mostram claramente a fila e o progresso de cada uma</string>
+    <string name="appstrings_release_v2035_database_servers">O modo automático compara agora o servidor principal e o espelho e mantém a base de dados mais recente</string>
+    <string name="appstrings_release_v2035_site_status_lines">A personalização das páginas permite agora mostrar ou ocultar separadamente as linhas Voz e Dados na tabela de estado do site</string>
+    <string name="appstrings_release_v2035_status_uncertainty">Os estados de avaria desconhecidos mostram agora pontos de interrogação verdes ou vermelhos mais claros, e os dados 2G deixam de ser apresentados como aplicáveis</string>
+    <string name="appstrings_release_v2035_operation_pause">As operações demoradas de bases, mapas e geração local podem agora ser pausadas e retomadas nas definições</string>
 </resources>

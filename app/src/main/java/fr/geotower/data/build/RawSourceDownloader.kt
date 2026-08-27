@@ -49,7 +49,13 @@ class RawSourceDownloader(private val client: OkHttpClient = defaultClient()) {
      * Telecharge `url` vers `dest` en flux, plafonne a `maxBytes`. `onProgress(copied, total)` est
      * notifie a chaque bloc ; `total` vaut la taille annoncee (Content-Length) ou -1 si inconnue.
      */
-    fun downloadToFile(url: String, dest: File, maxBytes: Long, onProgress: ((copied: Long, total: Long) -> Unit)? = null) {
+    fun downloadToFile(
+        url: String,
+        dest: File,
+        maxBytes: Long,
+        onProgress: ((copied: Long, total: Long) -> Unit)? = null,
+        beforeRead: (() -> Unit)? = null,
+    ) {
         require(OfficialSources.isAllowedHost(url)) { "Hote non autorise: $url" }
         val request = Request.Builder().url(url).header("Accept-Encoding", "identity").build()
         client.newCall(request).execute().use { response ->
@@ -61,6 +67,7 @@ class RawSourceDownloader(private val client: OkHttpClient = defaultClient()) {
                 val buffer = ByteArray(64 * 1024)
                 body.byteStream().use { input ->
                     while (true) {
+                        beforeRead?.invoke()
                         val read = input.read(buffer)
                         if (read < 0) break
                         copied += read

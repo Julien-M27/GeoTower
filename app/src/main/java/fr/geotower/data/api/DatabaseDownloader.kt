@@ -17,6 +17,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
+import okhttp3.CacheControl
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
@@ -283,7 +284,24 @@ object DatabaseDownloader {
         // sur un appareil inéligible à la génération, couper ici ne donnerait pas de l'autonomie,
         // mais une application sans la moindre donnée.
         if (AppConfig.blockServerDatabase()) return null
-        val served = readVerifiedDownloadManifest() ?: return null
+
+        // En mode automatique, les deux manifestes sont lus séparément. Le miroir peut avoir reçu
+        // le dernier fichier hebdomadaire alors que le principal répond encore avec le précédent.
+        // En mode forcé, un seul serveur est interrogé : le choix explicite de l'utilisateur reste
+        // prioritaire, même si l'autre serveur possède une version plus récente.
+        val candidates = if (ApiEndpoints.isAutomaticMode()) {
+            ApiServer.entries.mapNotNull { server -> readVerifiedDatabaseInfoFrom(server) }
+        } else {
+            listOfNotNull(readVerifiedDatabaseInfoFrom(ApiEndpoints.active()))
+        }
+
+        val primary = candidates.firstOrNull { it.host.equals(ApiServer.PRIMARY.host, ignoreCase = true) }
+        val mirror = candidates.firstOrNull { it.host.equals(ApiServer.MIRROR.host, ignoreCase = true) }
+        return selectPreferredDatabase(primary, mirror)
+    }
+
+    private fun readVerifiedDatabaseInfoFrom(server: ApiServer): ServedFrom<DownloadManifestDatabase>? {
+        val served = readVerifiedDownloadManifest(server) ?: return null
         val database = served.value.database ?: return null
         if (
             !isOfficialDatabaseDownloadUrl(database.url) ||
@@ -300,9 +318,37 @@ object DatabaseDownloader {
         return ServedFrom(database, served.host)
     }
 
-    private fun readVerifiedDownloadManifest(): ServedFrom<DownloadManifest>? {
+    /**
+     * Sélectionne la publication à utiliser pour une recherche automatique.
+     *
+     * Le principal gagne à version hebdomadaire égale : la date de génération, la date HTTP et le
+     * SHA-256 ne servent pas à départager deux publications de la même semaine.
+     */
+    internal fun selectPreferredDatabase(
+        primary: ServedFrom<DownloadManifestDatabase>?,
+        mirror: ServedFrom<DownloadManifestDatabase>?
+    ): ServedFrom<DownloadManifestDatabase>? {
+        if (primary == null) return mirror
+        if (mirror == null) return primary
+
+        return if (DatabaseVersionPolicy.isRemoteNewer(
+                mirror.value.version,
+                primary.value.version
+            )
+        ) {
+            mirror
+        } else {
+            primary
+        }
+    }
+
+    private fun readVerifiedDownloadManifest(server: ApiServer): ServedFrom<DownloadManifest>? {
         val request = Request.Builder()
-            .url(DOWNLOAD_MANIFEST_URL)
+            // URL explicite + en-tête de pin : l'intercepteur ne peut pas remplacer ce serveur par
+            // l'autre pendant la comparaison automatique.
+            .url(ApiEndpoints.urlOnHost(DOWNLOAD_MANIFEST_URL, server.host))
+            .cacheControl(CacheControl.FORCE_NETWORK)
+            .header(ApiEndpoints.PIN_HOST_HEADER, server.host)
             .header("Accept-Encoding", "identity")
             .build()
 

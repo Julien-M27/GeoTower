@@ -64,9 +64,36 @@ class SiteServiceStatusGridTest {
         // Voix 4G non publiée alors que la data 4G est tombée : « ? », pas un tiret.
         assertNull(g4.isVoixOk)
         assertTrue(g4.isVoixUncertain)
+        assertEquals(UncertainServiceColor.Red, g4.voixUncertainColor)
+        assertFalse(g4.isVoixUncertainGreen)
         // La 3G n'est pas concernée : rien de publié, rien de déduit d'une autre génération.
         assertFalse(grid.getValue("3G").isVoixUncertain)
         assertFalse(grid.getValue("3G").isInternetUncertain)
+    }
+
+    @Test
+    fun anOkSiblingMakesTheUndeclaredServiceGreenUncertain() {
+        // La 3G est en panne, mais la data 4G est déclarée OK : la voix 4G non publiée reste une
+        // information incertaine, avec un « ? » vert pour signaler que la génération fonctionne.
+        val grid = gridOf(site(data3g = "HS", data4g = "OK"))
+
+        val g4 = grid.getValue("4G")
+        assertNull(g4.isVoixOk)
+        assertEquals(UncertainServiceColor.Green, g4.voixUncertainColor)
+        assertTrue(g4.isVoixUncertain)
+        assertTrue(g4.isVoixUncertainGreen)
+    }
+
+    @Test
+    fun aPublishedOkGenerationOverridesTheSiblingGlobalOutage() {
+        // Le global Data peut être HS sur d'autres générations, mais la Data 5G précise est OK :
+        // la Voix 5G non publiée est donc un « ? » vert.
+        val grid = gridOf(site(data5g = "OK", dataGlobal = "HS"), has5G = true)
+
+        val g5 = grid.getValue("5G")
+        assertNull(g5.isVoixOk)
+        assertEquals(UncertainServiceColor.Green, g5.voixUncertainColor)
+        assertTrue(g5.isVoixUncertainGreen)
     }
 
     @Test
@@ -76,9 +103,9 @@ class SiteServiceStatusGridTest {
 
         assertTrue(grid.getValue("3G").isInternetUncertain)
         assertTrue(grid.getValue("4G").isInternetUncertain)
-        // La voix ne l'est pas : rien ne la déclare touchée.
-        assertFalse(grid.getValue("3G").isVoixUncertain)
-        assertFalse(grid.getValue("4G").isVoixUncertain)
+        // La Data globale est HS : une Voix non détaillée reste incertaine et doit être rouge.
+        assertEquals(UncertainServiceColor.Red, grid.getValue("3G").voixUncertainColor)
+        assertEquals(UncertainServiceColor.Red, grid.getValue("4G").voixUncertainColor)
     }
 
     @Test
@@ -143,6 +170,19 @@ class SiteServiceStatusGridTest {
         assertNull(g5.isVoixOk)
         assertFalse(g5.isVoixUncertain)
         assertFalse(g5.isInternetUncertain)
+    }
+
+    @Test
+    fun dataIsUnavailableOn2G() {
+        // La Data 2G n'existe pas dans le tableau : même une valeur résiduelle ne doit ni afficher
+        // un « ? », ni rendre la case rouge.
+        val grid = gridOf(site(data2g = "HS", data3g = "HS"))
+
+        val g2 = grid.getValue("2G")
+        assertNull(g2.isInternetOk)
+        assertNull(g2.internetUncertainColor)
+        assertFalse(g2.isInternetUncertain)
+        assertFalse(g2.isVoixUncertain)
     }
 
     @Test

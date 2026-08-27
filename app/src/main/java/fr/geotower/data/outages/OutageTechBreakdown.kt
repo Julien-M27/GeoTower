@@ -129,7 +129,9 @@ private fun SiteHsEntity.voiceStatus(technology: OutageTechnology): String? = wh
 }
 
 private fun SiteHsEntity.dataStatus(technology: OutageTechnology): String? = when (technology) {
-    OutageTechnology.G2 -> data2g
+    // La grille GeoTower ne considère la 2G que pour la voix : la Data 2G ne doit pas faire
+    // apparaître une panne 2G dans les répartitions non plus.
+    OutageTechnology.G2 -> null
     OutageTechnology.G3 -> data3g
     OutageTechnology.G4 -> data4g
     OutageTechnology.G5 -> data5g

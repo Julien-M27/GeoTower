@@ -158,6 +158,8 @@ object SitePagePrefs {
     val share = BooleanPreference("page_site_share", true)
     val dates = BooleanPreference("page_site_dates", true)
     val address = BooleanPreference("page_site_address", true)
+    val statusVoice = BooleanPreference("page_site_status_voice", true)
+    val statusData = BooleanPreference("page_site_status_data", true)
     val freqs = BooleanPreference("page_site_freqs", true)
     val links = BooleanPreference("page_site_links", true)
 

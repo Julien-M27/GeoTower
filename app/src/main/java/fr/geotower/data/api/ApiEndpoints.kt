@@ -124,6 +124,9 @@ object ApiEndpoints {
         ApiServerMode.AUTO -> autoServer
     }
 
+    /** Vrai uniquement quand l'application est autorisée à arbitrer entre les deux serveurs. */
+    fun isAutomaticMode(): Boolean = currentMode == ApiServerMode.AUTO
+
     /** Hôte connu de l'API GeoTower (principal ou miroir) : sert aussi aux contrôles de sécurité. */
     fun isOfficialApiHost(host: String?): Boolean = serverForHost(host) != null
 

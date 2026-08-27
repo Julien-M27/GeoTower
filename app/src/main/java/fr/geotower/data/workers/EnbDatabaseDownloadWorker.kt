@@ -60,18 +60,22 @@ class EnbDatabaseDownloadWorker(
                 context.getDatabasePath(EnbDatabaseValidator.DB_NAME)
             ).isValid
             setForeground(createForegroundInfo(0))
+            awaitIfPaused(0)
 
             val success = EnbDatabaseDownloader.downloadUpdate(context) { progress ->
-                setProgress(workDataOf(KEY_PROGRESS to progress))
-                notifySafely(notificationId, createNotification(progress))
+                awaitIfPaused(progress)
+                setProgress(workDataOf(KEY_PROGRESS to progress, KEY_PAUSED to false))
+                notifySafely(notificationId, createNotification(progress, paused = false))
             }
 
             if (success) {
+                OperationPauseStore.clear(context, OperationPauseStore.ENB_DB_DOWNLOAD)
                 DbOperationTimings.finish(context, DbOperationTimings.ENB_DOWNLOAD)
-                setProgress(workDataOf(KEY_PROGRESS to 100))
+                setProgress(workDataOf(KEY_PROGRESS to 100, KEY_PAUSED to false))
                 showSuccessNotification()
                 Result.success()
             } else {
+                OperationPauseStore.clear(context, OperationPauseStore.ENB_DB_DOWNLOAD)
                 DbOperationTimings.clearStart(context, DbOperationTimings.ENB_DOWNLOAD)
                 showErrorNotification()
                 failureResult()
@@ -87,6 +91,7 @@ class EnbDatabaseDownloadWorker(
     }
 
     private fun retryOrFail(): Result {
+        OperationPauseStore.clear(context, OperationPauseStore.ENB_DB_DOWNLOAD)
         cancelSafely(notificationId)
         return if (runAttemptCount < MAX_RETRY_ATTEMPTS) {
             Result.retry()
@@ -138,14 +143,18 @@ class EnbDatabaseDownloadWorker(
         }
     }
 
-    private fun createNotification(progress: Int): android.app.Notification {
+    private fun createNotification(progress: Int, paused: Boolean = false): android.app.Notification {
         val databaseName = context.getString(R.string.notification_history_type_db_enb)
         val title = context.getString(
             if (isUpdatingExistingDatabase) R.string.notification_database_download_title
             else R.string.notification_database_first_download_title,
             databaseName
         )
-        val content = context.getString(R.string.notification_database_download_progress, progress)
+        val content = if (paused) {
+            context.getString(R.string.appstrings_operation_paused)
+        } else {
+            context.getString(R.string.notification_database_download_progress, progress)
+        }
         val pendingIntent = settingsPendingIntent(0, showSuccessPopup = false)
         val cancelLabel = context.getString(R.string.appstrings_download_cancel)
         val cancelIntent = WorkManager.getInstance(context).createCancelPendingIntent(id)
@@ -202,6 +211,15 @@ class EnbDatabaseDownloadWorker(
         }
 
         return builder.build()
+    }
+
+    private suspend fun awaitIfPaused(progress: Int) {
+        if (!OperationPauseStore.isPaused(context, OperationPauseStore.ENB_DB_DOWNLOAD)) return
+        setProgress(workDataOf(KEY_PROGRESS to progress, KEY_PAUSED to true))
+        notifySafely(notificationId, createNotification(progress, paused = true))
+        OperationPauseStore.awaitUntilResumed(context, OperationPauseStore.ENB_DB_DOWNLOAD)
+        setProgress(workDataOf(KEY_PROGRESS to progress, KEY_PAUSED to false))
+        notifySafely(notificationId, createNotification(progress, paused = false))
     }
 
     private fun showSuccessNotification() {
@@ -265,12 +283,16 @@ class EnbDatabaseDownloadWorker(
         const val UNIQUE_WORK_NAME = "enb_db_download"
         const val WORK_TAG = "database_download_enb"
         const val KEY_PROGRESS = "progress"
+        const val KEY_PAUSED = "paused"
         private const val KEY_CONTINUE_AFTER_FAILURE = "continue_after_failure"
 
         private const val TAG = "GeoTowerEnbDb"
         private const val MAX_RETRY_ATTEMPTS = 3
 
-        fun buildRequest(continueAfterFailure: Boolean = false) = OneTimeWorkRequestBuilder<EnbDatabaseDownloadWorker>()
+        fun buildRequest(
+            continueAfterFailure: Boolean = false,
+            bulkActionTag: String? = null
+        ) = OneTimeWorkRequestBuilder<EnbDatabaseDownloadWorker>()
             .setConstraints(
                 Constraints.Builder()
                     .setRequiredNetworkType(NetworkType.CONNECTED)
@@ -279,6 +301,7 @@ class EnbDatabaseDownloadWorker(
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
             .setInputData(workDataOf(KEY_CONTINUE_AFTER_FAILURE to continueAfterFailure))
             .addTag(WORK_TAG)
+            .apply { bulkActionTag?.let(::addTag) }
             .build()
 
         fun enqueue(workManager: WorkManager) {

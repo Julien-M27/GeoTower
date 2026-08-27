@@ -3335,18 +3335,20 @@ private fun GeoTowerPdfStatusCard(
                 statusSelector = { _, status -> status.isVoixOk },
                 projectSelector = { _, status -> status.isProject || status.isVoixProject },
                 uncertainSelector = { _, status -> status.isVoixUncertain },
+                uncertainGreenSelector = { _, status -> status.isVoixUncertainGreen },
                 colorOk = colorOk,
                 colorKo = colorKo,
                 colorProject = colorProject,
                 colorNeutral = colorNeutral
             )
             GeoTowerPdfServiceStatusRow(
-                label = stringResource(R.string.appstrings_service_internet),
+                label = stringResource(R.string.appstrings_outage_data),
                 technologies = technologies,
                 techStatus = realTechStatus,
                 statusSelector = { tech, status -> if (tech == "2G") null else status.isInternetOk },
                 projectSelector = { tech, status -> tech != "2G" && (status.isProject || status.isInternetProject) },
                 uncertainSelector = { tech, status -> tech != "2G" && status.isInternetUncertain },
+                uncertainGreenSelector = { tech, status -> tech != "2G" && status.isInternetUncertainGreen },
                 colorOk = colorOk,
                 colorKo = colorKo,
                 colorProject = colorProject,
@@ -3382,6 +3384,7 @@ private fun GeoTowerPdfServiceStatusRow(
     statusSelector: (String, ServiceStatus) -> Boolean?,
     projectSelector: (String, ServiceStatus) -> Boolean,
     uncertainSelector: (String, ServiceStatus) -> Boolean,
+    uncertainGreenSelector: (String, ServiceStatus) -> Boolean,
     colorOk: Color,
     colorKo: Color,
     colorProject: Color,
@@ -3402,13 +3405,20 @@ private fun GeoTowerPdfServiceStatusRow(
             val value = status?.let { statusSelector(tech, it) }
             val isProject = status?.let { projectSelector(tech, it) } == true
             val isUncertain = status?.let { uncertainSelector(tech, it) } == true
+            val isUncertainGreen = status?.let { uncertainGreenSelector(tech, it) } == true
             Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                 when {
                     isProject -> Text("~", color = colorProject, fontWeight = FontWeight.Bold, fontSize = 12.sp, lineHeight = 12.sp)
                     value == true -> Icon(Icons.Default.Check, contentDescription = null, tint = colorOk, modifier = Modifier.size(10.dp))
                     value == false -> Icon(Icons.Default.Close, contentDescription = null, tint = colorKo, modifier = Modifier.size(10.dp))
                     // Même lecture que la fiche site : panne déclarée, service non détaillé.
-                    isUncertain -> Text("?", color = colorKo, fontWeight = FontWeight.Bold, fontSize = 10.sp, lineHeight = 11.sp)
+                    isUncertain -> Text(
+                        "?",
+                        color = if (isUncertainGreen) colorOk else colorKo,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 10.sp,
+                        lineHeight = 11.sp
+                    )
                     else -> Icon(Icons.Default.Remove, contentDescription = null, tint = colorNeutral, modifier = Modifier.size(10.dp))
                 }
             }

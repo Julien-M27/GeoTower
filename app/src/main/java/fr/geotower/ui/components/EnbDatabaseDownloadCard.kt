@@ -58,6 +58,7 @@ import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.db.DbOperationTimings
 import fr.geotower.data.db.EnbDatabaseValidator
 import fr.geotower.data.workers.EnbDatabaseDownloadWorker
+import fr.geotower.data.workers.OperationPauseStore
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -95,6 +96,10 @@ fun EnbDatabaseDownloadCard(
     }
 
     val isSyncing = currentWork != null
+    var pauseStateVersion by remember { mutableIntStateOf(0) }
+    val isPaused = remember(currentWork?.id, pauseStateVersion) {
+        OperationPauseStore.isPaused(context, OperationPauseStore.ENB_DB_DOWNLOAD)
+    }
     val downloadProgress = currentWork?.progress?.getInt(EnbDatabaseDownloadWorker.KEY_PROGRESS, 0)?.div(100f) ?: 0f
 
     val txtSearching = stringResource(R.string.database_searching)
@@ -279,9 +284,25 @@ fun EnbDatabaseDownloadCard(
                         modifier = Modifier.padding(top = sizing.spacing(4.dp)),
                     )
                     Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
+                    OperationPauseButton(
+                        paused = isPaused,
+                        onClick = {
+                            safeClick("enb_database_toggle_pause") {
+                                OperationPauseStore.setPaused(
+                                    context,
+                                    OperationPauseStore.ENB_DB_DOWNLOAD,
+                                    paused = !isPaused,
+                                )
+                                pauseStateVersion++
+                            }
+                        },
+                    )
+                    Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
                     OutlinedButton(
                         onClick = {
                             safeClick("enb_database_cancel_download") {
+                                OperationPauseStore.clear(context, OperationPauseStore.ENB_DB_DOWNLOAD)
+                                pauseStateVersion++
                                 currentWork?.id?.let(workManager::cancelWorkById)
                             }
                         },
@@ -335,6 +356,8 @@ fun EnbDatabaseDownloadCard(
                                 RemoteFeatureFlags.isActionEnabled(RemoteFeatureFlags.Actions.START_DATABASE_DOWNLOAD) &&
                                 RemoteFeatureFlags.isWorkerEnabled(RemoteFeatureFlags.Workers.DATABASE_DOWNLOAD)
                             ) {
+                                OperationPauseStore.clear(context, OperationPauseStore.ENB_DB_DOWNLOAD)
+                                pauseStateVersion++
                                 EnbDatabaseDownloadWorker.enqueue(workManager)
                             }
                         }

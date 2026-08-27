@@ -9,6 +9,7 @@ import android.provider.Settings
 import android.widget.ImageView
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -70,11 +71,15 @@ import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.ViewAgenda
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LinearWavyProgressIndicator
+import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.RadioButton
@@ -126,6 +131,9 @@ import fr.geotower.data.AnfrRepository
 import fr.geotower.data.api.ApiEndpoints
 import fr.geotower.data.workers.DownloadNotificationCenter
 import fr.geotower.data.workers.DatabaseBulkUpdate
+import fr.geotower.data.workers.DatabaseDownloadWorker
+import fr.geotower.data.workers.EnbDatabaseDownloadWorker
+import fr.geotower.data.workers.RadioDatabaseDownloadWorker
 import fr.geotower.data.workers.UpdateCheckScheduler
 import fr.geotower.ui.screens.stats.DEPARTMENT_STATS_ROUTE
 import fr.geotower.utils.AppConfig
@@ -660,6 +668,7 @@ fun SettingsScreen(
     var showSiteSettingsSheet by remember { mutableStateOf(false) }
     var showSupportMiniMapSettingsSheet by remember { mutableStateOf(false) }
     var showSiteMiniMapSettingsSheet by remember { mutableStateOf(false) }
+    var showSiteStatusSettingsSheet by remember { mutableStateOf(false) }
     var showPhotosSettingsSheet by remember { mutableStateOf(false) }
 
     var pageSupportOrder by remember { mutableStateOf(SupportPagePrefs.order(prefs)) }
@@ -692,6 +701,8 @@ fun SettingsScreen(
     var pageSiteShare by remember { mutableStateOf(SitePagePrefs.share.read(prefs)) }
     var pageSiteDates by remember { mutableStateOf(SitePagePrefs.dates.read(prefs)) }
     var pageSiteAddress by remember { mutableStateOf(SitePagePrefs.address.read(prefs)) }
+    var pageSiteStatusVoice by remember { mutableStateOf(SitePagePrefs.statusVoice.read(prefs)) }
+    var pageSiteStatusData by remember { mutableStateOf(SitePagePrefs.statusData.read(prefs)) }
     var pageSiteFreqs by remember { mutableStateOf(SitePagePrefs.freqs.read(prefs)) }
     var pageSiteLinks by remember { mutableStateOf(SitePagePrefs.links.read(prefs)) }
     var pageSiteMiniMapMode by remember { mutableStateOf(MiniMapViewMode.fromStorageKey(prefs.getString(SitePagePrefs.MINI_MAP_MODE, null))) }
@@ -2178,6 +2189,8 @@ fun SettingsScreen(
                 showDates = pageSiteDates, onDatesChange = { pageSiteDates = it; prefs.edit().putBoolean(SitePagePrefs.dates.key, it).apply() },
                 showAddress = pageSiteAddress, onAddressChange = { pageSiteAddress = it; prefs.edit().putBoolean(SitePagePrefs.address.key, it).apply() },
                 showStatus = AppConfig.siteShowStatus.value, onStatusChange = { AppConfig.siteShowStatus.value = it; prefs.edit().putBoolean("site_show_status", it).apply() }, // 🚨 AJOUT DU STATUT
+                showStatusVoice = pageSiteStatusVoice, onStatusVoiceChange = { pageSiteStatusVoice = it; prefs.edit().putBoolean(SitePagePrefs.statusVoice.key, it).apply() },
+                showStatusData = pageSiteStatusData, onStatusDataChange = { pageSiteStatusData = it; prefs.edit().putBoolean(SitePagePrefs.statusData.key, it).apply() },
                 showSpeedtest = AppConfig.siteShowSpeedtest.value, onSpeedtestChange = { AppConfig.siteShowSpeedtest.value = it; prefs.edit().putBoolean("site_show_speedtest", it).apply() }, // 🚨 NEW
                 showFreqs = pageSiteFreqs, onFreqsChange = { pageSiteFreqs = it; prefs.edit().putBoolean(SitePagePrefs.freqs.key, it).apply() },
                 showLinks = pageSiteLinks, onLinksChange = { pageSiteLinks = it; prefs.edit().putBoolean(SitePagePrefs.links.key, it).apply() },
@@ -2200,8 +2213,34 @@ fun SettingsScreen(
                     showSiteSettingsSheet = false
                     showCommunityDataSheet = true
                 },
+                onOpenStatusSettings = {
+                    showSiteSettingsSheet = false
+                    showSiteStatusSettingsSheet = true
+                },
                 onDismiss = { showSiteSettingsSheet = false },
                 onBack = { safeClick { showSiteSettingsSheet = false } },
+                sheetState = sheetState,
+                useOneUi = useOneUi,
+                bubbleColor = bubbleBaseColor
+            )
+        }
+        if (showSiteStatusSettingsSheet) {
+            SiteStatusRowsSettingsSheet(
+                showVoice = pageSiteStatusVoice,
+                onVoiceChange = {
+                    pageSiteStatusVoice = it
+                    prefs.edit().putBoolean(SitePagePrefs.statusVoice.key, it).apply()
+                },
+                showData = pageSiteStatusData,
+                onDataChange = {
+                    pageSiteStatusData = it
+                    prefs.edit().putBoolean(SitePagePrefs.statusData.key, it).apply()
+                },
+                onDismiss = { showSiteStatusSettingsSheet = false },
+                onBack = {
+                    showSiteStatusSettingsSheet = false
+                    showSiteSettingsSheet = true
+                },
                 sheetState = sheetState,
                 useOneUi = useOneUi,
                 bubbleColor = bubbleBaseColor
@@ -3651,6 +3690,7 @@ fun SectionSysteme(
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun SectionDatabase(
     shape: Shape,
@@ -3694,13 +3734,102 @@ fun SectionDatabase(
     val showMobileCard = !generatesInstead
     val showRadioCard = !generatesInstead
     val showEnbCard = !serverDataCutOff
+    val featureFlags by RemoteFeatureFlags.config
+    val sectionRefreshKey = refreshState?.refreshKey ?: 0
     val workManager = remember(context) { androidx.work.WorkManager.getInstance(context) }
     val bulkWorkInfos by workManager
         .getWorkInfosForUniqueWorkFlow(DatabaseBulkUpdate.UNIQUE_WORK_NAME)
         .collectAsState(initial = emptyList())
     val isBulkUpdateRunning = bulkWorkInfos.any { workInfo -> !workInfo.state.isFinished }
     var isCheckingBulkUpdates by remember { mutableStateOf(false) }
-    var queuedBulkUpdateCount by remember { mutableStateOf<Int?>(null) }
+    var queuedBulkUpdateTargets by remember {
+        mutableStateOf<List<DatabaseBulkUpdate.TargetAction>>(emptyList())
+    }
+    var allDatabasesUpToDate by remember { mutableStateOf<Boolean?>(null) }
+    var hasMissingDatabases by remember { mutableStateOf(false) }
+    var hasDatabaseUpdates by remember { mutableStateOf(false) }
+
+    fun workTagFor(target: DatabaseBulkUpdate.Target): String = when (target) {
+        DatabaseBulkUpdate.Target.MOBILE -> DatabaseDownloadWorker.WORK_TAG
+        DatabaseBulkUpdate.Target.RADIO -> RadioDatabaseDownloadWorker.WORK_TAG
+        DatabaseBulkUpdate.Target.ENB -> EnbDatabaseDownloadWorker.WORK_TAG
+    }
+
+    @Composable
+    fun labelFor(target: DatabaseBulkUpdate.Target): String = when (target) {
+        DatabaseBulkUpdate.Target.MOBILE -> stringResource(R.string.notification_history_type_db_mobile)
+        DatabaseBulkUpdate.Target.RADIO -> stringResource(R.string.notification_history_type_db_radio)
+        DatabaseBulkUpdate.Target.ENB -> stringResource(R.string.notification_history_type_db_enb)
+    }
+
+    // Une réouverture de la page doit aussi retrouver les bases d'une file créée avant la
+    // navigation : les WorkInfo restent la source de vérité tant que le travail n'est pas terminé.
+    val activeBulkUpdateTargets = listOf(
+        DatabaseBulkUpdate.Target.MOBILE,
+        DatabaseBulkUpdate.Target.RADIO,
+        DatabaseBulkUpdate.Target.ENB
+    ).mapNotNull { target ->
+        bulkWorkInfos.firstOrNull { workInfo ->
+            workTagFor(target) in workInfo.tags && !workInfo.state.isFinished
+        }?.let { workInfo ->
+            val action = if (DatabaseBulkUpdate.actionTag(DatabaseBulkUpdate.Action.DOWNLOAD) in workInfo.tags) {
+                DatabaseBulkUpdate.Action.DOWNLOAD
+            } else {
+                DatabaseBulkUpdate.Action.UPDATE
+            }
+            DatabaseBulkUpdate.TargetAction(target, action)
+        }
+    }
+    val displayedBulkUpdateTargets = (queuedBulkUpdateTargets + activeBulkUpdateTargets)
+        .distinctBy { targetAction -> targetAction.target }
+
+    val updateAllButtonBusy = isCheckingBulkUpdates || isBulkUpdateRunning
+    val updateAllButtonContainerTarget = when {
+        allDatabasesUpToDate == true -> MaterialTheme.colorScheme.surfaceVariant
+        updateAllButtonBusy -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+        else -> MaterialTheme.colorScheme.primary
+    }
+    val updateAllButtonContentTarget = when {
+        allDatabasesUpToDate == true -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+        updateAllButtonBusy -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+        else -> MaterialTheme.colorScheme.onPrimary
+    }
+    val updateAllButtonContainerColor by animateColorAsState(
+        targetValue = updateAllButtonContainerTarget,
+        animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Color>(),
+        label = "database-update-all-container"
+    )
+    val updateAllButtonContentColor by animateColorAsState(
+        targetValue = updateAllButtonContentTarget,
+        animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Color>(),
+        label = "database-update-all-content"
+    )
+
+    // Vérification initiale à l'ouverture de la page, puis à chaque actualisation de la section.
+    // Un résultat incomplet (réseau indisponible ou manifeste invalide) ne doit pas être présenté
+    // comme « tout est à jour » : le bouton reste alors disponible pour permettre un nouvel essai.
+    LaunchedEffect(sectionRefreshKey, featureFlags, showMobileCard, showRadioCard, showEnbCard, isBulkUpdateRunning) {
+        if (!showMobileCard && !showRadioCard && !showEnbCard) {
+            allDatabasesUpToDate = null
+            return@LaunchedEffect
+        }
+        if (isBulkUpdateRunning) {
+            allDatabasesUpToDate = null
+            return@LaunchedEffect
+        }
+
+        isCheckingBulkUpdates = true
+        allDatabasesUpToDate = null
+        val result = DatabaseBulkUpdate.checkAvailableUpdates(context, workManager)
+        allDatabasesUpToDate = result.isComplete && result.targets.isEmpty()
+        hasMissingDatabases = result.hasMissingDatabases
+        hasDatabaseUpdates = result.hasDatabaseUpdates
+        queuedBulkUpdateTargets = result.targetActions
+        if (allDatabasesUpToDate == true) {
+            queuedBulkUpdateTargets = emptyList()
+        }
+        isCheckingBulkUpdates = false
+    }
 
     // 🚀 LA CARTE DE LA BASE DE DONNÉES (Existante)
     Column(modifier = modifier.fillMaxWidth()) {
@@ -3769,27 +3898,44 @@ fun SectionDatabase(
                         onClick = {
                             safeClick("database_update_all") {
                                 isCheckingBulkUpdates = true
-                                queuedBulkUpdateCount = null
+                                queuedBulkUpdateTargets = emptyList()
                                 scope.launch {
-                                    val targets = DatabaseBulkUpdate.findAvailableUpdates(context, workManager)
+                                    val result = DatabaseBulkUpdate.checkAvailableUpdates(context, workManager)
+                                    val targets = result.targets
                                     if (targets.isNotEmpty()) {
-                                        DatabaseBulkUpdate.enqueue(workManager, targets)
+                                        DatabaseBulkUpdate.enqueueDetailed(workManager, result.targetActions)
                                     }
-                                    queuedBulkUpdateCount = targets.size
+                                    queuedBulkUpdateTargets = result.targetActions
+                                    allDatabasesUpToDate = result.isComplete && targets.isEmpty()
+                                    hasMissingDatabases = result.hasMissingDatabases
+                                    hasDatabaseUpdates = result.hasDatabaseUpdates
                                     isCheckingBulkUpdates = false
                                 }
                             }
                         },
-                        enabled = !isCheckingBulkUpdates && !isBulkUpdateRunning,
+                        enabled = !isCheckingBulkUpdates && !isBulkUpdateRunning && allDatabasesUpToDate != true,
                         modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = sizing.component(50.dp)),
-                        shape = RoundedCornerShape(sizing.component(12.dp))
+                        shape = RoundedCornerShape(sizing.component(12.dp)),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = updateAllButtonContainerColor,
+                            contentColor = updateAllButtonContentColor,
+                            disabledContainerColor = updateAllButtonContainerColor,
+                            disabledContentColor = updateAllButtonContentColor
+                        )
                     ) {
-                        Icon(Icons.Default.CloudDownload, contentDescription = null)
+                        Icon(
+                            imageVector = if (allDatabasesUpToDate == true) Icons.Default.CheckCircle else Icons.Default.CloudDownload,
+                            contentDescription = null
+                        )
                         Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
                         Text(
                             text = when {
                                 isCheckingBulkUpdates -> stringResource(R.string.database_update_all_checking)
                                 isBulkUpdateRunning -> stringResource(R.string.database_update_all_running)
+                                allDatabasesUpToDate == true -> stringResource(R.string.database_update_all_none)
+                                hasMissingDatabases && hasDatabaseUpdates ->
+                                    stringResource(R.string.database_download_and_update_all_action)
+                                hasMissingDatabases -> stringResource(R.string.database_download_all_action)
                                 else -> stringResource(R.string.database_update_all_action)
                             },
                             fontWeight = FontWeight.Bold
@@ -3799,17 +3945,90 @@ fun SectionDatabase(
                         Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
                         LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                     }
-                    queuedBulkUpdateCount?.let { count ->
+
+                    if (displayedBulkUpdateTargets.isNotEmpty()) {
                         Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
                         Text(
-                            text = if (count == 0) {
-                                stringResource(R.string.database_update_all_none)
-                            } else {
-                                stringResource(R.string.database_update_all_queued, count)
-                            },
-                            style = sizing.textStyle(MaterialTheme.typography.bodySmall),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            text = stringResource(R.string.database_update_all_queue_title),
+                            style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
+                            fontWeight = FontWeight.Bold
                         )
+                        displayedBulkUpdateTargets.forEach { targetAction ->
+                            val target = targetAction.target
+                            // Les WorkInfo terminés peuvent rester dans l'historique WorkManager.
+                            // Ils ne doivent pas être associés à une nouvelle base détectée comme
+                            // manquante ou obsolète, sinon elle apparaît à tort comme terminée.
+                            val workInfo = bulkWorkInfos.firstOrNull { info ->
+                                workTagFor(target) in info.tags && !info.state.isFinished
+                            }
+                            val progress = (workInfo?.progress?.getInt(
+                                when (target) {
+                                    DatabaseBulkUpdate.Target.MOBILE -> DatabaseDownloadWorker.KEY_PROGRESS
+                                    DatabaseBulkUpdate.Target.RADIO -> RadioDatabaseDownloadWorker.KEY_PROGRESS
+                                    DatabaseBulkUpdate.Target.ENB -> EnbDatabaseDownloadWorker.KEY_PROGRESS
+                                },
+                                0
+                            ) ?: 0).coerceIn(0, 100)
+                            val status = when (workInfo?.state) {
+                                androidx.work.WorkInfo.State.RUNNING ->
+                                    stringResource(R.string.database_update_all_download_progress, progress)
+                                androidx.work.WorkInfo.State.ENQUEUED,
+                                androidx.work.WorkInfo.State.BLOCKED ->
+                                    stringResource(R.string.database_update_all_download_waiting)
+                                androidx.work.WorkInfo.State.SUCCEEDED ->
+                                    stringResource(R.string.database_update_all_download_completed)
+                                androidx.work.WorkInfo.State.FAILED,
+                                androidx.work.WorkInfo.State.CANCELLED ->
+                                    stringResource(R.string.database_update_all_download_failed)
+                                else -> when (targetAction.action) {
+                                    DatabaseBulkUpdate.Action.DOWNLOAD ->
+                                        stringResource(R.string.database_update_all_download_ready)
+                                    DatabaseBulkUpdate.Action.UPDATE ->
+                                        stringResource(R.string.database_update_all_update_ready)
+                                }
+                            }
+
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = sizing.spacing(8.dp))
+                            ) {
+                                Text(
+                                    text = labelFor(target),
+                                    style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    text = when (targetAction.action) {
+                                        DatabaseBulkUpdate.Action.DOWNLOAD ->
+                                            stringResource(R.string.database_update_all_download_type)
+                                        DatabaseBulkUpdate.Action.UPDATE ->
+                                            stringResource(R.string.database_update_all_update_type)
+                                    },
+                                    style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = status,
+                                    style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                if (workInfo != null && (workInfo.state == androidx.work.WorkInfo.State.RUNNING ||
+                                    workInfo.state == androidx.work.WorkInfo.State.ENQUEUED ||
+                                    workInfo.state == androidx.work.WorkInfo.State.BLOCKED
+                                )) {
+                                    LinearWavyProgressIndicator(
+                                        progress = { progress / 100f },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(top = sizing.spacing(4.dp))
+                                            .height(sizing.component(8.dp)),
+                                        color = MaterialTheme.colorScheme.primary,
+                                        trackColor = MaterialTheme.colorScheme.surfaceVariant
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }

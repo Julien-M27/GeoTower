@@ -33,20 +33,42 @@ object DatabaseBulkUpdate {
         ENB
     }
 
+    enum class Action {
+        DOWNLOAD,
+        UPDATE
+    }
+
+    data class TargetAction(
+        val target: Target,
+        val action: Action
+    )
+
+    data class AvailableUpdatesResult(
+        val targets: List<Target>,
+        val isComplete: Boolean,
+        val hasMissingDatabases: Boolean = false,
+        val hasDatabaseUpdates: Boolean = false,
+        val targetActions: List<TargetAction> = emptyList()
+    )
+
     /**
      * Ne retourne que les bases qui peuvent etre telechargees ici et dont la version distante est
      * plus recente. Une base deja en cours de telechargement est laissee tranquille.
      */
-    suspend fun findAvailableUpdates(context: Context, workManager: WorkManager): List<Target> =
+    suspend fun checkAvailableUpdates(context: Context, workManager: WorkManager): AvailableUpdatesResult =
         withContext(Dispatchers.IO) {
             if (
                 !RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.DATABASE_DOWNLOAD) ||
                 !RemoteFeatureFlags.isActionEnabled(RemoteFeatureFlags.Actions.START_DATABASE_DOWNLOAD) ||
                 !RemoteFeatureFlags.isWorkerEnabled(RemoteFeatureFlags.Workers.DATABASE_DOWNLOAD)
             ) {
-                return@withContext emptyList()
+                return@withContext AvailableUpdatesResult(emptyList(), isComplete = false)
             }
 
+            var isComplete = true
+            var hasMissingDatabases = false
+            var hasDatabaseUpdates = false
+            val targetActions = mutableListOf<TargetAction>()
             buildList {
                 // Les deux bases ANFR se reconstruisent localement quand ce mode est impose : les
                 // telecharger ici ecraserait cette decision de provenance.
@@ -59,8 +81,20 @@ object DatabaseBulkUpdate {
                         if (!mobileLocallyBuilt && !hasUnfinishedWork(workManager, DatabaseDownloadWorker.UNIQUE_WORK_NAME)) {
                             val remote = DatabaseDownloader.getLatestDatabaseUpdateInfo()
                             val local = GeoTowerDatabaseValidator.getInstalledDatabaseVersion(context)
-                            if (DatabaseDownloader.isRemoteDatabaseUpdateAvailable(context, remote, local)) {
+                            if (local == null) {
+                                hasMissingDatabases = true
+                            }
+                            if (remote == null) {
+                                isComplete = false
+                            } else if (DatabaseDownloader.isRemoteDatabaseUpdateAvailable(context, remote, local)) {
+                                if (local != null) {
+                                    hasDatabaseUpdates = true
+                                }
                                 add(Target.MOBILE)
+                                targetActions += TargetAction(
+                                    Target.MOBILE,
+                                    if (local == null) Action.DOWNLOAD else Action.UPDATE
+                                )
                             }
                         }
 
@@ -72,7 +106,21 @@ object DatabaseBulkUpdate {
                             } else {
                                 null
                             }
-                            if (DatabaseVersionPolicy.isRemoteNewer(remote, local)) add(Target.RADIO)
+                            if (local == null) {
+                                hasMissingDatabases = true
+                            }
+                            if (remote == null) {
+                                isComplete = false
+                            } else if (DatabaseVersionPolicy.isRemoteNewer(remote, local)) {
+                                if (local != null) {
+                                    hasDatabaseUpdates = true
+                                }
+                                add(Target.RADIO)
+                                targetActions += TargetAction(
+                                    Target.RADIO,
+                                    if (local == null) Action.DOWNLOAD else Action.UPDATE
+                                )
+                            }
                         }
                     }
                 }
@@ -90,19 +138,51 @@ object DatabaseBulkUpdate {
                     } else {
                         null
                     }
+                    if (local == null) {
+                        hasMissingDatabases = true
+                    }
                     // La version eNB contient un digest : une comparaison exacte est indispensable
                     // pour detecter le changement d'une source plus ancienne que les autres.
-                    if (!remote.isNullOrBlank() && remote != local) add(Target.ENB)
+                    if (remote.isNullOrBlank()) {
+                        isComplete = false
+                    } else if (remote != local) {
+                        if (local != null) {
+                            hasDatabaseUpdates = true
+                        }
+                        add(Target.ENB)
+                        targetActions += TargetAction(
+                            Target.ENB,
+                            if (local == null) Action.DOWNLOAD else Action.UPDATE
+                        )
+                    }
                 }
+            }.let { targets ->
+                AvailableUpdatesResult(
+                    targets = targets,
+                    isComplete = isComplete,
+                    hasMissingDatabases = hasMissingDatabases,
+                    hasDatabaseUpdates = hasDatabaseUpdates,
+                    targetActions = targetActions
+                )
             }
         }
+
+    suspend fun findAvailableUpdates(context: Context, workManager: WorkManager): List<Target> =
+        checkAvailableUpdates(context, workManager).targets
 
     /**
      * Construit une seule chaine WorkManager. `continueAfterFailure` permet aux bases suivantes de
      * partir meme si une precedente a echoue apres ses tentatives : chaque erreur reste notifiee.
      */
     fun enqueue(workManager: WorkManager, targets: List<Target>) {
-        val requests = targets.distinct().mapNotNull(::requestFor)
+        enqueueDetailed(
+            workManager,
+            targets.distinct().map { target -> TargetAction(target, Action.UPDATE) }
+        )
+    }
+
+    fun enqueueDetailed(workManager: WorkManager, targetActions: List<TargetAction>) {
+        val requests = targetActions.distinctBy { it.target }.mapNotNull(::requestFor)
         if (requests.isEmpty()) return
 
         var continuation = workManager.beginUniqueWork(
@@ -116,10 +196,24 @@ object DatabaseBulkUpdate {
         continuation.enqueue()
     }
 
-    private fun requestFor(target: Target): OneTimeWorkRequest? = when (target) {
-        Target.MOBILE -> DatabaseDownloadWorker.buildRequest(continueAfterFailure = true)
-        Target.RADIO -> RadioDatabaseDownloadWorker.buildRequest(continueAfterFailure = true)
-        Target.ENB -> EnbDatabaseDownloadWorker.buildRequest(continueAfterFailure = true)
+    private fun requestFor(targetAction: TargetAction): OneTimeWorkRequest? = when (targetAction.target) {
+        Target.MOBILE -> DatabaseDownloadWorker.buildRequest(
+            continueAfterFailure = true,
+            bulkActionTag = actionTag(targetAction.action)
+        )
+        Target.RADIO -> RadioDatabaseDownloadWorker.buildRequest(
+            continueAfterFailure = true,
+            bulkActionTag = actionTag(targetAction.action)
+        )
+        Target.ENB -> EnbDatabaseDownloadWorker.buildRequest(
+            continueAfterFailure = true,
+            bulkActionTag = actionTag(targetAction.action)
+        )
+    }
+
+    fun actionTag(action: Action): String = when (action) {
+        Action.DOWNLOAD -> "database_bulk_action_download"
+        Action.UPDATE -> "database_bulk_action_update"
     }
 
     private fun hasUnfinishedWork(workManager: WorkManager, uniqueWorkName: String): Boolean =

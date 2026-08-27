@@ -40,6 +40,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -66,6 +67,7 @@ import fr.geotower.data.db.DbOperationTimings
 import fr.geotower.data.db.LocalDbProvenance
 import fr.geotower.data.workers.DatabaseDownloadWorker
 import fr.geotower.data.workers.LocalDbBuildWorker
+import fr.geotower.data.workers.OperationPauseStore
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -99,6 +101,10 @@ fun LocalDbBuildCard(
 
     val currentBuild = buildInfos.firstOrNull()
     val isBuilding = currentBuild?.state == WorkInfo.State.RUNNING || currentBuild?.state == WorkInfo.State.ENQUEUED
+    var pauseStateVersion by remember { mutableIntStateOf(0) }
+    val isPaused = remember(currentBuild?.id, pauseStateVersion) {
+        OperationPauseStore.isPaused(context, OperationPauseStore.LOCAL_DB_BUILD)
+    }
     val buildWasCancelled = currentBuild?.state == WorkInfo.State.CANCELLED
     val buildFailureReason = currentBuild
         ?.takeIf { it.state == WorkInfo.State.FAILED }
@@ -314,9 +320,25 @@ fun LocalDbBuildCard(
                         downloaded = false,
                     )
                     Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
+                    OperationPauseButton(
+                        paused = isPaused,
+                        onClick = {
+                            safeClick("local_build_toggle_pause") {
+                                OperationPauseStore.setPaused(
+                                    context,
+                                    OperationPauseStore.LOCAL_DB_BUILD,
+                                    paused = !isPaused,
+                                )
+                                pauseStateVersion++
+                            }
+                        },
+                    )
+                    Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
                     OutlinedButton(
                         onClick = {
                             safeClick("local_build_cancel") {
+                                OperationPauseStore.clear(context, OperationPauseStore.LOCAL_DB_BUILD)
+                                pauseStateVersion++
                                 workManager.cancelUniqueWork(LocalDbBuildWorker.UNIQUE_WORK_NAME)
                             }
                         },
@@ -524,6 +546,8 @@ fun LocalDbBuildCard(
                     Button(
                         onClick = {
                             safeClick("local_build_start") {
+                                OperationPauseStore.clear(context, OperationPauseStore.LOCAL_DB_BUILD)
+                                pauseStateVersion++
                                 LocalDbBuildWorker.enqueue(
                                     workManager, packMobile, packRadioBroadcast, packNonMobileTech,
                                     force = forceBuild,

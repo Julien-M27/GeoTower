@@ -97,7 +97,8 @@ class MapDownloadWorker(
         DbOperationTimings.markStart(applicationContext, timingKey)
 
         try {
-            setProgress(workDataOf("state" to "DOWNLOADING", "progress" to 0))
+            setProgress(workDataOf("state" to "DOWNLOADING", "progress" to 0, "paused" to false))
+            awaitIfPaused(0, mapFilename, mapDisplayName, progressNotifId)
             if (tempMapFile.exists()) tempMapFile.delete()
 
             val request = Request.Builder().url(mapUrl).build()
@@ -139,10 +140,16 @@ class MapDownloadWorker(
                                 val progress = ((bytesCopied * 100) / expectedContentLength).toInt()
                                 if (progress > lastProgress) {
                                     lastProgress = progress
-                                    setProgress(workDataOf("state" to "DOWNLOADING", "progress" to progress))
-                                    notificationManager.notify(progressNotifId, createNotification(progress, mapFilename, mapDisplayName, progressNotifId))
+                                    awaitIfPaused(progress, mapFilename, mapDisplayName, progressNotifId)
+                                    setProgress(workDataOf("state" to "DOWNLOADING", "progress" to progress, "paused" to false))
+                                    notificationManager.notify(progressNotifId, createNotification(progress, mapFilename, mapDisplayName, progressNotifId, paused = false))
                                 }
                             }
+
+                            // Verifie la pause a chaque bloc, et pas seulement lorsqu'un nouveau
+                            // pourcentage est publie : une carte volumineuse peut parcourir plusieurs
+                            // Mo sans changer l'affichage arrondi.
+                            awaitIfPaused(lastProgress, mapFilename, mapDisplayName, progressNotifId)
 
                             bytes = inputStream.read(buffer)
                         }
@@ -162,6 +169,7 @@ class MapDownloadWorker(
             }
 
             setProgress(workDataOf("state" to "DONE", "progress" to 100))
+            OperationPauseStore.clear(applicationContext, OperationPauseStore.mapDownloadKey(mapFilename))
             val success = replaceMapAtomically(tempMapFile, finalMapFile, backupMapFile)
 
             return@withContext if (success) {
@@ -179,6 +187,7 @@ class MapDownloadWorker(
             notificationManager.cancel(progressNotifId)
             throw e
         } catch (e: Exception) {
+            OperationPauseStore.clear(applicationContext, OperationPauseStore.mapDownloadKey(mapFilename))
             DbOperationTimings.clearStart(applicationContext, timingKey)
             AppLogger.w(TAG, "Map download failed", e)
             if (tempMapFile.exists()) tempMapFile.delete()
@@ -236,7 +245,13 @@ class MapDownloadWorker(
         }
     }
 
-    private fun createNotification(progress: Int, mapFilename: String, mapName: String, notifId: Int): Notification {
+    private fun createNotification(
+        progress: Int,
+        mapFilename: String,
+        mapName: String,
+        notifId: Int,
+        paused: Boolean = false,
+    ): Notification {
         DownloadNotificationCenter.rememberMapDownloadNotification(applicationContext, notifId)
 
         ensureNotificationChannel()
@@ -245,7 +260,11 @@ class MapDownloadWorker(
         // pas seulement sur le bloc « cartes hors ligne ».
         val pendingIntent = createOfflineMapsPendingIntent(notifId, mapFilename)
         val title = applicationContext.getString(R.string.notification_map_download_title, mapName)
-        val content = applicationContext.getString(R.string.notification_map_download_progress, progress)
+        val content = if (paused) {
+            applicationContext.getString(R.string.appstrings_operation_paused)
+        } else {
+            applicationContext.getString(R.string.notification_map_download_progress, progress)
+        }
         val cancelLabel = applicationContext.getString(R.string.appstrings_download_cancel)
         val cancelIntent = WorkManager.getInstance(applicationContext).createCancelPendingIntent(id)
         val actionIconRes = NotificationIconResources.smallIconRes(applicationContext)
@@ -301,6 +320,27 @@ class MapDownloadWorker(
         }
 
         return builder.build()
+    }
+
+    private suspend fun awaitIfPaused(
+        progress: Int,
+        mapFilename: String,
+        mapName: String,
+        progressNotifId: Int,
+    ) {
+        val operation = OperationPauseStore.mapDownloadKey(mapFilename)
+        if (!OperationPauseStore.isPaused(applicationContext, operation)) return
+        setProgress(workDataOf("state" to "PAUSED", "progress" to progress, "paused" to true))
+        notificationManager.notify(
+            progressNotifId,
+            createNotification(progress, mapFilename, mapName, progressNotifId, paused = true),
+        )
+        OperationPauseStore.awaitUntilResumed(applicationContext, operation)
+        setProgress(workDataOf("state" to "DOWNLOADING", "progress" to progress, "paused" to false))
+        notificationManager.notify(
+            progressNotifId,
+            createNotification(progress, mapFilename, mapName, progressNotifId, paused = false),
+        )
     }
 
     private fun showSuccessNotification(mapFilename: String, mapDisplayName: String, progressNotifId: Int, resultNotifId: Int) {

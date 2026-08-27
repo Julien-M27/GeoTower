@@ -58,18 +58,22 @@ class RadioDatabaseDownloadWorker(
                 context.getDatabasePath(RadioDatabaseValidator.DB_NAME)
             ).isValid
             setForeground(createForegroundInfo(0))
+            awaitIfPaused(0)
 
             val success = RadioDatabaseDownloader.downloadUpdate(context) { progress ->
-                setProgress(workDataOf(KEY_PROGRESS to progress))
-                notifySafely(notificationId, createNotification(progress))
+                awaitIfPaused(progress)
+                setProgress(workDataOf(KEY_PROGRESS to progress, KEY_PAUSED to false))
+                notifySafely(notificationId, createNotification(progress, paused = false))
             }
 
             if (success) {
+                OperationPauseStore.clear(context, OperationPauseStore.RADIO_DB_DOWNLOAD)
                 DbOperationTimings.finish(context, DbOperationTimings.RADIO_DOWNLOAD)
-                setProgress(workDataOf(KEY_PROGRESS to 100))
+                setProgress(workDataOf(KEY_PROGRESS to 100, KEY_PAUSED to false))
                 showSuccessNotification()
                 Result.success()
             } else {
+                OperationPauseStore.clear(context, OperationPauseStore.RADIO_DB_DOWNLOAD)
                 DbOperationTimings.clearStart(context, DbOperationTimings.RADIO_DOWNLOAD)
                 showErrorNotification()
                 failureResult()
@@ -85,6 +89,7 @@ class RadioDatabaseDownloadWorker(
     }
 
     private fun retryOrFail(): Result {
+        OperationPauseStore.clear(context, OperationPauseStore.RADIO_DB_DOWNLOAD)
         cancelSafely(notificationId)
         return if (runAttemptCount < MAX_RETRY_ATTEMPTS) {
             Result.retry()
@@ -136,14 +141,18 @@ class RadioDatabaseDownloadWorker(
         }
     }
 
-    private fun createNotification(progress: Int): android.app.Notification {
+    private fun createNotification(progress: Int, paused: Boolean = false): android.app.Notification {
         val databaseName = context.getString(R.string.notification_history_type_db_radio)
         val title = context.getString(
             if (isUpdatingExistingDatabase) R.string.notification_database_download_title
             else R.string.notification_database_first_download_title,
             databaseName
         )
-        val content = context.getString(R.string.notification_database_download_progress, progress)
+        val content = if (paused) {
+            context.getString(R.string.appstrings_operation_paused)
+        } else {
+            context.getString(R.string.notification_database_download_progress, progress)
+        }
         val pendingIntent = settingsPendingIntent(0, showSuccessPopup = false)
         val cancelLabel = context.getString(R.string.appstrings_download_cancel)
         val cancelIntent = WorkManager.getInstance(context).createCancelPendingIntent(id)
@@ -200,6 +209,15 @@ class RadioDatabaseDownloadWorker(
         }
 
         return builder.build()
+    }
+
+    private suspend fun awaitIfPaused(progress: Int) {
+        if (!OperationPauseStore.isPaused(context, OperationPauseStore.RADIO_DB_DOWNLOAD)) return
+        setProgress(workDataOf(KEY_PROGRESS to progress, KEY_PAUSED to true))
+        notifySafely(notificationId, createNotification(progress, paused = true))
+        OperationPauseStore.awaitUntilResumed(context, OperationPauseStore.RADIO_DB_DOWNLOAD)
+        setProgress(workDataOf(KEY_PROGRESS to progress, KEY_PAUSED to false))
+        notifySafely(notificationId, createNotification(progress, paused = false))
     }
 
     private fun showSuccessNotification() {
@@ -263,12 +281,16 @@ class RadioDatabaseDownloadWorker(
         const val UNIQUE_WORK_NAME = "radio_db_download"
         const val WORK_TAG = "database_download_radio"
         const val KEY_PROGRESS = "progress"
+        const val KEY_PAUSED = "paused"
         private const val KEY_CONTINUE_AFTER_FAILURE = "continue_after_failure"
 
         private const val TAG = "GeoTowerRadioDb"
         private const val MAX_RETRY_ATTEMPTS = 3
 
-        fun buildRequest(continueAfterFailure: Boolean = false) = OneTimeWorkRequestBuilder<RadioDatabaseDownloadWorker>()
+        fun buildRequest(
+            continueAfterFailure: Boolean = false,
+            bulkActionTag: String? = null
+        ) = OneTimeWorkRequestBuilder<RadioDatabaseDownloadWorker>()
             .setConstraints(
                 Constraints.Builder()
                     .setRequiredNetworkType(NetworkType.CONNECTED)
@@ -277,6 +299,7 @@ class RadioDatabaseDownloadWorker(
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
             .setInputData(workDataOf(KEY_CONTINUE_AFTER_FAILURE to continueAfterFailure))
             .addTag(WORK_TAG)
+            .apply { bulkActionTag?.let(::addTag) }
             .build()
 
         fun enqueue(workManager: WorkManager) {

@@ -2520,6 +2520,8 @@ fun SiteSettingsSheet(
     showDates: Boolean, onDatesChange: (Boolean) -> Unit,
     showAddress: Boolean, onAddressChange: (Boolean) -> Unit,
     showStatus: Boolean, onStatusChange: (Boolean) -> Unit,
+    showStatusVoice: Boolean, onStatusVoiceChange: (Boolean) -> Unit,
+    showStatusData: Boolean, onStatusDataChange: (Boolean) -> Unit,
     showSpeedtest: Boolean, onSpeedtestChange: (Boolean) -> Unit,
     showFreqs: Boolean, onFreqsChange: (Boolean) -> Unit,
     showLinks: Boolean, onLinksChange: (Boolean) -> Unit,
@@ -2527,6 +2529,7 @@ fun SiteSettingsSheet(
     onOpenFrequencies: () -> Unit,
     onOpenPhotosSettings: () -> Unit,
     onOpenSpeedtestSettings: () -> Unit,
+    onOpenStatusSettings: () -> Unit,
     onDismiss: () -> Unit,
     onBack: () -> Unit,
     sheetState: SheetState,
@@ -2560,7 +2563,10 @@ fun SiteSettingsSheet(
             ConfigurableBlock("share", { stringResource(R.string.appstrings_site_share_option) }, showShare, onShareChange),
             ConfigurableBlock("dates", { stringResource(R.string.appstrings_site_dates_option) }, showDates, onDatesChange),
             ConfigurableBlock("address", { stringResource(R.string.appstrings_site_address_option) }, showAddress, onAddressChange),
-            ConfigurableBlock("status", { stringResource(R.string.appstrings_show_status_option) }, showStatus, onStatusChange),
+            ConfigurableBlock("status", { stringResource(R.string.appstrings_show_status_option) }, showStatus, onStatusChange, onSettingsClick = {
+                onDismiss()
+                onOpenStatusSettings()
+            }),
             ConfigurableBlock("speedtest", { stringResource(R.string.appstrings_show_speedtest_label) }, showSpeedtest, onSpeedtestChange, onSettingsClick = {
                 onDismiss()
                 onOpenSpeedtestSettings()
@@ -2592,6 +2598,8 @@ fun SiteSettingsSheet(
             onDatesChange(true)
             onAddressChange(true)
             onStatusChange(true)
+            onStatusVoiceChange(true)
+            onStatusDataChange(true)
             onFreqsChange(true)
             onLinksChange(true)
         },
@@ -2605,6 +2613,91 @@ fun SiteSettingsSheet(
         },
         highlightBlockId = highlightBlockId
     )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SiteStatusRowsSettingsSheet(
+    showVoice: Boolean,
+    onVoiceChange: (Boolean) -> Unit,
+    showData: Boolean,
+    onDataChange: (Boolean) -> Unit,
+    onDismiss: () -> Unit,
+    onBack: () -> Unit,
+    sheetState: SheetState,
+    useOneUi: Boolean,
+    bubbleColor: Color
+) {
+    val themeMode by AppConfig.themeMode
+    val isOledMode by AppConfig.isOledMode
+    val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
+    val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    val shape = oneUiActionButtonShape(useOneUi)
+    val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = sheetBgColor,
+        dragHandle = {
+            Column(
+                modifier = Modifier.fillMaxWidth().statusBarsPadding(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                BottomSheetDefaults.DragHandle(modifier = Modifier.padding(top = sizing.spacing(8.dp), bottom = sizing.spacing(4.dp)))
+            }
+        }
+    ) {
+        BackHandler(onBack = onBack)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = sizing.spacing(48.dp), start = sizing.spacing(24.dp), end = sizing.spacing(24.dp)),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Row(modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(20.dp)), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
+                Text(
+                    stringResource(R.string.appstrings_site_status_lines_title),
+                    style = sizing.textStyle(MaterialTheme.typography.titleLarge),
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center
+                )
+                Spacer(Modifier.width(sizing.spacing(48.dp)))
+            }
+            Text(
+                stringResource(R.string.appstrings_site_status_lines_description),
+                style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(16.dp)),
+                textAlign = TextAlign.Center
+            )
+            SimpleSwitchCard(
+                title = stringResource(R.string.appstrings_site_status_voice_option),
+                showMapLocation = showVoice,
+                onLocationChange = onVoiceChange,
+                shape = shape,
+                border = border,
+                bubbleColor = bubbleColor,
+                useOneUi = useOneUi
+            )
+            Spacer(Modifier.height(sizing.spacing(12.dp)))
+            SimpleSwitchCard(
+                title = stringResource(R.string.appstrings_site_status_data_option),
+                showMapLocation = showData,
+                onLocationChange = onDataChange,
+                shape = shape,
+                border = border,
+                bubbleColor = bubbleColor,
+                useOneUi = useOneUi
+            )
+            Spacer(Modifier.height(sizing.spacing(32.dp)))
+        }
+    }
 }
 
 // ===== Réglages par défaut « Couverture théorique » (centralisés ici) =====

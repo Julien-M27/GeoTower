@@ -101,6 +101,8 @@ fun EmbeddedSiteBlocksSettingsSheet(
     // restent locaux à la section, sinon les masquer déréglerait le partage et le rapport PDF.
     var showPhotos by remember { mutableStateOf(read("photos", "site_show_photos", AppConfig.siteShowPhotos.value)) }
     var showStatus by remember { mutableStateOf(read("status", "site_show_status", AppConfig.siteShowStatus.value)) }
+    var showStatusVoice by remember { mutableStateOf(read("status_voice", SitePagePrefs.statusVoice.key, SitePagePrefs.statusVoice.read(prefs))) }
+    var showStatusData by remember { mutableStateOf(read("status_data", SitePagePrefs.statusData.key, SitePagePrefs.statusData.read(prefs))) }
     var showSpeedtest by remember { mutableStateOf(read("speedtest", "site_show_speedtest", AppConfig.siteShowSpeedtest.value)) }
 
     if (mainVisible) {
@@ -148,6 +150,10 @@ fun EmbeddedSiteBlocksSettingsSheet(
             onAddressChange = { showAddress = it; write(SitePagePrefs.address.key, it) },
             showStatus = showStatus,
             onStatusChange = { showStatus = it; write("site_show_status", it) },
+            showStatusVoice = showStatusVoice,
+            onStatusVoiceChange = { showStatusVoice = it; write(SitePagePrefs.statusVoice.key, it) },
+            showStatusData = showStatusData,
+            onStatusDataChange = { showStatusData = it; write(SitePagePrefs.statusData.key, it) },
             showSpeedtest = showSpeedtest,
             onSpeedtestChange = { showSpeedtest = it; write("site_show_speedtest", it) },
             showFreqs = showFreqs,
@@ -158,6 +164,7 @@ fun EmbeddedSiteBlocksSettingsSheet(
             onOpenFrequencies = { mainVisible = false; subSheet = SUB_SHEET_FREQUENCIES },
             onOpenPhotosSettings = { mainVisible = false; subSheet = SUB_SHEET_PHOTOS },
             onOpenSpeedtestSettings = { mainVisible = false; subSheet = SUB_SHEET_SPEEDTEST },
+            onOpenStatusSettings = { mainVisible = false; subSheet = SUB_SHEET_STATUS },
             onDismiss = { mainVisible = false },
             onBack = onBack,
             sheetState = sheetState,
@@ -195,6 +202,18 @@ fun EmbeddedSiteBlocksSettingsSheet(
             onOpenCommunityDataSettings = { subSheet = SUB_SHEET_COMMUNITY_PHOTOS }
         )
 
+        SUB_SHEET_STATUS -> SiteStatusRowsSettingsSheet(
+            showVoice = showStatusVoice,
+            onVoiceChange = { showStatusVoice = it; write(SitePagePrefs.statusVoice.key, it) },
+            showData = showStatusData,
+            onDataChange = { showStatusData = it; write(SitePagePrefs.statusData.key, it) },
+            onDismiss = { subSheet = null },
+            onBack = { subSheet = null; mainVisible = true },
+            sheetState = sheetState,
+            useOneUi = useOneUi,
+            bubbleColor = bubbleColor
+        )
+
         SUB_SHEET_COMMUNITY_PHOTOS, SUB_SHEET_SPEEDTEST -> CommunityDataSettingsSheet(
             onDismiss = { subSheet = null },
             sheetState = sheetState,
@@ -212,4 +231,5 @@ private const val SUB_SHEET_MINI_MAP = "mini_map"
 private const val SUB_SHEET_FREQUENCIES = "frequencies"
 private const val SUB_SHEET_PHOTOS = "photos"
 private const val SUB_SHEET_SPEEDTEST = "speedtest"
+private const val SUB_SHEET_STATUS = "status"
 private const val SUB_SHEET_COMMUNITY_PHOTOS = "community_photos"

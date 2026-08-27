@@ -35,6 +35,7 @@ import fr.geotower.data.db.InstalledDatabaseArtifactIdentity
 import fr.geotower.data.db.LocalDbProvenance
 import fr.geotower.data.workers.DatabaseDownloadWorker
 import fr.geotower.data.workers.LocalDbBuildWorker
+import fr.geotower.data.workers.OperationPauseStore
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppConfig
 import kotlinx.coroutines.Dispatchers
@@ -64,6 +65,10 @@ fun DatabaseDownloadCard(
     }
 
     val isSyncing = currentWork != null
+    var pauseStateVersion by remember { mutableIntStateOf(0) }
+    val isPaused = remember(currentWork?.id, pauseStateVersion) {
+        OperationPauseStore.isPaused(context, OperationPauseStore.MOBILE_DB_DOWNLOAD)
+    }
     val downloadProgress = currentWork?.progress?.getInt(DatabaseDownloadWorker.KEY_PROGRESS, 0)?.div(100f) ?: 0f
 
     // Génération locale en cours : la base mobile n'est installée qu'à la toute fin du build, donc
@@ -405,10 +410,27 @@ fun DatabaseDownloadCard(
 
                     Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
 
+                    OperationPauseButton(
+                        paused = isPaused,
+                        onClick = {
+                            safeClick("database_toggle_pause") {
+                                OperationPauseStore.setPaused(
+                                    context,
+                                    OperationPauseStore.MOBILE_DB_DOWNLOAD,
+                                    paused = !isPaused,
+                                )
+                                pauseStateVersion++
+                            }
+                        },
+                    )
+                    Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
+
                     // ✅ NOUVEAU : Le bouton pour annuler le téléchargement via WorkManager
                     OutlinedButton(
                         onClick = {
                             safeClick("database_cancel_download") {
+                                OperationPauseStore.clear(context, OperationPauseStore.MOBILE_DB_DOWNLOAD)
+                                pauseStateVersion++
                                 currentWork?.id?.let(workManager::cancelWorkById)
                             }
                         },
@@ -489,6 +511,9 @@ fun DatabaseDownloadCard(
                     Button(
                         onClick = {
                             safeClick("database_start_rebuild") {
+                                OperationPauseStore.clear(context, OperationPauseStore.LOCAL_DB_BUILD)
+                                OperationPauseStore.clear(context, OperationPauseStore.MOBILE_DB_DOWNLOAD)
+                                pauseStateVersion++
                                 // Seule la base mobile : les packs radio se choisissent sur la
                                 // carte « Génération locale », juste en dessous.
                                 LocalDbBuildWorker.enqueue(
@@ -525,6 +550,8 @@ fun DatabaseDownloadCard(
                                 RemoteFeatureFlags.isActionEnabled(RemoteFeatureFlags.Actions.START_DATABASE_DOWNLOAD) &&
                                 RemoteFeatureFlags.isWorkerEnabled(RemoteFeatureFlags.Workers.DATABASE_DOWNLOAD)
                             ) {
+                                OperationPauseStore.clear(context, OperationPauseStore.MOBILE_DB_DOWNLOAD)
+                                pauseStateVersion++
                                 DatabaseDownloadWorker.enqueue(workManager)
                             }
                         }

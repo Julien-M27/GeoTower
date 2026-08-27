@@ -223,6 +223,9 @@
     <string name="database_size_warning">Tamaño del archivo: %1$.1f MB\nSe recomienda descargar por Wi-Fi.</string>
     <string name="database_download_progress">Descargando: %1$d%%</string>
     <string name="database_cancel_download">Cancelar descarga</string>
+    <string name="appstrings_pause">Pausar</string>
+    <string name="appstrings_resume">Reanudar</string>
+    <string name="appstrings_operation_paused">En pausa</string>
     <string name="database_up_to_date">Actualizado</string>
     <string name="database_antenna_count">Antenas: %1$s</string>
     <string name="radio_database_site_count">Sitios de radio: %1$s</string>
@@ -267,10 +270,20 @@
     <string name="database_update_all_title">Actualizar bases de datos</string>
     <string name="database_update_all_desc">Comprueba las bases móvil, de radio y eNB/gNB, y descarga solo las que necesitan actualizarse.</string>
     <string name="database_update_all_action">Actualizar bases disponibles</string>
+    <string name="database_download_all_action">Descargar bases disponibles</string>
+    <string name="database_download_and_update_all_action">Descargar y actualizar las bases</string>
     <string name="database_update_all_checking">Buscando actualizaciones…</string>
     <string name="database_update_all_running">Actualizaciones en curso…</string>
     <string name="database_update_all_none">Todas las bases disponibles están actualizadas.</string>
-    <string name="database_update_all_queued">Actualizaciones en cola: %1$d</string>
+    <string name="database_update_all_queue_title">Bases afectadas</string>
+    <string name="database_update_all_download_type">Para descargar</string>
+    <string name="database_update_all_update_type">Para actualizar</string>
+    <string name="database_update_all_download_waiting">Esperando la descarga…</string>
+    <string name="database_update_all_download_progress">Descarga: %1$d %%</string>
+    <string name="database_update_all_download_ready">Descarga pendiente</string>
+    <string name="database_update_all_update_ready">Actualización pendiente</string>
+    <string name="database_update_all_download_completed">Descarga completada</string>
+    <string name="database_update_all_download_failed">Error de descarga</string>
     <string name="notification_app_updates_channel_name">Actualizaciones de GeoTower</string>
     <string name="notification_app_update_available_title">Nueva versión de GeoTower</string>
     <string name="notification_app_update_available_desc">GeoTower %1$s está disponible. Toca para abrir la descarga.</string>
@@ -1246,6 +1259,10 @@
     <string name="appstrings_show_speedometer">Velocímetro</string>
     <string name="appstrings_show_speedtest_label">Mostrar mejor Speedtest</string>
     <string name="appstrings_show_status_option">Mostrar estado</string>
+    <string name="appstrings_site_status_lines_title">Líneas del estado</string>
+    <string name="appstrings_site_status_lines_description">Elige las líneas de servicio que se muestran en la tabla de estado.</string>
+    <string name="appstrings_site_status_voice_option">Línea de voz</string>
+    <string name="appstrings_site_status_data_option">Línea de datos</string>
     <string name="appstrings_site_address_option">Dirección y coordenadas</string>
     <string name="appstrings_site_anfr_label">Sitio ANFR</string>
     <string name="appstrings_site_bearing_option">Rumbo</string>
@@ -1372,7 +1389,7 @@
     <string name="appstrings_status_legend_project">Tecnología declarada planificada.</string>
     <string name="appstrings_status_legend_title">Leyenda de la tabla</string>
     <string name="appstrings_status_legend_unavailable">Tecnología ausente, no declarada o información no disponible.</string>
-    <string name="appstrings_status_legend_uncertain">Servicio no declarado para esta generación, aunque la avería notificada puede afectarlo.</string>
+    <string name="appstrings_status_legend_uncertain">Servicio no declarado para esta generación: «?» verde significa que la generación funciona; «?» rojo significa que una avería puede afectarla.</string>
     <string name="appstrings_support_detail_title">Detalle del soporte</string>
     <string name="appstrings_support_details_option">Detalles del soporte</string>
     <string name="appstrings_support_details_title">Detalles del soporte</string>
@@ -3051,4 +3068,10 @@
     <string name="appstrings_release_v2034_database_updates">Un solo botón comprueba las bases móvil, radio y eNB/gNB y pone en cola únicamente las actualizaciones necesarias</string>
     <string name="appstrings_release_v2034_local_build_progress">La generación local muestra ahora el progreso global, el paso actual, la fuente leída y el detalle de líneas y descargas</string>
     <string name="appstrings_release_v2034_database_storage">Las descargas identifican correctamente los datos instalados, limpian los archivos temporales y detallan cada base en las notificaciones</string>
+    <!-- Notas de la versión 2.0.35 -->
+    <string name="appstrings_release_v2035_database_queue">Las descargas distinguen ahora las bases que faltan de las actualizaciones, muestran la cola con claridad y el progreso de cada una</string>
+    <string name="appstrings_release_v2035_database_servers">El modo automático compara ahora el servidor principal y el espejo, y conserva la base más reciente</string>
+    <string name="appstrings_release_v2035_site_status_lines">La personalización de páginas permite mostrar u ocultar por separado las líneas de Voz y Datos de la tabla de estado del sitio</string>
+    <string name="appstrings_release_v2035_status_uncertainty">Los estados de avería desconocidos muestran ahora signos de interrogación verdes o rojos más claros, y los Datos 2G ya no se muestran como aplicables</string>
+    <string name="appstrings_release_v2035_operation_pause">Las operaciones largas de bases, mapas y generación local se pueden pausar y reanudar desde los ajustes</string>
 </resources>

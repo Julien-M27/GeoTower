@@ -223,6 +223,9 @@
     <string name="database_size_warning">File size: %1$.1f MB\nWi-Fi download is recommended.</string>
     <string name="database_download_progress">Downloading: %1$d%%</string>
     <string name="database_cancel_download">Cancel download</string>
+    <string name="appstrings_pause">Pause</string>
+    <string name="appstrings_resume">Resume</string>
+    <string name="appstrings_operation_paused">Paused</string>
     <string name="database_up_to_date">Up to date</string>
     <string name="database_antenna_count">Antennas: %1$s</string>
     <string name="radio_database_site_count">Radio sites: %1$s</string>
@@ -267,10 +270,20 @@
     <string name="database_update_all_title">Update databases</string>
     <string name="database_update_all_desc">Checks the mobile, radio and eNB/gNB databases, then downloads only the ones that need updating.</string>
     <string name="database_update_all_action">Update available databases</string>
+    <string name="database_download_all_action">Download available databases</string>
+    <string name="database_download_and_update_all_action">Download and update databases</string>
     <string name="database_update_all_checking">Checking for updates…</string>
     <string name="database_update_all_running">Updates in progress…</string>
     <string name="database_update_all_none">All available databases are up to date.</string>
-    <string name="database_update_all_queued">Queued updates: %1$d</string>
+    <string name="database_update_all_queue_title">Affected databases</string>
+    <string name="database_update_all_download_type">To download</string>
+    <string name="database_update_all_update_type">To update</string>
+    <string name="database_update_all_download_waiting">Waiting to download…</string>
+    <string name="database_update_all_download_progress">Downloading: %1$d%%</string>
+    <string name="database_update_all_download_ready">Download pending</string>
+    <string name="database_update_all_update_ready">Update pending</string>
+    <string name="database_update_all_download_completed">Download complete</string>
+    <string name="database_update_all_download_failed">Download failed</string>
     <string name="notification_app_updates_channel_name">GeoTower updates</string>
     <string name="notification_app_update_available_title">New GeoTower version</string>
     <string name="notification_app_update_available_desc">GeoTower %1$s is available. Tap to open the download.</string>
@@ -1246,6 +1259,10 @@
     <string name="appstrings_show_speedometer">Speedometer</string>
     <string name="appstrings_show_speedtest_label">Show best Speedtest</string>
     <string name="appstrings_show_status_option">Show status</string>
+    <string name="appstrings_site_status_lines_title">Status lines</string>
+    <string name="appstrings_site_status_lines_description">Choose which service lines are shown in the status table.</string>
+    <string name="appstrings_site_status_voice_option">Voice line</string>
+    <string name="appstrings_site_status_data_option">Data line</string>
     <string name="appstrings_site_address_option">Address &amp; Coordinates</string>
     <string name="appstrings_site_anfr_label">ANFR site</string>
     <string name="appstrings_site_bearing_option">Bearing</string>
@@ -1372,7 +1389,7 @@
     <string name="appstrings_status_legend_project">Technology declared planned.</string>
     <string name="appstrings_status_legend_title">Table legend</string>
     <string name="appstrings_status_legend_unavailable">Technology absent, not declared, or information unavailable.</string>
-    <string name="appstrings_status_legend_uncertain">Service not declared for this generation, while a reported outage may affect it.</string>
+    <string name="appstrings_status_legend_uncertain">Service not declared for this generation: green “?” means the generation is known to work; red “?” means an outage may affect it.</string>
     <string name="appstrings_support_detail_title">Support Detail</string>
     <string name="appstrings_support_details_option">Support details</string>
     <string name="appstrings_support_details_title">Support details</string>
@@ -3051,4 +3068,10 @@
     <string name="appstrings_release_v2034_database_updates">One action checks the mobile, radio and eNB/gNB databases, then queues only the updates you need</string>
     <string name="appstrings_release_v2034_local_build_progress">Local database generation now shows overall progress, the current step, the source being read and detailed row and download counts</string>
     <string name="appstrings_release_v2034_database_storage">Database downloads now identify the installed data reliably, clean up temporary files and report each database clearly in notifications</string>
+    <!-- Release notes 2.0.35 -->
+    <string name="appstrings_release_v2035_database_queue">Database downloads now distinguish missing databases from updates, queue them clearly and show progress for each one</string>
+    <string name="appstrings_release_v2035_database_servers">Automatic mode now compares the primary and mirror servers and keeps the most recent database</string>
+    <string name="appstrings_release_v2035_site_status_lines">The site status table now lets you show or hide the Voice and Data lines independently in page customization</string>
+    <string name="appstrings_release_v2035_status_uncertainty">Unknown outage states now show clearer green or red question marks, and 2G data is no longer shown as applicable</string>
+    <string name="appstrings_release_v2035_operation_pause">Long database, map and local generation operations can now be paused and resumed from settings</string>
 </resources>

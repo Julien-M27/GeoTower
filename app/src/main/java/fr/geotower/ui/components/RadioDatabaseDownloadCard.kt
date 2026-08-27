@@ -59,6 +59,7 @@ import fr.geotower.data.db.DbOperationTimings
 import fr.geotower.data.db.LocalDbProvenance
 import fr.geotower.data.db.RadioDatabaseValidator
 import fr.geotower.data.workers.RadioDatabaseDownloadWorker
+import fr.geotower.data.workers.OperationPauseStore
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -87,6 +88,10 @@ fun RadioDatabaseDownloadCard(
     }
 
     val isSyncing = currentWork != null
+    var pauseStateVersion by remember { mutableIntStateOf(0) }
+    val isPaused = remember(currentWork?.id, pauseStateVersion) {
+        OperationPauseStore.isPaused(context, OperationPauseStore.RADIO_DB_DOWNLOAD)
+    }
     val downloadProgress = currentWork?.progress?.getInt(RadioDatabaseDownloadWorker.KEY_PROGRESS, 0)?.div(100f) ?: 0f
 
     // Génération locale en cours (packs radio) : la base n'est installée qu'à la fin du build, on
@@ -272,9 +277,25 @@ fun RadioDatabaseDownloadCard(
                         modifier = Modifier.padding(top = sizing.spacing(4.dp)),
                     )
                     Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
+                    OperationPauseButton(
+                        paused = isPaused,
+                        onClick = {
+                            safeClick("radio_database_toggle_pause") {
+                                OperationPauseStore.setPaused(
+                                    context,
+                                    OperationPauseStore.RADIO_DB_DOWNLOAD,
+                                    paused = !isPaused,
+                                )
+                                pauseStateVersion++
+                            }
+                        },
+                    )
+                    Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
                     OutlinedButton(
                         onClick = {
                             safeClick("radio_database_cancel_download") {
+                                OperationPauseStore.clear(context, OperationPauseStore.RADIO_DB_DOWNLOAD)
+                                pauseStateVersion++
                                 currentWork?.id?.let(workManager::cancelWorkById)
                             }
                         },
@@ -322,6 +343,8 @@ fun RadioDatabaseDownloadCard(
                                 RemoteFeatureFlags.isActionEnabled(RemoteFeatureFlags.Actions.START_DATABASE_DOWNLOAD) &&
                                 RemoteFeatureFlags.isWorkerEnabled(RemoteFeatureFlags.Workers.DATABASE_DOWNLOAD)
                             ) {
+                                OperationPauseStore.clear(context, OperationPauseStore.RADIO_DB_DOWNLOAD)
+                                pauseStateVersion++
                                 RadioDatabaseDownloadWorker.enqueue(workManager)
                             }
                         }

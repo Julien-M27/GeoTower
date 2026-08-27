@@ -59,6 +59,14 @@ class OutageTechBreakdownTest {
     }
 
     @Test
+    fun dataIsIgnoredFor2G() {
+        val rows = OutageTechBreakdown.of(listOf(site("Orange", data2g = "HS")))
+
+        // La Data 2G est non applicable : elle ne doit pas créer une panne 2G.
+        assertEquals(OutageTechBreakdown.UNPUBLISHED, rows.single().countFor(OutageTechnology.G2))
+    }
+
+    @Test
     fun aTechnologyNobodyReportsStaysUnpublishedInsteadOfZero() {
         val rows = OutageTechBreakdown.of(
             listOf(

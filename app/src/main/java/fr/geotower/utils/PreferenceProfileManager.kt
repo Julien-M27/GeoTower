@@ -296,6 +296,8 @@ object PreferenceProfileManager {
         AppConfig.PREF_HOME_HELP_POSITION to "Position du bouton Aides",
         "external_links_order" to "Ordre des liens externes",
         "page_site_external_links_order" to "Ordre des liens externes",
+        "page_site_status_voice" to "Ligne Voix du statut",
+        "page_site_status_data" to "Ligne Data du statut",
         "link_cartoradio" to "Cartoradio",
         "link_cellularfr" to "CellularFR",
         "link_signalquest" to "Signal Quest",

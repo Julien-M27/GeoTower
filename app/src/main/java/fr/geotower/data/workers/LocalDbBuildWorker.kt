@@ -111,8 +111,17 @@ class LocalDbBuildWorker(
                             KEY_FILE to snapshot.fileName,
                             KEY_DOWNLOADED_BYTES to snapshot.downloadedBytes,
                             KEY_TOTAL_BYTES to snapshot.totalBytes,
+                            KEY_PAUSED to OperationPauseStore.isPaused(context, OperationPauseStore.LOCAL_DB_BUILD),
                         ),
                     )
+                    BuildPhase.values().getOrNull(snapshot.phaseOrdinal)?.let { phase ->
+                        notifyLive(
+                            phase,
+                            snapshot.percent,
+                            snapshot.detail,
+                            OperationPauseStore.isPaused(context, OperationPauseStore.LOCAL_DB_BUILD),
+                        )
+                    }
                     delay(500)
                 }
             } catch (_: CancellationException) {
@@ -137,30 +146,45 @@ class LocalDbBuildWorker(
                 nonMobileTech = inputData.getBoolean(KEY_PACK_NONMOBILE, true),
             )
             val force = inputData.getBoolean(KEY_FORCE, false)
-            val result = LocalDbBuildPipeline().run(context, packs, force) { update: BuildProgressUpdate ->
-                val previous = progressSnapshot.get()
-                val snapshot = ProgressSnapshot(
-                    percent = maxOf(previous.percent, update.percent.coerceIn(0, 100)),
-                    phaseOrdinal = update.phase.ordinal,
-                    detail = update.detail.orEmpty(),
-                    importOrdinal = update.importType?.ordinal ?: -1,
-                    fileName = update.fileName.orEmpty(),
-                    downloadedBytes = update.downloadedBytes,
-                    totalBytes = update.totalBytes,
-                )
-                progressSnapshot.set(snapshot)
-                notifyLive(update.phase, snapshot.percent, update.detail)
-            }
+            val result = LocalDbBuildPipeline().run(
+                context = context,
+                packs = packs,
+                force = force,
+                onProgress = { update: BuildProgressUpdate ->
+                    val previous = progressSnapshot.get()
+                    val snapshot = ProgressSnapshot(
+                        percent = maxOf(previous.percent, update.percent.coerceIn(0, 100)),
+                        phaseOrdinal = update.phase.ordinal,
+                        detail = update.detail.orEmpty(),
+                        importOrdinal = update.importType?.ordinal ?: -1,
+                        fileName = update.fileName.orEmpty(),
+                        downloadedBytes = update.downloadedBytes,
+                        totalBytes = update.totalBytes,
+                    )
+                    progressSnapshot.set(snapshot)
+                    notifyLive(
+                        update.phase,
+                        snapshot.percent,
+                        update.detail,
+                        OperationPauseStore.isPaused(context, OperationPauseStore.LOCAL_DB_BUILD),
+                    )
+                },
+                onPause = {
+                    OperationPauseStore.blockIfPaused(context, OperationPauseStore.LOCAL_DB_BUILD)
+                },
+            )
 
             ticker.cancel()
             ticker.join()
             cancelSafely(PROGRESS_NOTIFICATION_ID)
             if (result.success) {
+                OperationPauseStore.clear(context, OperationPauseStore.LOCAL_DB_BUILD)
                 DbOperationTimings.finish(context, DbOperationTimings.LOCAL_BUILD)
                 setProgress(workDataOf(KEY_PROGRESS to 100, KEY_PHASE to BuildPhase.DONE.ordinal))
                 showResult(success = true, reason = null)
                 Result.success()
             } else {
+                OperationPauseStore.clear(context, OperationPauseStore.LOCAL_DB_BUILD)
                 DbOperationTimings.clearStart(context, DbOperationTimings.LOCAL_BUILD)
                 AppLogger.w(TAG, "Local DB build failed: ${result.reason}")
                 showResult(success = false, reason = result.reason)
@@ -172,6 +196,7 @@ class LocalDbBuildWorker(
             cancelSafely(PROGRESS_NOTIFICATION_ID)
             throw e
         } catch (e: Exception) {
+            OperationPauseStore.clear(context, OperationPauseStore.LOCAL_DB_BUILD)
             DbOperationTimings.clearStart(context, DbOperationTimings.LOCAL_BUILD)
             ticker.cancel()
             AppLogger.w(TAG, "Local DB build worker crashed", e)
@@ -192,8 +217,8 @@ class LocalDbBuildWorker(
             capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
     }
 
-    private fun notifyLive(phase: BuildPhase, percent: Int, detail: String?) {
-        notifySafely(PROGRESS_NOTIFICATION_ID, buildProgressNotification(phase, percent, detail))
+    private fun notifyLive(phase: BuildPhase, percent: Int, detail: String?, paused: Boolean) {
+        notifySafely(PROGRESS_NOTIFICATION_ID, buildProgressNotification(phase, percent, detail, paused))
     }
 
     private fun createChannel() {
@@ -208,7 +233,7 @@ class LocalDbBuildWorker(
     }
 
     private fun createForegroundInfo(phase: BuildPhase, percent: Int, detail: String?): ForegroundInfo {
-        val notification = buildProgressNotification(phase, percent, detail)
+        val notification = buildProgressNotification(phase, percent, detail, paused = false)
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             ForegroundInfo(PROGRESS_NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
         } else {
@@ -216,11 +241,20 @@ class LocalDbBuildWorker(
         }
     }
 
-    private fun buildProgressNotification(phase: BuildPhase, percent: Int, detail: String?): android.app.Notification {
+    private fun buildProgressNotification(
+        phase: BuildPhase,
+        percent: Int,
+        detail: String?,
+        paused: Boolean,
+    ): android.app.Notification {
         val title = context.getString(R.string.appstrings_local_build_notif_title)
         val label = context.getString(phase.labelRes())
         val labelWithDetail = if (detail.isNullOrBlank()) label else "$label ($detail)"
-        val content = "$labelWithDetail — $percent %"
+        val content = if (paused) {
+            context.getString(R.string.appstrings_operation_paused)
+        } else {
+            "$labelWithDetail — $percent %"
+        }
         val cancelLabel = context.getString(R.string.database_cancel_download)
         val cancelIntent = WorkManager.getInstance(context).createCancelPendingIntent(id)
         val actionIcon = NotificationIconResources.smallIconRes(context)
@@ -339,6 +373,7 @@ class LocalDbBuildWorker(
         const val KEY_FILE = "file"
         const val KEY_DOWNLOADED_BYTES = "downloaded_bytes"
         const val KEY_TOTAL_BYTES = "total_bytes"
+        const val KEY_PAUSED = "paused"
         const val KEY_ERROR = "error"
         const val KEY_PACK_MOBILE = "pack_mobile"
         const val KEY_PACK_RADIO_BROADCAST = "pack_radio_broadcast"
