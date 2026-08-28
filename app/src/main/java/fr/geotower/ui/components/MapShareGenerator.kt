@@ -60,6 +60,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.res.stringResource
 import fr.geotower.R
+import fr.geotower.ui.theme.GeoTowerExportUiStyleProvider
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import java.util.Locale
 
@@ -231,14 +232,15 @@ private fun shareFullMapCapture(
             setContent {
                 val colors = if (forceDarkTheme) darkColorScheme() else lightColorScheme()
                 MaterialTheme(colorScheme = colors) {
-                    Surface(color = MaterialTheme.colorScheme.background) {
-                        Column(
-                            modifier = Modifier
-                                .width(540.dp) // ✅ Un peu plus grand pour une meilleure résolution d'image
-                                .wrapContentHeight()
-                                .padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
+                    GeoTowerExportUiStyleProvider {
+                        Surface(color = MaterialTheme.colorScheme.background) {
+                            Column(
+                                modifier = Modifier
+                                    .width(540.dp) // ✅ Un peu plus grand pour une meilleure résolution d'image
+                                    .wrapContentHeight()
+                                    .padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
                             Text(text = txtTitle, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
 
                             // ✅ 1. ON CALCULE LES PROPORTIONS EXACTES DE TA CARTE
@@ -305,6 +307,7 @@ private fun shareFullMapCapture(
                             }
 
                             Text(text = txtGeneratedBy, fontSize = 12.sp, color = Color.Gray, modifier = Modifier.align(Alignment.CenterHorizontally))
+                            }
                         }
                     }
                 }

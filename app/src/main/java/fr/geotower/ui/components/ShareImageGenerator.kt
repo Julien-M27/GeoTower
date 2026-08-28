@@ -56,6 +56,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.zIndex
 import androidx.core.content.FileProvider
 import androidx.lifecycle.findViewTreeLifecycleOwner
+import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.findViewTreeViewModelStoreOwner
 import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.lifecycle.setViewTreeViewModelStoreOwner
@@ -120,6 +121,7 @@ import fr.geotower.ui.components.SiteStatusCard
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import fr.geotower.R
+import fr.geotower.ui.theme.GeoTowerExportUiStyleProvider
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 
 private const val TAG_SHARE_IMAGE = "GeoTower"
@@ -498,6 +500,45 @@ private fun Bitmap.trimTransparentBottom(): Bitmap {
 
     if (bottom < 0 || bottom == height - 1) return this
     return Bitmap.createBitmap(this, 0, 0, width, bottom + 1)
+}
+
+private data class PendingShareBitmap(
+    val bitmap: Bitmap,
+    val file: File,
+    val trimTransparentBottom: Boolean = false
+)
+
+/**
+ * L'encodage PNG et le balayage des lignes transparentes sont des opérations CPU/IO. Ils ne
+ * doivent pas s'exécuter dans le callback UI qui vient de mesurer et dessiner le ComposeView.
+ */
+private suspend fun writeShareBitmapFiles(
+    context: Context,
+    pendingBitmaps: List<PendingShareBitmap>
+): List<Uri> = withContext(Dispatchers.IO) {
+    pendingBitmaps.map { pending ->
+        var trimmed: Bitmap? = null
+        try {
+            trimmed = if (pending.trimTransparentBottom) {
+                pending.bitmap.trimTransparentBottom()
+            } else {
+                pending.bitmap
+            }
+            FileOutputStream(pending.file).use { output ->
+                check(trimmed.compress(Bitmap.CompressFormat.PNG, 100, output)) {
+                    "Unable to encode share image ${pending.file.name}"
+                }
+            }
+            FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", pending.file)
+        } finally {
+            if (trimmed != null && trimmed !== pending.bitmap && !trimmed.isRecycled) {
+                trimmed.recycle()
+            }
+            if (!pending.bitmap.isRecycled) {
+                pending.bitmap.recycle()
+            }
+        }
+    }
 }
 
 private fun captureShareMapBitmap(mapView: org.osmdroid.views.MapView?): Bitmap? {
@@ -1082,22 +1123,24 @@ private fun shareRadioCapture(
             setContent {
                 val colors = if (forceDarkTheme) darkColorScheme() else lightColorScheme()
                 MaterialTheme(colorScheme = colors) {
-                    RadioShareCaptureContent(
-                        title = title,
-                        mainMarker = mainMarker,
-                        markers = visibleMarkers,
-                        distanceStr = distanceStr,
-                        bearingStr = bearingStr,
-                        mapBitmap = mapBitmap,
-                        txtGeneratedBy = txtGeneratedBy,
-                        useOneUi = useOneUi,
-                        forceDarkTheme = forceDarkTheme,
-                        isSupportShare = isSupportShare,
-                        shareOrder = shareOrder,
-                        includedBlocks = includedBlocks,
-                        incQrCode = incQrCode,
-                        incConfidential = incConfidential
-                    )
+                    GeoTowerExportUiStyleProvider {
+                        RadioShareCaptureContent(
+                            title = title,
+                            mainMarker = mainMarker,
+                            markers = visibleMarkers,
+                            distanceStr = distanceStr,
+                            bearingStr = bearingStr,
+                            mapBitmap = mapBitmap,
+                            txtGeneratedBy = txtGeneratedBy,
+                            useOneUi = useOneUi,
+                            forceDarkTheme = forceDarkTheme,
+                            isSupportShare = isSupportShare,
+                            shareOrder = shareOrder,
+                            includedBlocks = includedBlocks,
+                            incQrCode = incQrCode,
+                            incConfidential = incConfidential
+                        )
+                    }
                 }
             }
         }
@@ -4063,7 +4106,8 @@ fun shareFullAntennaCapture(
         setViewTreeViewModelStoreOwner(currentView.findViewTreeViewModelStoreOwner())
         setContent {
             MaterialTheme(colorScheme = if (forceDarkTheme) darkColorScheme() else lightColorScheme()) {
-                Surface(color = Color.Transparent) { // ⚠️ TRÈS IMPORTANT : Fond transparent pour ne pas colorer le vide
+                GeoTowerExportUiStyleProvider {
+                    Surface(color = Color.Transparent) { // ⚠️ TRÈS IMPORTANT : Fond transparent pour ne pas colorer le vide
 
                     val distanceUnit = AppConfig.distanceUnit.intValue
                     val formattedHeights = if (info.azimuts.isNullOrBlank()) ""
@@ -4939,12 +4983,17 @@ fun shareFullAntennaCapture(
                             }
                         }
                     }
+                    }
                 }
             }
         }
     }
 
-    val rootView = currentView.rootView as ViewGroup
+    val rootView = currentView.rootView as? ViewGroup ?: run {
+        Toast.makeText(context, txtInitError, Toast.LENGTH_SHORT).show()
+        onComplete?.invoke()
+        return
+    }
     composeView.translationX = 10000f
 
     try {
@@ -4960,6 +5009,7 @@ fun shareFullAntennaCapture(
     } catch (e: Exception) {
         AppLogger.w(TAG_SHARE_IMAGE, "Site share view setup failed", e)
         Toast.makeText(context, txtInitError, Toast.LENGTH_SHORT).show()
+        onComplete?.invoke()
         return
     }
 
@@ -4976,7 +5026,7 @@ fun shareFullAntennaCapture(
                 val imagesDir = File(context.cacheDir, "images")
                 imagesDir.mkdirs()
 
-                val urisToShare = java.util.ArrayList<Uri>()
+                val pendingBitmaps = ArrayList<PendingShareBitmap>()
 
                 // Une image par colonne, dessinée à part : allouer la planche entière
                 // (400 dp × nombre d'images) coûterait des dizaines de Mo sur une station chargée.
@@ -4986,68 +5036,67 @@ fun shareFullAntennaCapture(
                     val canvas = Canvas(columnBitmap)
                     canvas.translate(-(columnIndex * columnWidth).toFloat(), 0f)
                     composeView.draw(canvas)
-                    // Les colonnes n'ont pas la même hauteur : le vide sous la plus courte est
-                    // transparent (le fond est peint par chaque colonne, pas par la Row).
-                    val trimmed = columnBitmap.trimTransparentBottom()
-
-                    val file = File(
-                        imagesDir,
-                        if (columnCount == 1) "Geotower_site_${info.idAnfr}.png"
-                        else "Geotower_site_${info.idAnfr}_part${columnIndex + 1}.png"
+                    pendingBitmaps += PendingShareBitmap(
+                        bitmap = columnBitmap,
+                        file = File(
+                            imagesDir,
+                            if (columnCount == 1) "Geotower_site_${info.idAnfr}.png"
+                            else "Geotower_site_${info.idAnfr}_part${columnIndex + 1}.png"
+                        ),
+                        // Les colonnes n'ont pas la même hauteur : le vide sous la plus courte
+                        // est transparent (le fond est peint par chaque colonne, pas par la Row).
+                        trimTransparentBottom = true
                     )
-                    FileOutputStream(file).use { trimmed.compress(Bitmap.CompressFormat.PNG, 100, it) }
-                    if (trimmed !== columnBitmap) columnBitmap.recycle()
-                    trimmed.recycle()
-
-                    urisToShare.add(FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file))
                 }
                 rootView.removeView(composeView)
 
                 elevationProfileBitmap?.let { profileBitmap ->
-                    val profileFile = File(imagesDir, "Geotower_site_${info.idAnfr}_profil_altimetrique.png")
-                    FileOutputStream(profileFile).use { profileBitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-                    urisToShare.add(FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", profileFile))
-                }
-
-                // Lancement de l'intention de partage
-                if (destination == ShareImageDestination.Clipboard) {
-                    shareOrCopyImageUris(
-                        context = context,
-                        uris = urisToShare,
-                        label = "Capture",
-                        chooserTitle = txtShareSiteVia,
-                        destination = destination,
-                        copiedMessage = txtCopiedToClipboard
+                    pendingBitmaps += PendingShareBitmap(
+                        bitmap = profileBitmap,
+                        file = File(imagesDir, "Geotower_site_${info.idAnfr}_profil_altimetrique.png")
                     )
-                } else {
-                    val sendMultipleImages = urisToShare.size > 1
-                val intent = Intent(if (sendMultipleImages) Intent.ACTION_SEND_MULTIPLE else Intent.ACTION_SEND).apply {
-                    type = "image/png"
-                    if (sendMultipleImages) {
-                        putParcelableArrayListExtra(Intent.EXTRA_STREAM, urisToShare)
-                        // ✅ CORRECTION : Ajout de toutes les URIs au ClipData pour autoriser la lecture
-                        val clipDataMulti = ClipData.newUri(context.contentResolver, "Capture", urisToShare[0])
-                        for (i in 1 until urisToShare.size) {
-                            clipDataMulti.addItem(ClipData.Item(urisToShare[i]))
-                        }
-                        clipData = clipDataMulti
-                    } else {
-                        putExtra(Intent.EXTRA_STREAM, urisToShare.first())
-                        clipData = ClipData.newUri(context.contentResolver, "Capture", urisToShare.first())
-                    }
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 }
 
-                    context.startActivity(Intent.createChooser(intent, txtShareSiteVia).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                val lifecycleOwner = currentView.findViewTreeLifecycleOwner()
+                if (lifecycleOwner == null) {
+                    pendingBitmaps.forEach { pending ->
+                        if (!pending.bitmap.isRecycled) pending.bitmap.recycle()
+                    }
+                    Toast.makeText(context, txtInitError, Toast.LENGTH_SHORT).show()
+                    onComplete?.invoke()
+                    return@postDelayed
                 }
-                onComplete?.invoke()
+
+                lifecycleOwner.lifecycleScope.launch {
+                    try {
+                        val urisToShare = writeShareBitmapFiles(context, pendingBitmaps)
+                        shareOrCopyImageUris(
+                            context = context,
+                            uris = urisToShare,
+                            label = "Capture",
+                            chooserTitle = txtShareSiteVia,
+                            destination = destination,
+                            copiedMessage = txtCopiedToClipboard
+                        )
+                    } catch (e: Exception) {
+                        AppLogger.w(TAG_SHARE_IMAGE, "Site share file export failed", e)
+                        Toast.makeText(context, txtInitError, Toast.LENGTH_SHORT).show()
+                    } finally {
+                        pendingBitmaps.forEach { pending ->
+                            if (!pending.bitmap.isRecycled) pending.bitmap.recycle()
+                        }
+                        onComplete?.invoke()
+                    }
+                }
             } else {
                 rootView.removeView(composeView)
+                Toast.makeText(context, txtInitError, Toast.LENGTH_SHORT).show()
                 onComplete?.invoke()
             }
         } catch (e: Exception) {
             AppLogger.w(TAG_SHARE_IMAGE, "Site share capture failed", e)
             if (composeView.parent != null) rootView.removeView(composeView)
+            Toast.makeText(context, txtInitError, Toast.LENGTH_SHORT).show()
             onComplete?.invoke()
         }
     }, 500)
@@ -5105,14 +5154,15 @@ fun shareFullSiteCapture(
             setContent {
                 val colors = if (forceDarkTheme) darkColorScheme() else lightColorScheme()
                 MaterialTheme(colorScheme = colors) {
-                    Surface(color = MaterialTheme.colorScheme.background) {
-                        Column(
-                            modifier = Modifier
-                                .width(400.dp)
-                                .wrapContentHeight()
-                                .padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
+                    GeoTowerExportUiStyleProvider {
+                        Surface(color = MaterialTheme.colorScheme.background) {
+                            Column(
+                                modifier = Modifier
+                                    .width(400.dp)
+                                    .wrapContentHeight()
+                                    .padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
                             Text(text = txtTitle, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
 
                             shareOrder.forEach { block ->
@@ -5236,6 +5286,7 @@ fun shareFullSiteCapture(
                             }
 
                             Text(text = txtGeneratedBy, fontSize = 12.sp, color = Color.Gray, modifier = Modifier.align(Alignment.CenterHorizontally))
+                            }
                         }
                     }
                 }
@@ -5243,6 +5294,7 @@ fun shareFullSiteCapture(
         }
 
         val rootView = currentView.rootView as? ViewGroup ?: run {
+            Toast.makeText(context, txtInitError, Toast.LENGTH_SHORT).show()
             onComplete?.invoke()
             return
         }
@@ -5266,19 +5318,37 @@ fun shareFullSiteCapture(
                 cachePath.mkdirs()
                 val safeId = (physique?.idSupport?.takeIf { it.isNotBlank() } ?: siteId)
                     .replace(Regex("[^A-Za-z0-9._-]"), "_")
-                val file = File(cachePath, "Geotower_support_$safeId.png")
-                FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-
-                val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-                shareOrCopyImageUris(
-                    context = context,
-                    uris = listOf(uri),
-                    label = "Capture",
-                    chooserTitle = txtShareSiteVia,
-                    destination = destination,
-                    copiedMessage = txtCopiedToClipboard
+                val pending = PendingShareBitmap(
+                    bitmap = bitmap,
+                    file = File(cachePath, "Geotower_support_$safeId.png")
                 )
-                onComplete?.invoke()
+                val lifecycleOwner = currentView.findViewTreeLifecycleOwner()
+                if (lifecycleOwner == null) {
+                    bitmap.recycle()
+                    Toast.makeText(context, txtInitError, Toast.LENGTH_SHORT).show()
+                    onComplete?.invoke()
+                    return@post
+                }
+
+                lifecycleOwner.lifecycleScope.launch {
+                    try {
+                        val uri = writeShareBitmapFiles(context, listOf(pending)).single()
+                        shareOrCopyImageUris(
+                            context = context,
+                            uris = listOf(uri),
+                            label = "Capture",
+                            chooserTitle = txtShareSiteVia,
+                            destination = destination,
+                            copiedMessage = txtCopiedToClipboard
+                        )
+                    } catch (e: Exception) {
+                        AppLogger.w(TAG_SHARE_IMAGE, "Support share file export failed", e)
+                        Toast.makeText(context, txtInitError, Toast.LENGTH_SHORT).show()
+                    } finally {
+                        if (!bitmap.isRecycled) bitmap.recycle()
+                        onComplete?.invoke()
+                    }
+                }
             } catch (e: Exception) {
                 AppLogger.w(TAG_SHARE_IMAGE, "Support share capture failed", e)
                 Toast.makeText(context, txtInitError, Toast.LENGTH_SHORT).show()
@@ -5288,6 +5358,7 @@ fun shareFullSiteCapture(
         }
     } catch (e: Exception) {
         AppLogger.w(TAG_SHARE_IMAGE, "Support share initialization failed", e)
+        Toast.makeText(context, txtInitError, Toast.LENGTH_SHORT).show()
         onComplete?.invoke()
     }
 }
@@ -5632,8 +5703,10 @@ private fun exportGeoTowerPdfPages(
             setViewTreeViewModelStoreOwner(currentView.findViewTreeViewModelStoreOwner())
             setContent {
                 MaterialTheme(colorScheme = lightColorScheme()) {
-                    Surface(color = Color.White) {
-                        pageContent(index, pageLabel)
+                    GeoTowerExportUiStyleProvider {
+                        Surface(color = Color.White) {
+                            pageContent(index, pageLabel)
+                        }
                     }
                 }
             }
@@ -6927,14 +7000,15 @@ fun shareThroughputCapture(
             setContent {
                 val colors = if (forceDarkTheme) darkColorScheme() else lightColorScheme()
                 MaterialTheme(colorScheme = colors) {
-                    Surface(color = MaterialTheme.colorScheme.background) {
-                        Column(
-                            modifier = Modifier
-                                .width(400.dp)
-                                .wrapContentHeight()
-                                .padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
+                    GeoTowerExportUiStyleProvider {
+                        Surface(color = MaterialTheme.colorScheme.background) {
+                            Column(
+                                modifier = Modifier
+                                    .width(400.dp)
+                                    .wrapContentHeight()
+                                    .padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
                             Text(text = txtTitle, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                             ThroughputShareContent(
                                 site = info,
@@ -6961,6 +7035,7 @@ fun shareThroughputCapture(
                                 }
                             }
                             Text(text = txtGeneratedBy, fontSize = 12.sp, color = Color.Gray, modifier = Modifier.align(Alignment.CenterHorizontally))
+                            }
                         }
                     }
                 }

@@ -25,6 +25,9 @@ object OutageStatusCodes {
 
     fun isUp(value: String?): Boolean = normalized(value) in UP
 
+    /** Vrai pour une indisponibilité globale explicite (« HS »), hors simple dégradation (« DE »). */
+    fun isHs(value: String?): Boolean = normalized(value) == "HS"
+
     private fun normalized(value: String?): String? = clean(value)?.uppercase(Locale.ROOT)
 }
 

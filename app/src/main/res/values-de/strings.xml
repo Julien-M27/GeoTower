@@ -1390,6 +1390,12 @@
     <string name="appstrings_status_legend_title">Tabellenlegende</string>
     <string name="appstrings_status_legend_unavailable">Technologie nicht vorhanden, nicht deklariert oder Information nicht verfügbar.</string>
     <string name="appstrings_status_legend_uncertain">Dienst für diese Generation nicht deklariert: Grünes „?“ bedeutet, dass die Generation bekanntermaßen funktioniert; rotes „?“ bedeutet, dass eine Störung sie betreffen kann.</string>
+    <string name="appstrings_status_legend_codes_title">Statuscodes</string>
+    <string name="appstrings_status_code_ok">Funktionsfähig</string>
+    <string name="appstrings_status_code_de">Beeinträchtigt</string>
+    <string name="appstrings_status_code_hs">Außer Betrieb</string>
+    <string name="appstrings_status_code_ne">Nicht ausgestattet</string>
+    <string name="appstrings_status_legend_reason_codes_title">Codes für Störungsgründe</string>
     <string name="appstrings_support_detail_title">Supportdetail</string>
     <string name="appstrings_support_details_option">Supportdetails</string>
     <string name="appstrings_support_details_title">Supportdetails</string>
@@ -1505,6 +1511,7 @@
     <string name="appstrings_generating_db_banner_desc">Die Datenbank wird auf dem Gerät erstellt: kein Download nötig.</string>
     <string name="appstrings_db_generation_in_progress">Wird erstellt…</string>
     <string name="appstrings_update_db_banner_title">Update verfügbar</string>
+    <string name="appstrings_db_banner_databases">Betroffene Datenbanken: %1$s</string>
     <string name="appstrings_update_db_banner_desc_rebuild">Auf diesem Gerät wird die Datenbank durch Neuerstellen aktualisiert.</string>
     <string name="appstrings_update_notif_setting_desc">Benachrichtigen, wenn eine neue Datenbank oder APK verfügbar ist</string>
     <string name="appstrings_update_notif_setting_title">Update-Benachrichtigungen</string>
@@ -3074,4 +3081,10 @@
     <string name="appstrings_release_v2035_site_status_lines">In der Seitenanpassung lassen sich die Sprach- und Datenzeile der Standortstatus-Tabelle jetzt unabhängig ein- und ausblenden</string>
     <string name="appstrings_release_v2035_status_uncertainty">Unbekannte Störungszustände zeigen jetzt klarere grüne oder rote Fragezeichen; 2G-Daten werden nicht mehr als anwendbar angezeigt</string>
     <string name="appstrings_release_v2035_operation_pause">Lange Vorgänge für Datenbanken, Karten und lokale Erstellung lassen sich jetzt in den Einstellungen pausieren und fortsetzen</string>
+    <string name="appstrings_release_section_sharing">Teilen</string>
+    <string name="appstrings_release_v2036_frequency_grid">Das Frequenzraster ist jetzt standardmäßig aktiviert und bietet eine nützlichere Standortübersicht</string>
+    <string name="appstrings_release_v2036_database_banner">Datenbankbanner zeigen jetzt an, welche Datenbanken von einem verfügbaren Update betroffen sind</string>
+    <string name="appstrings_release_v2036_status_details">Standortdetails enthalten jetzt Legenden für Status- und Störungsursachencodes mit klareren Informationen</string>
+    <string name="appstrings_release_v2036_global_outages">Globale Störungen werden jetzt konsistent auf ausgestattete Generationen angewendet, mit klareren Außer-Betrieb-Anzeigen</string>
+    <string name="appstrings_release_v2036_share_export">Karten- und Standortaufnahmen folgen jetzt dem App-Theme und werden im Hintergrund exportiert, für ein flüssigeres und zuverlässigeres Teilen</string>
 </resources>

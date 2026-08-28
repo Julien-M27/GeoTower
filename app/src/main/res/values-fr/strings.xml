@@ -1387,6 +1387,12 @@
     <string name="appstrings_status_legend_title">Légende du tableau</string>
     <string name="appstrings_status_legend_unavailable">Technologie absente, non déclarée ou information non communiquée.</string>
     <string name="appstrings_status_legend_uncertain">Service non déclaré pour cette génération : « ? » vert si la génération fonctionne, « ? » rouge si une panne peut la toucher.</string>
+    <string name="appstrings_status_legend_codes_title">Codes de statut</string>
+    <string name="appstrings_status_code_ok">Fonctionnel</string>
+    <string name="appstrings_status_code_de">Dégradé</string>
+    <string name="appstrings_status_code_hs">Hors service</string>
+    <string name="appstrings_status_code_ne">Non équipé</string>
+    <string name="appstrings_status_legend_reason_codes_title">Codes des raisons de panne</string>
     <string name="appstrings_status_outage">En panne</string>
     <string name="appstrings_status_project">En projet</string>
     <string name="appstrings_status_title">Statut du site</string>
@@ -1505,6 +1511,7 @@
     <string name="appstrings_generating_db_banner_desc">La base est construite sur l\'appareil : aucun téléchargement n\'est nécessaire.</string>
     <string name="appstrings_db_generation_in_progress">Génération en cours…</string>
     <string name="appstrings_update_db_banner_title">Mise à jour disponible</string>
+    <string name="appstrings_db_banner_databases">Bases concernées : %1$s</string>
     <string name="appstrings_update_db_banner_desc_rebuild">Sur cet appareil, la base se met à jour en la régénérant.</string>
     <string name="appstrings_update_notif_setting_desc">Être alerté quand une nouvelle base de données ou une nouvelle APK est disponible</string>
     <string name="appstrings_update_notif_setting_title">Notifications de mise à jour</string>
@@ -3076,4 +3083,10 @@
     <string name="appstrings_release_v2035_site_status_lines">Le tableau de statut d’un site permet désormais d’afficher ou de masquer séparément les lignes Voix et Data dans la personnalisation des pages</string>
     <string name="appstrings_release_v2035_status_uncertainty">Les états de panne inconnus affichent des « ? » verts ou rouges plus explicites, et la Data 2G n’est plus présentée comme applicable</string>
     <string name="appstrings_release_v2035_operation_pause">Les opérations longues — bases, cartes et génération locale — peuvent désormais être mises en pause puis reprises depuis les réglages</string>
+    <string name="appstrings_release_section_sharing">Partage</string>
+    <string name="appstrings_release_v2036_frequency_grid">La grille des fréquences est désormais activée par défaut pour une vue plus utile des sites</string>
+    <string name="appstrings_release_v2036_database_banner">Les bandeaux de base indiquent désormais les bases concernées par une mise à jour disponible</string>
+    <string name="appstrings_release_v2036_status_details">Les détails du statut incluent désormais les légendes des codes de statut et des raisons de panne</string>
+    <string name="appstrings_release_v2036_global_outages">Les pannes globales s’appliquent maintenant correctement aux générations équipées, avec des indicateurs hors service plus clairs</string>
+    <string name="appstrings_release_v2036_share_export">Les captures de carte et de site suivent désormais le thème de l’application et sont exportées en arrière-plan pour un partage plus fluide et fiable</string>
 </resources>

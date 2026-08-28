@@ -142,14 +142,30 @@ class SiteServiceStatusGridTest {
     }
 
     @Test
-    fun aPublishedCodeIsNeverUncertain() {
+    fun aGlobalHsOverridesAPublishedOkCode() {
         val grid = gridOf(site(voix4g = "OK", data4g = "HS", dataGlobal = "HS", voixGlobal = "HS"))
 
         val g4 = grid.getValue("4G")
-        assertEquals(true, g4.isVoixOk)
+        // Le HS global est prioritaire : même un OK détaillé est affiché rouge pour signaler
+        // l'état global du service.
+        assertEquals(false, g4.isVoixOk)
         assertFalse(g4.isVoixUncertain)
         assertEquals(false, g4.isInternetOk)
         assertFalse(g4.isInternetUncertain)
+    }
+
+    @Test
+    fun aGlobalHsMakesEveryUndeclaredGenerationRed() {
+        val grid = gridOf(site(voixGlobal = "HS", dataGlobal = "HS"), has5G = true)
+
+        listOf("2G", "3G", "4G", "5G").forEach { technology ->
+            val status = grid.getValue(technology)
+            assertEquals(UncertainServiceColor.Red, status.voixUncertainColor)
+            assertEquals(
+                if (technology == "2G") null else UncertainServiceColor.Red,
+                status.internetUncertainColor
+            )
+        }
     }
 
     @Test

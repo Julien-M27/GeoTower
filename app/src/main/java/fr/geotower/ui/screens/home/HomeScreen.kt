@@ -499,6 +499,7 @@ fun HomeScreen(navController: NavController) {
                 isDownloading = isDownloading,
                 isGenerating = isGeneratingDb,
                 isRebuildOffer = isRebuildBanner,
+                databaseNames = listOf(stringResource(R.string.notification_history_type_db_mobile)),
                 downloadProgress = if (isGeneratingDb) localBuild.progress else downloadProgress,
                 onBannerClick = {
                     safeClick("home_database_banner") {
@@ -1404,11 +1405,19 @@ fun DatabaseWarningBanner(
     // La base installée a été générée sur l'appareil : la mise à jour se propose en « Régénérer »
     // plutôt qu'en « Télécharger » (le bouton lance alors la génération locale).
     isRebuildOffer: Boolean = false,
+    // Les libellés des bases concernées. La liste permet au composant d'afficher plusieurs bases
+    // si le bandeau est réutilisé pour une mise à jour groupée.
+    databaseNames: List<String> = emptyList(),
     downloadProgress: Int, // ✅ NOUVEAU PARAMÈTRE (progression du téléchargement OU de la génération)
     onBannerClick: () -> Unit,
     onDownloadClick: () -> Unit
 ) {
     val sizing = LocalGeoTowerUiSizing.current
+    val databaseNamesText = databaseNames
+        .map(String::trim)
+        .filter(String::isNotEmpty)
+        .distinct()
+        .joinToString(separator = " • ")
     androidx.compose.animation.AnimatedVisibility(
         visible = isMissing || isInvalid || isUpdateAvailable || isDownloading || isGenerating,
         enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
@@ -1468,6 +1477,14 @@ fun DatabaseWarningBanner(
                         color = contentColor,
                         style = androidx.compose.material3.MaterialTheme.typography.titleSmall
                     )
+                    if (databaseNamesText.isNotBlank()) {
+                        androidx.compose.material3.Text(
+                            text = stringResource(R.string.appstrings_db_banner_databases, databaseNamesText),
+                            color = contentColor,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                            style = androidx.compose.material3.MaterialTheme.typography.bodySmall
+                        )
+                    }
                     if (isGenerating) {
                         androidx.compose.material3.Text(
                             text = stringResource(R.string.appstrings_generating_db_banner_desc),

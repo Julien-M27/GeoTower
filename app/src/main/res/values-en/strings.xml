@@ -1390,6 +1390,12 @@
     <string name="appstrings_status_legend_title">Table legend</string>
     <string name="appstrings_status_legend_unavailable">Technology absent, not declared, or information unavailable.</string>
     <string name="appstrings_status_legend_uncertain">Service not declared for this generation: green “?” means the generation is known to work; red “?” means an outage may affect it.</string>
+    <string name="appstrings_status_legend_codes_title">Status codes</string>
+    <string name="appstrings_status_code_ok">Functional</string>
+    <string name="appstrings_status_code_de">Degraded</string>
+    <string name="appstrings_status_code_hs">Out of service</string>
+    <string name="appstrings_status_code_ne">Not equipped</string>
+    <string name="appstrings_status_legend_reason_codes_title">Outage reason codes</string>
     <string name="appstrings_support_detail_title">Support Detail</string>
     <string name="appstrings_support_details_option">Support details</string>
     <string name="appstrings_support_details_title">Support details</string>
@@ -1505,6 +1511,7 @@
     <string name="appstrings_generating_db_banner_desc">The database is being built on this device: no download needed.</string>
     <string name="appstrings_db_generation_in_progress">Building…</string>
     <string name="appstrings_update_db_banner_title">Update available</string>
+    <string name="appstrings_db_banner_databases">Databases: %1$s</string>
     <string name="appstrings_update_db_banner_desc_rebuild">On this device, the database updates by rebuilding it.</string>
     <string name="appstrings_update_notif_setting_desc">Get alerted when a new database or APK is available</string>
     <string name="appstrings_update_notif_setting_title">Update notifications</string>
@@ -3074,4 +3081,10 @@
     <string name="appstrings_release_v2035_site_status_lines">The site status table now lets you show or hide the Voice and Data lines independently in page customization</string>
     <string name="appstrings_release_v2035_status_uncertainty">Unknown outage states now show clearer green or red question marks, and 2G data is no longer shown as applicable</string>
     <string name="appstrings_release_v2035_operation_pause">Long database, map and local generation operations can now be paused and resumed from settings</string>
+    <string name="appstrings_release_section_sharing">Sharing</string>
+    <string name="appstrings_release_v2036_frequency_grid">The frequency grid is now enabled by default for a more useful site overview</string>
+    <string name="appstrings_release_v2036_database_banner">Database banners now identify the databases concerned by an available update</string>
+    <string name="appstrings_release_v2036_status_details">Site status details now include status and outage reason code legends with clearer information</string>
+    <string name="appstrings_release_v2036_global_outages">Global outages are now applied consistently to equipped generations, with clearer out-of-service indicators</string>
+    <string name="appstrings_release_v2036_share_export">Map and site captures now follow the app theme and are exported in the background for smoother, more reliable sharing</string>
 </resources>

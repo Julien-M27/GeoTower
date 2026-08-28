@@ -1390,6 +1390,12 @@
     <string name="appstrings_status_legend_title">Legenda da tabela</string>
     <string name="appstrings_status_legend_unavailable">Tecnologia ausente, não declarada ou informação indisponível.</string>
     <string name="appstrings_status_legend_uncertain">Serviço não declarado para esta geração: «?» verde significa que a geração funciona; «?» vermelho significa que uma avaria pode afetá-la.</string>
+    <string name="appstrings_status_legend_codes_title">Códigos de estado</string>
+    <string name="appstrings_status_code_ok">Funcional</string>
+    <string name="appstrings_status_code_de">Degradado</string>
+    <string name="appstrings_status_code_hs">Fora de serviço</string>
+    <string name="appstrings_status_code_ne">Não equipado</string>
+    <string name="appstrings_status_legend_reason_codes_title">Códigos dos motivos da falha</string>
     <string name="appstrings_support_detail_title">Detalhe do suporte</string>
     <string name="appstrings_support_details_option">Detalhes do suporte</string>
     <string name="appstrings_support_details_title">Detalhes do suporte</string>
@@ -1505,6 +1511,7 @@
     <string name="appstrings_generating_db_banner_desc">A base está a ser gerada no aparelho: não é preciso transferir nada.</string>
     <string name="appstrings_db_generation_in_progress">A gerar…</string>
     <string name="appstrings_update_db_banner_title">Atualização disponible</string>
+    <string name="appstrings_db_banner_databases">Bases afetadas: %1$s</string>
     <string name="appstrings_update_db_banner_desc_rebuild">Neste aparelho, a base atualiza-se gerando-a de novo.</string>
     <string name="appstrings_update_notif_setting_desc">Ser alertado quando uma nova base de dados ou APK estiver disponivel</string>
     <string name="appstrings_update_notif_setting_title">Notificações de atualização</string>
@@ -3074,4 +3081,10 @@
     <string name="appstrings_release_v2035_site_status_lines">A personalização das páginas permite agora mostrar ou ocultar separadamente as linhas Voz e Dados na tabela de estado do site</string>
     <string name="appstrings_release_v2035_status_uncertainty">Os estados de avaria desconhecidos mostram agora pontos de interrogação verdes ou vermelhos mais claros, e os dados 2G deixam de ser apresentados como aplicáveis</string>
     <string name="appstrings_release_v2035_operation_pause">As operações demoradas de bases, mapas e geração local podem agora ser pausadas e retomadas nas definições</string>
+    <string name="appstrings_release_section_sharing">Partilha</string>
+    <string name="appstrings_release_v2036_frequency_grid">A grelha de frequências está agora ativada por predefinição para uma visão mais útil dos sites</string>
+    <string name="appstrings_release_v2036_database_banner">Os avisos das bases indicam agora quais são afetadas por uma atualização disponível</string>
+    <string name="appstrings_release_v2036_status_details">Os detalhes do estado do site incluem agora legendas dos códigos de estado e dos motivos de avaria, com informações mais claras</string>
+    <string name="appstrings_release_v2036_global_outages">As avarias globais são agora aplicadas de forma consistente às gerações equipadas, com indicadores de fora de serviço mais claros</string>
+    <string name="appstrings_release_v2036_share_export">As capturas de mapas e sites seguem agora o tema da aplicação e são exportadas em segundo plano, para uma partilha mais fluida e fiável</string>
 </resources>

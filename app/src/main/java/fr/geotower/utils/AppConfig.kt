@@ -285,7 +285,7 @@ object AppConfig {
     var siteF5G_4200 = mutableStateOf(true)
     var siteF5G_26000 = mutableStateOf(true)
 
-    var siteFreqGridDisplay = mutableStateOf(false)
+    var siteFreqGridDisplay = mutableStateOf(true)
 
     // --- FILTRES : LARGEUR DE BANDE ET SPECTRE (DÉTAILS DU SITE) ---
     // Les clés de préférences gardent leur nom historique « site_show_spectrum* » : ces trois
@@ -764,7 +764,7 @@ object AppConfig {
         siteF5G_26000.value = prefs.getBoolean("site_f5g_26000", true)
 
         //AFFICHAGE DES FREQUENCES EN GRILLE
-        siteFreqGridDisplay.value = prefs.getBoolean("site_freq_grid_display", false)
+        siteFreqGridDisplay.value = prefs.getBoolean("site_freq_grid_display", true)
 
         // --- CHARGEMENT LARGEUR DE BANDE (clés historiques « site_show_spectrum* ») ---
         siteShowBandwidth.value = prefs.getBoolean("site_show_spectrum", true)

@@ -163,8 +163,19 @@ fun siteServiceStatusGrid(
 ): Map<String, ServiceStatus> {
     val isOutage = hsEntity != null
 
-    fun availability(hasTech: Boolean, outageCode: String?): Boolean? =
-        serviceAvailabilityFromOutageCode(hasTech, outageCode, isOutage)
+    fun availability(hasTech: Boolean, outageCode: String?, globalCode: String?): Boolean? {
+        if (!hasTech || !isOutage) return if (hasTech) true else null
+
+        // Un HS global s'applique à toutes les générations renseignées pour ce service. Une case
+        // absente reste indéterminée afin d'afficher « ? » rouge plutôt qu'un faux « HS » précis.
+        if (OutageStatusCodes.isHs(globalCode) && OutageStatusCodes.clean(outageCode) != null) {
+            return when {
+                OutageStatusCodes.isUp(outageCode) || OutageStatusCodes.isDown(outageCode) -> false
+                else -> null
+            }
+        }
+        return serviceAvailabilityFromOutageCode(hasTech, outageCode, isOutage)
+    }
 
     fun voiceUncertainColor(hasTech: Boolean, voiceCode: String?, dataCode: String?): UncertainServiceColor? =
         serviceUncertaintyColorFromOutageCode(
@@ -193,7 +204,7 @@ fun siteServiceStatusGrid(
 
     return mapOf(
         "2G" to ServiceStatus(
-            isVoixOk = availability(has2G, hsEntity?.voix2g),
+            isVoixOk = availability(has2G, hsEntity?.voix2g, hsEntity?.voixGlobal),
             // La 2G est suivie uniquement pour la voix dans cette grille : la Data est non applicable.
             isInternetOk = null,
             isProject = is2gProject,
@@ -201,22 +212,22 @@ fun siteServiceStatusGrid(
             internetUncertainColor = null
         ),
         "3G" to ServiceStatus(
-            isVoixOk = availability(has3G, hsEntity?.voix3g),
-            isInternetOk = availability(has3G, hsEntity?.data3g),
+            isVoixOk = availability(has3G, hsEntity?.voix3g, hsEntity?.voixGlobal),
+            isInternetOk = availability(has3G, hsEntity?.data3g, hsEntity?.dataGlobal),
             isProject = is3gProject,
             voixUncertainColor = voiceUncertainColor(has3G, hsEntity?.voix3g, hsEntity?.data3g),
             internetUncertainColor = dataUncertainColor(has3G, hsEntity?.data3g, hsEntity?.voix3g)
         ),
         "4G" to ServiceStatus(
-            isVoixOk = availability(has4G, hsEntity?.voix4g),
-            isInternetOk = availability(has4G, hsEntity?.data4g),
+            isVoixOk = availability(has4G, hsEntity?.voix4g, hsEntity?.voixGlobal),
+            isInternetOk = availability(has4G, hsEntity?.data4g, hsEntity?.dataGlobal),
             isProject = is4gProject,
             voixUncertainColor = voiceUncertainColor(has4G, hsEntity?.voix4g, hsEntity?.data4g),
             internetUncertainColor = dataUncertainColor(has4G, hsEntity?.data4g, hsEntity?.voix4g)
         ),
         "5G" to ServiceStatus(
-            isVoixOk = availability(has5G, hsEntity?.voix5g),
-            isInternetOk = availability(has5G, hsEntity?.data5g),
+            isVoixOk = availability(has5G, hsEntity?.voix5g, hsEntity?.voixGlobal),
+            isInternetOk = availability(has5G, hsEntity?.data5g, hsEntity?.dataGlobal),
             isProject = is5gProject,
             isVoixProject = is5gVoiceProject,
             isInternetProject = is5gDataProject,
@@ -350,13 +361,14 @@ fun SiteStatusCard(
                         OutageDateLine(
                             label = stringResource(R.string.appstrings_outage_start_date),
                             value = formattedStartDate
-                                ?: stringResource(R.string.appstrings_outage_date_unavailable)
+                                ?: stringResource(R.string.appstrings_outage_date_unavailable),
+                            valueColor = MaterialTheme.colorScheme.primary
                         )
                         OutageDateLine(
                             label = stringResource(R.string.appstrings_outage_restore_forecast),
                             value = formattedRestorationDate
                                 ?: stringResource(R.string.appstrings_outage_date_unavailable),
-                            emphasized = true
+                            valueColor = MaterialTheme.colorScheme.primary
                         )
                     }
                 }
@@ -479,7 +491,8 @@ fun SiteStatusCard(
 
 private data class OutageDetailDisplayRow(
     val label: String,
-    val value: String
+    val value: String,
+    val valueColor: Color? = null
 )
 
 @Composable
@@ -536,6 +549,44 @@ private fun StatusLegendDialog(onDismiss: () -> Unit) {
                         Text("~", color = colorProject, fontWeight = FontWeight.Bold, fontSize = sizing.text(22.sp))
                     },
                     text = stringResource(R.string.appstrings_status_legend_project)
+                )
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                Text(
+                    text = stringResource(R.string.appstrings_status_legend_codes_title),
+                    fontSize = sizing.text(12.sp),
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                StatusLegendRow(
+                    symbol = { Text("OK", fontWeight = FontWeight.Bold, fontSize = sizing.text(12.sp)) },
+                    text = stringResource(R.string.appstrings_status_code_ok)
+                )
+                StatusLegendRow(
+                    symbol = { Text("DE", fontWeight = FontWeight.Bold, fontSize = sizing.text(12.sp)) },
+                    text = stringResource(R.string.appstrings_status_code_de)
+                )
+                StatusLegendRow(
+                    symbol = { Text("HS", fontWeight = FontWeight.Bold, fontSize = sizing.text(12.sp)) },
+                    text = stringResource(R.string.appstrings_status_code_hs)
+                )
+                StatusLegendRow(
+                    symbol = { Text("NE", fontWeight = FontWeight.Bold, fontSize = sizing.text(12.sp)) },
+                    text = stringResource(R.string.appstrings_status_code_ne)
+                )
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                Text(
+                    text = stringResource(R.string.appstrings_status_legend_reason_codes_title),
+                    fontSize = sizing.text(12.sp),
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                StatusLegendRow(
+                    symbol = { Text("INT", fontWeight = FontWeight.Bold, fontSize = sizing.text(11.sp)) },
+                    text = stringResource(R.string.appstrings_outage_reason_incident)
+                )
+                StatusLegendRow(
+                    symbol = { Text("MAINT", fontWeight = FontWeight.Bold, fontSize = sizing.text(11.sp)) },
+                    text = stringResource(R.string.appstrings_outage_reason_maintenance)
                 )
             }
         },
@@ -609,10 +660,9 @@ private fun OutageDetailsSection(
     if (!expanded) return
 
     val unavailableText = stringResource(R.string.appstrings_outage_date_unavailable)
+    val outageColor = Color(0xFFE53935)
 
-    fun displayValue(value: String?): String {
-        return cleanOutageValue(value) ?: unavailableText
-    }
+    fun displayValue(value: String?): String = cleanOutageValue(value) ?: unavailableText
 
     fun displayDate(value: String?): String {
         return formatOutageStatusDate(value) ?: unavailableText
@@ -622,34 +672,29 @@ private fun OutageDetailsSection(
         return OutageDetailDisplayRow(label, displayValue(value))
     }
 
+    fun serviceDetailRow(label: String, value: String?, globalCode: String?): OutageDetailDisplayRow {
+        val valueColor = if (OutageStatusCodes.isHs(globalCode) || OutageStatusCodes.isDown(value)) {
+            outageColor
+        } else {
+            null
+        }
+        return OutageDetailDisplayRow(label, displayValue(value), valueColor)
+    }
+
     val projectText = stringResource(R.string.appstrings_status_project)
 
     fun technologyStatusRow(
         label: String,
         value: String?,
         technology: String,
+        globalCode: String?,
         isServiceProject: (ServiceStatus) -> Boolean
     ): OutageDetailDisplayRow {
         val status = techStatus[technology]
         return if (status != null && (status.isProject || isServiceProject(status))) {
             OutageDetailDisplayRow(label, projectText)
         } else {
-            detailRow(label, value)
-        }
-    }
-
-    fun optionalTechnologyStatusRow(
-        label: String,
-        value: String?,
-        technology: String,
-        isServiceProject: (ServiceStatus) -> Boolean
-    ): OutageDetailDisplayRow? {
-        val status = techStatus[technology]
-        val isProject = status != null && (status.isProject || isServiceProject(status))
-        return if (cleanOutageValue(value) == null && !isProject) {
-            null
-        } else {
-            technologyStatusRow(label, value, technology, isServiceProject)
+            serviceDetailRow(label, value, globalCode)
         }
     }
 
@@ -684,16 +729,16 @@ private fun OutageDetailsSection(
     val voiceLabel = stringResource(R.string.appstrings_outage_voice)
     val dataLabel = stringResource(R.string.appstrings_outage_data)
     val rawStatusRows = listOf(
-        detailRow(voiceLabel, details.voixGlobal),
-        detailRow(dataLabel, details.dataGlobal),
-        technologyStatusRow("$voiceLabel 2G", details.voix2g, "2G") { it.isVoixProject },
-        technologyStatusRow("$voiceLabel 3G", details.voix3g, "3G") { it.isVoixProject },
-        technologyStatusRow("$voiceLabel 4G", details.voix4g, "4G") { it.isVoixProject },
-        optionalTechnologyStatusRow("$voiceLabel 5G", details.voix5g, "5G") { it.isVoixProject },
-        technologyStatusRow("$dataLabel 3G", details.data3g, "3G") { it.isInternetProject },
-        technologyStatusRow("$dataLabel 4G", details.data4g, "4G") { it.isInternetProject },
-        technologyStatusRow("$dataLabel 5G", details.data5g, "5G") { it.isInternetProject }
-    ).filterNotNull()
+        serviceDetailRow(voiceLabel, details.voixGlobal, details.voixGlobal),
+        serviceDetailRow(dataLabel, details.dataGlobal, details.dataGlobal),
+        technologyStatusRow("$voiceLabel 2G", details.voix2g, "2G", details.voixGlobal) { it.isVoixProject },
+        technologyStatusRow("$voiceLabel 3G", details.voix3g, "3G", details.voixGlobal) { it.isVoixProject },
+        technologyStatusRow("$voiceLabel 4G", details.voix4g, "4G", details.voixGlobal) { it.isVoixProject },
+        technologyStatusRow("$voiceLabel 5G", details.voix5g, "5G", details.voixGlobal) { it.isVoixProject },
+        technologyStatusRow("$dataLabel 3G", details.data3g, "3G", details.dataGlobal) { it.isInternetProject },
+        technologyStatusRow("$dataLabel 4G", details.data4g, "4G", details.dataGlobal) { it.isInternetProject },
+        technologyStatusRow("$dataLabel 5G", details.data5g, "5G", details.dataGlobal) { it.isInternetProject }
+    )
 
     Spacer(modifier = Modifier.height(sizing.spacing(14.dp)))
     OutageDetailGroup(stringResource(R.string.appstrings_outage_site_section), identityRows)
@@ -716,13 +761,13 @@ private fun OutageDetailGroup(title: String, rows: List<OutageDetailDisplayRow>)
 
     Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(3.dp))) {
         rows.forEach { row ->
-            OutageDetailLine(label = row.label, value = row.value)
+            OutageDetailLine(label = row.label, value = row.value, valueColor = row.valueColor)
         }
     }
 }
 
 @Composable
-private fun OutageDetailLine(label: String, value: String) {
+private fun OutageDetailLine(label: String, value: String, valueColor: Color? = null) {
     val sizing = LocalGeoTowerUiSizing.current
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -739,17 +784,19 @@ private fun OutageDetailLine(label: String, value: String) {
         Text(
             text = value,
             fontSize = sizing.text(11.sp),
-            color = MaterialTheme.colorScheme.onSurface,
+            color = valueColor ?: MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1.2f)
         )
     }
 }
 
 @Composable
-private fun OutageDateLine(label: String, value: String, emphasized: Boolean = false) {
+private fun OutageDateLine(
+    label: String,
+    value: String,
+    valueColor: Color
+) {
     val sizing = LocalGeoTowerUiSizing.current
-    val labelColor = if (emphasized) Color(0xFFE53935) else MaterialTheme.colorScheme.onSurfaceVariant
-    val valueColor = if (emphasized) Color(0xFFE53935) else MaterialTheme.colorScheme.onSurface
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(sizing.spacing(6.dp)),
@@ -759,12 +806,13 @@ private fun OutageDateLine(label: String, value: String, emphasized: Boolean = f
             text = "$label :",
             fontSize = sizing.text(12.sp),
             fontWeight = FontWeight.SemiBold,
-            color = labelColor,
+            color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(0.9f)
         )
         Text(
             text = value,
-            fontSize = sizing.text(12.sp),
+            fontSize = sizing.text(13.sp),
+            fontWeight = FontWeight.Bold,
             color = valueColor,
             modifier = Modifier.weight(1.2f)
         )
