@@ -41,6 +41,12 @@ internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
         item(stringResource(R.string.appstrings_release_v2036_global_outages))
     }
 
+    section(stringResource(R.string.appstrings_release_section_hidden_sites)) {
+        item(stringResource(R.string.appstrings_release_v2037_hidden_sites))
+        item(stringResource(R.string.appstrings_release_v2037_hidden_sites_scope))
+        item(stringResource(R.string.appstrings_release_v2037_hidden_sites_backup))
+    }
+
     section(stringResource(R.string.appstrings_release_section_sharing)) {
         item(stringResource(R.string.appstrings_release_v2036_share_export))
     }

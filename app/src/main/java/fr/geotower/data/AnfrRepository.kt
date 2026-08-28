@@ -63,6 +63,7 @@ import fr.geotower.data.models.toPhysiqueEntity
 import fr.geotower.data.models.toRadioStatRow
 import fr.geotower.data.models.toTechniqueEntity
 import fr.geotower.data.models.toWeeklyRadioStatRow
+import fr.geotower.data.hidden.HiddenSitesStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -380,6 +381,12 @@ class AnfrRepository(
     private val api: AnfrService,
     private val context: Context // ✅ NOUVEAU : On passe le context
 ) {
+
+    /** Le clustering pré-agrégé ne connaît pas les préférences locales de masquage. */
+    fun hasHiddenSites(): Boolean = HiddenSitesStore.hasAny(context)
+
+    private fun hideHiddenSites(antennas: List<LocalisationEntity>): List<LocalisationEntity> =
+        HiddenSitesStore.filter(context, antennas)
 
     // ✅ NOUVEAU : On récupère toujours le DAO depuis l'instance active (qui se recréera si elle a été fermée)
     private data class LongitudeRange(val min: Double, val max: Double)
@@ -909,7 +916,7 @@ class AnfrRepository(
         detailBackedBandMask: Int = DETAIL_BACKED_5G_BANDS
     ): List<LocalisationEntity> {
         if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_BBOX)) {
-            return getLiveSitesInBox(latNorth, lonEast, latSouth, lonWest)
+            return hideHiddenSites(getLiveSitesInBox(latNorth, lonEast, latSouth, lonWest))
         }
 
         val bounds = mapQueryBounds(latNorth, lonEast, latSouth, lonWest)
@@ -925,7 +932,7 @@ class AnfrRepository(
                 }
                 .distinctBy { it.idAnfr }
         }
-        return enrichRadioBandMasksFromDetails(localisations, detailBackedBandMask)
+        return hideHiddenSites(enrichRadioBandMasksFromDetails(localisations, detailBackedBandMask))
     }
 
     /**
@@ -1026,7 +1033,7 @@ class AnfrRepository(
                 }
                 .distinctBy { it.idAnfr }
         }
-        return enrichRadioBandMasksFromDetails(localisations, detailBackedBandMask)
+        return hideHiddenSites(enrichRadioBandMasksFromDetails(localisations, detailBackedBandMask))
     }
 
     /**
@@ -1043,7 +1050,7 @@ class AnfrRepository(
         detailBackedBandMask: Int = DETAIL_BACKED_5G_BANDS
     ): List<LocalisationEntity> {
         if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_BBOX)) {
-            return getLiveSitesInBox(latNorth, lonEast, latSouth, lonWest)
+            return hideHiddenSites(getLiveSitesInBox(latNorth, lonEast, latSouth, lonWest))
                 .filterNot { it.isDeclaredActive() }
         }
 
@@ -1060,7 +1067,7 @@ class AnfrRepository(
                 }
                 .distinctBy { it.idAnfr }
         }
-        return enrichRadioBandMasksFromDetails(localisations, detailBackedBandMask)
+        return hideHiddenSites(enrichRadioBandMasksFromDetails(localisations, detailBackedBandMask))
     }
 
     suspend fun getAntennasInBoxForFrequencyFilter(
@@ -1084,9 +1091,9 @@ class AnfrRepository(
         if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_BBOX)) {
             val liveSites = getLiveSitesInBox(latNorth, lonEast, latSouth, lonWest)
             return if (detailBackedBandMask != 0 && liveSites.size <= LIVE_DETAIL_LOOKUP_LIMIT) {
-                enrichRadioBandMasksFromDetails(liveSites, detailBackedBandMask)
+                hideHiddenSites(enrichRadioBandMasksFromDetails(liveSites, detailBackedBandMask))
             } else {
-                liveSites
+                hideHiddenSites(liveSites)
             }
         }
 
@@ -1112,7 +1119,7 @@ class AnfrRepository(
                 }
                 .distinctBy { it.idAnfr }
         }
-        return enrichRadioBandMasksFromDetails(localisations, detailBackedBandMask)
+        return hideHiddenSites(enrichRadioBandMasksFromDetails(localisations, detailBackedBandMask))
     }
 
     suspend fun getAntennasByIdsInBox(
@@ -1146,7 +1153,7 @@ class AnfrRepository(
             }
             .distinctBy { it.idAnfr }
 
-        return enrichRadioBandMasksFromDetails(localisations, detailBackedBandMask)
+        return hideHiddenSites(enrichRadioBandMasksFromDetails(localisations, detailBackedBandMask))
     }
 
     suspend fun getNearest100(lat: Double, lon: Double): List<LocalisationEntity> {
@@ -1159,14 +1166,18 @@ class AnfrRepository(
         limit: Int,
         detailBackedBandMask: Int = 0
     ): List<LocalisationEntity> {
+        val safeLimit = limit.coerceAtLeast(1)
+        val candidateLimit = (safeLimit.toLong() * 8L).coerceAtMost(5000L).toInt()
         if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_NEARBY)) {
-            return getLiveNearest(lat, lon, limit, zbOnly = true)
+            return hideHiddenSites(getLiveNearest(lat, lon, candidateLimit, zbOnly = true))
+                .take(safeLimit)
         }
 
         val localisations = queryLocalDatabase(emptyList()) {
-            this.getNearestZb(lat, lon, limit.coerceAtLeast(1))
+            this.getNearestZb(lat, lon, candidateLimit)
         }
-        return enrichRadioBandMasksFromDetails(localisations, detailBackedBandMask)
+        return hideHiddenSites(enrichRadioBandMasksFromDetails(localisations, detailBackedBandMask))
+            .take(safeLimit)
     }
 
     suspend fun getNearest(
@@ -1175,12 +1186,14 @@ class AnfrRepository(
         limit: Int,
         detailBackedBandMask: Int = 0
     ): List<LocalisationEntity> {
+        val safeLimit = limit.coerceAtLeast(1)
+        val candidateLimit = (safeLimit.toLong() * 8L).coerceAtMost(5000L).toInt()
         if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_NEARBY)) {
-            return getLiveNearest(lat, lon, limit, zbOnly = false)
+            return hideHiddenSites(getLiveNearest(lat, lon, candidateLimit, zbOnly = false))
+                .take(safeLimit)
         }
 
         val localisations = queryLocalDatabase(emptyList()) {
-            val safeLimit = limit.coerceAtLeast(1)
             val radii = listOf(0.03, 0.08, 0.18, 0.45, 1.0, 2.5, 5.0)
             var bestResult = emptyList<LocalisationEntity>()
 
@@ -1193,16 +1206,17 @@ class AnfrRepository(
                     minLon = lon - radius,
                     maxLon = lon + radius,
                     maxDistanceSquared = radius * radius,
-                    limit = safeLimit
+                    limit = candidateLimit
                 )
 
                 if (nearest.size > bestResult.size) bestResult = nearest
-                if (nearest.size >= safeLimit) return@queryLocalDatabase nearest
+                if (nearest.size >= candidateLimit) return@queryLocalDatabase nearest
             }
 
-            this.getNearest(lat, lon, safeLimit).ifEmpty { bestResult }
+            this.getNearest(lat, lon, candidateLimit).ifEmpty { bestResult }
         }
-        return enrichRadioBandMasksFromDetails(localisations, detailBackedBandMask)
+        return hideHiddenSites(enrichRadioBandMasksFromDetails(localisations, detailBackedBandMask))
+            .take(safeLimit)
     }
 
     // =================================================================
@@ -1238,11 +1252,26 @@ class AnfrRepository(
     // =================================================================
     // 2. POUR LES DÉTAILS (Quand on clique sur une antenne)
     // =================================================================
+    private suspend fun isLocalAnfrIdHidden(idAnfr: String): Boolean {
+        return queryLocalDatabase(false) {
+            getAntennasByExactId(idAnfr).any { antenna -> HiddenSitesStore.isHidden(context, antenna) }
+        }
+    }
+
+    private fun isLiveSiteHidden(site: LiveSiteResponseDto?): Boolean {
+        return site?.matches.orEmpty()
+            .mapNotNull { it.toLocalisationEntity() }
+            .any { antenna -> HiddenSitesStore.isHidden(context, antenna) }
+    }
+
     suspend fun getTechniqueDetails(idAnfr: String): TechniqueEntity? {
         if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_SITE_DETAIL)) {
-            return getLiveSite(idAnfr)?.detail?.toTechniqueEntity()
+            val site = getLiveSite(idAnfr)
+            if (isLiveSiteHidden(site)) return null
+            return site?.detail?.toTechniqueEntity()
         }
 
+        if (isLocalAnfrIdHidden(idAnfr)) return null
         return queryLocalDatabase(null) {
             getTechniqueDetails(idAnfr)
         }
@@ -1250,9 +1279,12 @@ class AnfrRepository(
 
     suspend fun getPhysiqueDetails(idAnfr: String): List<PhysiqueEntity> {
         if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_SITE_DETAIL)) {
-            return getLiveSite(idAnfr)?.supports?.mapNotNull { it.toPhysiqueEntity() }.orEmpty()
+            val site = getLiveSite(idAnfr)
+            if (isLiveSiteHidden(site)) return emptyList()
+            return site?.supports?.mapNotNull { it.toPhysiqueEntity() }.orEmpty()
         }
 
+        if (isLocalAnfrIdHidden(idAnfr)) return emptyList()
         return queryLocalDatabase(emptyList()) {
             getPhysiqueDetails(idAnfr)
         }
@@ -1260,6 +1292,7 @@ class AnfrRepository(
 
     /** Antennes brutes d'un site (couverture théorique). FH inclus : le moteur filtre `is_fh`. */
     suspend fun getAntennesForCoverage(idAnfr: String): List<AntenneDbEntity> {
+        if (isLocalAnfrIdHidden(idAnfr)) return emptyList()
         return queryLocalDatabase(emptyList()) {
             getAntennesByIdAnfr(idAnfr)
         }
@@ -1274,6 +1307,7 @@ class AnfrRepository(
 
     /** Position + opérateur d'un site (couverture théorique). */
     suspend fun getCoverageSiteLocation(idAnfr: String): CoverageSiteLocationEntity? {
+        if (isLocalAnfrIdHidden(idAnfr)) return null
         return queryLocalDatabase(null) {
             getCoverageSiteLocation(idAnfr)
         }
@@ -1356,6 +1390,7 @@ class AnfrRepository(
     }
 
     suspend fun getFaisceauxDetails(idAnfr: String): List<FaisceauxEntity> {
+        if (isLocalAnfrIdHidden(idAnfr)) return emptyList()
         return queryLocalDatabase(emptyList()) {
             getFaisceauxDetails(idAnfr)
         }
@@ -1363,9 +1398,12 @@ class AnfrRepository(
 
     suspend fun getPhysiqueByAnfr(idAnfr: String): List<PhysiqueEntity> {
         if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_SITE_DETAIL)) {
-            return getLiveSite(idAnfr)?.supports?.mapNotNull { it.toPhysiqueEntity() }.orEmpty()
+            val site = getLiveSite(idAnfr)
+            if (isLiveSiteHidden(site)) return emptyList()
+            return site?.supports?.mapNotNull { it.toPhysiqueEntity() }.orEmpty()
         }
 
+        if (isLocalAnfrIdHidden(idAnfr)) return emptyList()
         return queryLocalDatabase(emptyList()) {
             getPhysiqueByAnfr(idAnfr)
         }
@@ -1373,9 +1411,12 @@ class AnfrRepository(
 
     suspend fun getTechniqueByAnfr(idAnfr: String): List<TechniqueEntity> {
         if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_SITE_DETAIL)) {
-            return listOfNotNull(getLiveSite(idAnfr)?.detail?.toTechniqueEntity())
+            val site = getLiveSite(idAnfr)
+            if (isLiveSiteHidden(site)) return emptyList()
+            return listOfNotNull(site?.detail?.toTechniqueEntity())
         }
 
+        if (isLocalAnfrIdHidden(idAnfr)) return emptyList()
         return queryLocalDatabase(emptyList()) {
             getTechniqueByAnfr(idAnfr)
         }
@@ -1402,35 +1443,62 @@ class AnfrRepository(
         val results = queryLocalDatabase(emptyList()) {
             searchAntennasById(query)
         }
-        return enrichRadioBandMasksFromDetails(results)
+        return hideHiddenSites(enrichRadioBandMasksFromDetails(results))
     }
 
     suspend fun searchAntennasByText(query: String, limit: Int = 200): List<LocalisationEntity> {
         val results = queryLocalDatabase(emptyList()) {
             searchAntennasByText(query, limit)
         }
-        return enrichRadioBandMasksFromDetails(results)
+        return hideHiddenSites(enrichRadioBandMasksFromDetails(results))
     }
 
     suspend fun searchAntennasByAddress(query: String, limit: Int = 5000): List<LocalisationEntity> {
         val results = queryLocalDatabase(emptyList()) {
             searchAntennasByAddress(query, limit)
         }
-        return enrichRadioBandMasksFromDetails(results)
+        return hideHiddenSites(enrichRadioBandMasksFromDetails(results))
     }
 
     suspend fun getAntennasByExactId(exactId: String): List<LocalisationEntity> {
         if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_SITE_DETAIL)) {
-            return getLiveSite(exactId)
+            return hideHiddenSites(getLiveSite(exactId)
                 ?.matches
                 ?.mapNotNull { it.toLocalisationEntity() }
-                .orEmpty()
+                .orEmpty())
         }
 
         val results = queryLocalDatabase(emptyList()) {
             getAntennasByExactId(exactId)
         }
-        return enrichRadioBandMasksFromDetails(results)
+        return hideHiddenSites(enrichRadioBandMasksFromDetails(results))
+    }
+
+    /**
+     * Données minimales nécessaires à la page des sites masqués.
+     *
+     * Contrairement aux lectures destinées à l'affichage, cette méthode doit pouvoir relire un
+     * site déjà masqué afin de compléter les anciennes entrées qui ne conservaient pas encore les
+     * azimuts. Elle reste volontairement limitée aux identifiants explicitement fournis par cette
+     * page et ne sert pas aux listes publiques de l'application.
+     */
+    suspend fun getAntennasForHiddenSites(idAnfrs: List<String>): Map<String, List<LocalisationEntity>> {
+        val distinctIds = idAnfrs.filter { it.isNotBlank() }.distinct()
+        if (distinctIds.isEmpty()) return emptyMap()
+
+        if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_SITE_DETAIL)) {
+            return getLiveSites(distinctIds)
+                .flatMap { site -> site.matches.mapNotNull { it.toLocalisationEntity() } }
+                .groupBy { it.idAnfr }
+        }
+
+        return distinctIds
+            .flatMap { id ->
+                queryLocalDatabase(emptyList<LocalisationEntity>()) {
+                    getAntennasByExactId(id)
+                }
+            }
+            .groupBy { it.idAnfr }
     }
 
     suspend fun enrichRadioBandMasksFromDetails(
@@ -1714,17 +1782,21 @@ class AnfrRepository(
         }
 
         val sourceKey = currentSitesHsSourceKey()
-        if (!forceRefresh) readSitesHsCache(sourceKey)?.let { return it }
+        if (!forceRefresh) readSitesHsCache(sourceKey)?.let {
+            return it.filterNot { site -> HiddenSitesStore.isHidden(context, site) }
+        }
 
         return sitesHsCacheMutex.withLock {
             // Un appel concurrent a pu remplir le cache pendant l'attente du verrou.
-            if (!forceRefresh) readSitesHsCache(sourceKey)?.let { return@withLock it }
+            if (!forceRefresh) readSitesHsCache(sourceKey)?.let {
+                return@withLock it.filterNot { site -> HiddenSitesStore.isHidden(context, site) }
+            }
 
             val sites = loadSitesHs(forceRefresh)
             // Une liste vide vient presque toujours d'un échec (réseau coupé, provider off) :
             // on ne la mémorise pas, sinon l'app resterait « sans pannes » pendant tout le TTL.
             if (sites.isNotEmpty()) storeSitesHsCache(sourceKey, sites)
-            sites
+            sites.filterNot { site -> HiddenSitesStore.isHidden(context, site) }
         }
     }
 

@@ -63,6 +63,7 @@ import fr.geotower.ui.screens.onboarding.FirstStartScreen
 import fr.geotower.ui.screens.home.HomeScreen
 import fr.geotower.ui.screens.help.HelpScreen
 import fr.geotower.ui.screens.settings.SettingsScreen
+import fr.geotower.ui.screens.settings.HiddenSitesScreen
 import fr.geotower.ui.screens.settings.PhotosFavoritesScreen
 import fr.geotower.ui.screens.settings.NotificationHistoryScreen
 import fr.geotower.ui.screens.settings.ShareHistoryScreen
@@ -975,6 +976,19 @@ class MainActivity : ComponentActivity() {
                                 Box(modifier = Modifier.padding(innerPadding)) {
                                     fr.geotower.ui.screens.settings.BackupScreen(
                                         navController = navController
+                                    )
+                                }
+                            }
+
+                            // Sites/opérateurs masqués localement, restaurables indépendamment.
+                            composable(
+                                route = "hidden_sites",
+                                deepLinks = listOf(navDeepLink { uriPattern = "geotower://hidden_sites" })
+                            ) {
+                                Box(modifier = Modifier.padding(innerPadding)) {
+                                    HiddenSitesScreen(
+                                        navController = navController,
+                                        repository = repository
                                     )
                                 }
                             }

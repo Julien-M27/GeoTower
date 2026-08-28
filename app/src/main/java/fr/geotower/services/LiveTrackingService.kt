@@ -43,6 +43,7 @@ import fr.geotower.data.api.RetrofitClient
 import fr.geotower.data.db.AppDatabase
 import fr.geotower.data.db.GeoTowerDao
 import fr.geotower.data.models.LocalisationEntity
+import fr.geotower.data.hidden.HiddenSitesStore
 import fr.geotower.data.models.SiteHsEntity
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.DeviceProfile
@@ -429,10 +430,11 @@ class LiveTrackingService : Service() {
                 )
                 results[0] <= radiusMeters
             }
-            if (insideRadius.isNotEmpty()) return insideRadius
+            val visibleInsideRadius = HiddenSitesStore.filter(applicationContext, insideRadius)
+            if (visibleInsideRadius.isNotEmpty()) return visibleInsideRadius
         }
 
-        return if (isNearestMode) {
+        return HiddenSitesStore.filter(applicationContext, if (isNearestMode) {
             dao.getNearestActiveLocalisations(
                 lat = location.latitude,
                 lon = location.longitude,
@@ -449,7 +451,7 @@ class LiveTrackingService : Service() {
                     )
                 }
                 .distinctBy { it.idAnfr }
-        }
+        })
     }
 
     private fun requestLiveOutageRefreshIfNeeded(force: Boolean = false) {

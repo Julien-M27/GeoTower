@@ -42,6 +42,7 @@ object PageScrollPrefs {
     const val NOTIFICATION_HISTORY = "notification_history"
     const val DEPARTMENT_STATS = "department_stats"
     const val TRIPS = "trips"
+    const val HIDDEN_SITES = "hidden_sites"
 
     /** Les trois aides réglables indépendamment (l'ordre est celui affiché dans les réglages). */
     enum class Aid(val keyPrefix: String) {
@@ -85,7 +86,8 @@ object PageScrollPrefs {
         HISTORIES,
         PHOTO_UPLOAD_HISTORY,
         SHARE_HISTORY,
-        NOTIFICATION_HISTORY
+        NOTIFICATION_HISTORY,
+        HIDDEN_SITES
     )
 
     val allPages = customizablePages + otherPages

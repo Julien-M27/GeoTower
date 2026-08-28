@@ -36,6 +36,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
@@ -102,6 +103,10 @@ fun GeoTowerBreadcrumbBar(
     ) {
         Row(
             modifier = Modifier
+                // On réserve une vraie marge intérieure à droite : lorsque le contenu déborde,
+                // il s'arrête dans cette seconde pastille au lieu d'être coupé au bord extérieur.
+                .padding(end = pillMargin)
+                .clip(pillShape)
                 .horizontalScroll(scrollState)
                 .padding(pillMargin),
             verticalAlignment = Alignment.CenterVertically,

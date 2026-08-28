@@ -59,7 +59,7 @@ import androidx.compose.material.icons.filled.WifiTethering
 import androidx.compose.material.icons.outlined.Backup
 import androidx.compose.material.icons.outlined.Bookmarks
 import androidx.compose.material.icons.outlined.Dashboard
-import androidx.compose.material.icons.outlined.Dns
+import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Map
@@ -1073,6 +1073,11 @@ fun SettingsScreen(
                 Icons.Outlined.Backup
             ) { navController.navigate("backup") }
             directEntry(
+                context.getString(R.string.hidden_sites_title),
+                "sites masques cachés cache retrait operateur antenne retablir restaurer",
+                Icons.Outlined.VisibilityOff
+            ) { navController.navigate("hidden_sites") }
+            directEntry(
                 context.getString(R.string.preference_profiles_title),
                 "profil profils profiles preferences sauvegarde configuration",
                 Icons.Outlined.Bookmarks
@@ -1306,6 +1311,10 @@ fun SettingsScreen(
                                 safeClick { navController.navigate("backup") }
                             }
                             Spacer(Modifier.height(sizing.spacing(8.dp)))
+                            NavigationMenuItem(stringResource(R.string.hidden_sites_title), Icons.Outlined.VisibilityOff, false, isDark) {
+                                safeClick { navController.navigate("hidden_sites") }
+                            }
+                            Spacer(Modifier.height(sizing.spacing(8.dp)))
                             NavigationMenuItem(stringResource(R.string.preference_profiles_title), Icons.Outlined.Bookmarks, false, isDark) {
                                 safeClick { showPreferenceProfilesSheet = true }
                             }
@@ -1503,6 +1512,7 @@ fun SettingsScreen(
                                     onPhotoReports = { navController.navigate("photo_reports") },
                                     onHistories = { navController.navigate("histories") },
                                     onBackup = { navController.navigate("backup") },
+                                    onHiddenSites = { navController.navigate("hidden_sites") },
                                     onPreferenceProfiles = { showPreferenceProfilesSheet = true },
                                     shape = cardShape,
                                     border = cardBorder,
@@ -1566,6 +1576,7 @@ fun SettingsScreen(
                                     onPhotoReports = { navController.navigate("photo_reports") },
                                     onHistories = { navController.navigate("histories") },
                                     onBackup = { navController.navigate("backup") },
+                                    onHiddenSites = { navController.navigate("hidden_sites") },
                                     onLocalMode = { navController.navigate("local_mode") },
                                     databaseCardModifiers = databaseCardAnchorModifiers,
                                     databaseRefreshState = databaseRefreshState
@@ -2691,6 +2702,7 @@ fun AllSettingsContent(
     onPhotoReports: () -> Unit = {},
     onHistories: () -> Unit = {},
     onBackup: () -> Unit = {},
+    onHiddenSites: () -> Unit = {},
     onLocalMode: () -> Unit = {},
     databaseCardModifiers: Map<String, Modifier> = emptyMap(),
     databaseRefreshState: DatabaseRefreshState? = null
@@ -2752,6 +2764,7 @@ fun AllSettingsContent(
         onPhotoReports = onPhotoReports,
         onHistories = onHistories,
         onBackup = onBackup,
+        onHiddenSites = onHiddenSites,
         onPreferenceProfiles = onPreferenceProfiles,
         shape = shape,
         border = border,
@@ -3643,7 +3656,7 @@ fun SectionSysteme(
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(modifier = Modifier.padding(sizing.spacing(16.dp)), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Outlined.Dns, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(sizing.component(24.dp)))
+            Icon(Icons.Outlined.VisibilityOff, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(sizing.component(24.dp)))
             Spacer(Modifier.width(sizing.spacing(16.dp)))
             Column {
                 Text(stringResource(R.string.appstrings_diagnostic_api_dialog_title), style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.Bold)
@@ -4683,6 +4696,7 @@ private fun SettingsDirectEntries(
     onPhotoReports: () -> Unit,
     onHistories: () -> Unit,
     onBackup: () -> Unit,
+    onHiddenSites: () -> Unit,
     onPreferenceProfiles: () -> Unit,
     shape: Shape,
     border: BorderStroke?,
@@ -4744,6 +4758,18 @@ private fun SettingsDirectEntries(
         )
         Spacer(Modifier.height(sizing.spacing(12.dp)))
         PreferenceActionCard(
+            title = stringResource(R.string.hidden_sites_title),
+            desc = stringResource(R.string.hidden_sites_settings_desc),
+            onClick = onHiddenSites,
+            shape = shape,
+            border = border,
+            bubbleColor = bubbleColor,
+            useOneUi = useOneUi,
+            safeClick = safeClick,
+            icon = Icons.Outlined.VisibilityOff
+        )
+        Spacer(Modifier.height(sizing.spacing(12.dp)))
+        PreferenceActionCard(
             title = stringResource(R.string.preference_profiles_title),
             desc = stringResource(R.string.preference_profiles_card_desc),
             onClick = onPreferenceProfiles,
@@ -4769,6 +4795,7 @@ private fun SettingsSectionsHome(
     onPhotoReports: () -> Unit,
     onHistories: () -> Unit,
     onBackup: () -> Unit,
+    onHiddenSites: () -> Unit,
     onPreferenceProfiles: () -> Unit,
     shape: Shape,
     border: BorderStroke?,
@@ -4808,6 +4835,7 @@ private fun SettingsSectionsHome(
             onPhotoReports = onPhotoReports,
             onHistories = onHistories,
             onBackup = onBackup,
+            onHiddenSites = onHiddenSites,
             onPreferenceProfiles = onPreferenceProfiles,
             shape = shape,
             border = border,

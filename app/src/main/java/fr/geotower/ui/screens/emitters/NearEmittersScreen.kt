@@ -68,6 +68,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -134,6 +135,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.SiteHsEntity
 import fr.geotower.data.models.isDeclaredActive
+import fr.geotower.data.hidden.HiddenSitesStore
 import androidx.compose.runtime.saveable.rememberSaveable
 import java.text.Normalizer
 import java.util.Locale
@@ -210,6 +212,7 @@ fun NearEmittersScreen(
     SecureScreenEffect(RemoteFeatureFlags.SecureScreens.NEARBY)
     val context = LocalContext.current
     val activity = LocalActivity.current
+    val hiddenSites by HiddenSitesStore.flow(context).collectAsState()
 
     // --- DÉTECTION RÉACTIVE DE LA DISPONIBILITÉ DE LA LOCALISATION ---
     // Réévaluée à chaque retour sur l'écran (et en temps réel pour le GPS) : si l'accès à la position
@@ -481,18 +484,21 @@ fun NearEmittersScreen(
     // Recherche locale instantanee; les resultats globaux arrivent ensuite depuis un cache separe.
     val filteredSites = remember(
         sites, searchQuery, maxItemsToShow, remoteSearchQuery, remoteSearchSites,
-        showSitesInService, showSitesOutOfService, showProjectSites, showOnlyZbSites, hideUndergroundSites, hsOperatorMap
+        showSitesInService, showSitesOutOfService, showProjectSites, showOnlyZbSites, hideUndergroundSites,
+        hsOperatorMap, hiddenSites
     ) {
         val query = searchQuery.trim()
+        val visibleSites = sites.applyHiddenSiteOperators(context)
+        val visibleRemoteSites = remoteSearchSites.applyHiddenSiteOperators(context)
         if (query.isEmpty()) {
-            return@remember sites
+            return@remember visibleSites
                 .applyNearbyDisplayFilters(showSitesInService, showSitesOutOfService, showProjectSites, showOnlyZbSites, hideUndergroundSites, hsOperatorMap)
                 .take(maxItemsToShow)
         }
 
         val searchSpec = parseNearbySearchQuery(query)
-        val localMatches = sites.filter { siteMatchesSearch(it, searchSpec) }
-        val matchingRemoteSites = if (remoteSearchQuery == query) remoteSearchSites else emptyList()
+        val localMatches = visibleSites.filter { siteMatchesSearch(it, searchSpec) }
+        val matchingRemoteSites = if (remoteSearchQuery == query) visibleRemoteSites else emptyList()
         (localMatches + matchingRemoteSites)
             .distinctBy { it.id }
             .applyNearbyDisplayFilters(showSitesInService, showSitesOutOfService, showProjectSites, showOnlyZbSites, hideUndergroundSites, hsOperatorMap)
@@ -1750,6 +1756,20 @@ private fun List<UiSite>.applyNearbyDisplayFilters(
     statusOk &&
         (!showOnlyZb || site.isZb) &&
         (!hideUnderground || !site.hasUnderground)
+}
+
+/** Retire uniquement les opérateurs masqués : un site partagé reste visible si l'autre opérateur
+ * est encore présent. */
+private fun List<UiSite>.applyHiddenSiteOperators(context: Context): List<UiSite> {
+    if (!HiddenSitesStore.hasAny(context)) return this
+    return mapNotNull { site ->
+        val siteKey = "${Math.round(site.latitude * 10000.0)}_${Math.round(site.longitude * 10000.0)}"
+        val visibleOperators = site.operators.filterNot { operator ->
+            val key = OperatorColors.keyFor(operator) ?: operator
+            HiddenSitesStore.isHidden(context, siteKey, key)
+        }
+        if (visibleOperators.isEmpty()) null else site.copy(operators = visibleOperators)
+    }
 }
 
 private data class NearbyAddressParts(

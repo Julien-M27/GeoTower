@@ -119,6 +119,8 @@ import kotlinx.coroutines.withContext
 import java.util.Locale
 import androidx.compose.ui.res.stringResource
 import fr.geotower.R
+import fr.geotower.data.hidden.HiddenSitesStore
+import fr.geotower.data.models.physicalSiteKey
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -173,7 +175,11 @@ fun CompassScreen(
     var compassOrder by remember { mutableStateOf(prefs.getString("compass_order", "location,gps,accuracy")!!.split(",")) }
     var showCompassSettingsSheet by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
-    val antennasList by viewModel.antennas.collectAsState()
+    val rawAntennasList by viewModel.antennas.collectAsState()
+    val hiddenSites by HiddenSitesStore.flow(context).collectAsState()
+    val antennasList = remember(rawAntennasList, hiddenSites) {
+        HiddenSitesStore.filter(context, rawAntennasList)
+    }
 
     // --- MODE CLAIR / SOMBRE DYNAMIQUE ---
     val themeMode by AppConfig.themeMode
@@ -404,6 +410,9 @@ fun CompassScreen(
                             .mapNotNull { it.operateur }
                             .flatMap { OperatorColors.keysFor(it).asSequence() }
                             .distinct()
+                            .filterNot { operatorKey ->
+                                HiddenSitesStore.isHidden(context, mainAntenna.physicalSiteKey(), operatorKey)
+                            }
                             .sortedBy { op -> priorityList.indexOf(op).takeIf { it >= 0 } ?: 99 }
                             .toList()
 

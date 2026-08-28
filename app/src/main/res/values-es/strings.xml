@@ -3027,24 +3027,6 @@
     <string name="appstrings_release_v2033_backup_preview">Una vista previa muestra lo que la copia añadiría antes de que confirmes</string>
     <string name="appstrings_release_v2033_trip_arrival">Al llegar a una parada, la aplicación propone enviar fotos del soporte: busca el sitio a tu alrededor, pregunta a qué operadores enviarlas y acepta una nota de campo</string>
     <!-- Etiquetas compartidas y generación local de la base de datos -->
-    <string name="app_name">GeoTower</string>
-    <string name="brand_geotower">GeoTower</string>
-    <string name="brand_anfr">ANFR</string>
-    <string name="brand_signalquest">SignalQuest</string>
-    <string name="brand_qr_code">Código QR</string>
-    <string name="network_2g">2G</string>
-    <string name="network_3g">3G</string>
-    <string name="network_4g">4G</string>
-    <string name="network_5g">5G</string>
-    <string name="mapping_provider_osm">OpenStreetMap</string>
-    <string name="mapping_provider_maplibre">MapLibre</string>
-    <string name="mapping_provider_topo">OpenTopoMap</string>
-    <string name="car_error_detail">%1$s\n%2$s</string>
-    <string name="appstrings_map_map_libre">MapLibre</string>
-    <string name="appstrings_map_osm">OpenStreetMap</string>
-    <string name="appstrings_map_osm_layer">OpenStreetMap</string>
-    <string name="appstrings_map_topo">OpenTopoMap</string>
-    <string name="appstrings_onboarding_welcome_title">GeoTower</string>
     <string name="appstrings_local_build_overall_progress">Progreso global de la generación: %1$d %%</string>
     <string name="appstrings_local_build_current_step">Paso actual: %1$s</string>
     <string name="appstrings_local_build_waiting_network">Esperando una conexión a Internet antes de descargar las fuentes</string>
@@ -3069,7 +3051,6 @@
     <string name="appstrings_local_build_source_progress">Fuente %1$s: %2$s / %3$s líneas</string>
     <string name="appstrings_local_build_source_processed">Fuente %1$s: %2$s líneas procesadas</string>
     <string name="appstrings_local_build_source_started">Fuente %1$s: lectura en curso</string>
-    <string name="outage_tech_breakdown_unpublished">—</string>
     <string name="trips_route_calculating">Calculando la ruta…</string>
     <!-- Notas de la versión 2.0.34 -->
     <string name="appstrings_release_v2034_database_updates">Un solo botón comprueba las bases móvil, radio y eNB/gNB y pone en cola únicamente las actualizaciones necesarias</string>
@@ -3087,4 +3068,17 @@
     <string name="appstrings_release_v2036_status_details">Los detalles del estado del sitio ahora incluyen leyendas de códigos de estado y motivos de incidencia más claros</string>
     <string name="appstrings_release_v2036_global_outages">Las incidencias globales se aplican ahora de forma coherente a las generaciones equipadas, con indicadores de fuera de servicio más claros</string>
     <string name="appstrings_release_v2036_share_export">Las capturas de mapas y sitios siguen ahora el tema de la aplicación y se exportan en segundo plano para compartirlas de forma más fluida y fiable</string>
+    <string name="hidden_sites_title">Hidden sites</string>
+    <string name="hidden_sites_settings_desc">Choose which sites or operators should no longer appear in the app</string>
+    <string name="hidden_sites_description">These local exclusions apply to the map, nearby sites, compass, live notifications and compatible exports.</string>
+    <string name="hidden_sites_empty">No hidden site</string>
+    <string name="hidden_sites_restore">Restore</string>
+    <string name="hidden_sites_hide_title">Hide an operator</string>
+    <string name="hidden_sites_hide_message">Which operator is no longer present at this site?</string>
+    <string name="hidden_sites_hide_action">Hide</string>
+    <string name="backup_section_hidden_sites">Hidden sites</string>
+    <string name="appstrings_release_section_hidden_sites">Sitios ocultos</string>
+    <string name="appstrings_release_v2037_hidden_sites">Oculta un sitio u operador ausente directamente desde el mapa y gestiónalo o restáuralo desde los ajustes</string>
+    <string name="appstrings_release_v2037_hidden_sites_scope">Las preferencias de ocultación se aplican al mapa, sitios cercanos, brújula, notificaciones en directo y widgets</string>
+    <string name="appstrings_release_v2037_hidden_sites_backup">Los sitios ocultos se incluyen ahora en las copias de seguridad y pueden restaurarse en otra instalación</string>
 </resources>

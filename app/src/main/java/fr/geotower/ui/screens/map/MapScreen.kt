@@ -110,6 +110,11 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -220,6 +225,8 @@ import fr.geotower.data.trip.TripRouteCalculator
 import fr.geotower.data.trip.TripStep
 import fr.geotower.data.models.isDeclaredActive
 import fr.geotower.data.models.physicalSiteKey
+import fr.geotower.data.hidden.HiddenSiteRecord
+import fr.geotower.data.hidden.HiddenSitesStore
 import fr.geotower.ui.components.LiveDatabaseUsageWarningDialog
 import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.ui.navigation.ROOT_FALLBACK_ROUTE
@@ -1687,9 +1694,13 @@ fun MapScreen(
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current // ✅ AJOUT
     val isUltraCompact = configuration.screenWidthDp < 300 || configuration.screenHeightDp < 350 // ✅ AJOUT
     val scope = rememberCoroutineScope()
+    val hiddenSitesSnackbarHostState = remember { SnackbarHostState() }
+    val hiddenSitesConfirmation = stringResource(R.string.hidden_sites_hide_confirmation)
+    val hiddenSitesOpenSettings = stringResource(R.string.hidden_sites_open_settings)
     val uriHandler = LocalUriHandler.current
     val density = LocalDensity.current
     val antennas by viewModel.antennas.collectAsState()
+    val hiddenSites by HiddenSitesStore.flow(context).collectAsState()
     val oldestServiceDate by viewModel.oldestServiceDate.collectAsState()
     val radioMarkers by viewModel.radioMarkers.collectAsState()
     val signalQuestCoveragePoints by viewModel.signalQuestCoveragePoints.collectAsState()
@@ -1844,6 +1855,25 @@ fun MapScreen(
 
     // Supports superposés (mêmes coordonnées GPS) en attente de choix par l'utilisateur.
     var supportChoices by remember { mutableStateOf<List<SupportChoice>>(emptyList()) }
+    // Opérateurs proposés après un appui long sur un marqueur de site.
+    var hideSiteChoices by remember { mutableStateOf<List<HiddenSiteRecord>>(emptyList()) }
+    var hideSiteAddress by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(hideSiteChoices) {
+        hideSiteAddress = null
+        if (hideSiteChoices.isEmpty()) return@LaunchedEffect
+
+        val techniqueById = try {
+            viewModel.getMapTechniqueSummaries(hideSiteChoices.map { it.idAnfr })
+        } catch (cancellation: kotlinx.coroutines.CancellationException) {
+            throw cancellation
+        } catch (_: Exception) {
+            emptyMap()
+        }
+        hideSiteAddress = hideSiteChoices.asSequence()
+            .mapNotNull { choice -> techniqueById[choice.idAnfr]?.adresse?.trim() }
+            .firstOrNull { it.isNotBlank() }
+    }
 
     var currentZoom by remember { mutableDoubleStateOf(15.0) }
     var currentLat by remember { mutableDoubleStateOf(48.8584) }
@@ -3611,7 +3641,7 @@ fun MapScreen(
         AppConfig.f5G_700.value, AppConfig.f5G_1400.value, AppConfig.f5G_2100.value, AppConfig.f5G_3500.value, AppConfig.f5G_4200.value, AppConfig.f5G_26000.value,
         AppConfig.showSitesInService.value, AppConfig.showSitesOutOfService.value, AppConfig.hideUndergroundSites.value, AppConfig.showOnlyZbSites.value,
         AppConfig.showProjectSites.value, sitesHs, currentCityPolygons,
-        isTimeSliderVisible, timeSliderThreshold, adminAreaStatsAntennas
+        isTimeSliderVisible, timeSliderThreshold, adminAreaStatsAntennas, hiddenSites
     ) {
         val computed = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
             val selectedOperators = AppConfig.selectedOperatorKeys.value
@@ -3643,7 +3673,7 @@ fun MapScreen(
                 // --- 3. POUR LES VRAIES ANTENNES, ON CONTINUE AVEC LE RESTE DES FILTRES ---
                 val isInCityBounds = currentCityPolygons.isNullOrEmpty() || currentCityPolygons!!.any { poly -> isPointInPolygon(antenna.latitude, antenna.longitude, poly) }
 
-                isInCityBounds && passesSiteDisplayFilters(
+                isInCityBounds && !HiddenSitesStore.isHidden(context, antenna) && passesSiteDisplayFilters(
                     antenna = antenna,
                     hsOperatorMap = hsOperatorMap,
                     selectedOperatorKeys = selectedOperators,
@@ -4266,7 +4296,11 @@ fun MapScreen(
             }
 
             fun buildAntennaMarkers(antennas: List<LocalisationEntity>): List<AntennaMarker> {
-                val groupedSites = antennas.groupBy { "${it.latitude}_${it.longitude}" }.values.take(PowerProfile.mapMarkerCap)
+                // Les lignes ANFR d'un même pylône peuvent avoir de très légères différences
+                // de coordonnées selon l'opérateur. Utiliser la même clé physique que le
+                // masquage évite de superposer plusieurs marqueurs et de faire ouvrir le
+                // maintien sur un opérateur différent de celui visible autour du point.
+                val groupedSites = antennas.groupBy { it.physicalSiteKey() }.values.take(PowerProfile.mapMarkerCap)
 
                 return groupedSites.mapNotNull { siteAntennas ->
                     val filteredSiteAntennas = siteAntennas.mapNotNull { antenna ->
@@ -4279,7 +4313,10 @@ fun MapScreen(
                             selectedOperatorKeys = selectedOperators
                         )
 
-                        if (activeOps.isEmpty()) null else visibleAntennaForMap(antenna, activeOps)
+                        val notHiddenOps = activeOps.filterNot { operatorKey ->
+                            HiddenSitesStore.isHidden(context, antenna.physicalSiteKey(), operatorKey)
+                        }
+                        if (notHiddenOps.isEmpty()) null else visibleAntennaForMap(antenna, notHiddenOps)
                     }
                     if (filteredSiteAntennas.isEmpty()) return@mapNotNull null
 
@@ -4289,7 +4326,17 @@ fun MapScreen(
                     }
 
                     ensureMapNotDisposed()
-                    AntennaMarker(map, filteredSiteAntennas, safePrimaryColor, satelliteMarkerContrast).apply {
+                    AntennaMarker(
+                        map,
+                        filteredSiteAntennas,
+                        safePrimaryColor,
+                        satelliteMarkerContrast,
+                        onLongClick = {
+                            if (plannerPlan == null && !isMeasuringMode) {
+                                hideSiteChoices = HiddenSitesStore.recordsFor(filteredSiteAntennas)
+                            }
+                        }
+                    ).apply {
                         position = GeoPoint(mainAntenna.latitude, mainAntenna.longitude)
                         setAnchor(org.osmdroid.views.overlay.Marker.ANCHOR_CENTER, org.osmdroid.views.overlay.Marker.ANCHOR_CENTER)
 
@@ -4382,7 +4429,9 @@ fun MapScreen(
                 }
             } else {
                 // 🔍 MODE MICRO
-                val groupedSites = antennasList.groupBy { "${it.latitude}_${it.longitude}" }.values.take(PowerProfile.mapMarkerCap)
+                // Même regroupement dans le mode micro : un site partagé doit rester un seul
+                // marqueur, y compris lorsque les coordonnées diffèrent de quelques mètres.
+                val groupedSites = antennasList.groupBy { it.physicalSiteKey() }.values.take(PowerProfile.mapMarkerCap)
 
                 // ✅ RETOUR À map : 1 seul marqueur définitif par pylône
                 val newMarkers = groupedSites.mapNotNull { siteAntennas ->
@@ -4396,7 +4445,10 @@ fun MapScreen(
                             selectedOperatorKeys = selectedOperators
                         )
 
-                        if (activeOps.isEmpty()) null else visibleAntennaForMap(antenna, activeOps)
+                        val notHiddenOps = activeOps.filterNot { operatorKey ->
+                            HiddenSitesStore.isHidden(context, antenna.physicalSiteKey(), operatorKey)
+                        }
+                        if (notHiddenOps.isEmpty()) null else visibleAntennaForMap(antenna, notHiddenOps)
                     }
                     if (filteredSiteAntennas.isEmpty()) return@mapNotNull null
 
@@ -4407,7 +4459,17 @@ fun MapScreen(
 
                     // Le marqueur UNIQUE (L'antenne)
                     ensureMapNotDisposed()
-                    AntennaMarker(map, filteredSiteAntennas, safePrimaryColor, satelliteMarkerContrast).apply {
+                    AntennaMarker(
+                        map,
+                        filteredSiteAntennas,
+                        safePrimaryColor,
+                        satelliteMarkerContrast,
+                        onLongClick = {
+                            if (plannerPlan == null && !isMeasuringMode) {
+                                hideSiteChoices = HiddenSitesStore.recordsFor(filteredSiteAntennas)
+                            }
+                        }
+                    ).apply {
                         position = GeoPoint(mainAntenna.latitude, mainAntenna.longitude)
                         setAnchor(org.osmdroid.views.overlay.Marker.ANCHOR_CENTER, org.osmdroid.views.overlay.Marker.ANCHOR_CENTER)
 
@@ -4482,6 +4544,7 @@ fun MapScreen(
     // Dès qu'une case est cochée/décochée, la carte sera forcée de se redessiner !
     LaunchedEffect(
         filteredAntennas,
+        hiddenSites,
         sitesHs, // ✅ AJOUT ICI
         isMeasuringMode,
         safePrimaryColor,
@@ -7677,6 +7740,31 @@ fun MapScreen(
             onDismiss = { supportChoices = emptyList() }
         )
     }
+    if (hideSiteChoices.isNotEmpty()) {
+        HiddenSiteDialog(
+            choices = hideSiteChoices,
+            address = hideSiteAddress,
+            onConfirm = { selected ->
+                val hiddenCount = selected.count { HiddenSitesStore.hide(context, it) }
+                hideSiteChoices = emptyList()
+                if (hiddenCount > 0) {
+                    scope.launch {
+                        val result = hiddenSitesSnackbarHostState.showSnackbar(
+                            message = hiddenSitesConfirmation,
+                            actionLabel = hiddenSitesOpenSettings,
+                            duration = SnackbarDuration.Long
+                        )
+                        if (result == SnackbarResult.ActionPerformed) {
+                            navController.navigate("hidden_sites") {
+                                launchSingleTop = true
+                            }
+                        }
+                    }
+                }
+            },
+            onDismiss = { hideSiteChoices = emptyList() }
+        )
+    }
     if (showCityStatsPopup) {
         androidx.compose.ui.window.Dialog(
             onDismissRequest = { showCityStatsPopup = false }
@@ -7824,6 +7912,44 @@ fun MapScreen(
         LaunchedEffect(showCityStatsDetail) {
             viewModel.clearCityStatsTechniques()
         }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        SnackbarHost(
+            hostState = hiddenSitesSnackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(
+                    start = sizing.spacing(16.dp),
+                    end = sizing.spacing(16.dp),
+                    bottom = sizing.spacing(88.dp)
+                ),
+            snackbar = { data ->
+                Snackbar(
+                    modifier = Modifier.padding(horizontal = sizing.spacing(4.dp)),
+                    shape = RoundedCornerShape(28.dp),
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    actionContentColor = MaterialTheme.colorScheme.primary,
+                    actionOnNewLine = true,
+                    action = data.visuals.actionLabel?.let { label ->
+                        {
+                            TextButton(onClick = { data.performAction() }) {
+                                Text(text = label, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    },
+                    content = {
+                        Text(
+                            text = data.visuals.message,
+                            maxLines = 3,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                )
+            }
+        )
     }
 }
 
@@ -8425,11 +8551,23 @@ class AntennaMarker(
     private val mapView: org.osmdroid.views.MapView,
     private val siteAntennas: List<LocalisationEntity>,
     private val primaryColor: Int,
-    private val satelliteContrast: Boolean = false
+    private val satelliteContrast: Boolean = false,
+    private val onLongClick: (() -> Unit)? = null
 ) : org.osmdroid.views.overlay.Marker(mapView) {
 
     private val density = mapView.context.resources.displayMetrics.density
     private val ptCenter = android.graphics.Point()
+    private val longPressHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val touchSlop = android.view.ViewConfiguration.get(mapView.context).scaledTouchSlop
+    private var downX = 0f
+    private var downY = 0f
+    private var longPressTriggered = false
+    private var touchStartedOnMarker = false
+    private val longPressRunnable = Runnable {
+        longPressTriggered = true
+        onLongClick?.invoke()
+        mapView.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+    }
 
     // Débord du liseré de contraste, de part et d'autre du trait ou de la pastille (satellite only).
     private val outlineWidthPx = 1.2f * density
@@ -8447,6 +8585,56 @@ class AntennaMarker(
         // Rayon cliquable fixe de 22dp (englobe juste le rond central, ignore le carré transparent)
         val clickRadius = 22f * density
         return (dx * dx + dy * dy) <= (clickRadius * clickRadius)
+    }
+
+    override fun onTouchEvent(event: android.view.MotionEvent, mapView: org.osmdroid.views.MapView): Boolean {
+        when (event.actionMasked) {
+            android.view.MotionEvent.ACTION_DOWN -> {
+                // RadiusMarkerClusterer relaie l'événement à tous ses marqueurs. Sans ce test,
+                // chacun armait son propre minuteur et le dernier callback écrasait le site choisi.
+                if (!hitTest(event, mapView)) {
+                    touchStartedOnMarker = false
+                    longPressHandler.removeCallbacks(longPressRunnable)
+                    return false
+                }
+
+                touchStartedOnMarker = true
+                downX = event.x
+                downY = event.y
+                longPressTriggered = false
+                longPressHandler.removeCallbacks(longPressRunnable)
+                longPressHandler.postDelayed(
+                    longPressRunnable,
+                    android.view.ViewConfiguration.getLongPressTimeout().toLong()
+                )
+            }
+            android.view.MotionEvent.ACTION_MOVE -> {
+                if (!touchStartedOnMarker) return false
+                val dx = event.x - downX
+                val dy = event.y - downY
+                if (dx * dx + dy * dy > touchSlop * touchSlop) {
+                    longPressHandler.removeCallbacks(longPressRunnable)
+                    touchStartedOnMarker = false
+                }
+            }
+            android.view.MotionEvent.ACTION_UP,
+            android.view.MotionEvent.ACTION_CANCEL -> {
+                if (!touchStartedOnMarker) return false
+                longPressHandler.removeCallbacks(longPressRunnable)
+                touchStartedOnMarker = false
+                if (longPressTriggered) {
+                    longPressTriggered = false
+                    return true
+                }
+            }
+        }
+        return super.onTouchEvent(event, mapView)
+    }
+
+    override fun onDetach(mapView: org.osmdroid.views.MapView) {
+        longPressHandler.removeCallbacks(longPressRunnable)
+        touchStartedOnMarker = false
+        super.onDetach(mapView)
     }
 
     // ✅ NOUVELLE STRUCTURE : On regroupe les couleurs par azimut !
@@ -9107,6 +9295,96 @@ private fun CoverageDetailRow(label: String, value: String, valueColor: Color = 
             modifier = Modifier.weight(1f)
         )
     }
+}
+
+@Composable
+private fun HiddenSiteDialog(
+    choices: List<HiddenSiteRecord>,
+    address: String?,
+    onConfirm: (List<HiddenSiteRecord>) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val sizing = LocalGeoTowerUiSizing.current
+    var selectedKeys by remember(choices) { mutableStateOf(emptySet<String>()) }
+    val addressText = address?.takeIf { it.isNotBlank() }
+        ?: stringResource(R.string.appstrings_unknown_address)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface,
+        title = {
+            Text(
+                text = stringResource(R.string.hidden_sites_hide_title),
+                fontWeight = FontWeight.Bold,
+                style = sizing.textStyle(MaterialTheme.typography.titleLarge)
+            )
+        },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp)),
+                modifier = Modifier.verticalScroll(rememberScrollState())
+            ) {
+                Text(
+                    text = stringResource(R.string.hidden_sites_hide_message),
+                    style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = stringResource(R.string.appstrings_address_label) + addressText,
+                    style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                choices.forEach { choice ->
+                    val checked = choice.operatorKey in selectedKeys
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable {
+                                selectedKeys = if (checked) selectedKeys - choice.operatorKey
+                                else selectedKeys + choice.operatorKey
+                            }
+                            .padding(vertical = sizing.spacing(2.dp)),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = checked,
+                            onCheckedChange = { value ->
+                                selectedKeys = if (value) selectedKeys + choice.operatorKey
+                                else selectedKeys - choice.operatorKey
+                            }
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = choice.operatorLabel,
+                                style = sizing.textStyle(MaterialTheme.typography.titleSmall),
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = stringResource(R.string.hidden_sites_anfr_id_label) + " : " + choice.idAnfr,
+                                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(choices.filter { it.operatorKey in selectedKeys }) },
+                enabled = selectedKeys.isNotEmpty()
+            ) {
+                Text(text = stringResource(R.string.hidden_sites_hide_action))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = stringResource(R.string.appstrings_cancel))
+            }
+        }
+    )
 }
 
 @Composable

@@ -19,6 +19,7 @@ import fr.geotower.GeoTowerApp
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.SiteHsEntity
+import fr.geotower.data.hidden.HiddenSitesStore
 
 // ⚠️ Assure-toi que cet import correspond au nom exact de ta base de données locale
 import fr.geotower.data.db.AppDatabase
@@ -147,9 +148,9 @@ class AntennaWidgetWorker(
                 minLon = lon - offsetLon,
                 maxLon = lon + offsetLon
             )
-            val antennas = antennasInBox.ifEmpty {
+            val antennas = HiddenSitesStore.filter(context, antennasInBox.ifEmpty {
                 dao.getNearest100(lat, lon)
-            }
+            })
 
             if (antennas.isEmpty()) {
                 updateUiAndFinish(true, "[]", clearMap = true)

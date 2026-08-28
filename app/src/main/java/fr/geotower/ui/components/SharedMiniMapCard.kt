@@ -95,7 +95,10 @@ fun SharedMiniMapCard(
     onMapTap: ((Double, Double) -> Unit)? = null,
     allowGestures: Boolean = false,
     fitSelectedPointRequest: Int = 0,
-    activeOperatorKeys: Set<String>? = null
+    activeOperatorKeys: Set<String>? = null,
+    showAzimuths: Boolean? = null,
+    showAzimuthCones: Boolean? = null,
+    showZoomControls: Boolean = true
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
     val context = LocalContext.current
@@ -124,8 +127,10 @@ fun SharedMiniMapCard(
     }
 
     val ignStyle by AppConfig.ignStyle
-    val showAzimuthLines by AppConfig.showAzimuths
-    val showAzimuthCones by AppConfig.showAzimuthsCone
+    val configuredShowAzimuthLines by AppConfig.showAzimuths
+    val configuredShowAzimuthCones by AppConfig.showAzimuthsCone
+    val effectiveShowAzimuthLines = showAzimuths ?: configuredShowAzimuthLines
+    val effectiveShowAzimuthCones = showAzimuthCones ?: configuredShowAzimuthCones
     val shouldInvertColors = (mapProvider == 0 && ignStyle == 1)
     // Sur orthophoto seulement, le marqueur est cerné d'un liseré de contraste (cf. MapUtils).
     val satelliteMarkerContrast = MapUtils.isSatelliteBasemap(effectiveProvider, ignStyle)
@@ -191,6 +196,8 @@ fun SharedMiniMapCard(
 
                     // ✅ MODIFICATION : On utilise le nouveau marqueur personnalisé avec les azimuts
                     val marker = MiniMapAntennaMarker(this, mappedAntennas, safePrimaryColor, focusOperator, inactiveOperatorKeys).apply { // 👈 AJOUTEZ focusOperator
+                        this.showAzimuthLines = effectiveShowAzimuthLines
+                        this.showAzimuthCones = effectiveShowAzimuthCones
                         position = GeoPoint(centerLat, centerLon)
                         setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
                         infoWindow = null
@@ -328,8 +335,8 @@ fun SharedMiniMapCard(
                     marker.focusOperator = focusOperator
                     marker.inactiveOperatorKeys = inactiveOperatorKeys
                     marker.radioMarkers = radioMarkers
-                    marker.showAzimuthLines = showAzimuthLines
-                    marker.showAzimuthCones = showAzimuthCones
+                    marker.showAzimuthLines = effectiveShowAzimuthLines
+                    marker.showAzimuthCones = effectiveShowAzimuthCones
                     marker.satelliteContrast = satelliteMarkerContrast
 
                     val hasOperatorMarkerColors = mappedAntennas.any { antenna ->
@@ -397,9 +404,11 @@ fun SharedMiniMapCard(
                 map.invalidate()
             }
         )
-        Column(modifier = Modifier.align(Alignment.BottomEnd).padding(sizing.spacing(12.dp)), verticalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))) {
-            Surface(onClick = { mapRef?.controller?.zoomIn() }, shape = CircleShape, color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f), shadowElevation = 4.dp, modifier = Modifier.size(sizing.component(38.dp))) { Icon(Icons.Default.Add, null, modifier = Modifier.padding(sizing.spacing(6.dp))) }
-            Surface(onClick = { mapRef?.controller?.zoomOut() }, shape = CircleShape, color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f), shadowElevation = 4.dp, modifier = Modifier.size(sizing.component(38.dp))) { Icon(Icons.Default.Remove, null, modifier = Modifier.padding(sizing.spacing(6.dp))) }
+        if (showZoomControls) {
+            Column(modifier = Modifier.align(Alignment.BottomEnd).padding(sizing.spacing(12.dp)), verticalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))) {
+                Surface(onClick = { mapRef?.controller?.zoomIn() }, shape = CircleShape, color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f), shadowElevation = 4.dp, modifier = Modifier.size(sizing.component(38.dp))) { Icon(Icons.Default.Add, null, modifier = Modifier.padding(sizing.spacing(6.dp))) }
+                Surface(onClick = { mapRef?.controller?.zoomOut() }, shape = CircleShape, color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f), shadowElevation = 4.dp, modifier = Modifier.size(sizing.component(38.dp))) { Icon(Icons.Default.Remove, null, modifier = Modifier.padding(sizing.spacing(6.dp))) }
+            }
         }
         if (showViewModeToggle) {
             Surface(

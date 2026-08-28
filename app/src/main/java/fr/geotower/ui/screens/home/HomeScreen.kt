@@ -112,9 +112,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import fr.geotower.data.build.LocalDbRebuildOffer
 import fr.geotower.data.workers.AppUpdateNotifier
+import fr.geotower.data.workers.DatabaseBulkUpdate
 import fr.geotower.data.workers.DatabaseDownloadWorker
+import fr.geotower.data.workers.EnbDatabaseDownloadWorker
 import fr.geotower.data.workers.LocalDbBuildWorker
 import fr.geotower.data.workers.OperationPauseStore
+import fr.geotower.data.workers.RadioDatabaseDownloadWorker
 import fr.geotower.data.api.ServerStatus
 import fr.geotower.ui.components.LocationUnavailableBanner
 import fr.geotower.ui.components.PageScrollEdgeButtons
@@ -133,6 +136,24 @@ import kotlinx.coroutines.launch
 
 private const val TAG_HOME = "GeoTowerDb"
 private const val PREF_HOME_ANNOUNCEMENT_DISMISSED = "home_announcement_dismissed_key"
+
+private fun databaseProgressKey(target: DatabaseBulkUpdate.Target): String = when (target) {
+    DatabaseBulkUpdate.Target.MOBILE -> DatabaseDownloadWorker.KEY_PROGRESS
+    DatabaseBulkUpdate.Target.RADIO -> RadioDatabaseDownloadWorker.KEY_PROGRESS
+    DatabaseBulkUpdate.Target.ENB -> EnbDatabaseDownloadWorker.KEY_PROGRESS
+}
+
+private fun databasePauseKey(target: DatabaseBulkUpdate.Target): String = when (target) {
+    DatabaseBulkUpdate.Target.MOBILE -> OperationPauseStore.MOBILE_DB_DOWNLOAD
+    DatabaseBulkUpdate.Target.RADIO -> OperationPauseStore.RADIO_DB_DOWNLOAD
+    DatabaseBulkUpdate.Target.ENB -> OperationPauseStore.ENB_DB_DOWNLOAD
+}
+
+private fun databaseSettingsSection(target: DatabaseBulkUpdate.Target): String = when (target) {
+    DatabaseBulkUpdate.Target.MOBILE -> "db_mobile"
+    DatabaseBulkUpdate.Target.RADIO -> "db_radio"
+    DatabaseBulkUpdate.Target.ENB -> "db_enb"
+}
 
 private data class HomeMenuButtonMetrics(
     val width: Dp,
@@ -257,16 +278,35 @@ fun HomeScreen(navController: NavController) {
     // ---> LOGIQUE DE VÉRIFICATION DE LA BASE DE DONNÉES <---
     val workManager = remember { androidx.work.WorkManager.getInstance(context) }
 
-    // ✅ NOUVEAU : On écoute si un téléchargement est déjà en cours
-    val workInfos by workManager.getWorkInfosByTagFlow(DatabaseDownloadWorker.WORK_TAG).collectAsState(initial = emptyList())
-    val currentWork = workInfos.firstOrNull { workInfo ->
+    // ✅ On écoute les trois téléchargements : une mise à jour groupée peut enchaîner la base
+    // mobile, la base radio et la base eNB/gNB dans une seule file WorkManager.
+    val mobileWorkInfos by workManager
+        .getWorkInfosByTagFlow(DatabaseDownloadWorker.WORK_TAG)
+        .collectAsState(initial = emptyList())
+    val radioWorkInfos by workManager
+        .getWorkInfosByTagFlow(RadioDatabaseDownloadWorker.WORK_TAG)
+        .collectAsState(initial = emptyList())
+    val enbWorkInfos by workManager
+        .getWorkInfosByTagFlow(EnbDatabaseDownloadWorker.WORK_TAG)
+        .collectAsState(initial = emptyList())
+    val activeDatabaseWork = listOf(
+        mobileWorkInfos.map { workInfo -> workInfo to DatabaseBulkUpdate.Target.MOBILE },
+        radioWorkInfos.map { workInfo -> workInfo to DatabaseBulkUpdate.Target.RADIO },
+        enbWorkInfos.map { workInfo -> workInfo to DatabaseBulkUpdate.Target.ENB }
+    ).flatten().firstOrNull { (workInfo, _) ->
         workInfo.state == androidx.work.WorkInfo.State.RUNNING ||
             workInfo.state == androidx.work.WorkInfo.State.ENQUEUED ||
             workInfo.state == androidx.work.WorkInfo.State.BLOCKED
     }
+    val currentWork = activeDatabaseWork?.first
+    val currentWorkTarget = activeDatabaseWork?.second
     val isSyncing = currentWork != null
     // ✅ NOUVEAU : On récupère la progression de 0 à 100
-    val downloadProgress = currentWork?.progress?.getInt(DatabaseDownloadWorker.KEY_PROGRESS, 0) ?: 0
+    val downloadProgress = if (currentWork != null && currentWorkTarget != null) {
+        currentWork.progress.getInt(databaseProgressKey(currentWorkTarget), 0)
+    } else {
+        0
+    }
 
     // ✅ Retour visuel immédiat au clic « Télécharger » : WorkManager met un court instant à passer
     // le worker à ENQUEUED/RUNNING. Ce latch bascule le bandeau en mode « téléchargement » dès le
@@ -283,11 +323,14 @@ fun HomeScreen(navController: NavController) {
     // installée qu'à la toute fin. Pendant ce temps elle est bel et bien absente du disque — le
     // bandeau doit dire « génération en cours », surtout pas « base manquante ».
     val localBuild = rememberLocalDbBuildStatus()
-    val isGeneratingDb = localBuild.mobileRunning || isRebuildStarting
+    val isGeneratingDb = localBuild.running || isRebuildStarting
 
     val localDbState by AppConfig.localDatabaseState
     var wasSyncing by remember { mutableStateOf(isSyncing) }
     var isUpdateAvailable by remember { mutableStateOf(false) }
+    var availableDatabaseUpdates by remember {
+        mutableStateOf<List<DatabaseBulkUpdate.TargetAction>>(emptyList())
+    }
     // La base installée a été GÉNÉRÉE sur l'appareil : une nouvelle version se propose alors en
     // régénération, pas en téléchargement (vérifié en même temps que la version distante).
     var isRebuildOffer by remember { mutableStateOf(false) }
@@ -374,16 +417,33 @@ fun HomeScreen(navController: NavController) {
                         // Base générée sur l'appareil : la nouvelle version se propose en
                         // régénération, la même donnée ANFR étant à portée de build local.
                         val rebuildOffer = hasRemoteUpdate && LocalDbRebuildOffer.forMobile(context)
+                        // La vérification groupée ajoute les bases radio et eNB/gNB. La base mobile
+                        // reste calculée ci-dessus afin de conserver le cas particulier de la
+                        // régénération locale, que la file de téléchargements ignore volontairement.
+                        val additionalUpdates = DatabaseBulkUpdate
+                            .checkAvailableUpdates(context, workManager)
+                            .targetActions
+                            .filter {
+                                it.action == DatabaseBulkUpdate.Action.UPDATE &&
+                                    it.target != DatabaseBulkUpdate.Target.MOBILE
+                            }
+                        val updateActions = buildList {
+                            if (hasRemoteUpdate) {
+                                add(
+                                    DatabaseBulkUpdate.TargetAction(
+                                        DatabaseBulkUpdate.Target.MOBILE,
+                                        DatabaseBulkUpdate.Action.UPDATE
+                                    )
+                                )
+                            }
+                            addAll(additionalUpdates)
+                        }.distinctBy { it.target }
 
                         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                             isRebuildOffer = rebuildOffer
-                            if (hasRemoteUpdate) {
-                                isUpdateAvailable = true
-                                fr.geotower.utils.AppConfig.isDbUpdateAvailable.value = true
-                            } else {
-                                isUpdateAvailable = false
-                                fr.geotower.utils.AppConfig.isDbUpdateAvailable.value = false
-                            }
+                            availableDatabaseUpdates = updateActions
+                            isUpdateAvailable = updateActions.isNotEmpty()
+                            fr.geotower.utils.AppConfig.isDbUpdateAvailable.value = updateActions.isNotEmpty()
                         }
                     } catch (e: Exception) {
                         AppLogger.w(TAG_HOME, "Database update check failed", e)
@@ -482,15 +542,33 @@ fun HomeScreen(navController: NavController) {
             val isRebuildBanner = isRebuildOffer && isUpdateAvailable && !isDbMissing && !isDbInvalid
             // Le bandeau est un résumé de l'état de la base : son appui doit retrouver la carte
             // qui porte réellement cet état dans les réglages, pas seulement ouvrir leur accueil.
-            // Une génération/régénération vise la carte de génération locale ; les autres états
-            // visent la carte de la base mobile téléchargée. Le dernier cas couvre une base
-            // manquante sur un appareil configuré pour la génération locale.
+            // Une génération/régénération vise la carte de génération locale. Pour un téléchargement
+            // ou une mise à jour unique, on vise la carte de la base concernée ; une file groupée
+            // revient au titre de la section pour laisser voir toutes les bases concernées.
             val databaseBannerTargetSection = when {
                 isGeneratingDb -> "db_local_build"
-                isDownloading -> "db_mobile"
+                isDownloading -> currentWorkTarget?.let(::databaseSettingsSection) ?: "database"
                 isRebuildBanner || AppConfig.dbForcedLocal() -> "db_local_build"
-                else -> "db_mobile"
+                availableDatabaseUpdates.size == 1 ->
+                    databaseSettingsSection(availableDatabaseUpdates.first().target)
+                else -> "database"
             }
+
+            val databaseNamesByTarget = mapOf(
+                DatabaseBulkUpdate.Target.MOBILE to stringResource(R.string.notification_history_type_db_mobile),
+                DatabaseBulkUpdate.Target.RADIO to stringResource(R.string.notification_history_type_db_radio),
+                DatabaseBulkUpdate.Target.ENB to stringResource(R.string.notification_history_type_db_enb)
+            )
+            val displayedDatabaseTargets = buildList {
+                if (isDbUnavailable) add(DatabaseBulkUpdate.Target.MOBILE)
+                if (isGeneratingDb) {
+                    if (localBuild.mobileRunning) add(DatabaseBulkUpdate.Target.MOBILE)
+                    if (localBuild.radioRunning) add(DatabaseBulkUpdate.Target.RADIO)
+                }
+                addAll(availableDatabaseUpdates.map { it.target })
+                currentWorkTarget?.let(::add)
+            }.distinct()
+            val displayedDatabaseNames = displayedDatabaseTargets.mapNotNull(databaseNamesByTarget::get)
 
             DatabaseWarningBanner(
                 isMissing = isDbMissing,
@@ -499,7 +577,7 @@ fun HomeScreen(navController: NavController) {
                 isDownloading = isDownloading,
                 isGenerating = isGeneratingDb,
                 isRebuildOffer = isRebuildBanner,
-                databaseNames = listOf(stringResource(R.string.notification_history_type_db_mobile)),
+                databaseNames = displayedDatabaseNames,
                 downloadProgress = if (isGeneratingDb) localBuild.progress else downloadProgress,
                 onBannerClick = {
                     safeClick("home_database_banner") {
@@ -510,12 +588,13 @@ fun HomeScreen(navController: NavController) {
                 },
                 onDownloadClick = {
                     // On cache le bandeau et on lance le téléchargement (ou la régénération) manuel
+                    val updatesToProcess = availableDatabaseUpdates
                     isUpdateAvailable = false
                     AppConfig.isDbUpdateAvailable.value = false
 
                     if (isRebuildBanner) {
-                        // Régénération de la SEULE base annoncée par le bandeau (la base mobile) :
-                        // les packs radio se pilotent depuis la carte de génération des réglages.
+                        // La base mobile générée localement doit être reconstruite. Les autres bases
+                        // obsolètes éventuelles suivent ensuite leur propre téléchargement groupé.
                         isRebuildStarting = true
                         OperationPauseStore.clear(context, OperationPauseStore.LOCAL_DB_BUILD)
                         LocalDbBuildWorker.enqueue(
@@ -524,6 +603,33 @@ fun HomeScreen(navController: NavController) {
                             radioBroadcast = false,
                             nonMobileTech = false
                         )
+                        val otherUpdates = updatesToProcess.filter {
+                            it.target != DatabaseBulkUpdate.Target.MOBILE
+                        }
+                        if (otherUpdates.isNotEmpty()) {
+                            otherUpdates.forEach { update ->
+                                OperationPauseStore.clear(context, databasePauseKey(update.target))
+                            }
+                            DatabaseBulkUpdate.enqueueDetailed(workManager, otherUpdates)
+                        }
+                    } else if (updatesToProcess.isNotEmpty() && canStartDatabaseDownload &&
+                        RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.DATABASE_DOWNLOAD) &&
+                        RemoteFeatureFlags.isActionEnabled(RemoteFeatureFlags.Actions.START_DATABASE_DOWNLOAD) &&
+                        RemoteFeatureFlags.isWorkerEnabled(RemoteFeatureFlags.Workers.DATABASE_DOWNLOAD)
+                    ) {
+                        updatesToProcess.forEach { update ->
+                            OperationPauseStore.clear(context, databasePauseKey(update.target))
+                        }
+                        // Une seule mise à jour mobile garde son chemin historique ; dès qu'une
+                        // autre base est concernée, on utilise la file séquentielle commune.
+                        isDownloadStarting = true
+                        if (updatesToProcess.size == 1 &&
+                            updatesToProcess.first().target == DatabaseBulkUpdate.Target.MOBILE
+                        ) {
+                            DatabaseDownloadWorker.enqueue(workManager)
+                        } else {
+                            DatabaseBulkUpdate.enqueueDetailed(workManager, updatesToProcess)
+                        }
                     } else if (canStartDatabaseDownload &&
                         RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.DATABASE_DOWNLOAD) &&
                         RemoteFeatureFlags.isActionEnabled(RemoteFeatureFlags.Actions.START_DATABASE_DOWNLOAD) &&

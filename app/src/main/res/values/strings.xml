@@ -3091,4 +3091,20 @@
     <string name="appstrings_release_v2036_status_details">Site status details now include status and outage reason code legends with clearer information</string>
     <string name="appstrings_release_v2036_global_outages">Global outages are now applied consistently to equipped generations, with clearer out-of-service indicators</string>
     <string name="appstrings_release_v2036_share_export">Map and site captures now follow the app theme and are exported in the background for smoother, more reliable sharing</string>
+    <string name="hidden_sites_title">Hidden sites</string>
+    <string name="hidden_sites_settings_desc">Choose which sites or operators should no longer appear in the app</string>
+    <string name="hidden_sites_description">These local exclusions apply to the map, nearby sites, compass, live notifications and compatible exports.</string>
+    <string name="hidden_sites_empty">No hidden site</string>
+    <string name="hidden_sites_restore">Restore</string>
+    <string name="hidden_sites_hide_title">Hide an operator</string>
+    <string name="hidden_sites_hide_message">Which operator is no longer present at this site?</string>
+    <string name="hidden_sites_hide_action">Hide</string>
+    <string name="hidden_sites_anfr_id_label">ANFR ID</string>
+    <string name="hidden_sites_hide_confirmation">Hidden entry saved. You can restore it from Settings.</string>
+    <string name="hidden_sites_open_settings">View hidden sites</string>
+    <string name="backup_section_hidden_sites">Hidden sites</string>
+    <string name="appstrings_release_section_hidden_sites">Hidden sites</string>
+    <string name="appstrings_release_v2037_hidden_sites">Hide an absent site or operator directly from the map, then manage and restore it from Settings</string>
+    <string name="appstrings_release_v2037_hidden_sites_scope">Hidden-site preferences are applied across the map, nearby sites, compass, live notifications and widgets</string>
+    <string name="appstrings_release_v2037_hidden_sites_backup">Hidden sites are now included in app backups and can be restored on another installation</string>
 </resources>

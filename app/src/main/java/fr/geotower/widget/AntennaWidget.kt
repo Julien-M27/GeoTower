@@ -67,6 +67,7 @@ import com.google.android.gms.tasks.CancellationTokenSource
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeoutOrNull
 import fr.geotower.data.db.AppDatabase
+import fr.geotower.data.hidden.HiddenSitesStore
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppUiMode
@@ -458,10 +459,10 @@ class RefreshWidgetAction : ActionCallback {
                 val offsetLat = 0.045
                 val offsetLon = 0.045 / Math.cos(Math.toRadians(lat))
 
-                val antennas = dao.getLocalisationsInBox(
+                val antennas = HiddenSitesStore.filter(context, dao.getLocalisationsInBox(
                     minLat = lat - offsetLat, maxLat = lat + offsetLat,
                     minLon = lon - offsetLon, maxLon = lon + offsetLon
-                )
+                ))
 
                 if (antennas.isEmpty()) {
                     updateUi(true, "[]")

@@ -540,6 +540,7 @@ private fun backupSectionTitleRes(section: String): Int = when (section) {
     BackupSection.PHOTO_FAVORITES -> R.string.backup_section_photo_favorites
     BackupSection.COUNTERS -> R.string.backup_section_counters
     BackupSection.SETTINGS_PROFILES -> R.string.backup_section_settings_profiles
+    BackupSection.HIDDEN_SITES -> R.string.backup_section_hidden_sites
     else -> R.string.backup_section_unknown
 }
 

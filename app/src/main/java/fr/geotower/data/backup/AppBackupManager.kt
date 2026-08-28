@@ -7,6 +7,8 @@ import android.os.Build
 import android.util.Base64
 import androidx.core.content.FileProvider
 import fr.geotower.data.community.CommunityDataPreferences
+import fr.geotower.data.hidden.HiddenSiteRecord
+import fr.geotower.data.hidden.HiddenSitesStore
 import fr.geotower.data.community.PhotoReportHistoryStore
 import fr.geotower.data.notifications.NotificationHistoryStore
 import fr.geotower.data.share.ShareHistoryStore
@@ -40,9 +42,9 @@ import java.util.Locale
  * mais un document qu'on rouvre, donc la version la plus récemment modifiée gagne. Voir
  * [TripPlanStore.mergePlans].
  *
- * Ce qui reste volontairement **hors** de la sauvegarde : les caches serveur (sites HS, statistiques
- * départementales), les bases de données, les cartes hors-ligne et les envois en cours. Rien de tout
- * cela n'est une donnée de l'utilisateur — l'app le retélécharge ou le régénère toute seule.
+ * Ce qui reste volontairement **hors** de la sauvegarde : les caches serveur (statistiques
+ * départementales), les bases de données, les cartes hors-ligne et les envois en cours. Les
+ * exclusions de sites, elles, font partie des données personnelles et voyagent avec la sauvegarde.
  */
 object AppBackupManager {
     /** Marqueur d'enveloppe : ce qu'on refuse d'ouvrir quand il manque. */
@@ -75,7 +77,8 @@ object AppBackupManager {
             BackupSectionSize(BackupSection.TRIPS, TripPlanStore.read(context).size),
             BackupSectionSize(BackupSection.PHOTO_FAVORITES, CommunityDataPreferences.favoritePhotoEntries(prefs).size),
             BackupSectionSize(BackupSection.COUNTERS, prefs.getInt(KEY_LIFETIME_UPLOADS, 0)),
-            BackupSectionSize(BackupSection.SETTINGS_PROFILES, PreferenceProfileManager.profiles(context).size)
+            BackupSectionSize(BackupSection.SETTINGS_PROFILES, PreferenceProfileManager.profiles(context).size),
+            BackupSectionSize(BackupSection.HIDDEN_SITES, HiddenSitesStore.records(context).size)
         )
     }
 
@@ -156,6 +159,12 @@ object AppBackupManager {
                 JSONObject(PreferenceProfileManager.exportProfilesJson(context, profileIds))
             }.getOrNull()
             if (exported != null) sectionsJson.put(BackupSection.SETTINGS_PROFILES, exported)
+        }
+        if (BackupSection.HIDDEN_SITES in sections) {
+            sectionsJson.put(
+                BackupSection.HIDDEN_SITES,
+                entriesSection(HiddenSitesStore.records(context).map(::hiddenSiteToJson))
+            )
         }
 
         return JSONObject()
@@ -292,6 +301,15 @@ object AppBackupManager {
                     newCount = (parsed?.profiles?.size ?: 0) - (parsed?.conflicts?.size ?: 0)
                 )
             }
+            BackupSection.HIDDEN_SITES -> {
+                val incoming = entries.mapNotNull(::hiddenSiteFromJson).distinctBy(::hiddenSiteIdentity)
+                val known = HiddenSitesStore.records(context).mapTo(HashSet(), ::hiddenSiteIdentity)
+                BackupSectionPreview(
+                    section = section,
+                    incomingCount = incoming.size,
+                    newCount = incoming.count { hiddenSiteIdentity(it) !in known }
+                )
+            }
             else -> BackupSectionPreview(section, entries.size, 0)
         }
     }
@@ -356,6 +374,10 @@ object AppBackupManager {
             BackupSection.PHOTO_FAVORITES -> BackupSectionOutcome(section, importFavorites(context, entries))
             BackupSection.COUNTERS -> BackupSectionOutcome(section, importCounters(context, json))
             BackupSection.SETTINGS_PROFILES -> importProfiles(context, json)
+            BackupSection.HIDDEN_SITES -> BackupSectionOutcome(
+                section,
+                HiddenSitesStore.merge(context, entries.mapNotNull(::hiddenSiteFromJson))
+            )
             else -> BackupSectionOutcome(section, 0)
         }
     }
@@ -431,6 +453,37 @@ object AppBackupManager {
 
     private fun entriesSection(entries: List<JSONObject>): JSONObject =
         JSONObject().put("entries", JSONArray().also { array -> entries.forEach { array.put(it) } })
+
+    private fun hiddenSiteToJson(record: HiddenSiteRecord): JSONObject = JSONObject()
+        .put("physicalSiteKey", record.physicalSiteKey)
+        .put("operatorKey", record.operatorKey)
+        .put("operatorLabel", record.operatorLabel)
+        .put("idAnfr", record.idAnfr)
+        .put("latitude", record.latitude)
+        .put("longitude", record.longitude)
+        .put("azimuts", record.azimuts)
+        .put("azimutsFh", record.azimutsFh)
+        .put("hiddenAtMillis", record.hiddenAtMillis)
+
+    private fun hiddenSiteFromJson(json: JSONObject): HiddenSiteRecord? {
+        val siteKey = json.stringOrNull("physicalSiteKey") ?: return null
+        val operatorKey = json.stringOrNull("operatorKey") ?: return null
+        if (siteKey.isBlank() || operatorKey.isBlank()) return null
+        return HiddenSiteRecord(
+            physicalSiteKey = siteKey,
+            operatorKey = operatorKey,
+            operatorLabel = json.stringOrNull("operatorLabel").orEmpty(),
+            idAnfr = json.stringOrNull("idAnfr").orEmpty(),
+            latitude = json.optDouble("latitude", 0.0),
+            longitude = json.optDouble("longitude", 0.0),
+            azimuts = json.stringOrNull("azimuts"),
+            azimutsFh = json.stringOrNull("azimutsFh"),
+            hiddenAtMillis = json.optLong("hiddenAtMillis", 0L)
+        )
+    }
+
+    private fun hiddenSiteIdentity(record: HiddenSiteRecord): String =
+        "${record.physicalSiteKey.trim()}|${record.operatorKey.trim().uppercase(Locale.ROOT)}"
 
     private fun favoritePrefKey(json: JSONObject): String? {
         val siteId = json.stringOrNull("siteId") ?: return null

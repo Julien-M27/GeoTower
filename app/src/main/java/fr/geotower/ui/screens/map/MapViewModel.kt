@@ -278,7 +278,12 @@ class MapViewModel(
                 val hasSiteDisplayFilter = !showSitesInService || !showSitesOutOfService || !showProjectSites
                 val hasFrequencyFilter = !frequencyFilter.isFullyEnabled
 
-                if (zoom < 13.0 && cityPolygons == null && !hasSiteDisplayFilter && !hasFrequencyFilter && !AppConfig.timeSliderActive.value) {
+                // Les clusters sont pré-agrégés et ne peuvent pas soustraire les masquages locaux
+                // opérateur par opérateur. Dès qu'il existe une préférence de masquage, on charge
+                // les lignes détaillées afin que la carte reste cohérente avec tous les autres écrans.
+                if (zoom < 13.0 && cityPolygons == null && !hasSiteDisplayFilter && !hasFrequencyFilter &&
+                    !AppConfig.timeSliderActive.value && !repository.hasHiddenSites()
+                ) {
                     val clusters = repository.getClusteredAntennas(zoom, latNorth, lonEast, latSouth, lonWest)
                     val clusterIsZb = if (AppConfig.showOnlyZbSites.value) 1 else 0
 
@@ -641,6 +646,15 @@ class MapViewModel(
             requestedIds.mapNotNull { id ->
                 mapAzimuthTechniqueCache[id]?.let { technique -> id to technique }
             }.toMap()
+        }
+    }
+
+    /** Résout les adresses affichées dans les informations contextuelles de la carte. */
+    suspend fun getMapTechniqueSummaries(idAnfrs: List<String>): Map<String, TechniqueEntity> {
+        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val requestedIds = idAnfrs.filter { it.isNotBlank() }.distinct()
+            if (requestedIds.isEmpty()) emptyMap()
+            else repository.getTechniqueSummariesByIds(requestedIds)
         }
     }
 
