@@ -93,6 +93,7 @@ import fr.geotower.data.outages.OutageServerInfo
 import fr.geotower.ui.components.DatabaseRefreshMembership
 import fr.geotower.ui.components.DatabaseRefreshTimeout
 import fr.geotower.ui.components.DatabaseSectionRefreshButton
+import fr.geotower.ui.components.AppLogoImage
 import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.components.SafeClick
 import fr.geotower.ui.components.rememberDatabaseRefreshState
@@ -1000,13 +1001,10 @@ private fun SourceDataLink(label: String?, host: String, onClick: (() -> Unit)?)
 
 @Composable
 private fun AboutDrawableImage(resId: Int, modifier: Modifier = Modifier, contentDescription: String? = null) {
-    AndroidView<ImageView>(
+    AppLogoImage(
+        resId = resId,
         modifier = modifier,
-        factory = { ctx -> ImageView(ctx).apply { scaleType = ImageView.ScaleType.FIT_CENTER } },
-        update = { imageView ->
-            if (resId != 0) imageView.setImageResource(resId)
-            imageView.contentDescription = contentDescription
-        }
+        contentDescription = contentDescription
     )
 }
 

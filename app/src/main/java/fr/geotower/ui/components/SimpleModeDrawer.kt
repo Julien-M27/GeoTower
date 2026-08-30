@@ -377,9 +377,8 @@ private fun SimpleModeDrawerContent(
         verticalArrangement = Arrangement.Center
     ) {
         if (displayLogoResId != 0) {
-            Image(
-                painter = painterResource(id = displayLogoResId),
-                contentDescription = null,
+            AppLogoImage(
+                resId = displayLogoResId,
                 modifier = Modifier
                     .size(sizing.component(180.dp))
                     .clip(RoundedCornerShape(sizing.component(36.dp)))

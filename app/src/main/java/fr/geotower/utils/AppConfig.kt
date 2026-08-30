@@ -84,11 +84,13 @@ object AppConfig {
     const val PREF_SIMPLE_MODE = "simple_mode"
 
     // --- Apparence ---
+    const val PREF_LOGO_MATERIAL_WAVES = "logo_material_waves"
     var themeMode = mutableIntStateOf(0)
     var isOledMode = mutableStateOf(true)
     var isBlurEnabled = mutableStateOf(true)
     var colorPalette = mutableStateOf(DEFAULT_COLOR_PALETTE)
     var appLogoDrawingChoice = mutableStateOf(AppLogoDrawingResources.AUTO)
+    var isLogoMaterialWavesEnabled = mutableStateOf(false)
 
     // Style d'affichage des fiches : plein écran, ou fractionné (le contexte reste à gauche, le
     // détail s'ouvre à droite). Tant que l'utilisateur n'a rien choisi dans les réglages, on reste
@@ -684,6 +686,11 @@ object AppConfig {
         prefs.edit().putString(PREF_HOME_HELP_POSITION, position).apply()
     }
 
+    fun setLogoMaterialWaves(prefs: SharedPreferences, enabled: Boolean) {
+        isLogoMaterialWavesEnabled.value = enabled
+        prefs.edit().putBoolean(PREF_LOGO_MATERIAL_WAVES, enabled).apply()
+    }
+
     // --- FONCTION POUR CHARGER LA MÉMOIRE AU DÉMARRAGE ---
     fun loadSavedFilters(prefs: android.content.SharedPreferences) {
 
@@ -696,6 +703,7 @@ object AppConfig {
         appLogoDrawingChoice.value = AppLogoDrawingResources.normalize(
             prefs.getString(AppLogoDrawingResources.PREF_KEY, AppLogoDrawingResources.AUTO)
         )
+        isLogoMaterialWavesEnabled.value = prefs.getBoolean(PREF_LOGO_MATERIAL_WAVES, false)
         //Statut
         shareSiteStatus.value = prefs.getBoolean("share_site_status", true)
         shareSiteSpeedtest.value = prefs.getBoolean("share_site_speedtest", true) // 🚨 NEW

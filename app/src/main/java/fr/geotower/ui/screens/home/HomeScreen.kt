@@ -122,6 +122,7 @@ import fr.geotower.data.api.ServerStatus
 import fr.geotower.ui.components.LocationUnavailableBanner
 import fr.geotower.ui.components.PageScrollEdgeButtons
 import fr.geotower.ui.components.ServerUnreachableBanner
+import fr.geotower.ui.components.AppLogoImage
 import fr.geotower.ui.components.rememberLocalDbBuildStatus
 import fr.geotower.ui.components.rememberServerReachabilityState
 import fr.geotower.ui.components.pageScrollbar
@@ -1491,11 +1492,7 @@ fun MenuButton(
 
 @Composable
 fun DrawableImage(resId: Int, modifier: Modifier = Modifier) {
-    AndroidView(
-        modifier = modifier,
-        factory = { ctx -> ImageView(ctx).apply { scaleType = ImageView.ScaleType.FIT_CENTER; if (resId != 0) setImageResource(resId) } },
-        update = { if (resId != 0) it.setImageResource(resId) }
-    )
+    AppLogoImage(resId = resId, modifier = modifier)
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -1558,19 +1555,21 @@ fun DatabaseWarningBanner(
             shadowElevation = 2.dp,            // ✅ AJOUT DE L'OMBRE
             modifier = androidx.compose.ui.Modifier.fillMaxWidth()
         ) {
-            androidx.compose.foundation.layout.Row(
+            androidx.compose.foundation.layout.Column(
                 modifier = androidx.compose.ui.Modifier
                     .fillMaxWidth()
                     .padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(12.dp)),
-                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
             ) {
-                androidx.compose.material3.Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = contentColor
-                )
-                androidx.compose.foundation.layout.Spacer(androidx.compose.ui.Modifier.width(sizing.component(12.dp)))
-                androidx.compose.foundation.layout.Column(modifier = androidx.compose.ui.Modifier.weight(1f)) {
+                androidx.compose.foundation.layout.Row(
+                    modifier = androidx.compose.ui.Modifier.fillMaxWidth(),
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                ) {
+                    androidx.compose.material3.Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = contentColor
+                    )
+                    androidx.compose.foundation.layout.Spacer(androidx.compose.ui.Modifier.width(sizing.component(12.dp)))
                     androidx.compose.material3.Text(
                         text = when {
                             isGenerating -> stringResource(R.string.appstrings_generating_db_banner_title)
@@ -1581,83 +1580,97 @@ fun DatabaseWarningBanner(
                         },
                         fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
                         color = contentColor,
-                        style = androidx.compose.material3.MaterialTheme.typography.titleSmall
+                        style = androidx.compose.material3.MaterialTheme.typography.titleSmall,
+                        modifier = androidx.compose.ui.Modifier.weight(1f)
                     )
-                    if (databaseNamesText.isNotBlank()) {
-                        androidx.compose.material3.Text(
-                            text = stringResource(R.string.appstrings_db_banner_databases, databaseNamesText),
-                            color = contentColor,
-                            fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
-                            style = androidx.compose.material3.MaterialTheme.typography.bodySmall
-                        )
-                    }
-                    if (isGenerating) {
-                        androidx.compose.material3.Text(
-                            text = stringResource(R.string.appstrings_generating_db_banner_desc),
-                            color = contentColor,
-                            style = androidx.compose.material3.MaterialTheme.typography.bodySmall
-                        )
-                    } else if (isRebuildOffer && !isDownloading) {
-                        androidx.compose.material3.Text(
-                            text = stringResource(R.string.appstrings_update_db_banner_desc_rebuild),
-                            color = contentColor,
-                            style = androidx.compose.material3.MaterialTheme.typography.bodySmall
-                        )
-                    } else if ((isMissing || isInvalid) && !isDownloading) {
-                        androidx.compose.material3.Text(
-                            text = if (isInvalid) {
-                                stringResource(R.string.appstrings_invalid_db_banner_desc)
-                            } else {
-                                stringResource(R.string.appstrings_missing_db_banner_desc)
-                            },
-                            color = contentColor,
-                            style = androidx.compose.material3.MaterialTheme.typography.bodySmall
-                        )
+
+                    if (isDownloading || isGenerating) {
+                        androidx.compose.foundation.layout.Row(
+                            modifier = androidx.compose.ui.Modifier
+                                .height(sizing.component(36.dp))
+                                .width(sizing.component(100.dp)),
+                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.End
+                        ) {
+                            CircularWavyProgressIndicator(
+                                modifier = androidx.compose.ui.Modifier.size(sizing.component(24.dp)),
+                                color = contentColor
+                            )
+                            androidx.compose.foundation.layout.Spacer(
+                                androidx.compose.ui.Modifier.width(sizing.component(8.dp))
+                            )
+                            androidx.compose.material3.Text(
+                                text = "$downloadProgress %",
+                                color = contentColor,
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                                fontSize = sizing.text(13.sp)
+                            )
+                        }
+                    } else {
+                        androidx.compose.material3.Button(
+                            onClick = onDownloadClick,
+                            colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                                containerColor = contentColor,
+                                contentColor = containerColor
+                            ),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                                horizontal = sizing.spacing(12.dp),
+                                vertical = sizing.spacing(4.dp)
+                            ),
+                            modifier = androidx.compose.ui.Modifier.height(sizing.component(36.dp))
+                        ) {
+                            androidx.compose.material3.Text(
+                                text = stringResource(
+                                    if (isRebuildOffer) R.string.appstrings_btn_rebuild_banner
+                                    else R.string.appstrings_btn_download_banner
+                                ),
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                                fontSize = sizing.text(12.sp)
+                            )
+                        }
                     }
                 }
 
-                // ✅ NOUVEAU : Si ça télécharge (ou génère), on affiche l'animation WavyLoader + LE POURCENTAGE
-                if (isDownloading || isGenerating) {
-                    androidx.compose.foundation.layout.Row(
-                        modifier = androidx.compose.ui.Modifier.height(sizing.component(36.dp)).width(sizing.component(100.dp)),
-                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-                        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.End // On aligne à droite
-                    ) {
-                        // ✅ CORRECTION : Utilisation de CircularWavyProgressIndicator
-                        CircularWavyProgressIndicator(
-                            modifier = androidx.compose.ui.Modifier.size(sizing.component(24.dp)),
-                            color = contentColor
-                        )
-                        androidx.compose.foundation.layout.Spacer(androidx.compose.ui.Modifier.width(sizing.component(8.dp)))
-                        androidx.compose.material3.Text(
-                            text = "$downloadProgress %",
-                            color = contentColor,
-                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                            fontSize = sizing.text(13.sp)
-                        )
-                    }
-                } else {
-                    // Sinon, on affiche le bouton normal
-                    androidx.compose.material3.Button(
-                        onClick = onDownloadClick,
-                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                            containerColor = contentColor,
-                            contentColor = containerColor
-                        ),
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = sizing.spacing(12.dp), vertical = sizing.spacing(4.dp)),
-                        modifier = androidx.compose.ui.Modifier.height(sizing.component(36.dp))
-                    ) {
-                        androidx.compose.material3.Text(
-                            text = stringResource(
-                                if (isRebuildOffer) R.string.appstrings_btn_rebuild_banner
-                                else R.string.appstrings_btn_download_banner
-                            ),
-                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                            fontSize = sizing.text(12.sp)
-                        )
-                    }
+                // Les bases concernées occupent une ligne dédiée, sans être comprimées par le
+                // bouton ou l'indicateur de progression placé à droite de la première ligne.
+                if (databaseNamesText.isNotBlank()) {
+                    androidx.compose.material3.Text(
+                        text = stringResource(R.string.appstrings_db_banner_databases, databaseNamesText),
+                        color = contentColor,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                        style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+                        modifier = androidx.compose.ui.Modifier.padding(start = sizing.component(36.dp))
+                    )
+                }
+
+                if (isGenerating) {
+                    androidx.compose.material3.Text(
+                        text = stringResource(R.string.appstrings_generating_db_banner_desc),
+                        color = contentColor,
+                        style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+                        modifier = androidx.compose.ui.Modifier.padding(start = sizing.component(36.dp))
+                    )
+                } else if (isRebuildOffer && !isDownloading) {
+                    androidx.compose.material3.Text(
+                        text = stringResource(R.string.appstrings_update_db_banner_desc_rebuild),
+                        color = contentColor,
+                        style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+                        modifier = androidx.compose.ui.Modifier.padding(start = sizing.component(36.dp))
+                    )
+                } else if ((isMissing || isInvalid) && !isDownloading) {
+                    androidx.compose.material3.Text(
+                        text = if (isInvalid) {
+                            stringResource(R.string.appstrings_invalid_db_banner_desc)
+                        } else {
+                            stringResource(R.string.appstrings_missing_db_banner_desc)
+                        },
+                        color = contentColor,
+                        style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+                        modifier = androidx.compose.ui.Modifier.padding(start = sizing.component(36.dp))
+                    )
                 }
             }
+
         }
     }
 }

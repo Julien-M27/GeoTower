@@ -188,6 +188,30 @@ object SiteSpeedtestsPagePreferences {
     }
 }
 
+/** Options d'affichage propres au référentiel des bandes de fréquences. */
+object FrequencyReferencePagePreferences {
+    const val SORT_ORDER = "page_frequency_reference_sort_order"
+    const val SORT_SPECTRUM = "spectrum"
+    const val SORT_BAND = "band"
+    const val DEFAULT_SORT_ORDER = SORT_SPECTRUM
+
+    fun normalizeSortOrder(value: String?): String = when (value) {
+        SORT_BAND -> SORT_BAND
+        else -> SORT_SPECTRUM
+    }
+
+    fun read(prefs: SharedPreferences): String =
+        normalizeSortOrder(prefs.getString(SORT_ORDER, DEFAULT_SORT_ORDER))
+
+    fun write(prefs: SharedPreferences, value: String) {
+        prefs.edit().putString(SORT_ORDER, normalizeSortOrder(value)).apply()
+    }
+
+    fun reset(prefs: SharedPreferences) {
+        write(prefs, DEFAULT_SORT_ORDER)
+    }
+}
+
 /**
  * Options d'affichage propres aux pages d'historiques, réglées depuis la roue dentée de leur barre
  * du haut. Les aides au défilement de ces pages restent gérées par [PageScrollPrefs].
@@ -316,9 +340,125 @@ fun HistoryPageSettingsSheet(
     }
 }
 
+/** Feuille de réglages du référentiel des bandes : ordre des lignes et aides au défilement. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun FrequencyReferenceSettingsSheet(
+    sortOrder: String,
+    onSortOrderChange: (String) -> Unit,
+    onReset: () -> Unit,
+    onDismiss: () -> Unit,
+    onBack: () -> Unit,
+    sheetState: SheetState,
+    useOneUi: Boolean,
+    bubbleColor: Color
+) {
+    val themeMode by AppConfig.themeMode
+    val isOledMode by AppConfig.isOledMode
+    val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
+    val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
+    val scrollState = rememberScrollState()
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    val context = LocalContext.current
+    val prefs = remember(context) { context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE) }
+
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
+        BackHandler(onBack = onBack)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .settingsPopupFadingEdge(scrollState)
+                .verticalScroll(scrollState)
+                .padding(bottom = sizing.spacing(48.dp), start = sizing.spacing(24.dp), end = sizing.spacing(24.dp)),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(16.dp)),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
+                Text(
+                    text = stringResource(R.string.appstrings_frequency_reference_title),
+                    style = sizing.textStyle(MaterialTheme.typography.titleLarge),
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center
+                )
+                Spacer(Modifier.width(sizing.spacing(48.dp)))
+            }
+
+            val shape = oneUiActionButtonShape(useOneUi)
+            val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
+
+            Text(
+                text = stringResource(R.string.appstrings_frequency_reference_sort_title),
+                style = sizing.textStyle(MaterialTheme.typography.titleMedium),
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(Modifier.height(sizing.spacing(8.dp)))
+            Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))) {
+                SettingsRadioItem(
+                    name = stringResource(R.string.appstrings_frequency_reference_sort_spectrum),
+                    isSelected = sortOrder == FrequencyReferencePagePreferences.SORT_SPECTRUM,
+                    useOneUi = useOneUi,
+                    bubbleColor = bubbleColor,
+                    onClick = { onSortOrderChange(FrequencyReferencePagePreferences.SORT_SPECTRUM) }
+                )
+                SettingsRadioItem(
+                    name = stringResource(R.string.appstrings_frequency_reference_sort_band),
+                    isSelected = sortOrder == FrequencyReferencePagePreferences.SORT_BAND,
+                    useOneUi = useOneUi,
+                    bubbleColor = bubbleColor,
+                    onClick = { onSortOrderChange(FrequencyReferencePagePreferences.SORT_BAND) }
+                )
+            }
+            Text(
+                text = stringResource(R.string.appstrings_frequency_reference_sort_desc),
+                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth().padding(top = sizing.spacing(8.dp))
+            )
+
+            Spacer(Modifier.height(sizing.spacing(16.dp)))
+            PageScrollAidsCards(
+                page = PageScrollPrefs.FREQUENCY_REFERENCE,
+                shape = shape,
+                border = border,
+                bubbleColor = bubbleColor,
+                useOneUi = useOneUi
+            )
+
+            Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
+            TextButton(
+                onClick = {
+                    PageScrollPrefs.Aid.entries.forEach { aid ->
+                        PageScrollPrefs.set(
+                            prefs,
+                            aid,
+                            PageScrollPrefs.FREQUENCY_REFERENCE,
+                            PageScrollPrefs.defaultEnabled(aid, PageScrollPrefs.FREQUENCY_REFERENCE)
+                        )
+                    }
+                    onReset()
+                }
+            ) {
+                Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(sizing.spacing(8.dp)))
+                Text(
+                    stringResource(R.string.appstrings_reset_to_default),
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            Spacer(modifier = Modifier.height(sizing.spacing(32.dp)).navigationBarsPadding())
+        }
+    }
+}
+
 
 /**
- * Les destinations de la section « Pages », rassemblées en un seul objet plutôt qu'en quatorze
+ * Les destinations de la section « Pages », rassemblées en un seul objet plutôt qu'en quinze
  * paramètres : la section est rendue à deux endroits (sa page dédiée et le mode « tout sur une
  * page »), et chacun devrait sinon recopier la même liasse de lambdas.
  */
@@ -333,6 +473,7 @@ class PagesSectionActions(
     val onAbout: () -> Unit = {},
     val onSupport: () -> Unit = {},
     val onSite: () -> Unit = {},
+    val onFrequencyReference: () -> Unit = {},
     val onSpeedtests: () -> Unit = {},
     val onTheoreticalCoverage: () -> Unit = {},
     val onElevationProfile: () -> Unit = {},
@@ -411,13 +552,14 @@ fun SectionPages(
     val hasAbout = featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.ABOUT)
     val hasSupport = featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.SUPPORT_DETAIL)
     val hasSite = featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.SITE_DETAIL)
+    val hasFrequencyReference = featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SITE_FREQUENCIES)
     val hasCoverage = featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.THEORETICAL_COVERAGE)
     val hasElevation = featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.ELEVATION_PROFILE)
     val hasThroughput = featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.THROUGHPUT_CALCULATOR)
 
     SectionTitle(stringResource(R.string.settings_pages_customization_title))
     // Seule section des réglages à porter un sous-titre : les autres alignent des interrupteurs
-    // qui se lisent seuls, celle-ci n'est qu'un aiguillage vers quatorze autres écrans.
+    // qui se lisent seuls, celle-ci n'est qu'un aiguillage vers quinze autres écrans.
     Text(
         text = stringResource(R.string.settings_pages_customization_desc),
         style = sizing.textStyle(MaterialTheme.typography.bodySmall),
@@ -500,7 +642,7 @@ fun SectionPages(
         }
     }
 
-    if (hasSupport || hasSite) {
+    if (hasSupport || hasSite || hasFrequencyReference) {
         PagesGroupTitle(stringResource(R.string.settings_pages_group_details))
         if (hasSupport) {
             PageSettingsCard(
@@ -531,6 +673,15 @@ fun SectionPages(
                 desc = stringResource(R.string.settings_page_speedtests_desc),
                 icon = Icons.Default.Speed,
                 onClick = actions.onSpeedtests,
+                shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi, safeClick = safeClick
+            )
+        }
+        if (hasFrequencyReference) {
+            PageSettingsCard(
+                title = stringResource(R.string.appstrings_frequency_reference_title),
+                desc = stringResource(R.string.settings_page_frequency_reference_desc),
+                icon = Icons.Default.WifiTethering,
+                onClick = actions.onFrequencyReference,
                 shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi, safeClick = safeClick
             )
         }

@@ -1,6 +1,7 @@
 package fr.geotower.data.trip
 
 import com.google.gson.GsonBuilder
+import com.google.gson.reflect.TypeToken
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -31,6 +32,13 @@ object TripExport {
     private val gson = GsonBuilder().setPrettyPrinting().create()
 
     fun buildJson(plans: List<TripPlan>): String = gson.toJson(plans)
+
+    /** Relit un export JSON GeoTower, en écartant les trajets invalides ou vides. */
+    fun parseJson(content: String): List<TripPlan> {
+        val type = object : TypeToken<List<TripPlan>>() {}.type
+        val plans: List<TripPlan>? = gson.fromJson(content, type)
+        return plans.orEmpty().mapNotNull { it.sanitized() }.filterNot { it.isEmptyDraft() }
+    }
 
     /**
      * Un `<trk>` par trajet, un `<trkseg>` par segment, un `<wpt>` par étape.

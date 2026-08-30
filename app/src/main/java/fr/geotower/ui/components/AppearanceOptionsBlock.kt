@@ -49,6 +49,8 @@ fun AppearanceOptionsBlock(
     appLogoDrawingChoice: String? = null,
     appLogoDrawingRes: Int? = null,
     onAppLogoDrawingClick: (() -> Unit)? = null,
+    logoMaterialWavesEnabled: Boolean? = null,
+    onLogoMaterialWavesChange: ((Boolean) -> Unit)? = null,
     onColorPaletteClick: (() -> Unit)? = null,
     shape: Shape, border: BorderStroke?, bubbleColor: Color, safeClick: SafeClick
 ) {
@@ -151,15 +153,9 @@ fun AppearanceOptionsBlock(
                     modifier = Modifier.size(sizing.component(44.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    AndroidView(
-                        modifier = Modifier.size(sizing.component(34.dp)),
-                        factory = { ctx ->
-                            ImageView(ctx).apply {
-                                scaleType = ImageView.ScaleType.FIT_CENTER
-                                setImageResource(appLogoDrawingRes)
-                            }
-                        },
-                        update = { it.setImageResource(appLogoDrawingRes) }
+                    AppLogoImage(
+                        resId = appLogoDrawingRes,
+                        modifier = Modifier.size(sizing.component(34.dp))
                     )
                 }
 
@@ -167,6 +163,24 @@ fun AppearanceOptionsBlock(
                 Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(sizing.component(24.dp)))
             }
         }
+        Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+    }
+
+    if (logoMaterialWavesEnabled != null && onLogoMaterialWavesChange != null) {
+        PreferenceSwitchCard(
+            title = stringResource(R.string.appearance_logo_material_waves_title),
+            desc = stringResource(R.string.appearance_logo_material_waves_desc),
+            checked = logoMaterialWavesEnabled,
+            onCheckedChange = { enabled ->
+                safeClick("appearance_logo_material_waves") {
+                    onLogoMaterialWavesChange(enabled)
+                }
+            },
+            shape = shape,
+            border = border,
+            bubbleColor = bubbleColor,
+            useOneUi = useOneUi
+        )
         Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
     }
 

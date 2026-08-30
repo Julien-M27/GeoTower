@@ -1,6 +1,10 @@
 package fr.geotower.utils
 
+import android.content.Context
+import android.graphics.drawable.Drawable
+import android.graphics.drawable.LayerDrawable
 import androidx.annotation.DrawableRes
+import androidx.core.content.ContextCompat
 import fr.geotower.R
 
 object AppLogoDrawingResources {
@@ -78,5 +82,36 @@ object AppLogoDrawingResources {
                 else -> R.drawable.logo_geotower_color_on_dark
             }
         }
+    }
+
+    /**
+     * Returns the in-app logo drawable, optionally replacing only GeoTower's wave layer with the
+     * current Material accent. Other logo families and monochrome variants remain unchanged.
+     */
+    fun displayDrawable(context: Context, @DrawableRes drawableRes: Int, materialWavesEnabled: Boolean, materialColor: Int): Drawable? {
+        val layers = if (materialWavesEnabled) dynamicGeoTowerLayers(drawableRes) else null
+        if (layers == null) return ContextCompat.getDrawable(context, drawableRes)
+
+        val structure = ContextCompat.getDrawable(context, layers.structureRes) ?: return null
+        val waves = ContextCompat.getDrawable(context, layers.wavesRes)?.mutate() ?: return structure
+        waves.setTint(materialColor)
+        return LayerDrawable(arrayOf(structure, waves))
+    }
+
+    private data class DynamicLogoLayers(
+        @DrawableRes val structureRes: Int,
+        @DrawableRes val wavesRes: Int
+    )
+
+    private fun dynamicGeoTowerLayers(@DrawableRes drawableRes: Int): DynamicLogoLayers? = when (drawableRes) {
+        R.drawable.logo_geotower_color_on_light -> DynamicLogoLayers(
+            R.drawable.logo_geotower_structure_on_light,
+            R.drawable.logo_geotower_waves
+        )
+        R.drawable.logo_geotower_color_on_dark -> DynamicLogoLayers(
+            R.drawable.logo_geotower_structure_on_dark,
+            R.drawable.logo_geotower_waves
+        )
+        else -> null
     }
 }

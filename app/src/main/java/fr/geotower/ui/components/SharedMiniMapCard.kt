@@ -60,6 +60,15 @@ import kotlin.math.sqrt
 
 private const val MINI_MAP_HS_OPERATOR_WILDCARD = "*"
 private const val MINI_MAP_DEFAULT_MIN_ZOOM = 14.0
+private const val MINI_MAP_AZIMUTH_COMPACT_ZOOM = 14.0
+private const val MINI_MAP_AZIMUTH_FULL_ZOOM = 17.0
+private const val MINI_MAP_AZIMUTH_COMPACT_BEAM_DP = 18f
+private const val MINI_MAP_AZIMUTH_FULL_BEAM_DP = 50f
+private const val MINI_MAP_AZIMUTH_LINE_DP = 3.5f
+private const val MINI_MAP_AZIMUTH_POINT_RADIUS_DP = 3.5f
+private const val MINI_MAP_AZIMUTH_CONE_EDGE_DP = 2.2f
+private const val MINI_MAP_AZIMUTH_COMPACT_THICKNESS_SCALE = 0.7f
+private const val MINI_MAP_AZIMUTH_FULL_THICKNESS_SCALE = 1f
 private const val MINI_MAP_TILE_SIZE = 256.0
 private const val MINI_MAP_EARTH_RADIUS_METERS = 6_378_137.0
 private val MINI_MAP_EARTH_CIRCUMFERENCE_METERS = 2.0 * Math.PI * MINI_MAP_EARTH_RADIUS_METERS
@@ -158,6 +167,22 @@ fun SharedMiniMapCard(
         stringResource(R.string.appstrings_mini_map_switch_to_antenna)
     } else {
         stringResource(R.string.appstrings_mini_map_switch_to_user)
+    }
+
+    fun zoomMiniMapAroundAntenna(zoomDirection: Double) {
+        val map = mapRef ?: return
+        val antennaPoint = GeoPoint(centerLat, centerLon)
+        map.post {
+            // Les boutons doivent zoomer autour de l'antenne, même si une interaction précédente
+            // a laissé la caméra légèrement décalée ou si une animation est encore active.
+            map.controller.stopAnimation(false)
+            map.controller.setCenter(antennaPoint)
+            if (zoomDirection > 0.0) {
+                map.controller.zoomIn()
+            } else {
+                map.controller.zoomOut()
+            }
+        }
     }
 
     Box(modifier = modifier.height(sizing.component(200.dp)).clip(blockShape).border(cardBorder ?: BorderStroke(0.dp, Color.Transparent), blockShape)) {
@@ -406,8 +431,8 @@ fun SharedMiniMapCard(
         )
         if (showZoomControls) {
             Column(modifier = Modifier.align(Alignment.BottomEnd).padding(sizing.spacing(12.dp)), verticalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))) {
-                Surface(onClick = { mapRef?.controller?.zoomIn() }, shape = CircleShape, color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f), shadowElevation = 4.dp, modifier = Modifier.size(sizing.component(38.dp))) { Icon(Icons.Default.Add, null, modifier = Modifier.padding(sizing.spacing(6.dp))) }
-                Surface(onClick = { mapRef?.controller?.zoomOut() }, shape = CircleShape, color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f), shadowElevation = 4.dp, modifier = Modifier.size(sizing.component(38.dp))) { Icon(Icons.Default.Remove, null, modifier = Modifier.padding(sizing.spacing(6.dp))) }
+                Surface(onClick = { zoomMiniMapAroundAntenna(1.0) }, shape = CircleShape, color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f), shadowElevation = 4.dp, modifier = Modifier.size(sizing.component(38.dp))) { Icon(Icons.Default.Add, null, modifier = Modifier.padding(sizing.spacing(6.dp))) }
+                Surface(onClick = { zoomMiniMapAroundAntenna(-1.0) }, shape = CircleShape, color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f), shadowElevation = 4.dp, modifier = Modifier.size(sizing.component(38.dp))) { Icon(Icons.Default.Remove, null, modifier = Modifier.padding(sizing.spacing(6.dp))) }
             }
         }
         if (showViewModeToggle) {
@@ -591,6 +616,27 @@ private fun miniMapZoomForRadius(radiusMeters: Double): Double {
         radiusMeters >= 300.0 -> 16.0
         else -> 17.0
     }
+}
+
+/**
+ * Les azimuts sont des indications visuelles, pas des distances cartographiques. À faible
+ * zoom, leur conserver une longueur fixe les fait prendre toute la place dans une mini-carte.
+ * On les compacte progressivement jusqu'au zoom de détail, puis on garde leur taille lisible.
+ */
+private fun miniMapAzimuthBeamLengthDp(zoom: Double): Float {
+    val progress = ((zoom - MINI_MAP_AZIMUTH_COMPACT_ZOOM) /
+        (MINI_MAP_AZIMUTH_FULL_ZOOM - MINI_MAP_AZIMUTH_COMPACT_ZOOM))
+        .coerceIn(0.0, 1.0)
+    return (MINI_MAP_AZIMUTH_COMPACT_BEAM_DP +
+        (MINI_MAP_AZIMUTH_FULL_BEAM_DP - MINI_MAP_AZIMUTH_COMPACT_BEAM_DP) * progress).toFloat()
+}
+
+private fun miniMapAzimuthThicknessScale(zoom: Double): Float {
+    val progress = ((zoom - MINI_MAP_AZIMUTH_COMPACT_ZOOM) /
+        (MINI_MAP_AZIMUTH_FULL_ZOOM - MINI_MAP_AZIMUTH_COMPACT_ZOOM))
+        .coerceIn(0.0, 1.0)
+    return (MINI_MAP_AZIMUTH_COMPACT_THICKNESS_SCALE +
+        (MINI_MAP_AZIMUTH_FULL_THICKNESS_SCALE - MINI_MAP_AZIMUTH_COMPACT_THICKNESS_SCALE) * progress).toFloat()
 }
 
 private fun normalizedMiniMapAnfrId(value: String): String {
@@ -878,8 +924,8 @@ class MiniMapAntennaMarker(
     // Débord du liseré de contraste (fond satellite seulement), de part et d'autre du trait
     // ou de la pastille. Les azimuts estompés (opérateur non consulté) n'en reçoivent pas :
     // un liseré opaque sous un trait à 27 % d'opacité annulerait justement l'estompage.
-    private val outlineWidthPx = 1.2f * density
-    private val thinOutlineWidthPx = 0.9f * density // pastilles FH et bords de cône : liseré plus fin
+    private val outlineWidthPx = 0.8f * density
+    private val thinOutlineWidthPx = 0.6f * density // pastilles FH et bords de cône : liseré plus fin
 
     // Cache pour les pinceaux de couleur
     private val dotPaints = mutableMapOf<Int, android.graphics.Paint>()
@@ -1067,7 +1113,7 @@ class MiniMapAntennaMarker(
             val linePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
                 style = android.graphics.Paint.Style.STROKE
                 color = ColorUtils.setAlphaComponent(mainColor, lineAlpha)
-                strokeWidth = 3.5f * density
+                strokeWidth = MINI_MAP_AZIMUTH_LINE_DP * density
                 strokeCap = android.graphics.Paint.Cap.ROUND
             }
 
@@ -1079,7 +1125,7 @@ class MiniMapAntennaMarker(
             val coneEdgePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
                 style = android.graphics.Paint.Style.STROKE
                 color = ColorUtils.setAlphaComponent(mainColor, coneEdgeAlpha)
-                strokeWidth = 2.2f * density
+                strokeWidth = MINI_MAP_AZIMUTH_CONE_EDGE_DP * density
                 strokeCap = android.graphics.Paint.Cap.ROUND
             }
 
@@ -1115,7 +1161,7 @@ class MiniMapAntennaMarker(
             val dashedPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
                 style = android.graphics.Paint.Style.STROKE
                 color = android.graphics.Color.argb(lineAlpha, android.graphics.Color.red(mainColor), android.graphics.Color.green(mainColor), android.graphics.Color.blue(mainColor))
-                strokeWidth = 3f * density
+                strokeWidth = 2.2f * density
                 strokeCap = android.graphics.Paint.Cap.ROUND
                 pathEffect = android.graphics.DashPathEffect(floatArrayOf(5f * density, 5f * density), 0f)
             }
@@ -1138,7 +1184,7 @@ class MiniMapAntennaMarker(
             val radioPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
                 style = android.graphics.Paint.Style.STROKE
                 color = ColorUtils.setAlphaComponent(mainColor, 230)
-                strokeWidth = 2.6f * density
+                strokeWidth = 2.1f * density
                 strokeCap = android.graphics.Paint.Cap.ROUND
             }
 
@@ -1159,15 +1205,14 @@ class MiniMapAntennaMarker(
             projection.toPixels(mPosition, ptCenter)
 
             val scale = ((zoom - 11.0) / 6.5).coerceIn(0.5, 1.0).toFloat()
+            val thicknessScale = miniMapAzimuthThicknessScale(zoom)
 
-            val beamLengthPx = when {
-                zoom >= 17.0 -> 50f * density
-                zoom >= 15.0 -> 40f * density
-                else -> 30f * density
-            }
+            val beamLengthPx = miniMapAzimuthBeamLengthDp(zoom) * density
 
-            val pointRadius = 3.5f * density
+            val pointRadius = MINI_MAP_AZIMUTH_POINT_RADIUS_DP * density * thicknessScale
             val fhRadius = pointRadius * 0.7f
+            val outlineWidth = outlineWidthPx * thicknessScale
+            val thinOutlineWidth = thinOutlineWidthPx * thicknessScale
 
             val baseOffset = 18f * density
             val circleOffsetPx = baseOffset * scale
@@ -1189,10 +1234,10 @@ class MiniMapAntennaMarker(
                     val startAngle = data.azimuth - 90f - 35f
                     canvas.drawArc(rectF, startAngle, 70f, true, data.conePaint)
                     data.coneEdgeOutlinePaint?.let { outlinePaint ->
-                        drawConeEdgeLines(canvas, data.azimuth, circleOffsetPx, totalRadiusPx, outlinePaint)
+                        drawConeEdgeLines(canvas, data.azimuth, circleOffsetPx, totalRadiusPx, outlinePaint, thicknessScale)
                     }
                     data.coneEdgePaint?.let { edgePaint ->
-                        drawConeEdgeLines(canvas, data.azimuth, circleOffsetPx, totalRadiusPx, edgePaint)
+                        drawConeEdgeLines(canvas, data.azimuth, circleOffsetPx, totalRadiusPx, edgePaint, thicknessScale)
                     }
                 }
 
@@ -1202,8 +1247,8 @@ class MiniMapAntennaMarker(
                     val endX = ptCenter.x + totalRadiusPx * data.cos
                     val endY = ptCenter.y + totalRadiusPx * data.sin
 
-                    data.lineOutlinePaint?.let { canvas.drawLine(startX, startY, endX, endY, it) }
-                    canvas.drawLine(startX, startY, endX, endY, data.linePaint)
+                    data.lineOutlinePaint?.let { drawMiniMapAzimuthLine(canvas, startX, startY, endX, endY, it, thicknessScale) }
+                    drawMiniMapAzimuthLine(canvas, startX, startY, endX, endY, data.linePaint, thicknessScale)
 
                     // Les pastilles se touchent (écart = un diamètre) : on pose TOUS les liserés
                     // d'abord, sinon celui d'une pastille rognerait la couleur de la précédente.
@@ -1213,7 +1258,7 @@ class MiniMapAntennaMarker(
                             canvas.drawCircle(
                                 endX + (data.cos * offsetMag),
                                 endY + (data.sin * offsetMag),
-                                pointRadius + outlineWidthPx,
+                                pointRadius + outlineWidth,
                                 getDotOutlinePaint(colorInt)
                             )
                         }
@@ -1238,8 +1283,8 @@ class MiniMapAntennaMarker(
                     val endX = ptCenter.x + totalRadiusPx * data.cos
                     val endY = ptCenter.y + totalRadiusPx * data.sin
 
-                    data.lineOutlinePaint?.let { canvas.drawLine(startX, startY, endX, endY, it) }
-                    canvas.drawLine(startX, startY, endX, endY, data.linePaint)
+                    data.lineOutlinePaint?.let { drawMiniMapAzimuthLine(canvas, startX, startY, endX, endY, it, thicknessScale) }
+                    drawMiniMapAzimuthLine(canvas, startX, startY, endX, endY, data.linePaint, thicknessScale)
 
                     if (data.lineOutlinePaint != null) {
                         data.dotColors.forEachIndexed { index, colorInt ->
@@ -1247,7 +1292,7 @@ class MiniMapAntennaMarker(
                             canvas.drawCircle(
                                 endX + (data.cos * offsetMag),
                                 endY + (data.sin * offsetMag),
-                                fhRadius + thinOutlineWidthPx,
+                                fhRadius + thinOutlineWidth,
                                 getDotOutlinePaint(colorInt)
                             )
                         }
@@ -1272,8 +1317,8 @@ class MiniMapAntennaMarker(
                     val endX = ptCenter.x + totalRadiusPx * data.cos
                     val endY = ptCenter.y + totalRadiusPx * data.sin
 
-                    data.lineOutlinePaint?.let { canvas.drawLine(startX, startY, endX, endY, it) }
-                    canvas.drawLine(startX, startY, endX, endY, data.linePaint)
+                    data.lineOutlinePaint?.let { drawMiniMapAzimuthLine(canvas, startX, startY, endX, endY, it, thicknessScale) }
+                    drawMiniMapAzimuthLine(canvas, startX, startY, endX, endY, data.linePaint, thicknessScale)
 
                     if (data.lineOutlinePaint != null) {
                         data.dotColors.forEachIndexed { index, colorInt ->
@@ -1281,7 +1326,7 @@ class MiniMapAntennaMarker(
                             canvas.drawCircle(
                                 endX + (data.cos * offsetMag),
                                 endY + (data.sin * offsetMag),
-                                radioRadius + outlineWidthPx,
+                                radioRadius + outlineWidth,
                                 getDotOutlinePaint(colorInt)
                             )
                         }
@@ -1305,20 +1350,38 @@ class MiniMapAntennaMarker(
         azimuth: Float,
         startRadiusPx: Float,
         endRadiusPx: Float,
-        paint: android.graphics.Paint
+        paint: android.graphics.Paint,
+        thicknessScale: Float
     ) {
         listOf(azimuth - 35f, azimuth + 35f).forEach { edgeAzimuth ->
             val edgeRad = Math.toRadians(edgeAzimuth - 90.0)
             val edgeCos = Math.cos(edgeRad).toFloat()
             val edgeSin = Math.sin(edgeRad).toFloat()
-            canvas.drawLine(
+            drawMiniMapAzimuthLine(
+                canvas,
                 ptCenter.x + startRadiusPx * edgeCos,
                 ptCenter.y + startRadiusPx * edgeSin,
                 ptCenter.x + endRadiusPx * edgeCos,
                 ptCenter.y + endRadiusPx * edgeSin,
-                paint
+                paint = paint,
+                thicknessScale = thicknessScale
             )
         }
+    }
+
+    private fun drawMiniMapAzimuthLine(
+        canvas: android.graphics.Canvas,
+        startX: Float,
+        startY: Float,
+        endX: Float,
+        endY: Float,
+        paint: android.graphics.Paint,
+        thicknessScale: Float
+    ) {
+        val originalStrokeWidth = paint.strokeWidth
+        paint.strokeWidth = originalStrokeWidth * thicknessScale
+        canvas.drawLine(startX, startY, endX, endY, paint)
+        paint.strokeWidth = originalStrokeWidth
     }
 
 }

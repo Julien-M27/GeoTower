@@ -117,6 +117,14 @@ class TripExportTest {
     }
 
     @Test
+    fun readsBackJsonExportsForImport() {
+        val original = plan(listOf(step(48.85, 2.35, visitedAtMillis = 99L)))
+            .copy(plannedAtMillis = 1_000L, reminderOffsetsMinutes = listOf(1440), stopDurationMinutes = 10)
+
+        assertEquals(listOf(original), TripExport.parseJson(TripExport.buildJson(listOf(original))))
+    }
+
+    @Test
     fun buildsFileNamesWithoutForbiddenCharacters() {
         // Les accents sont des lettres et restent ; seuls les caractères interdits deviennent des
         // tirets, et les tirets consécutifs fusionnent.

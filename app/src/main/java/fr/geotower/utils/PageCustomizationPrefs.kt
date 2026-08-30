@@ -46,6 +46,7 @@ object PageCustomizationPrefs {
         PageScrollPrefs.STATS,
         PageScrollPrefs.SUPPORT,
         PageScrollPrefs.SITE,
+        PageScrollPrefs.FREQUENCY_REFERENCE,
         PageScrollPrefs.SPEEDTESTS,
         PageScrollPrefs.COVERAGE,
         PageScrollPrefs.ELEVATION_PROFILE,

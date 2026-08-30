@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.WifiTethering
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -59,7 +60,8 @@ fun SiteFrequenciesBlock(
     blockShape: Shape,
     applyMapFilters: Boolean = false,
     forceGridDisplay: Boolean = false,
-    showAntennaTypeTable: Boolean = false
+    showAntennaTypeTable: Boolean = false,
+    onOpenFrequencyReference: (() -> Unit)? = null
 ) {
     val sizing = LocalGeoTowerUiSizing.current
     val context = LocalContext.current
@@ -123,10 +125,31 @@ fun SiteFrequenciesBlock(
     ) {
         Column(modifier = Modifier.padding(sizing.spacing(16.dp)).fillMaxWidth()) {
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Icon(Icons.Default.WifiTethering, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
-                Text(text = txtFrequenciesTitle, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, fontSize = sizing.text(18.sp))
+                Text(
+                    text = txtFrequenciesTitle,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontSize = sizing.text(18.sp),
+                    modifier = Modifier.weight(1f)
+                )
+                if (onOpenFrequencyReference != null) {
+                    IconButton(
+                        onClick = onOpenFrequencyReference,
+                        modifier = Modifier.size(sizing.component(40.dp))
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = stringResource(R.string.appstrings_frequency_reference_open),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))

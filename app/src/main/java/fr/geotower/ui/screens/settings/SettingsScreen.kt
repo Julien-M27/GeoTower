@@ -123,6 +123,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import fr.geotower.ui.theme.LocalGeoTowerUiSizing
+import fr.geotower.ui.components.AppLogoImage
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.navigation.NavController
@@ -316,6 +317,7 @@ fun SettingsScreen(
 
     var themeMode by AppConfig.themeMode
     var isOledMode by AppConfig.isOledMode
+    var logoMaterialWavesEnabled by AppConfig.isLogoMaterialWavesEnabled
     val prefs = context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
     val featureFlags by RemoteFeatureFlags.config
     val uiStyle = LocalGeoTowerUiStyle.current
@@ -666,6 +668,7 @@ fun SettingsScreen(
     // --- Variables d'état pour le Pylône et l'Antenne ---
     var showSupportSettingsSheet by remember { mutableStateOf(false) }
     var showSiteSettingsSheet by remember { mutableStateOf(false) }
+    var showFrequencyReferenceSettingsSheet by remember { mutableStateOf(false) }
     var showSupportMiniMapSettingsSheet by remember { mutableStateOf(false) }
     var showSiteMiniMapSettingsSheet by remember { mutableStateOf(false) }
     var showSiteStatusSettingsSheet by remember { mutableStateOf(false) }
@@ -706,6 +709,9 @@ fun SettingsScreen(
     var pageSiteFreqs by remember { mutableStateOf(SitePagePrefs.freqs.read(prefs)) }
     var pageSiteLinks by remember { mutableStateOf(SitePagePrefs.links.read(prefs)) }
     var pageSiteMiniMapMode by remember { mutableStateOf(MiniMapViewMode.fromStorageKey(prefs.getString(SitePagePrefs.MINI_MAP_MODE, null))) }
+    var pageFrequencyReferenceSortOrder by remember {
+        mutableStateOf(FrequencyReferencePagePreferences.read(prefs))
+    }
     var pageThroughputOrder by remember {
         mutableStateOf(ThroughputPrefs.blockOrder(prefs))
     }
@@ -804,7 +810,7 @@ fun SettingsScreen(
             // issue, pour que la refermer laisse sous les yeux les réglages des pages voisines.
             // Section fermée par le drapeau distant : on retombe sur Préférences, comme avant,
             // plutôt que d'ouvrir une section qui n'est rendue nulle part.
-            "nearby", "map", "compass", "support", "site", "throughput" -> {
+            "nearby", "map", "compass", "support", "site", "frequency_reference", "throughput" -> {
                 kotlinx.coroutines.delay(300)
                 val anchorSection = if (featureFlags.isMenuEnabled(RemoteFeatureFlags.Menus.PAGES_CUSTOMIZATION)) {
                     SECTION_PAGES
@@ -825,6 +831,7 @@ fun SettingsScreen(
                     "compass" -> showCompassSettingsSheet = true
                     "support" -> showSupportSettingsSheet = true
                     "site" -> showSiteSettingsSheet = true
+                    "frequency_reference" -> showFrequencyReferenceSettingsSheet = true
                     "throughput" -> showThroughputCalculatorSettingsSheet = true
                 }
             }
@@ -859,6 +866,7 @@ fun SettingsScreen(
         onAbout = { safeClick { showAboutPageSettingsSheet = true } },
         onSupport = { safeClick { showSupportSettingsSheet = true } },
         onSite = { safeClick { showSiteSettingsSheet = true } },
+        onFrequencyReference = { safeClick { showFrequencyReferenceSettingsSheet = true } },
         onSpeedtests = { safeClick { showSpeedtestsSettingsSheet = true } },
         onTheoreticalCoverage = { safeClick { showCoverageDefaultsSheet = true } },
         onElevationProfile = { safeClick { showElevationDefaultsSheet = true } },
@@ -935,6 +943,7 @@ fun SettingsScreen(
             entry(context.getString(R.string.appearance_scroll_blur_title), "flou blur defilement transparence effet", SECTION_APPEARANCE)
             entry(context.getString(R.string.appearance_app_icon_title), "icone icon launcher logo application accueil", SECTION_APPEARANCE) { showIconSheet = true }
             entry(context.getString(R.string.appearance_in_app_logo_title), "logo dessin drawing application interne", SECTION_APPEARANCE) { showLogoDrawingSheet = true }
+            entry(context.getString(R.string.appearance_logo_material_waves_title), "logo ondes waves material couleur palette theme", SECTION_APPEARANCE)
             entry(context.getString(R.string.appearance_menu_size_title), "taille menu size police texte echelle zoom", SECTION_APPEARANCE)
             if (isWideScreen) {
                 entry(context.getString(R.string.settings_display_style_title), "affichage display plein ecran split divise tablette", SECTION_APPEARANCE)
@@ -993,6 +1002,13 @@ fun SettingsScreen(
                         context.getString(R.string.appstrings_page_site_settings)
                     }
                     entry(siteEntryTitle, "site antenne fiche operateur blocs frequences photos speedtest hauteur azimut", SECTION_PAGES) { showSiteSettingsSheet = true }
+                    if (featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SITE_FREQUENCIES)) {
+                        entry(
+                            context.getString(R.string.appstrings_frequency_reference_title),
+                            "frequences bandes frequency reference spectre mhz ghz 2g 3g 4g 5g france international ordre tri",
+                            SECTION_PAGES
+                        ) { showFrequencyReferenceSettingsSheet = true }
+                    }
                     entry(context.getString(R.string.appstrings_page_speedtests_settings), "speedtests debits mesures filtres tri enb", SECTION_PAGES) { showSpeedtestsSettingsSheet = true }
                 }
                 if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.THEORETICAL_COVERAGE)) {
@@ -1534,6 +1550,8 @@ fun SettingsScreen(
                                     logo = logoResId,
                                     onIcon = { showIconSheet = true },
                                     onLogoDrawing = { showLogoDrawingSheet = true },
+                                    logoMaterialWavesEnabled = logoMaterialWavesEnabled,
+                                    onLogoMaterialWavesChange = { AppConfig.setLogoMaterialWaves(prefs, it) },
                                     op = defaultOperator,
                                     onOp = { showOperatorSheet = true },
                                     lang = appLanguage,
@@ -1620,6 +1638,8 @@ fun SettingsScreen(
                                         logoResId,
                                         { showIconSheet = true },
                                         { showLogoDrawingSheet = true },
+                                        logoMaterialWavesEnabled,
+                                        { AppConfig.setLogoMaterialWaves(prefs, it) },
                                         cardShape,
                                         cardBorder,
                                         bubbleBaseColor,
@@ -2235,6 +2255,26 @@ fun SettingsScreen(
                 bubbleColor = bubbleBaseColor
             )
         }
+        if (showFrequencyReferenceSettingsSheet) {
+            FrequencyReferenceSettingsSheet(
+                sortOrder = pageFrequencyReferenceSortOrder,
+                onSortOrderChange = {
+                    val normalized = FrequencyReferencePagePreferences.normalizeSortOrder(it)
+                    pageFrequencyReferenceSortOrder = normalized
+                    FrequencyReferencePagePreferences.write(prefs, normalized)
+                },
+                onReset = {
+                    pageFrequencyReferenceSortOrder = FrequencyReferencePagePreferences.DEFAULT_SORT_ORDER
+                    FrequencyReferencePagePreferences.reset(prefs)
+                },
+                onDismiss = { showFrequencyReferenceSettingsSheet = false },
+                onBack = { safeClick { showFrequencyReferenceSettingsSheet = false } },
+                sheetState = sheetState,
+                useOneUi = useOneUi,
+                bubbleColor = bubbleBaseColor
+            )
+        }
+
         if (showSiteStatusSettingsSheet) {
             SiteStatusRowsSettingsSheet(
                 showVoice = pageSiteStatusVoice,
@@ -2663,7 +2703,7 @@ fun SectionTitle(title: String) {
 
 @Composable
 fun AllSettingsContent(
-    isWide: Boolean, theme: Int, onTheme: (Int) -> Unit, oled: Boolean, onOled: (Boolean) -> Unit, oneUi: Boolean, onOneUi: (Boolean) -> Unit, blur: Boolean, onBlur: (Boolean) -> Unit, logo: Int, onIcon: () -> Unit, onLogoDrawing: () -> Unit, op: String, onOp: () -> Unit, lang: String, onLang: () -> Unit,
+    isWide: Boolean, theme: Int, onTheme: (Int) -> Unit, oled: Boolean, onOled: (Boolean) -> Unit, oneUi: Boolean, onOneUi: (Boolean) -> Unit, blur: Boolean, onBlur: (Boolean) -> Unit, logo: Int, onIcon: () -> Unit, onLogoDrawing: () -> Unit, logoMaterialWavesEnabled: Boolean, onLogoMaterialWavesChange: (Boolean) -> Unit, op: String, onOp: () -> Unit, lang: String, onLang: () -> Unit,
     onUnitSettings: () -> Unit,
     pagesActions: PagesSectionActions,
     showPagesSection: Boolean,
@@ -2709,7 +2749,7 @@ fun AllSettingsContent(
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
     Column(modifier = appearanceSectionModifier.fillMaxWidth()) {
-        SectionApparence(theme, onTheme, oled, onOled, oneUi, onOneUi, blur, onBlur, logo, onIcon, onLogoDrawing, shape, border, bubbleColor, useOneUi, safeClick, onColorPaletteClick, isWide = isWide)
+        SectionApparence(theme, onTheme, oled, onOled, oneUi, onOneUi, blur, onBlur, logo, onIcon, onLogoDrawing, logoMaterialWavesEnabled, onLogoMaterialWavesChange, shape, border, bubbleColor, useOneUi, safeClick, onColorPaletteClick, isWide = isWide)
     }
     Spacer(Modifier.height(sizing.spacing(32.dp)))
     Column(modifier = mappingSectionModifier.fillMaxWidth()) {
@@ -2784,6 +2824,7 @@ fun SectionApparence(
     theme: Int, onTheme: (Int) -> Unit, oled: Boolean, onOled: (Boolean) -> Unit,
     oneUi: Boolean, onOneUi: (Boolean) -> Unit, blur: Boolean, onBlur: (Boolean) -> Unit,
     logo: Int, onIcon: () -> Unit, onLogoDrawing: () -> Unit,
+    logoMaterialWavesEnabled: Boolean, onLogoMaterialWavesChange: (Boolean) -> Unit,
     shape: Shape, border: BorderStroke?, bubbleColor: Color, useOneUi: Boolean, safeClick: SafeClick,
     onColorPaletteClick: () -> Unit,
     // Grand écran : la réinitialisation est déjà dans la barre latérale, on ne la répète pas ici.
@@ -2822,6 +2863,8 @@ fun SectionApparence(
         appLogoDrawingChoice = logoDrawingChoice,
         appLogoDrawingRes = logoDrawingRes,
         onAppLogoDrawingClick = onLogoDrawing,
+        logoMaterialWavesEnabled = logoMaterialWavesEnabled,
+        onLogoMaterialWavesChange = onLogoMaterialWavesChange,
         onColorPaletteClick = onColorPaletteClick,
         shape = shape, border = border, bubbleColor = bubbleColor, safeClick = safeClick
     )
@@ -4460,15 +4503,9 @@ private fun LogoDrawingOptionRow(
             modifier = Modifier.fillMaxWidth().padding(horizontal = sizing.spacing(14.dp), vertical = sizing.spacing(10.dp)),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            AndroidView(
-                modifier = Modifier.size(sizing.component(52.dp)),
-                factory = { ctx ->
-                    ImageView(ctx).apply {
-                        scaleType = ImageView.ScaleType.FIT_CENTER
-                        setImageResource(previewRes)
-                    }
-                },
-                update = { it.setImageResource(previewRes) }
+            AppLogoImage(
+                resId = previewRes,
+                modifier = Modifier.size(sizing.component(52.dp))
             )
             Spacer(Modifier.width(sizing.spacing(14.dp)))
             Column(modifier = Modifier.weight(1f)) {

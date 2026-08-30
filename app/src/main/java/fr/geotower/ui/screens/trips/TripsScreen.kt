@@ -1,5 +1,9 @@
 package fr.geotower.ui.screens.trips
 
+import android.net.Uri
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -26,6 +30,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.DirectionsWalk
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.Route
@@ -34,6 +39,7 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.Unarchive
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -43,6 +49,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -70,6 +77,7 @@ import fr.geotower.data.api.RouteApi
 import fr.geotower.data.workers.TripReminderScheduler
 import fr.geotower.data.trip.TripPlan
 import fr.geotower.data.trip.TripPlanStore
+import fr.geotower.data.trip.TripExport
 import fr.geotower.data.trip.TripSharing
 import fr.geotower.data.trip.formatTripDuration
 import fr.geotower.ui.components.GeoTowerBackTopBar
@@ -122,6 +130,8 @@ fun TripsScreen(
     var renaming by remember { mutableStateOf<TripPlan?>(null) }
     var deleting by remember { mutableStateOf<TripPlan?>(null) }
     var scheduling by remember { mutableStateOf<TripPlan?>(null) }
+    var showAddTripOptions by remember { mutableStateOf(false) }
+    var importError by remember { mutableStateOf(false) }
 
     BackHandler(enabled = !safeBackNavigation.isLocked) { safeBackNavigation.navigateBack() }
 
@@ -139,6 +149,31 @@ fun TripsScreen(
 
     val stepFallback = stringResource(R.string.trips_step_fallback_pattern)
     val distanceUnit = AppConfig.distanceUnit.intValue
+
+    val importLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        runCatching {
+            val json = context.contentResolver.openInputStream(uri)?.use { stream ->
+                stream.readBytes().toString(Charsets.UTF_8)
+            } ?: error("fichier illisible")
+            val imported = TripExport.parseJson(json)
+            require(imported.isNotEmpty()) { "aucun trajet valide" }
+            TripPlanStore.mergePlans(context, imported)
+        }.onSuccess { result ->
+            reloadTick++
+            val touched = result.added + result.refreshed
+            val message = if (touched == 0) {
+                context.getString(R.string.trips_import_nothing)
+            } else {
+                context.resources.getQuantityString(R.plurals.trips_import_result, touched, touched)
+            }
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        }.onFailure {
+            importError = true
+        }
+    }
 
     Scaffold(
         containerColor = uiStyle.backgroundColor,
@@ -168,7 +203,7 @@ fun TripsScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { safeClick("new_trip", onCreateTrip) }) {
+            FloatingActionButton(onClick = { safeClick("add_trip") { showAddTripOptions = true } }) {
                 Icon(
                     imageVector = Icons.Default.Add,
                     contentDescription = stringResource(R.string.trips_new)
@@ -275,6 +310,68 @@ fun TripsScreen(
                 }
             }
         }
+    }
+
+    if (showAddTripOptions) {
+        AlertDialog(
+            onDismissRequest = { showAddTripOptions = false },
+            title = { Text(stringResource(R.string.trips_add_title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))) {
+                    Text(
+                        text = stringResource(R.string.trips_add_desc),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = sizing.text(13.sp)
+                    )
+                    Button(
+                        onClick = {
+                            showAddTripOptions = false
+                            safeClick("new_trip", onCreateTrip)
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null)
+                        Text(
+                            text = stringResource(R.string.trips_create),
+                            modifier = Modifier.padding(start = sizing.spacing(8.dp))
+                        )
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            showAddTripOptions = false
+                            safeClick("import_trip") {
+                                importLauncher.launch(arrayOf(TripExport.JSON_MIME_TYPE, "text/json"))
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.FileUpload, contentDescription = null)
+                        Text(
+                            text = stringResource(R.string.trips_import),
+                            modifier = Modifier.padding(start = sizing.spacing(8.dp))
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showAddTripOptions = false }) {
+                    Text(stringResource(R.string.appstrings_cancel))
+                }
+            }
+        )
+    }
+
+    if (importError) {
+        AlertDialog(
+            onDismissRequest = { importError = false },
+            title = { Text(stringResource(R.string.trips_import_title)) },
+            text = { Text(stringResource(R.string.trips_import_failed)) },
+            confirmButton = {
+                TextButton(onClick = { importError = false }) {
+                    Text(stringResource(R.string.appstrings_close))
+                }
+            }
+        )
     }
 
     renaming?.let { target ->

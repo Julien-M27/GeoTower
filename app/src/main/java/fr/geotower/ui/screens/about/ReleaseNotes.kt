@@ -31,24 +31,21 @@ internal data class ReleaseNoteItem(
  */
 @Composable
 internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
-    section(stringResource(R.string.appstrings_release_section_database)) {
-        item(stringResource(R.string.appstrings_release_v2036_frequency_grid))
-        item(stringResource(R.string.appstrings_release_v2036_database_banner))
+    section(stringResource(R.string.appstrings_release_section_spectrums)) {
+        item(stringResource(R.string.appstrings_release_v2038_frequency_reference))
     }
 
-    section(stringResource(R.string.appstrings_release_section_site_detail)) {
-        item(stringResource(R.string.appstrings_release_v2036_status_details))
-        item(stringResource(R.string.appstrings_release_v2036_global_outages))
+    section(stringResource(R.string.appstrings_release_section_share_export)) {
+        item(stringResource(R.string.appstrings_release_v2038_trip_import))
     }
 
-    section(stringResource(R.string.appstrings_release_section_hidden_sites)) {
-        item(stringResource(R.string.appstrings_release_v2037_hidden_sites))
-        item(stringResource(R.string.appstrings_release_v2037_hidden_sites_scope))
-        item(stringResource(R.string.appstrings_release_v2037_hidden_sites_backup))
+    section(stringResource(R.string.appstrings_release_section_map)) {
+        item(stringResource(R.string.appstrings_release_v2038_map_readability))
+        item(stringResource(R.string.appstrings_release_v2038_page_customization))
     }
 
-    section(stringResource(R.string.appstrings_release_section_sharing)) {
-        item(stringResource(R.string.appstrings_release_v2036_share_export))
+    section(stringResource(R.string.appstrings_release_section_about)) {
+        item(stringResource(R.string.appstrings_release_v2038_logo_theme))
     }
 }
 

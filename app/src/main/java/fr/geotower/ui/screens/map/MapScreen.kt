@@ -5241,8 +5241,13 @@ fun MapScreen(
                 // bas) : le suivre ici reviendrait à ne tourner la carte qu'aux recompositions,
                 // donc par paliers.
                 rotationOverlayRef?.isEnabled = mapRotationEnabled
-                if (!followOrientation && !mapRotationEnabled && map.mapOrientation % 360f != 0f) {
-                    // Plus aucun moyen de la redresser à la main : on remet le nord en haut.
+                if (tripMode != TRIP_MODE_FOLLOW &&
+                    !followOrientation &&
+                    !mapRotationEnabled &&
+                    map.mapOrientation % 360f != 0f
+                ) {
+                    // Hors suivi de trajet, plus aucun moyen de la redresser à la main : on remet
+                    // le nord en haut. Le suivi de trajet possède sa propre rotation de navigation.
                     map.applyOrientation(0f)
                     mapOrientationState.floatValue = 0f
                 }

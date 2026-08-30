@@ -2,6 +2,7 @@ package fr.geotower.ui.components
 
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -75,21 +76,12 @@ fun GeoTowerBreadcrumbBar(
         }
     }
 
-    // Coins concentriques : la barre ET ses pastilles sont des stades (rayon = moitie de la
-    // hauteur), et la marge qui les separe est la meme sur les quatre cotes. Le rayon exterieur
-    // vaut alors toujours exactement « rayon interieur + marge », a n'importe quelle taille
-    // d'interface. Avec l'ancien MaterialTheme.shapes.extraLarge (28.dp figes) la barre gardait un
-    // bord droit des que sa hauteur depassait 56.dp, alors que la pastille restait un demi-cercle :
-    // les deux coins ne s'emboitaient plus.
+    // Coins concentriques : la barre et ses pastilles sont des stades (rayon = moitie de la
+    // hauteur), avec la meme marge tout autour.
     val pillShape = RoundedCornerShape(percent = 50)
     val pillMargin = sizing.spacing(7.dp)
-    // Un segment cliquable est une Surface(onClick), donc Material 3 lui impose la cible tactile
-    // minimale de 48.dp : son EMPLACEMENT passe a 48.dp mais la pastille restait peinte a sa
-    // hauteur naturelle (~39.dp), centree, laissant ~4,4.dp de vide en haut et en bas. La marge
-    // visible valait donc 11.dp en haut/bas contre 7.dp sur les cotes. On peint la pastille a la
-    // taille de sa cible tactile : plus de vide, marge identique sur les quatre cotes (et hauteur
-    // de barre inchangee, puisque c'est deja cette cible qui la dictait). Valeur non mise a
-    // l'echelle, comme la cible tactile de Material qu'elle vient combler.
+    // La cible tactile minimale de Material 3 fixe la hauteur utile des segments. La marge est
+    // ajoutee par la fenetre de clipping, pas par le Row defilant : elle reste ainsi symetrique.
     val pillMinHeight = 48.dp
 
     Surface(
@@ -101,76 +93,83 @@ fun GeoTowerBreadcrumbBar(
         contentColor = MaterialTheme.colorScheme.onSurface,
         tonalElevation = 2.dp
     ) {
-        Row(
+        // La fenêtre de défilement est elle-même une pastille, à l'intérieur de la pastille
+        // extérieure. Le contenu garde sa largeur naturelle : en le faisant glisser, chaque
+        // segment sort donc de la fenêtre comme avant, mais la découpe suit maintenant un arrondi.
+        Box(
             modifier = Modifier
-                // On réserve une vraie marge intérieure à droite : lorsque le contenu déborde,
-                // il s'arrête dans cette seconde pastille au lieu d'être coupé au bord extérieur.
-                .padding(end = pillMargin)
+                .fillMaxWidth()
+                .padding(pillMargin)
                 .clip(pillShape)
-                .horizontalScroll(scrollState)
-                .padding(pillMargin),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(sizing.spacing(4.dp))
         ) {
-            items.forEachIndexed { index, item ->
-                if (index > 0) {
-                    if (item.resolvedKey in separatorBeforeKeys) {
-                        Text(
-                            text = "/",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                            fontSize = sizing.text(18.sp),
-                            fontWeight = FontWeight.Bold
-                        )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(scrollState),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(sizing.spacing(4.dp))
+            ) {
+                items.forEachIndexed { index, item ->
+                    if (index > 0) {
+                        if (item.resolvedKey in separatorBeforeKeys) {
+                            Text(
+                                text = "/",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                                fontSize = sizing.text(18.sp),
+                                fontWeight = FontWeight.Bold
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                modifier = Modifier.size(sizing.component(16.dp))
+                            )
+                        }
+                    }
+
+                    val isCurrent = index == items.lastIndex || item.onClick == null
+                    val segmentColor = if (isCurrent) {
+                        MaterialTheme.colorScheme.primaryContainer
                     } else {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                            modifier = Modifier.size(sizing.component(16.dp))
-                        )
+                        MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.72f)
                     }
-                }
-
-                val isCurrent = index == items.lastIndex || item.onClick == null
-                val segmentColor = if (isCurrent) {
-                    MaterialTheme.colorScheme.primaryContainer
-                } else {
-                    MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.72f)
-                }
-                val segmentContentColor = if (isCurrent) {
-                    MaterialTheme.colorScheme.onPrimaryContainer
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                }
-
-                if (item.onClick != null) {
-                    Surface(
-                        onClick = item.onClick,
-                        modifier = Modifier.heightIn(min = pillMinHeight),
-                        color = segmentColor,
-                        contentColor = segmentContentColor,
-                        shape = pillShape,
-                        tonalElevation = if (isCurrent) 0.dp else 1.dp
-                    ) {
-                        BreadcrumbContent(
-                            item = item,
-                            fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.SemiBold,
-                            modifier = Modifier.padding(horizontal = sizing.spacing(11.dp), vertical = sizing.spacing(8.dp))
-                        )
+                    val segmentContentColor = if (isCurrent) {
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
                     }
-                } else {
-                    Surface(
-                        modifier = Modifier.heightIn(min = pillMinHeight),
-                        color = segmentColor,
-                        contentColor = segmentContentColor,
-                        shape = pillShape,
-                        tonalElevation = if (isCurrent) 0.dp else 1.dp
-                    ) {
-                        BreadcrumbContent(
-                            item = item,
-                            fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.SemiBold,
-                            modifier = Modifier.padding(horizontal = sizing.spacing(11.dp), vertical = sizing.spacing(8.dp))
-                        )
+                    val segmentModifier = Modifier.heightIn(min = pillMinHeight)
+
+                    if (item.onClick != null) {
+                        Surface(
+                            onClick = item.onClick,
+                            modifier = segmentModifier,
+                            color = segmentColor,
+                            contentColor = segmentContentColor,
+                            shape = pillShape,
+                            tonalElevation = if (isCurrent) 0.dp else 1.dp
+                        ) {
+                            BreadcrumbContent(
+                                item = item,
+                                fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.SemiBold,
+                                modifier = Modifier.padding(horizontal = sizing.spacing(11.dp), vertical = sizing.spacing(8.dp))
+                            )
+                        }
+                    } else {
+                        Surface(
+                            modifier = segmentModifier,
+                            color = segmentColor,
+                            contentColor = segmentContentColor,
+                            shape = pillShape,
+                            tonalElevation = if (isCurrent) 0.dp else 1.dp
+                        ) {
+                            BreadcrumbContent(
+                                item = item,
+                                fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.SemiBold,
+                                modifier = Modifier.padding(horizontal = sizing.spacing(11.dp), vertical = sizing.spacing(8.dp))
+                            )
+                        }
                     }
                 }
             }

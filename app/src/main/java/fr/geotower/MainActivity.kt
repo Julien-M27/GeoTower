@@ -74,6 +74,8 @@ import fr.geotower.ui.screens.emitters.ElevationProfileScreen
 import fr.geotower.ui.screens.emitters.NearEmittersSupportWrapperScreen
 import fr.geotower.ui.screens.emitters.SiteSpeedtestsScreen
 import fr.geotower.ui.screens.emitters.SiteDetailToolWrapperScreen
+import fr.geotower.ui.screens.emitters.FrequencyReferenceScreen
+import fr.geotower.ui.screens.emitters.FREQUENCY_REFERENCE_ROUTE
 import fr.geotower.ui.screens.emitters.RadioSiteDetailScreen
 import fr.geotower.ui.screens.emitters.ThroughputCalculatorScreen
 import fr.geotower.ui.screens.stats.DEPARTMENT_STATS_ROUTE
@@ -1274,6 +1276,11 @@ class MainActivity : ComponentActivity() {
                                     } else {
                                         DisabledFeatureRoute(navController, txtUnavailable)
                                     }
+                                }
+                            }
+                            composable(FREQUENCY_REFERENCE_ROUTE) {
+                                Box(modifier = Modifier.padding(innerPadding)) {
+                                    FrequencyReferenceScreen(navController = navController)
                                 }
                             }
                             composable(

@@ -26,6 +26,7 @@ object PageScrollPrefs {
     const val STATS = "stats"
     const val SUPPORT = "support"
     const val SITE = "site"
+    const val FREQUENCY_REFERENCE = "frequency_reference"
     const val SPEEDTESTS = "speedtests"
     const val COVERAGE = "coverage"
     const val ELEVATION_PROFILE = "elevation_profile"
@@ -64,6 +65,7 @@ object PageScrollPrefs {
         STATS,
         SUPPORT,
         SITE,
+        FREQUENCY_REFERENCE,
         SPEEDTESTS,
         COVERAGE,
         ELEVATION_PROFILE,

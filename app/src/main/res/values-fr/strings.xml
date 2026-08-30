@@ -64,6 +64,7 @@
     <string name="settings_page_about_desc">Défilement et visibilité de ses six parties</string>
     <string name="settings_page_support_desc">Blocs, mini-carte, photos</string>
     <string name="settings_page_site_desc">Blocs, fréquences, photos, speedtests</string>
+    <string name="settings_page_frequency_reference_desc">Bandes de fréquences par technologie, France et référentiel international</string>
     <string name="settings_page_speedtests_desc">Filtres, tri, détails affichés</string>
     <string name="settings_page_coverage_desc">Réglages par défaut du calcul de couverture</string>
     <string name="settings_page_elevation_desc">Terrain et bâtiments pris en compte</string>
@@ -174,6 +175,8 @@
     <string name="appearance_scroll_blur_desc">Activer ou désactiver le flou (plus énergivore)</string>
     <string name="appearance_app_icon_title">Icône de l\'application</string>
     <string name="appearance_in_app_logo_title">Logo affiché dans l\'application</string>
+    <string name="appearance_logo_material_waves_title">Ondes du logo selon le thème</string>
+    <string name="appearance_logo_material_waves_desc">Utiliser la couleur du thème Material choisie pour les ondes GeoTower</string>
     <string name="appearance_menu_size_title">Taille du menu principal</string>
     <string name="appearance_menu_size_small">Petit</string>
     <string name="appearance_menu_size_normal">Normal</string>
@@ -669,6 +672,32 @@
     <string name="appstrings_freq_grid_display_option">Afficher les fréquences en grille</string>
     <string name="appstrings_frequencies_and_techs">Technologies / Fréquences</string>
     <string name="appstrings_frequencies_title">Fréquences</string>
+    <string name="appstrings_frequency_reference_title">Bandes de fréquences</string>
+    <string name="appstrings_frequency_reference_sort_title">Ordre des bandes</string>
+    <string name="appstrings_frequency_reference_sort_spectrum">Fréquence du spectre (du plus bas au plus haut)</string>
+    <string name="appstrings_frequency_reference_sort_band">Nom de bande (B1, B2, B3…)</string>
+    <string name="appstrings_frequency_reference_sort_desc">Choisissez l’ordre d’affichage des bandes dans chaque technologie.</string>
+    <string name="appstrings_frequency_reference_open">Ouvrir le référentiel des bandes</string>
+    <string name="appstrings_frequency_reference_intro">Plages de référence des bandes radio mobiles. Une bande peut être autorisée ou utilisée différemment selon le pays, l’opérateur, le terminal et la zone.</string>
+    <string name="appstrings_frequency_reference_france_tab">France</string>
+    <string name="appstrings_frequency_reference_international_tab">International</string>
+    <string name="appstrings_frequency_reference_france_heading">Bandes utilisées ou autorisées en France métropolitaine</string>
+    <string name="appstrings_frequency_reference_international_heading">Bandes internationales de référence 3GPP</string>
+    <string name="appstrings_frequency_reference_source">Sources : Arcep pour la France métropolitaine et spécifications radio 3GPP pour les bandes internationales. Les plages sont indicatives et ne remplacent pas une autorisation d’opérateur.</string>
+    <string name="appstrings_frequency_reference_2g">2G · GSM</string>
+    <string name="appstrings_frequency_reference_2g_desc">Réseaux voix et données historiques</string>
+    <string name="appstrings_frequency_reference_3g">3G · UMTS</string>
+    <string name="appstrings_frequency_reference_3g_desc">Réseaux mobiles UMTS / HSPA</string>
+    <string name="appstrings_frequency_reference_4g">4G · LTE</string>
+    <string name="appstrings_frequency_reference_4g_desc">Réseaux haut débit LTE</string>
+    <string name="appstrings_frequency_reference_5g">5G · NR</string>
+    <string name="appstrings_frequency_reference_5g_desc">Réseaux 5G New Radio</string>
+    <string name="appstrings_frequency_reference_uplink">UL :</string>
+    <string name="appstrings_frequency_reference_downlink">DL :</string>
+    <string name="appstrings_frequency_reference_shared">Partagée :</string>
+    <string name="appstrings_frequency_reference_fdd">FDD · montante/descendante séparées</string>
+    <string name="appstrings_frequency_reference_tdd">TDD · bande partagée</string>
+    <string name="appstrings_frequency_reference_sdl">SDL · descendante uniquement</string>
     <string name="appstrings_from_my_position">de vous</string>
     <string name="appstrings_full_screen_photo_desc">Photo en plein écran</string>
     <string name="appstrings_gallery">Galerie</string>
@@ -2853,6 +2882,17 @@
     <!-- Planificateur de trajet -->
     <string name="trips_title">Trajets</string>
     <string name="trips_new">Nouveau trajet</string>
+    <string name="trips_add_title">Ajouter un trajet</string>
+    <string name="trips_add_desc">Créez une tournée sur la carte ou importez un export JSON GeoTower.</string>
+    <string name="trips_create">Créer un trajet</string>
+    <string name="trips_import">Importer un trajet</string>
+    <string name="trips_import_title">Importer un trajet</string>
+    <string name="trips_import_failed">Ce fichier n’est pas un export de trajet GeoTower valide.</string>
+    <string name="trips_import_nothing">Aucun nouveau trajet à importer.</string>
+    <plurals name="trips_import_result">
+        <item quantity="one">%d trajet importé ou mis à jour</item>
+        <item quantity="other">%d trajets importés ou mis à jour</item>
+    </plurals>
     <string name="trips_export_all">Exporter tous les trajets</string>
     <string name="trips_actions">Actions du trajet</string>
     <string name="trips_untitled">Trajet sans nom</string>
@@ -3086,4 +3126,9 @@
     <string name="appstrings_release_v2037_hidden_sites">Masquez directement depuis la carte un site ou un opérateur absent, puis gérez-le et rétablissez-le depuis les réglages</string>
     <string name="appstrings_release_v2037_hidden_sites_scope">Les masquages sont appliqués à la carte, aux sites proches, à la boussole, aux notifications live et aux widgets</string>
     <string name="appstrings_release_v2037_hidden_sites_backup">Les sites masqués sont désormais inclus dans les sauvegardes et peuvent être restaurés sur une autre installation</string>
+    <string name="appstrings_release_v2038_frequency_reference">Un nouveau référentiel des bandes de fréquences 2G, 3G, 4G et 5G propose des vues France et internationale, avec tri personnalisable</string>
+    <string name="appstrings_release_v2038_trip_import">Les trajets peuvent désormais être créés ou importés depuis un fichier JSON GeoTower directement depuis l’écran des trajets</string>
+    <string name="appstrings_release_v2038_map_readability">Les mini-cartes dimensionnent mieux les azimuts, gardent le zoom centré sur l’antenne et proposent une navigation plus claire</string>
+    <string name="appstrings_release_v2038_page_customization">La personnalisation des pages intègre désormais le référentiel des fréquences et de meilleurs aperçus des sections disponibles</string>
+    <string name="appstrings_release_v2038_logo_theme">Le logo GeoTower peut désormais adapter ses ondes à la couleur du thème Material choisi</string>
 </resources>

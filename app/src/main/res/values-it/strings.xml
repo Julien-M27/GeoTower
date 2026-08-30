@@ -64,6 +64,7 @@
     <string name="settings_page_about_desc">Scorrimento e visibilità delle sue sei parti</string>
     <string name="settings_page_support_desc">Blocchi, mini mappa, foto</string>
     <string name="settings_page_site_desc">Blocchi, frequenze, foto, speedtest</string>
+    <string name="settings_page_frequency_reference_desc">Bande di frequenza per tecnologia, Francia e riferimento internazionale</string>
     <string name="settings_page_speedtests_desc">Filtri, ordinamento, dettagli mostrati</string>
     <string name="settings_page_coverage_desc">Valori predefiniti del calcolo di copertura</string>
     <string name="settings_page_elevation_desc">Terreno ed edifici presi in considerazione</string>
@@ -174,6 +175,8 @@
     <string name="appearance_scroll_blur_desc">Attiva o disattiva la sfocatura (consuma più batteria)</string>
     <string name="appearance_app_icon_title">Icona applicazione</string>
     <string name="appearance_in_app_logo_title">Logo nell\'applicazione</string>
+    <string name="appearance_logo_material_waves_title">Onde del logo Material</string>
+    <string name="appearance_logo_material_waves_desc">Usa il colore del tema Material selezionato per le onde GeoTower</string>
     <string name="appearance_menu_size_title">Dimensione menu principale</string>
     <string name="appearance_menu_size_small">Piccolo</string>
     <string name="appearance_menu_size_normal">Normale</string>
@@ -669,6 +672,32 @@
     <string name="appstrings_freq_grid_display_option">Mostra frequenze in griglia</string>
     <string name="appstrings_frequencies_and_techs">Tecnologie / Frequenze</string>
     <string name="appstrings_frequencies_title">Frequenze</string>
+    <string name="appstrings_frequency_reference_title">Bande di frequenza</string>
+    <string name="appstrings_frequency_reference_sort_title">Ordine delle bande</string>
+    <string name="appstrings_frequency_reference_sort_spectrum">Frequenza dello spettro (dalla più bassa alla più alta)</string>
+    <string name="appstrings_frequency_reference_sort_band">Nome della banda (B1, B2, B3…)</string>
+    <string name="appstrings_frequency_reference_sort_desc">Scegli come ordinare le bande all’interno di ogni tecnologia.</string>
+    <string name="appstrings_frequency_reference_open">Apri il riferimento delle bande di frequenza</string>
+    <string name="appstrings_frequency_reference_intro">Intervalli di riferimento delle bande radio mobili. Una banda può essere autorizzata o utilizzata in modo diverso a seconda del Paese, dell’operatore, del dispositivo e della zona.</string>
+    <string name="appstrings_frequency_reference_france_tab">Francia</string>
+    <string name="appstrings_frequency_reference_international_tab">Internazionale</string>
+    <string name="appstrings_frequency_reference_france_heading">Bande utilizzate o autorizzate nella Francia metropolitana</string>
+    <string name="appstrings_frequency_reference_international_heading">Bande internazionali di riferimento 3GPP</string>
+    <string name="appstrings_frequency_reference_source">Fonti: Arcep per la Francia metropolitana e specifiche radio 3GPP per le bande internazionali. Gli intervalli sono indicativi e non sostituiscono un’autorizzazione dell’operatore.</string>
+    <string name="appstrings_frequency_reference_2g">2G · GSM</string>
+    <string name="appstrings_frequency_reference_2g_desc">Reti voce e dati legacy</string>
+    <string name="appstrings_frequency_reference_3g">3G · UMTS</string>
+    <string name="appstrings_frequency_reference_3g_desc">Reti mobili UMTS / HSPA</string>
+    <string name="appstrings_frequency_reference_4g">4G · LTE</string>
+    <string name="appstrings_frequency_reference_4g_desc">Reti LTE a banda larga</string>
+    <string name="appstrings_frequency_reference_5g">5G · NR</string>
+    <string name="appstrings_frequency_reference_5g_desc">Reti 5G New Radio</string>
+    <string name="appstrings_frequency_reference_uplink">UL:</string>
+    <string name="appstrings_frequency_reference_downlink">DL:</string>
+    <string name="appstrings_frequency_reference_shared">Condivisa:</string>
+    <string name="appstrings_frequency_reference_fdd">FDD · uplink/downlink separati</string>
+    <string name="appstrings_frequency_reference_tdd">TDD · banda condivisa</string>
+    <string name="appstrings_frequency_reference_sdl">SDL · solo downlink</string>
     <string name="appstrings_from_my_position">da te</string>
     <string name="appstrings_full_screen_photo_desc">Foto a schermo intero</string>
     <string name="appstrings_gallery">Galleria</string>
@@ -2827,6 +2856,17 @@
     <!-- Planificateur de trajet -->
     <string name="trips_title">Percorsi</string>
     <string name="trips_new">Nuovo percorso</string>
+    <string name="trips_add_title">Aggiungi un percorso</string>
+    <string name="trips_add_desc">Crea un tour sulla mappa o importa un export JSON di GeoTower.</string>
+    <string name="trips_create">Crea un percorso</string>
+    <string name="trips_import">Importa un percorso</string>
+    <string name="trips_import_title">Importa percorso</string>
+    <string name="trips_import_failed">Questo file non è un export di percorso GeoTower valido.</string>
+    <string name="trips_import_nothing">Nessun nuovo percorso da importare.</string>
+    <plurals name="trips_import_result">
+        <item quantity="one">%d percorso importato o aggiornato</item>
+        <item quantity="other">%d percorsi importati o aggiornati</item>
+    </plurals>
     <string name="trips_export_all">Esporta tutti i percorsi</string>
     <string name="trips_actions">Azioni del percorso</string>
     <string name="trips_untitled">Percorso senza nome</string>
@@ -3081,4 +3121,9 @@
     <string name="appstrings_release_v2037_hidden_sites">Nascondi un sito o operatore assente direttamente dalla mappa, poi gestiscilo e ripristinalo dalle impostazioni</string>
     <string name="appstrings_release_v2037_hidden_sites_scope">Le preferenze dei siti nascosti si applicano a mappa, siti vicini, bussola, notifiche live e widget</string>
     <string name="appstrings_release_v2037_hidden_sites_backup">I siti nascosti sono ora inclusi nei backup dell’app e possono essere ripristinati su un’altra installazione</string>
+    <string name="appstrings_release_v2038_frequency_reference">Nuovo riferimento delle bande di frequenza 2G, 3G, 4G e 5G, con viste per la Francia e internazionali e ordinamento personalizzabile</string>
+    <string name="appstrings_release_v2038_trip_import">Ora puoi creare percorsi o importarli da un file JSON GeoTower direttamente dalla schermata dei percorsi</string>
+    <string name="appstrings_release_v2038_map_readability">Le mini-mappe ridimensionano gli azimut in modo più naturale, mantengono lo zoom centrato sull’antenna e offrono una navigazione più chiara</string>
+    <string name="appstrings_release_v2038_page_customization">La personalizzazione delle pagine include ora il riferimento delle frequenze e anteprime migliori delle sezioni disponibili</string>
+    <string name="appstrings_release_v2038_logo_theme">Il logo GeoTower può ora adattare le sue onde al tema Material selezionato</string>
 </resources>

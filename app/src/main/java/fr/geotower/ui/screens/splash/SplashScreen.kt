@@ -16,6 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import fr.geotower.ui.components.AppLogoImage
 import androidx.navigation.NavController
 import fr.geotower.R
 import fr.geotower.data.config.RemoteFeatureFlags
@@ -141,17 +142,9 @@ fun DrawableImage(
     modifier: Modifier = Modifier,
     contentDescription: String? = null
 ) {
-    AndroidView(
+    AppLogoImage(
+        resId = resId,
         modifier = modifier,
-        factory = { ctx ->
-            ImageView(ctx).apply {
-                scaleType = ImageView.ScaleType.FIT_CENTER
-                if (resId != 0) setImageResource(resId)
-            }
-        },
-        update = { imageView ->
-            if (resId != 0) imageView.setImageResource(resId)
-            imageView.contentDescription = contentDescription
-        }
+        contentDescription = contentDescription
     )
 }
