@@ -656,6 +656,9 @@
     <string name="appstrings_map_active_filters_except">excepto %1$s</string>
     <string name="appstrings_map_active_filters_more">+%1$d</string>
     <string name="appstrings_map_active_filters_none">ninguno</string>
+    <string name="appstrings_map_active_filters_dialog_title">Filtros activos</string>
+    <string name="appstrings_map_active_filters_dialog_message">Los siguientes filtros están activos en el mapa. ¿Quieres desactivarlos?</string>
+    <string name="appstrings_map_active_filters_disable">Desactivar filtros</string>
     <string name="appstrings_map_filters_defaults_menu">Filtros</string>
     <string name="appstrings_map_filters_defaults_title">Filtros predeterminados</string>
     <string name="appstrings_map_filters_defaults_desc">Estos ajustes se convierten en los filtros predeterminados del mapa. El aviso «Filtros activos» solo aparece cuando el mapa difiere de ellos.</string>
@@ -3142,4 +3145,7 @@
     <string name="appstrings_release_v2039_android_auto">Android Auto ofrece ahora una pantalla de inicio específica con mapa de sitios y antenas cercanas, además de estados más claros de ubicación y base</string>
     <string name="appstrings_release_v2039_enb_operator_counts">La base eNB muestra ahora los recuentos de identificadores eNB y gNB agrupados por operador</string>
     <string name="appstrings_release_v2039_onboarding_database_download">El primer inicio ofrece ahora una única acción para comprobar y descargar todas las bases disponibles</string>
+    <string name="appstrings_release_v2040_city_stats">Las estadísticas de municipios, departamentos y regiones incluyen ahora población, superficie y proporciones más útiles</string>
+    <string name="appstrings_release_v2040_map_filters">El aviso de filtros activos ahora es interactivo y los filtros predeterminados del mapa se pueden configurar por separado</string>
+    <string name="appstrings_release_v2040_android_auto">Los mapas y listas de Android Auto son más compatibles y claros, y muestran los iconos de operador disponibles</string>
 </resources>

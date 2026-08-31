@@ -7,15 +7,18 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -23,12 +26,16 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.geotower.data.models.LocalisationEntity
+import fr.geotower.data.models.RadioFilterMasks
 import fr.geotower.data.models.TechniqueEntity
 import fr.geotower.data.models.isDeclaredActive
 import fr.geotower.data.models.physicalSiteKey
+import fr.geotower.data.api.CommuneReference
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.OperatorLogos
@@ -49,7 +56,8 @@ data class OperatorStat(
     val logoRes: Int?,
     val color: Color,
     val idAnfrs: Set<String>,
-    val groupedFreqs: Map<String, List<FrequencyStat>>
+    val groupedFreqs: Map<String, List<FrequencyStat>>,
+    val technologyStats: Map<String, CityTechnologyStat>
 )
 
 data class FrequencyStat(
@@ -58,11 +66,62 @@ data class FrequencyStat(
     val totalCount: Int
 )
 
+data class CityTechnologyStat(
+    val activeCount: Int,
+    val totalCount: Int,
+    val activeAntennaCount: Int,
+    val totalAntennaCount: Int
+)
+
+private data class CityStatsCount(
+    val activeCount: Int,
+    val totalCount: Int
+)
+
+private data class CityStatsData(
+    val summary: CityStatsSummary,
+    val operators: List<OperatorStat>
+)
+
+private data class CityStatsSummary(
+    val supports: CityStatsCount,
+    val stations: CityStatsCount,
+    val antennas: CityStatsCount?,
+    val antennasFh: CityStatsCount?,
+    val reference: CommuneReference?,
+    val antennaDetailsComplete: Boolean
+)
+
+private data class CityStationTechnologies(
+    val antenna: LocalisationEntity,
+    val declared: Set<String>,
+    val active: Set<String>,
+    val declaredAntennaCounts: Map<String, Int>,
+    val activeAntennaCounts: Map<String, Int>,
+    val declaredAntennaIds: Set<String>,
+    val activeAntennaIds: Set<String>,
+    val declaredFhCount: Int,
+    val activeFhCount: Int
+)
+
+private data class CityPanelCounts(
+    val declaredByTechnology: Map<String, Int>,
+    val activeByTechnology: Map<String, Int>,
+    val declaredAntennaIds: Set<String>,
+    val activeAntennaIds: Set<String>,
+    val declaredFh: Int,
+    val activeFh: Int
+)
+
+private val cityStatsTechnologies = listOf("2G", "3G", "4G", "5G", "FH")
+private val cityStatsPanelIdRegex = Regex("""\[AER_ID:\s*([^\]]+)\]""")
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun CityStatsDetailSheet(
     antennas: List<LocalisationEntity>,
     techniques: Map<String, TechniqueEntity>,
+    reference: CommuneReference?,
     isFrequencyStatusLoading: Boolean,
     /**
      * Recentrer sur la commune dominante : filet de sécurité d'une recherche de ville, où la bbox
@@ -76,22 +135,25 @@ fun CityStatsDetailSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val sizing = LocalGeoTowerUiStyle.current.sizing
 
-    val stats by produceState<List<OperatorStat>?>(
+    val stats by produceState<CityStatsData?>(
         initialValue = null,
         antennas,
         techniques,
+        reference,
         restrictToMainCity
     ) {
         value = withContext(Dispatchers.Default) {
-            buildCityOperatorStats(
+            buildCityStats(
                 antennas = antennas,
                 techniques = techniques,
+                reference = reference,
                 restrictToMainCity = restrictToMainCity
             )
         }
     }
 
     var expandedOps by remember { mutableStateOf(setOf<String>()) }
+    var showActiveOnly by rememberSaveable { mutableStateOf(false) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -106,7 +168,7 @@ fun CityStatsDetailSheet(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = stringResource(R.string.appstrings_operator_details_title),
+                text = stringResource(R.string.appstrings_city_stats_title),
                 style = sizing.textStyle(MaterialTheme.typography.titleLarge),
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
@@ -118,8 +180,8 @@ fun CityStatsDetailSheet(
                 verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp)),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                val currentStats = stats
-                if (currentStats == null) {
+                val currentData = stats
+                if (currentData == null) {
                     item {
                         Column(
                             modifier = Modifier.fillMaxWidth().padding(vertical = sizing.spacing(32.dp)),
@@ -139,6 +201,28 @@ fun CityStatsDetailSheet(
                         }
                     }
                 } else {
+                val currentStats = currentData.operators
+                item {
+                    CityStatsModeSelector(
+                        showActiveOnly = showActiveOnly,
+                        onChange = { showActiveOnly = it }
+                    )
+                }
+                item {
+                    CityStatsSummaryCard(
+                        summary = currentData.summary,
+                        showActiveOnly = showActiveOnly,
+                        isLoading = isFrequencyStatusLoading
+                    )
+                }
+                item {
+                    CityOperatorTechCard(
+                        operators = currentStats,
+                        showActiveOnly = showActiveOnly,
+                        panelsReady = currentData.summary.antennaDetailsComplete,
+                        isLoading = isFrequencyStatusLoading
+                    )
+                }
                 items(currentStats, key = { it.key }) { stat ->
                     val isExpanded = expandedOps.contains(stat.key)
                     val arrowRotation by animateFloatAsState(targetValue = if (isExpanded) 180f else 0f, label = "arrowAnim")
@@ -219,50 +303,419 @@ fun CityStatsDetailSheet(
     }
 }
 
-private fun buildCityOperatorStats(
+@Composable
+private fun CityStatsModeSelector(showActiveOnly: Boolean, onChange: (Boolean) -> Unit) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    Row(horizontalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))) {
+        FilterChip(
+            selected = !showActiveOnly,
+            onClick = { onChange(false) },
+            label = { Text(stringResource(R.string.department_stats_mode_all)) }
+        )
+        FilterChip(
+            selected = showActiveOnly,
+            onClick = { onChange(true) },
+            label = { Text(stringResource(R.string.department_stats_mode_active)) }
+        )
+    }
+}
+
+@Composable
+private fun CityStatsSummaryCard(
+    summary: CityStatsSummary,
+    showActiveOnly: Boolean,
+    isLoading: Boolean
+) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    val supports = cityStatsCountValue(summary.supports, showActiveOnly)
+    val stations = cityStatsCountValue(summary.stations, showActiveOnly)
+    val antennas = summary.antennas?.let { cityStatsCountValue(it, showActiveOnly) }
+    val antennasFh = summary.antennasFh?.let { cityStatsCountValue(it, showActiveOnly) }
+    val areaKm2 = summary.reference?.areaKm2
+    val population = summary.reference?.population
+
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+        ),
+        shape = RoundedCornerShape(sizing.component(12.dp)),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(sizing.spacing(16.dp))) {
+            Text(
+                text = stringResource(R.string.department_stats_authorisations_title),
+                style = sizing.textStyle(MaterialTheme.typography.titleSmall),
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(modifier = Modifier.height(sizing.spacing(10.dp)))
+            CityStatLine(
+                label = stringResource(R.string.department_stats_supports),
+                value = cityFormatCount(supports)
+            )
+            CityStatLine(
+                label = stringResource(R.string.department_stats_stations),
+                value = cityFormatCount(stations)
+            )
+            CityStatLine(
+                label = stringResource(R.string.department_stats_antennas),
+                value = antennas?.let(::cityFormatCount) ?: if (isLoading) "…" else "—"
+            )
+            HorizontalDivider(modifier = Modifier.padding(vertical = sizing.spacing(8.dp)))
+            CityStatLine(
+                label = stringResource(R.string.department_stats_stations_per_support),
+                value = cityFormatRatio(ratioOf(stations, supports), 2)
+            )
+            CityStatLine(
+                label = stringResource(R.string.department_stats_antennas_per_station),
+                value = cityFormatRatio(ratioOf(antennas, stations), 3)
+            )
+            CityStatLine(
+                label = stringResource(R.string.department_stats_supports_per_km2),
+                value = cityFormatRatio(ratioOf(supports, areaKm2), 3)
+            )
+            CityStatLine(
+                label = stringResource(R.string.department_stats_stations_per_km2),
+                value = cityFormatRatio(ratioOf(stations, areaKm2), 3)
+            )
+            CityStatLine(
+                label = stringResource(R.string.department_stats_antennas_per_km2),
+                value = cityFormatRatio(ratioOf(antennas, areaKm2), 3)
+            )
+            HorizontalDivider(modifier = Modifier.padding(vertical = sizing.spacing(8.dp)))
+            val populationPerThousand = population?.div(1000.0)
+            CityStatLine(
+                label = stringResource(R.string.department_stats_supports_per_1k),
+                value = cityFormatRatio(ratioOf(supports, populationPerThousand), 3)
+            )
+            CityStatLine(
+                label = stringResource(R.string.department_stats_stations_per_1k),
+                value = cityFormatRatio(ratioOf(stations, populationPerThousand), 3)
+            )
+            CityStatLine(
+                label = stringResource(R.string.department_stats_antennas_per_1k),
+                value = cityFormatRatio(ratioOf(antennas, populationPerThousand), 3)
+            )
+            CityStatLine(
+                label = stringResource(R.string.department_stats_hab_per_support),
+                value = cityFormatRatio(ratioOf(population, supports), 0)
+            )
+            CityStatLine(
+                label = stringResource(R.string.department_stats_hab_per_station),
+                value = cityFormatRatio(ratioOf(population, stations), 0)
+            )
+            CityStatLine(
+                label = stringResource(R.string.department_stats_hab_per_antenna),
+                value = cityFormatRatio(ratioOf(population, antennas), 0)
+            )
+
+            Spacer(modifier = Modifier.height(sizing.spacing(10.dp)))
+            val reference = summary.reference
+            val referenceText = if (reference?.areaKm2 != null && reference.population != null) {
+                stringResource(
+                    R.string.department_stats_reference_no_year,
+                    reference.name ?: reference.codeInsee,
+                    "%,.0f".format(reference.areaKm2),
+                    cityFormatCount(reference.population)
+                )
+            } else {
+                stringResource(R.string.department_stats_missing_reference)
+            }
+            Text(
+                text = referenceText,
+                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (antennasFh != null && antennasFh > 0) {
+                Text(
+                    text = stringResource(R.string.department_stats_fh, cityFormatCount(antennasFh)),
+                    style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+private fun cityStatsCountValue(count: CityStatsCount, showActiveOnly: Boolean): Int =
+    if (showActiveOnly) count.activeCount else count.totalCount
+
+@Composable
+private fun CityStatLine(label: String, value: String) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = sizing.spacing(3.dp)),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            text = value,
+            style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
+            fontWeight = FontWeight.SemiBold
+        )
+    }
+}
+
+@Composable
+private fun CityOperatorTechCard(
+    operators: List<OperatorStat>,
+    showActiveOnly: Boolean,
+    panelsReady: Boolean,
+    isLoading: Boolean
+) {
+    val visibleOperators = operators.filter { it.totalCount > 0 }
+    if (visibleOperators.isEmpty()) return
+
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    val tableScrollState = rememberScrollState()
+
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+        ),
+        shape = RoundedCornerShape(sizing.component(12.dp)),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(sizing.spacing(16.dp))) {
+            Text(
+                text = stringResource(R.string.department_stats_matrix_title),
+                style = sizing.textStyle(MaterialTheme.typography.titleSmall),
+                fontWeight = FontWeight.SemiBold
+            )
+            if (!panelsReady) {
+                Text(
+                    text = if (isLoading) {
+                        stringResource(R.string.appstrings_loading_operator_stats)
+                    } else {
+                        stringResource(R.string.appstrings_technical_data_unavailable)
+                    },
+                    style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(modifier = Modifier.height(sizing.spacing(10.dp)))
+
+            Column(modifier = Modifier.horizontalScroll(tableScrollState)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    CityTableHeaderCell(
+                        text = stringResource(R.string.department_stats_matrix_operator),
+                        width = sizing.component(132.dp),
+                        alignEnd = false
+                    )
+                    cityStatsTechnologies.forEach { tech ->
+                        CityTableHeaderCell(text = tech, width = sizing.component(56.dp))
+                    }
+                    CityTableHeaderCell(
+                        text = stringResource(R.string.department_stats_matrix_total),
+                        width = sizing.component(64.dp)
+                    )
+                    CityTableHeaderCell(
+                        text = stringResource(R.string.department_stats_supports),
+                        width = sizing.component(76.dp)
+                    )
+                }
+                HorizontalDivider(modifier = Modifier.padding(vertical = sizing.spacing(4.dp)))
+
+                visibleOperators.forEach { operator ->
+                    val perTech = cityStatsTechnologies.map { tech ->
+                        val stat = operator.technologyStats[tech]
+                        if (!panelsReady) {
+                            null
+                        } else if (showActiveOnly) {
+                            stat?.activeAntennaCount ?: 0
+                        } else {
+                            stat?.totalAntennaCount ?: 0
+                        }
+                    }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(vertical = sizing.spacing(3.dp))
+                    ) {
+                        Row(
+                            modifier = Modifier.width(sizing.component(132.dp)),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            if (operator.logoRes != null) {
+                                Image(
+                                    painter = painterResource(id = operator.logoRes),
+                                    contentDescription = operator.name,
+                                    modifier = Modifier
+                                        .size(sizing.component(28.dp))
+                                        .clip(RoundedCornerShape(sizing.component(5.dp)))
+                                        .background(Color.White)
+                                )
+                            } else {
+                                Box(
+                                    modifier = Modifier
+                                        .size(sizing.component(10.dp))
+                                        .clip(CircleShape)
+                                        .background(operator.color)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
+                            Text(
+                                text = operator.name,
+                                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        perTech.forEach { value ->
+                            CityTableValueCell(
+                                text = value?.let { if (it > 0) cityFormatCount(it) else "—" } ?: "—",
+                                width = sizing.component(56.dp)
+                            )
+                        }
+                        CityTableValueCell(
+                            text = perTech.sumOf { it ?: 0 }.let { total ->
+                                if (panelsReady) cityFormatCount(total) else "—"
+                            },
+                            width = sizing.component(64.dp),
+                            bold = true
+                        )
+                        CityTableValueCell(
+                            text = cityFormatCount(
+                                if (showActiveOnly) operator.activeCount else operator.totalCount
+                            ),
+                            width = sizing.component(76.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CityTableHeaderCell(text: String, width: androidx.compose.ui.unit.Dp, alignEnd: Boolean = true) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    Text(
+        text = text,
+        style = sizing.textStyle(MaterialTheme.typography.labelMedium),
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        textAlign = if (alignEnd) TextAlign.End else TextAlign.Start,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier.width(width)
+    )
+}
+
+@Composable
+private fun CityTableValueCell(text: String, width: androidx.compose.ui.unit.Dp, bold: Boolean = false) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    Text(
+        text = text,
+        style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+        fontWeight = if (bold) FontWeight.SemiBold else FontWeight.Normal,
+        textAlign = TextAlign.End,
+        maxLines = 1,
+        modifier = Modifier.width(width)
+    )
+}
+
+private fun cityFormatCount(value: Int): String = "%,d".format(value)
+
+private fun cityFormatRatio(value: Double?, decimals: Int): String =
+    if (value == null) "—" else "%,.${decimals}f".format(value)
+
+private fun ratioOf(numerator: Number?, denominator: Number?): Double? {
+    val top = numerator?.toDouble() ?: return null
+    val bottom = denominator?.toDouble() ?: return null
+    if (bottom == 0.0) return null
+    return top / bottom
+}
+
+private fun buildCityStats(
     antennas: List<LocalisationEntity>,
     techniques: Map<String, TechniqueEntity>,
+    reference: CommuneReference?,
     restrictToMainCity: Boolean
-): List<OperatorStat> {
-    val targetInsee = if (restrictToMainCity) {
-        antennas.mapNotNull { normalizeCityStatsInsee(it.codeInsee)?.takeIf { c -> c.isNotBlank() } }
-            .groupingBy { it }
-            .eachCount()
-            .maxByOrNull { it.value }
-            ?.key
-    } else {
-        null
+): CityStatsData {
+    val cityAntennas = cityStatsAntennas(antennas, restrictToMainCity)
+    val realAntennas = cityAntennas.filterNot { it.idAnfr.startsWith("CLUSTER_") }
+    val siteGroups = realAntennas.groupBy { it.physicalSiteKey() }
+    val stations = realAntennas.distinctBy { it.idAnfr }
+    val stationTechnologies = stations.map { antenna ->
+        val technique = techniques[antenna.idAnfr]
+        val panelCounts = cityStatsPanelCounts(technique?.detailsFrequences)
+        val declared = cityStatsDeclaredTechnologies(antenna, technique)
+        val activeFromDetails = activeCityTechnologiesFromDetails(technique?.detailsFrequences)
+        CityStationTechnologies(
+            antenna = antenna,
+            declared = declared,
+            active = if (activeFromDetails.isNotEmpty()) {
+                activeFromDetails
+            } else if (antenna.isDeclaredActive()) {
+                declared
+            } else {
+                emptySet()
+            },
+            declaredAntennaCounts = panelCounts.declaredByTechnology,
+            activeAntennaCounts = panelCounts.activeByTechnology,
+            declaredAntennaIds = panelCounts.declaredAntennaIds,
+            activeAntennaIds = panelCounts.activeAntennaIds,
+            declaredFhCount = panelCounts.declaredFh,
+            activeFhCount = panelCounts.activeFh
+        )
     }
 
-    val cityAntennas = if (targetInsee != null) {
-        antennas.filter { normalizeCityStatsInsee(it.codeInsee) == targetInsee }
-    } else {
-        antennas
-    }
+    val antennaDetailsComplete = stations.all { it.idAnfr in techniques }
+    val summary = CityStatsSummary(
+        supports = CityStatsCount(
+            activeCount = siteGroups.values.count { site -> site.any { it.isDeclaredActive() } },
+            totalCount = siteGroups.size
+        ),
+        stations = CityStatsCount(
+            activeCount = stations.count { it.isDeclaredActive() },
+            totalCount = stations.size
+        ),
+        // Comme dans les statistiques départementales : une antenne mobile 4G+5G ne compte
+        // qu'une fois dans le total, tandis que la matrice la compte dans chaque technologie.
+        antennas = CityStatsCount(
+            activeCount = stationTechnologies.sumOf { it.activeAntennaIds.size },
+            totalCount = stationTechnologies.sumOf { it.declaredAntennaIds.size }
+        ).takeIf { antennaDetailsComplete },
+        antennasFh = CityStatsCount(
+            activeCount = stationTechnologies.sumOf { it.activeFhCount },
+            totalCount = stationTechnologies.sumOf { it.declaredFhCount }
+        ).takeIf { antennaDetailsComplete },
+        reference = reference,
+        antennaDetailsComplete = antennaDetailsComplete
+    )
 
     val rawList = OperatorColors.all.map { operator ->
         val opKey = operator.key
         val logo = OperatorLogos.drawableRes(opKey)
         val color = Color(operator.colorArgb)
-
-        val opAntennasGrouped = cityAntennas
+        val opAntennas = cityAntennas
             .asSequence()
-            .filter { OperatorColors.keysFor(it.operateur).contains(opKey) }
-            .groupBy { it.physicalSiteKey() }
-
-        val totalSiteCount = opAntennasGrouped.size
-        val activeSiteCount = opAntennasGrouped.values.count { siteAntennas ->
-            siteAntennas.any { it.isDeclaredActive() }
+            .filter { !it.idAnfr.startsWith("CLUSTER_") && OperatorColors.keysFor(it.operateur).contains(opKey) }
+            .toList()
+        val opAntennasGrouped = opAntennas.groupBy { it.physicalSiteKey() }
+        val opStations = stationTechnologies.filter {
+            OperatorColors.keysFor(it.antenna.operateur).contains(opKey)
         }
-        val idAnfrs = opAntennasGrouped.values
-            .asSequence()
-            .flatten()
-            .map { it.idAnfr }
-            .filter { it.isNotBlank() && !it.startsWith("CLUSTER_") }
-            .toSet()
+        val technologyStats = cityStatsTechnologies.associateWith { tech ->
+            CityTechnologyStat(
+                activeCount = opStations.count { tech in it.active },
+                totalCount = opStations.count { tech in it.declared },
+                activeAntennaCount = opStations.sumOf { station ->
+                    if (tech == "FH") station.activeFhCount else station.activeAntennaCounts[tech] ?: 0
+                },
+                totalAntennaCount = opStations.sumOf { station ->
+                    if (tech == "FH") station.declaredFhCount else station.declaredAntennaCounts[tech] ?: 0
+                }
+            )
+        }
 
         val counts = mutableMapOf<String, FrequencyStat>()
-
         opAntennasGrouped.values.forEach { siteAntennas ->
             val activeSystems = siteAntennas.flatMap { antenna ->
                 activeFrequencyKeysFromDetails(techniques[antenna.idAnfr]?.detailsFrequences)
@@ -293,18 +746,148 @@ private fun buildCityOperatorStats(
         OperatorStat(
             key = operator.key,
             name = operator.label,
-            activeCount = activeSiteCount,
-            totalCount = totalSiteCount,
+            activeCount = opAntennasGrouped.values.count { siteAntennas ->
+                siteAntennas.any { it.isDeclaredActive() }
+            },
+            totalCount = opAntennasGrouped.size,
             logoRes = logo,
             color = color,
-            idAnfrs = idAnfrs,
-            groupedFreqs = groupedByTech
+            idAnfrs = opAntennas.map { it.idAnfr }.filter { it.isNotBlank() }.toSet(),
+            groupedFreqs = groupedByTech,
+            technologyStats = technologyStats
         )
     }
 
-    return rawList.filter { it.totalCount > 0 }.ifEmpty { rawList }
-        .sortedByDescending { it.totalCount }
+    return CityStatsData(
+        summary = summary,
+        operators = rawList.filter { it.totalCount > 0 }.ifEmpty { rawList }
+            .sortedByDescending { it.totalCount }
+    )
 }
+
+private fun cityStatsAntennas(
+    antennas: List<LocalisationEntity>,
+    restrictToMainCity: Boolean
+): List<LocalisationEntity> {
+    val targetInsee = if (restrictToMainCity) {
+        antennas.mapNotNull { normalizeCityStatsInsee(it.codeInsee)?.takeIf { c -> c.isNotBlank() } }
+            .groupingBy { it }
+            .eachCount()
+            .maxByOrNull { it.value }
+            ?.key
+    } else {
+        null
+    }
+
+    return if (targetInsee != null) {
+        antennas.filter { normalizeCityStatsInsee(it.codeInsee) == targetInsee }
+    } else {
+        antennas
+    }
+}
+
+private fun cityStatsDeclaredTechnologies(
+    antenna: LocalisationEntity,
+    technique: TechniqueEntity?
+): Set<String> {
+    val declared = buildSet {
+        if (antenna.techMask and RadioFilterMasks.TECH_2G != 0) add("2G")
+        if (antenna.techMask and RadioFilterMasks.TECH_3G != 0) add("3G")
+        if (antenna.techMask and RadioFilterMasks.TECH_4G != 0) add("4G")
+        if (antenna.techMask and RadioFilterMasks.TECH_5G != 0) add("5G")
+        if (antenna.techMask and RadioFilterMasks.TECH_FH != 0) add("FH")
+        technique?.detailsFrequences.orEmpty().lineSequence().forEach { line ->
+            val rawFrequency = line.substringBefore("|").trim()
+            if (isFhFrequency(rawFrequency)) {
+                add("FH")
+            } else {
+                frequencyKeysFromRawDetails(rawFrequency)
+                    .forEach { add(it.substringBefore("|")) }
+            }
+        }
+    }
+    return declared
+}
+
+private fun activeCityTechnologiesFromDetails(details: String?): Set<String> {
+    if (details.isNullOrBlank()) return emptySet()
+
+    return details.lineSequence()
+        .map { it.trim() }
+        .filter { it.isNotBlank() }
+        .filter { isActiveFrequencyStatus(it.split("|").getOrNull(1).orEmpty().trim()) }
+        .flatMap { line ->
+            val rawFrequency = line.substringBefore("|").trim()
+            if (isFhFrequency(rawFrequency)) {
+                sequenceOf("FH")
+            } else {
+                frequencyKeysFromRawDetails(rawFrequency).asSequence().map { it.substringBefore("|") }
+            }
+        }
+        .toSet()
+}
+
+private fun cityStatsPanelCounts(details: String?): CityPanelCounts {
+    if (details.isNullOrBlank()) {
+        return CityPanelCounts(
+            declaredByTechnology = emptyMap(),
+            activeByTechnology = emptyMap(),
+            declaredAntennaIds = emptySet(),
+            activeAntennaIds = emptySet(),
+            declaredFh = 0,
+            activeFh = 0
+        )
+    }
+
+    val declaredByTechnology = cityStatsTechnologies
+        .filter { it != "FH" }
+        .associateWith { mutableSetOf<String>() }
+    val activeByTechnology = cityStatsTechnologies
+        .filter { it != "FH" }
+        .associateWith { mutableSetOf<String>() }
+    val declaredFh = mutableSetOf<String>()
+    val activeFh = mutableSetOf<String>()
+    val declaredAntennaIds = mutableSetOf<String>()
+    val activeAntennaIds = mutableSetOf<String>()
+
+    details.lineSequence()
+        .map { it.trim() }
+        .filter { it.isNotBlank() }
+        .forEach { line ->
+            val aerId = cityStatsPanelIdRegex.find(line)?.groupValues?.getOrNull(1)?.trim()
+                ?.takeIf { it.isNotBlank() }
+                ?: return@forEach
+            val rawFrequency = line.substringBefore("|").trim()
+            val isActive = isActiveFrequencyStatus(line.split("|").getOrNull(1).orEmpty().trim())
+            if (isFhFrequency(rawFrequency)) {
+                declaredFh += aerId
+                if (isActive) activeFh += aerId
+            } else {
+                frequencyKeysFromRawDetails(rawFrequency)
+                    .map { it.substringBefore("|") }
+                    .forEach { tech ->
+                        declaredAntennaIds += aerId
+                        declaredByTechnology[tech]?.add(aerId)
+                        if (isActive) {
+                            activeAntennaIds += aerId
+                            activeByTechnology[tech]?.add(aerId)
+                        }
+                    }
+            }
+        }
+
+    return CityPanelCounts(
+        declaredByTechnology = declaredByTechnology.mapValues { it.value.size },
+        activeByTechnology = activeByTechnology.mapValues { it.value.size },
+        declaredAntennaIds = declaredAntennaIds,
+        activeAntennaIds = activeAntennaIds,
+        declaredFh = declaredFh.size,
+        activeFh = activeFh.size
+    )
+}
+
+private fun isFhFrequency(rawFrequency: String): Boolean =
+    rawFrequency.substringBefore(":").contains("FH", ignoreCase = true)
 
 private fun normalizeCityStatsInsee(code: String?): String? {
     return when {

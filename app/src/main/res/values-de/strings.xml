@@ -656,6 +656,9 @@
     <string name="appstrings_map_active_filters_except">außer %1$s</string>
     <string name="appstrings_map_active_filters_more">+%1$d</string>
     <string name="appstrings_map_active_filters_none">keine</string>
+    <string name="appstrings_map_active_filters_dialog_title">Aktive Filter</string>
+    <string name="appstrings_map_active_filters_dialog_message">Die folgenden Filter sind auf der Karte aktiv. Möchten Sie sie deaktivieren?</string>
+    <string name="appstrings_map_active_filters_disable">Filter deaktivieren</string>
     <string name="appstrings_map_filters_defaults_menu">Filter</string>
     <string name="appstrings_map_filters_defaults_title">Standardfilter</string>
     <string name="appstrings_map_filters_defaults_desc">Diese Einstellungen werden zu den Standardfiltern der Karte. Das Banner „Aktive Filter“ erscheint nur, wenn die Karte davon abweicht.</string>
@@ -3142,4 +3145,7 @@
     <string name="appstrings_release_v2039_android_auto">Android Auto bietet jetzt einen eigenen Startbildschirm mit Standortkarte und nahegelegenen Antennen sowie klareren Angaben zu Standort und Datenbank</string>
     <string name="appstrings_release_v2039_enb_operator_counts">Die eNB-Datenbank zeigt jetzt nach Betreiber gruppierte eNB- und gNB-Kennungszahlen</string>
     <string name="appstrings_release_v2039_onboarding_database_download">Beim ersten Start gibt es jetzt eine einzige Aktion, um alle verfügbaren Datenbanken zu prüfen und herunterzuladen</string>
+    <string name="appstrings_release_v2040_city_stats">Statistiken für Gemeinden, Departements und Regionen enthalten jetzt öffentliche Angaben zu Bevölkerung und Fläche sowie nützlichere Verhältnisse</string>
+    <string name="appstrings_release_v2040_map_filters">Das Banner für aktive Filter ist jetzt interaktiv, und die Standardfilter der Karte lassen sich separat konfigurieren</string>
+    <string name="appstrings_release_v2040_android_auto">Karten und Listen in Android Auto sind kompatibler und übersichtlicher und zeigen verfügbare Betreibersymbole</string>
 </resources>

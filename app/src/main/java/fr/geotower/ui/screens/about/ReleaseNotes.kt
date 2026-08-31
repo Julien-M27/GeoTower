@@ -31,30 +31,16 @@ internal data class ReleaseNoteItem(
  */
 @Composable
 internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
+    section(stringResource(R.string.appstrings_release_section_statistics)) {
+        item(stringResource(R.string.appstrings_release_v2040_city_stats))
+    }
+
+    section(stringResource(R.string.appstrings_release_section_map_settings)) {
+        item(stringResource(R.string.appstrings_release_v2040_map_filters))
+    }
+
     section(stringResource(R.string.appstrings_release_section_android_auto)) {
-        item(stringResource(R.string.appstrings_release_v2039_android_auto))
-    }
-
-    section(stringResource(R.string.appstrings_release_section_database)) {
-        item(stringResource(R.string.appstrings_release_v2039_enb_operator_counts))
-        item(stringResource(R.string.appstrings_release_v2039_onboarding_database_download))
-    }
-
-    section(stringResource(R.string.appstrings_release_section_spectrums)) {
-        item(stringResource(R.string.appstrings_release_v2038_frequency_reference))
-    }
-
-    section(stringResource(R.string.appstrings_release_section_share_export)) {
-        item(stringResource(R.string.appstrings_release_v2038_trip_import))
-    }
-
-    section(stringResource(R.string.appstrings_release_section_map)) {
-        item(stringResource(R.string.appstrings_release_v2038_map_readability))
-        item(stringResource(R.string.appstrings_release_v2038_page_customization))
-    }
-
-    section(stringResource(R.string.appstrings_release_section_about)) {
-        item(stringResource(R.string.appstrings_release_v2038_logo_theme))
+        item(stringResource(R.string.appstrings_release_v2040_android_auto))
     }
 }
 

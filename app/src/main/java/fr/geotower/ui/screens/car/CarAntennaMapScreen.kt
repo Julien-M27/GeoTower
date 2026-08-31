@@ -12,6 +12,7 @@ import androidx.car.app.model.CarLocation
 import androidx.car.app.model.Distance
 import androidx.car.app.model.DistanceSpan
 import androidx.car.app.model.ItemList
+import androidx.car.app.model.ListTemplate
 import androidx.car.app.model.Metadata
 import androidx.car.app.model.MessageTemplate
 import androidx.car.app.model.Place
@@ -19,6 +20,7 @@ import androidx.car.app.model.PlaceListMapTemplate
 import androidx.car.app.model.PlaceMarker
 import androidx.car.app.model.Row
 import androidx.car.app.model.Template
+import androidx.car.app.versioning.CarAppApiLevels
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import fr.geotower.R
@@ -62,7 +64,8 @@ class CarAntennaMapScreen(
         when (val currentState = state) {
             CarSitesLoadResult.Loading -> loadingTemplate()
             is CarSitesLoadResult.Loaded -> {
-                if (currentState.sites.isEmpty()) {
+                val validSites = currentState.sites.filter(::hasValidCoordinates)
+                if (validSites.isEmpty()) {
                     messageTemplate(
                         title = carContext.getString(R.string.car_map_title),
                         message = carContext.getString(R.string.car_no_sites_nearby),
@@ -70,7 +73,13 @@ class CarAntennaMapScreen(
                         action = ::loadSites
                     )
                 } else {
-                    loadedTemplate(currentState.sites)
+                    if (supportsPlaceListMapTemplate()) {
+                        loadedTemplate(validSites)
+                    } else {
+                        // PlaceListMapTemplate est une API 5. Les anciens hôtes restent utilisables
+                        // avec la liste, au lieu de recevoir un template qu'ils ne savent pas lire.
+                        fallbackListTemplate(validSites)
+                    }
                 }
             }
             CarSitesLoadResult.MissingLocationPermission -> missingPermissionTemplate()
@@ -153,9 +162,40 @@ class CarAntennaMapScreen(
         return PlaceListMapTemplate.Builder()
             .setTitle(carContext.getString(R.string.car_map_title))
             .setHeaderAction(carHeaderAction())
-            .setCurrentLocationEnabled(true)
+            // Le host peut reconstruire le template après un changement de permission. Ne jamais
+            // activer cette option si l'autorisation a été retirée entre deux rendus.
+            .setCurrentLocationEnabled(hasCarLocationPermission(carContext))
             .setItemList(items.build())
             .setActionStrip(ActionStrip.Builder().addAction(mapSwitch).build())
+            .build()
+    }
+
+    private fun fallbackListTemplate(sites: List<CarSiteListItem>): Template {
+        val screenManager = carContext.getCarService(ScreenManager::class.java)
+        val hostLimit = runCatching {
+            carContext.getCarService(ConstraintManager::class.java)
+                .getContentLimit(ConstraintManager.CONTENT_LIMIT_TYPE_LIST)
+        }.getOrElse { DEFAULT_MAP_PLACE_LIMIT }.coerceAtLeast(1)
+
+        val items = ItemList.Builder()
+        sites.take(hostLimit).forEach { site ->
+            val row = Row.Builder()
+                    .setImage(carOperatorGridIcon(carContext, site.operators))
+                    .setTitle(titleWithDistance(site))
+                    .setOnClickListener {
+                        screenManager.push(CarSiteDetailScreen(carContext, site))
+                    }
+            listOf(site.operators, site.subtitle)
+                .filter { it.isNotBlank() }
+                .take(2)
+                .forEach(row::addText)
+            items.addItem(row.build())
+        }
+
+        return ListTemplate.Builder()
+            .setTitle(carContext.getString(R.string.car_map_title))
+            .setHeaderAction(carHeaderAction())
+            .setSingleList(items.build())
             .build()
     }
 
@@ -179,6 +219,15 @@ class CarAntennaMapScreen(
     }
 
     private fun loadingTemplate(): Template {
+        if (!supportsPlaceListMapTemplate()) {
+            return messageTemplate(
+                title = carContext.getString(R.string.car_map_title),
+                message = carContext.getString(R.string.car_map_loading),
+                actionTitle = carContext.getString(R.string.common_try_again),
+                action = ::loadSites
+            )
+        }
+
         return PlaceListMapTemplate.Builder()
             .setTitle(carContext.getString(R.string.car_map_title))
             .setHeaderAction(carHeaderAction())
@@ -208,7 +257,7 @@ class CarAntennaMapScreen(
                 )
             ) { granted, _ ->
                 if (granted.isEmpty()) {
-                    state = CarSitesLoadResult.Error(carContext.getString(R.string.car_permission_denied))
+                    state = CarSitesLoadResult.MissingLocationPermission
                 } else {
                     loadSites()
                 }
@@ -219,6 +268,21 @@ class CarAntennaMapScreen(
             state = CarSitesLoadResult.Error(carContext.getString(R.string.car_permission_denied))
             invalidate()
         }
+    }
+
+    private fun hasValidCoordinates(site: CarSiteListItem): Boolean {
+        return site.latitude.isFinite() &&
+            site.longitude.isFinite() &&
+            site.distanceMeters.isFinite() &&
+            site.distanceMeters >= 0f &&
+            site.latitude in -90.0..90.0 &&
+            site.longitude in -180.0..180.0
+    }
+
+    private fun supportsPlaceListMapTemplate(): Boolean {
+        return runCatching {
+            carContext.getCarAppApiLevel() >= CarAppApiLevels.LEVEL_5
+        }.getOrDefault(false)
     }
 
     private fun messageTemplate(

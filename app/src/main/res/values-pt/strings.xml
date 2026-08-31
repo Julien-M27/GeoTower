@@ -656,6 +656,9 @@
     <string name="appstrings_map_active_filters_except">exceto %1$s</string>
     <string name="appstrings_map_active_filters_more">+%1$d</string>
     <string name="appstrings_map_active_filters_none">nenhum</string>
+    <string name="appstrings_map_active_filters_dialog_title">Filtros ativos</string>
+    <string name="appstrings_map_active_filters_dialog_message">Os seguintes filtros estão ativos no mapa. Pretende desativá-los?</string>
+    <string name="appstrings_map_active_filters_disable">Desativar filtros</string>
     <string name="appstrings_map_filters_defaults_menu">Filtros</string>
     <string name="appstrings_map_filters_defaults_title">Filtros predefinidos</string>
     <string name="appstrings_map_filters_defaults_desc">Estas definições tornam-se os filtros predefinidos do mapa. O aviso «Filtros ativos» só aparece quando o mapa difere deles.</string>
@@ -3142,4 +3145,7 @@
     <string name="appstrings_release_v2039_android_auto">O Android Auto oferece agora um ecrã inicial dedicado com mapa de sites e antenas próximas, com estados mais claros da localização e da base</string>
     <string name="appstrings_release_v2039_enb_operator_counts">A base eNB mostra agora as contagens de identificadores eNB e gNB agrupadas por operador</string>
     <string name="appstrings_release_v2039_onboarding_database_download">O primeiro arranque oferece agora uma única ação para verificar e transferir todas as bases disponíveis</string>
+    <string name="appstrings_release_v2040_city_stats">As estatísticas de municípios, departamentos e regiões incluem agora população, área e rácios mais úteis</string>
+    <string name="appstrings_release_v2040_map_filters">O aviso de filtros ativos é agora interativo e os filtros predefinidos do mapa podem ser configurados separadamente</string>
+    <string name="appstrings_release_v2040_android_auto">Os mapas e listas do Android Auto são mais compatíveis e claros e mostram os ícones dos operadores disponíveis</string>
 </resources>

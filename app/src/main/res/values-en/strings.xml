@@ -656,6 +656,9 @@
     <string name="appstrings_map_active_filters_except">except %1$s</string>
     <string name="appstrings_map_active_filters_more">+%1$d</string>
     <string name="appstrings_map_active_filters_none">none</string>
+    <string name="appstrings_map_active_filters_dialog_title">Active filters</string>
+    <string name="appstrings_map_active_filters_dialog_message">The following filters are active on the map. Do you want to disable them?</string>
+    <string name="appstrings_map_active_filters_disable">Disable filters</string>
     <string name="appstrings_map_filters_defaults_menu">Filters</string>
     <string name="appstrings_map_filters_defaults_title">Default filters</string>
     <string name="appstrings_map_filters_defaults_desc">These settings become the map\'s default filters. The \"Active filters\" banner only appears when the map differs from them.</string>
@@ -3142,4 +3145,7 @@
     <string name="appstrings_release_v2039_android_auto">Android Auto now offers a dedicated home with a site map and nearby antennas, with clearer location and database states</string>
     <string name="appstrings_release_v2039_enb_operator_counts">The eNB database now shows eNB and gNB identifier counts grouped by operator</string>
     <string name="appstrings_release_v2039_onboarding_database_download">First launch now offers a single action to check and download all available databases</string>
+    <string name="appstrings_release_v2040_city_stats">City, department and region statistics now include public population and area references, with more useful ratios</string>
+    <string name="appstrings_release_v2040_map_filters">The active-filter banner is actionable, and map filter defaults can now be configured separately</string>
+    <string name="appstrings_release_v2040_android_auto">Android Auto map and nearby lists are more compatible, clearer and show operator icons when available</string>
 </resources>

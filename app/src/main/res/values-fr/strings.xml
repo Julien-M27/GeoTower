@@ -656,6 +656,9 @@
     <string name="appstrings_map_active_filters_except">sauf %1$s</string>
     <string name="appstrings_map_active_filters_more">+%1$d</string>
     <string name="appstrings_map_active_filters_none">aucun</string>
+    <string name="appstrings_map_active_filters_dialog_title">Filtres actifs</string>
+    <string name="appstrings_map_active_filters_dialog_message">Les filtres suivants sont actifs sur la carte. Voulez-vous les désactiver ?</string>
+    <string name="appstrings_map_active_filters_disable">Désactiver les filtres</string>
     <string name="appstrings_map_filters_defaults_menu">Filtres</string>
     <string name="appstrings_map_filters_defaults_title">Filtres par défaut</string>
     <string name="appstrings_map_filters_defaults_desc">Ces réglages deviennent les filtres par défaut de la carte. Le bandeau « Filtres actifs » n\'apparaît que lorsque la carte s\'en écarte.</string>
@@ -3147,4 +3150,7 @@
     <string name="appstrings_release_v2039_android_auto">Android Auto propose désormais un accueil dédié avec carte des sites et antennes proches, ainsi que des états de localisation et de base plus clairs</string>
     <string name="appstrings_release_v2039_enb_operator_counts">La base eNB affiche désormais les nombres d’identifiants eNB et gNB regroupés par opérateur</string>
     <string name="appstrings_release_v2039_onboarding_database_download">Le premier lancement propose désormais une seule action pour vérifier et télécharger toutes les bases disponibles</string>
+    <string name="appstrings_release_v2040_city_stats">Les statistiques des communes, départements et régions intègrent désormais la population, la superficie et des ratios plus utiles</string>
+    <string name="appstrings_release_v2040_map_filters">Le bandeau des filtres actifs devient interactif et les filtres par défaut de la carte sont maintenant configurables séparément</string>
+    <string name="appstrings_release_v2040_android_auto">Les cartes et listes Android Auto sont plus compatibles et lisibles, avec les icônes des opérateurs lorsqu’elles sont disponibles</string>
 </resources>

@@ -170,6 +170,28 @@ object MapFilterDefaults {
     }
 
     /**
+     * Restaure l'état courant des filtres à la référence utilisée par le bandeau.
+     * Le snapshot de défaut reste inchangé : seul l'écart temporaire est supprimé.
+     */
+    fun applyReference(prefs: SharedPreferences, reference: Reference) {
+        val editor = prefs.edit()
+        booleanFilters.forEach { filter ->
+            val value = reference.booleanValue(filter.key)
+            filter.state.value = value
+            editor.putBoolean(filter.key, value)
+        }
+        AppConfig.updateShowRadioSitesFromCategoryFilters()
+        editor.putBoolean(AppConfig.PREF_SHOW_RADIO_SITES, AppConfig.showRadioSites.value)
+        editor.apply()
+
+        AppConfig.saveSelectedOperatorKeys(prefs, reference.operatorKeys)
+        AppConfig.saveSelectedSignalQuestCoverageOperatorKeys(
+            prefs,
+            reference.signalQuestCoverageOperatorKeys
+        )
+    }
+
+    /**
      * Remet les filtres courants (carte) ET le défaut de référence aux valeurs d'usine.
      * Après appel : la carte affiche tout, et le bandeau ne s'affiche plus.
      */
@@ -214,6 +236,42 @@ object MapFilterDefaults {
             ?.toSet()
             ?.takeIf { it.isNotEmpty() }
         return stored ?: AppConfig.defaultSignalQuestCoverageOperatorKeys
+    }
+
+    private fun Reference.booleanValue(key: String): Boolean = when (key) {
+        KEY_TECHNO_2G -> frequency.show2G
+        KEY_TECHNO_3G -> frequency.show3G
+        KEY_TECHNO_4G -> frequency.show4G
+        KEY_TECHNO_5G -> frequency.show5G
+        KEY_TECHNO_FH -> frequency.showFh
+        "f2g_900" -> frequency.f2G900
+        "f2g_1800" -> frequency.f2G1800
+        "f3g_900" -> frequency.f3G900
+        "f3g_2100" -> frequency.f3G2100
+        "f4g_700" -> frequency.f4G700
+        "f4g_800" -> frequency.f4G800
+        "f4g_900" -> frequency.f4G900
+        "f4g_1800" -> frequency.f4G1800
+        "f4g_2100" -> frequency.f4G2100
+        "f4g_2600" -> frequency.f4G2600
+        "f5g_700" -> frequency.f5G700
+        "f5g_1400" -> frequency.f5G1400
+        "f5g_2100" -> frequency.f5G2100
+        "f5g_3500" -> frequency.f5G3500
+        "f5g_4200" -> frequency.f5G4200
+        "f5g_26000" -> frequency.f5G26000
+        KEY_SITES_IN_SERVICE -> showSitesInService
+        KEY_SITES_OUT_OF_SERVICE -> showSitesOutOfService
+        AppConfig.PREF_HIDE_UNDERGROUND_SITES -> hideUndergroundSites
+        AppConfig.PREF_SHOW_ONLY_ZB_SITES -> showOnlyZbSites
+        AppConfig.PREF_SHOW_PROJECT_SITES -> showProjectSites
+        AppConfig.PREF_SHOW_RADIO_TV -> showRadioTv
+        AppConfig.PREF_SHOW_RADIO_BROADCAST -> showRadioBroadcast
+        AppConfig.PREF_SHOW_RADIO_PRIVATE_MOBILE -> showRadioPrivateMobile
+        AppConfig.PREF_SHOW_RADIO_FH -> showRadioFh
+        AppConfig.PREF_SHOW_RADIO_OTHER -> showRadioOther
+        AppConfig.PREF_SHOW_SIGNALQUEST_COVERAGE_POINTS -> showSignalQuestCoveragePoints
+        else -> error("Unknown map filter key: $key")
     }
 
     private class BooleanFilter(

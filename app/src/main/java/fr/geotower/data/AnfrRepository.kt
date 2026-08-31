@@ -1021,9 +1021,19 @@ class AnfrRepository(
      */
     suspend fun getAntennasInAdminArea(
         departmentCodes: List<String>,
-        detailBackedBandMask: Int = DETAIL_BACKED_5G_BANDS
+        detailBackedBandMask: Int = DETAIL_BACKED_5G_BANDS,
+        fallbackExtent: AdminAreaExtent? = null
     ): List<LocalisationEntity> {
         if (departmentCodes.isEmpty()) return emptyList()
+
+        // En mode API live, la base locale n'est volontairement pas consultée. Une recherche de
+        // département/région arrivée par Nominatim fournit alors une bbox de secours ; elle permet
+        // d'alimenter la fiche même sans référentiel ANFR embarqué.
+        if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_BBOX)) {
+            return fallbackExtent?.let {
+                hideHiddenSites(getLiveSitesInBox(it.latNorth, it.lonEast, it.latSouth, it.lonWest))
+            }.orEmpty()
+        }
 
         val localisations = queryLocalDatabase(emptyList<LocalisationEntity>()) {
             departmentCodes

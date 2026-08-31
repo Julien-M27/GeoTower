@@ -1708,6 +1708,7 @@ fun MapScreen(
     val sitesHs by viewModel.sitesHs.collectAsState()
     val cityStatsTechniques by viewModel.cityStatsTechniques.collectAsState()
     val isCityStatsTechniquesLoading by viewModel.isCityStatsTechniquesLoading.collectAsState()
+    val cityStatsReference by viewModel.cityStatsReference.collectAsState()
     val adminAreaOutline by viewModel.adminAreaOutline.collectAsState()
     val adminAreaStatsAntennas by viewModel.adminAreaStatsAntennas.collectAsState()
     val isAdminAreaStatsLoading by viewModel.isAdminAreaStatsLoading.collectAsState()
@@ -1730,6 +1731,7 @@ fun MapScreen(
     var currentCityPolygons by remember { mutableStateOf(decodeGeoPointPolygons(currentCityPolygonsEncoded)) }
     var currentSearchAreaBoundsEncoded by rememberSaveable { mutableStateOf<String?>(null) }
     var currentSearchAreaBounds by remember { mutableStateOf(decodeSearchAreaBounds(currentSearchAreaBoundsEncoded)) }
+    var currentCityInseeCode by rememberSaveable { mutableStateOf<String?>(null) }
     var loadedCitySearchKey by remember { mutableStateOf<String?>(null) }
     // Recherche par département / région : seul le code est mémorisé, le référentiel étant figé
     // dans l'app. L'emprise, elle, réutilise `currentSearchAreaBounds` — les deux recherches de
@@ -1738,11 +1740,16 @@ fun MapScreen(
     var loadedAdminAreaKey by remember { mutableStateOf<String?>(null) }
     val currentAdminArea = remember(currentAdminAreaCode) { decodeAdminArea(currentAdminAreaCode) }
 
-    fun setCurrentCitySearch(bounds: SearchAreaBounds?, polygons: List<List<GeoPoint>>?) {
+    fun setCurrentCitySearch(
+        bounds: SearchAreaBounds?,
+        polygons: List<List<GeoPoint>>?,
+        inseeCode: String? = null
+    ) {
         currentSearchAreaBounds = bounds
         currentSearchAreaBoundsEncoded = encodeSearchAreaBounds(bounds)
         currentCityPolygons = polygons
         currentCityPolygonsEncoded = encodeGeoPointPolygons(polygons)
+        currentCityInseeCode = inseeCode
         currentAdminAreaCode = null
         loadedAdminAreaKey = null
         if (bounds == null || polygons.isNullOrEmpty()) {
@@ -1751,7 +1758,7 @@ fun MapScreen(
     }
 
     fun setCurrentAdminAreaSearch(area: FrenchAdminAreas.Area, bounds: SearchAreaBounds) {
-        setCurrentCitySearch(bounds, null)
+        setCurrentCitySearch(bounds, null, null)
         currentAdminAreaCode = encodeAdminArea(area)
     }
 
@@ -1790,7 +1797,18 @@ fun MapScreen(
         loadedAdminAreaKey = filterKey
 
         viewModel.setAdminAreaFilter(area.departmentCodes, outlinePolygons)
-        viewModel.loadAdminAreaStats(areaCode, area.departmentCodes)
+        viewModel.loadAdminAreaStats(
+            areaKey = areaCode,
+            departmentCodes = area.departmentCodes,
+            fallbackExtent = currentSearchAreaBounds?.let { bounds ->
+                AdminAreaExtent(
+                    latNorth = bounds.latNorth,
+                    lonEast = bounds.lonEast,
+                    latSouth = bounds.latSouth,
+                    lonWest = bounds.lonWest
+                )
+            }
+        )
         return true
     }
 
@@ -1845,7 +1863,9 @@ fun MapScreen(
     val safeClick = rememberSafeClick()
 
     var showSettingsSheet by rememberSaveable { mutableStateOf(false) }
+    var showActiveFiltersDialog by rememberSaveable { mutableStateOf(false) }
     var showMapPageSettingsSheet by rememberSaveable { mutableStateOf(false) }
+    var showMapFiltersDefaultsSheet by rememberSaveable { mutableStateOf(false) }
     var showLayerSheet by rememberSaveable { mutableStateOf(false) }
     val pageSettingsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var mapViewRef by remember { mutableStateOf<MapView?>(null) }
@@ -4620,6 +4640,33 @@ fun MapScreen(
     // elle n'affiche que des regroupements, qui ne se comptent pas.
     val statsAntennas = if (currentAdminArea != null) filteredAdminAreaAntennas else filteredAntennas
     val statsLoading = if (currentAdminArea != null) isAdminAreaStatsLoading else isLoading
+    // La fiche détaillée doit rester indépendante des filtres d'affichage de la carte : elle
+    // représente toute la commune sélectionnée, comme la fiche d'un département.
+    val statsAntennasForDetail = if (currentAdminArea != null) adminAreaStatsAntennas else antennas
+
+    LaunchedEffect(
+        showCityStatsDetail,
+        currentCityInseeCode,
+        currentAdminArea?.let { "${it.kind.name}:${it.code}" },
+        statsAntennasForDetail
+    ) {
+        if (showCityStatsDetail) {
+            // La fiche d'une zone compte toutes ses stations, pas uniquement les points visibles
+            // après regroupement sur la carte. Le chargement reste asynchrone pour afficher tout de
+            // suite les supports/stations pendant que les panneaux sont détaillés.
+            viewModel.loadCityStatsTechniques(
+                statsAntennasForDetail.map { it.idAnfr }.distinct()
+            )
+            if (currentAdminArea == null) {
+                viewModel.loadCityStatsReference(currentCityInseeCode)
+            } else {
+                viewModel.loadAdminAreaStatsReference(currentAdminArea)
+            }
+        } else {
+            viewModel.clearCityStatsTechniques()
+            viewModel.clearCityStatsReference()
+        }
+    }
 
     LaunchedEffect(currentAdminAreaCode) {
         val area = currentAdminArea
@@ -5648,7 +5695,11 @@ fun MapScreen(
          * connue en base. Sans contour, donc sans découpe des sites ni encart de statistiques, mais
          * la carte va au bon endroit au lieu de ne rien faire.
          */
-        suspend fun frameGeocodedArea(locationQuery: String, fallbackInseeCode: String? = null) {
+        suspend fun frameGeocodedArea(
+            locationQuery: String,
+            fallbackInseeCode: String? = null,
+            fallbackAdminArea: FrenchAdminAreas.Area? = null
+        ) {
             val nominatimArea = NominatimApi.searchArea(locationQuery)
             if (nominatimArea != null) {
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
@@ -5663,8 +5714,12 @@ fun MapScreen(
                             polygon.map { point -> GeoPoint(point.latitude, point.longitude) }
                         }
 
-                        if (searchPolygons.isNotEmpty()) {
-                            setCurrentCitySearch(searchBounds, searchPolygons)
+                        if (fallbackAdminArea != null) {
+                            setCurrentAdminAreaSearch(fallbackAdminArea, searchBounds)
+                            refreshSearchBoundaryOverlay(map, searchPolygons.takeIf { it.isNotEmpty() })
+                            showCityStatsPopup = true
+                        } else if (searchPolygons.isNotEmpty()) {
+                            setCurrentCitySearch(searchBounds, searchPolygons, fallbackInseeCode)
                             refreshSearchBoundaryOverlay(map, searchPolygons)
                             loadCurrentCitySearchIfNeeded(force = true)
                             showCityStatsPopup = true
@@ -5691,7 +5746,7 @@ fun MapScreen(
             if (communeExtent != null) {
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                     mapViewRef?.let { map ->
-                        setCurrentCitySearch(null, null)
+                        setCurrentCitySearch(null, null, fallbackInseeCode)
                         refreshSearchBoundaryOverlay(map, null)
                         releaseLocationFollowForSearch()
                         map.zoomToBoundingBox(
@@ -5723,7 +5778,7 @@ fun MapScreen(
                             return@withContext
                         }
                         mapViewRef?.let { map ->
-                            setCurrentCitySearch(null, null)
+                            setCurrentCitySearch(null, null, null)
                             searchBoundaryOverlay.items.clear()
                             releaseLocationFollowForSearch()
                             map.controller.setZoom(15.0)
@@ -5812,7 +5867,16 @@ fun MapScreen(
                 }
 
                 // 4. Recherche de Ville / Adresse via internet (Nominatim), puis géocodeur système.
-                frameGeocodedArea(locationQuery)
+                val typedCommune = if (adminArea == null && !cleanQuery.contains(",")) {
+                    viewModel.searchCommuneSuggestions(cleanQuery, limit = 1).firstOrNull()
+                } else {
+                    null
+                }
+                frameGeocodedArea(
+                    locationQuery,
+                    fallbackInseeCode = typedCommune?.codeInsee,
+                    fallbackAdminArea = adminArea
+                )
             }
         }
 
@@ -5860,7 +5924,10 @@ fun MapScreen(
                             }
                         } else {
                             // Sans base locale (repli API live), la zone reste cadrable en ligne.
-                            frameGeocodedArea("${suggestion.area.name}, France")
+                            frameGeocodedArea(
+                                "${suggestion.area.name}, France",
+                                fallbackAdminArea = suggestion.area
+                            )
                         }
                     }
                 }
@@ -6634,6 +6701,7 @@ fun MapScreen(
             ) {
                 ActiveMapFiltersBanner(
                     summary = activeMapFilterSummary.orEmpty(),
+                    onClick = { showActiveFiltersDialog = true },
                     modifier = Modifier
                         .padding(start = sizing.spacing(88.dp), top = sizing.spacing(10.dp), end = sizing.spacing(88.dp))
                         .fillMaxWidth()
@@ -7586,6 +7654,19 @@ fun MapScreen(
             }
         }
         if (showSettingsSheet) { MapSettingsSheet(onDismiss = { showSettingsSheet = false }) }
+        if (showActiveFiltersDialog) {
+            ActiveMapFiltersDialog(
+                summary = activeMapFilterSummary.orEmpty(),
+                onDisable = {
+                    MapFilterDefaults.applyReference(
+                        prefs = prefs,
+                        reference = MapFilterDefaults.reference(prefs)
+                    )
+                    showActiveFiltersDialog = false
+                },
+                onDismiss = { showActiveFiltersDialog = false }
+            )
+        }
         if (showMapPageSettingsSheet) {
             fr.geotower.ui.screens.settings.MapSettingsSheet(
                 showLocation = showLocationBtn,
@@ -7657,9 +7738,27 @@ fun MapScreen(
                 },
                 onDismiss = { showMapPageSettingsSheet = false },
                 onBack = { showMapPageSettingsSheet = false },
+                onFiltersClick = {
+                    safeClick {
+                        showMapPageSettingsSheet = false
+                        showMapFiltersDefaultsSheet = true
+                    }
+                },
                 sheetState = pageSettingsSheetState,
                 useOneUi = uiStyle.useOneUi,
                 bubbleColor = uiStyle.bubbleColor
+            )
+        }
+        if (showMapFiltersDefaultsSheet) {
+            fr.geotower.ui.screens.settings.MapFiltersDefaultsSheet(
+                onDismiss = { showMapFiltersDefaultsSheet = false },
+                sheetState = pageSettingsSheetState,
+                onBack = {
+                    safeClick {
+                        showMapFiltersDefaultsSheet = false
+                        showMapPageSettingsSheet = true
+                    }
+                }
             )
         }
     }
@@ -7902,8 +8001,9 @@ fun MapScreen(
     }
     if (showCityStatsDetail) {
         fr.geotower.ui.components.CityStatsDetailSheet(
-            antennas = statsAntennas,
+            antennas = statsAntennasForDetail,
             techniques = cityStatsTechniques,
+            reference = cityStatsReference,
             isFrequencyStatusLoading = isCityStatsTechniquesLoading,
             // Un département couvre des centaines de communes : garder la commune dominante
             // n'y compterait qu'une fraction des sites, alors que le total en compte la totalité.
@@ -7913,10 +8013,6 @@ fun MapScreen(
             },
             onDismiss = { showCityStatsDetail = false }
         )
-    } else {
-        LaunchedEffect(showCityStatsDetail) {
-            viewModel.clearCityStatsTechniques()
-        }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -8297,10 +8393,12 @@ private fun correctLegacyAzimuthForDisplay(azimuth: Float, displayRotation: Int)
 @Composable
 private fun ActiveMapFiltersBanner(
     summary: String,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val sizing = LocalGeoTowerUiSizing.current
     Surface(
+        onClick = onClick,
         modifier = modifier,
         shape = RoundedCornerShape(18.dp),
         color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.94f),
@@ -8320,6 +8418,51 @@ private fun ActiveMapFiltersBanner(
             overflow = TextOverflow.Ellipsis
         )
     }
+}
+
+@Composable
+private fun ActiveMapFiltersDialog(
+    summary: String,
+    onDisable: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val sizing = LocalGeoTowerUiSizing.current
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface,
+        title = {
+            Text(
+                text = stringResource(R.string.appstrings_map_active_filters_dialog_title),
+                fontWeight = FontWeight.Bold,
+                style = sizing.textStyle(MaterialTheme.typography.titleLarge)
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp))) {
+                Text(
+                    text = stringResource(R.string.appstrings_map_active_filters_dialog_message),
+                    style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = summary,
+                    style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = onDisable) {
+                Text(stringResource(R.string.appstrings_map_active_filters_disable))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.appstrings_cancel))
+            }
+        }
+    )
 }
 
 /**

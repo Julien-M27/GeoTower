@@ -3,11 +3,13 @@ package fr.geotower.ui.screens.car
 import androidx.car.app.CarContext
 import androidx.car.app.Screen
 import androidx.car.app.ScreenManager
+import androidx.car.app.model.CarColor
 import androidx.car.app.model.CarIcon
 import androidx.car.app.model.GridItem
 import androidx.car.app.model.GridTemplate
 import androidx.car.app.model.ItemList
 import androidx.car.app.model.Template
+import androidx.core.graphics.drawable.IconCompat
 import fr.geotower.R
 import fr.geotower.data.AnfrRepository
 
@@ -24,7 +26,7 @@ class CarHomeScreen(
                 GridItem.Builder()
                     .setTitle(carContext.getString(R.string.car_menu_map))
                     .setText(carContext.getString(R.string.car_menu_map_description))
-                    .setImage(CarIcon.APP_ICON, GridItem.IMAGE_TYPE_ICON)
+                    .setImage(carMenuIcon(carContext, R.drawable.ic_car_map), GridItem.IMAGE_TYPE_ICON)
                     .setOnClickListener {
                         screenManager.push(CarAntennaMapScreen(carContext, repository))
                     }
@@ -34,7 +36,7 @@ class CarHomeScreen(
                 GridItem.Builder()
                     .setTitle(carContext.getString(R.string.car_menu_nearby))
                     .setText(carContext.getString(R.string.car_menu_nearby_description))
-                    .setImage(CarIcon.APP_ICON, GridItem.IMAGE_TYPE_ICON)
+                    .setImage(carMenuIcon(carContext, R.drawable.ic_place), GridItem.IMAGE_TYPE_ICON)
                     .setOnClickListener {
                         screenManager.push(CarNearbySitesScreen(carContext, repository))
                     }
@@ -48,4 +50,10 @@ class CarHomeScreen(
             .setSingleList(items)
             .build()
     }
+}
+
+private fun carMenuIcon(carContext: CarContext, drawableRes: Int): CarIcon {
+    return CarIcon.Builder(IconCompat.createWithResource(carContext, drawableRes))
+        .setTint(CarColor.PRIMARY)
+        .build()
 }

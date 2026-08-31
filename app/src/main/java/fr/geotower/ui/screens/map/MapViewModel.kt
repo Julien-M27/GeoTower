@@ -14,6 +14,9 @@ import fr.geotower.data.trip.TripStepSupport
 import fr.geotower.data.trip.groupTripStepSupports
 import fr.geotower.data.trip.tripStepSearchBox
 import fr.geotower.data.api.NominatimApi
+import fr.geotower.data.api.AdministrativeAreaReferenceApi
+import fr.geotower.data.api.CommuneReference
+import fr.geotower.data.api.CommuneReferenceApi
 import fr.geotower.data.api.SignalQuestClient
 import fr.geotower.data.api.SignalQuestOperators
 import fr.geotower.data.api.SqCoveragePointData
@@ -33,6 +36,7 @@ import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.DepartmentCodes
 import fr.geotower.utils.FrequencyFilterSelection
+import fr.geotower.utils.FrenchAdminAreas
 import fr.geotower.utils.OperatorColors
 
 /** Contour d'une zone administrative, associé au code qui l'a demandé pour éviter tout décalage. */
@@ -120,6 +124,9 @@ class MapViewModel(
     private val _isCityStatsTechniquesLoading = MutableStateFlow(false)
     val isCityStatsTechniquesLoading = _isCityStatsTechniquesLoading.asStateFlow()
 
+    private val _cityStatsReference = MutableStateFlow<CommuneReference?>(null)
+    val cityStatsReference = _cityStatsReference.asStateFlow()
+
     private val _adminAreaOutline = MutableStateFlow<AdminAreaOutline?>(null)
     val adminAreaOutline = _adminAreaOutline.asStateFlow()
 
@@ -137,6 +144,8 @@ class MapViewModel(
     private var signalQuestCoverageJob: Job? = null
     private var lastSignalQuestCoverageRequestKey: String? = null
     private var cityStatsTechniquesJob: Job? = null
+    private var cityStatsReferenceJob: Job? = null
+    private var cityStatsReferenceCode: String? = null
     private var loadedCityStatsTechniqueIds: Set<String> = emptySet()
     private val mapAzimuthTechniqueCache = mutableMapOf<String, TechniqueEntity>()
     private var cityPolygons: List<List<GeoPoint>>? = null
@@ -205,7 +214,11 @@ class MapViewModel(
      * La carte, elle, ne voit que ce qui est à l'écran : à l'échelle d'un département elle affiche
      * des regroupements, dont on ne peut rien compter de fiable.
      */
-    fun loadAdminAreaStats(areaKey: String, departmentCodes: List<String>) {
+    fun loadAdminAreaStats(
+        areaKey: String,
+        departmentCodes: List<String>,
+        fallbackExtent: AdminAreaExtent? = null
+    ) {
         if (loadedAdminAreaStatsKey == areaKey) return
 
         loadedAdminAreaStatsKey = areaKey
@@ -215,7 +228,10 @@ class MapViewModel(
         adminAreaStatsJob = viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             _isAdminAreaStatsLoading.value = true
             try {
-                _adminAreaStatsAntennas.value = repository.getAntennasInAdminArea(departmentCodes)
+                _adminAreaStatsAntennas.value = repository.getAntennasInAdminArea(
+                    departmentCodes = departmentCodes,
+                    fallbackExtent = fallbackExtent
+                )
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -618,6 +634,52 @@ class MapViewModel(
                 _isCityStatsTechniquesLoading.value = false
             }
         }
+    }
+
+    /** Charge les données publiques de population/superficie d'une commune, sans dépendre de la carte. */
+    fun loadCityStatsReference(codeInsee: String?) {
+        val normalizedCode = codeInsee?.trim()?.uppercase()?.takeIf { it.isNotBlank() }
+        if (normalizedCode == cityStatsReferenceCode) return
+
+        cityStatsReferenceCode = normalizedCode
+        cityStatsReferenceJob?.cancel()
+        if (normalizedCode == null) {
+            _cityStatsReference.value = null
+            return
+        }
+
+        _cityStatsReference.value = null
+        cityStatsReferenceJob = viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val reference = CommuneReferenceApi.get(normalizedCode)
+            if (cityStatsReferenceCode == normalizedCode) {
+                _cityStatsReference.value = reference
+            }
+        }
+    }
+
+    /** Charge le référentiel public d'un département ou d'une région pour les ratios de la fiche. */
+    fun loadAdminAreaStatsReference(area: FrenchAdminAreas.Area) {
+        val normalizedCode = area.code.trim().uppercase()
+        if (normalizedCode.isBlank()) return
+        val referenceKey = "${area.kind.name}:$normalizedCode"
+        if (referenceKey == cityStatsReferenceCode) return
+
+        cityStatsReferenceCode = referenceKey
+        cityStatsReferenceJob?.cancel()
+        _cityStatsReference.value = null
+        cityStatsReferenceJob = viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val reference = AdministrativeAreaReferenceApi.get(area)
+            if (cityStatsReferenceCode == referenceKey) {
+                _cityStatsReference.value = reference
+            }
+        }
+    }
+
+    fun clearCityStatsReference() {
+        cityStatsReferenceJob?.cancel()
+        cityStatsReferenceJob = null
+        cityStatsReferenceCode = null
+        _cityStatsReference.value = null
     }
 
     fun clearCityStatsTechniques() {
