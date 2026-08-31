@@ -4,6 +4,9 @@ import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import androidx.core.graphics.ColorUtils
+import kotlin.math.max
 
 // --- Palettes Material 3 de l'application ---
 // Ces couleurs pilotent uniquement le thème global de l'interface.
@@ -76,6 +79,59 @@ fun appStaticColorScheme(palette: AppColorPalette, darkTheme: Boolean): ColorSch
         AppColorPalette.Amber -> if (darkTheme) AmberDarkColorScheme else AmberLightColorScheme
         AppColorPalette.Graphite -> if (darkTheme) GraphiteDarkColorScheme else GraphiteLightColorScheme
         AppColorPalette.Custom -> if (darkTheme) CustomDarkColorScheme else CustomLightColorScheme
+    }
+}
+
+/**
+ * Renforce automatiquement l'accent des thèmes sombres quand Material You fournit un bleu trop
+ * profond. Les textes d'accent sont souvent posés directement sur un fond noir/OLED : une couleur
+ * qui reste correcte sur une dalle peu réfléchissante devient vite difficile à lire en extérieur.
+ *
+ * On conserve la teinte et la saturation de la palette. Seule la luminosité est relevée, et le
+ * texte utilisé sur les boutons est recalculé pour garder un contraste élevé avec le nouvel aplat.
+ */
+fun appAccessibleDarkColorScheme(colorScheme: ColorScheme, darkTheme: Boolean): ColorScheme {
+    if (!darkTheme) return colorScheme
+
+    val primaryArgb = colorScheme.primary.toArgb()
+    val primaryLuminance = ColorUtils.calculateLuminance(primaryArgb)
+    if (primaryLuminance >= DARK_PRIMARY_MIN_LUMINANCE) return colorScheme
+
+    val primary = brightenForDarkSurface(primaryArgb)
+    val onPrimary = bestContrastingColor(primary, colorScheme.onPrimary)
+    val primaryContainer = brightenForDarkSurface(colorScheme.primaryContainer.toArgb())
+    val onPrimaryContainer = bestContrastingColor(primaryContainer, colorScheme.onPrimaryContainer)
+
+    return colorScheme.copy(
+        primary = primary,
+        onPrimary = onPrimary,
+        primaryContainer = primaryContainer,
+        onPrimaryContainer = onPrimaryContainer,
+        inversePrimary = colorScheme.primary
+    )
+}
+
+private const val DARK_PRIMARY_MIN_LUMINANCE = 0.45
+private val HighContrastOnLightAccent = Color(0xFF00243A)
+
+private fun brightenForDarkSurface(colorArgb: Int): Color {
+    val hsl = FloatArray(3)
+    ColorUtils.colorToHSL(colorArgb, hsl)
+    // Relève suffisamment les bleus Material You moyens pour rester visibles sous un reflet
+    // solaire, sans transformer les accents déjà clairs des palettes statiques.
+    hsl[2] = max(hsl[2], 0.72f)
+    val brightArgb = ColorUtils.HSLToColor(hsl)
+    return Color(brightArgb)
+}
+
+private fun bestContrastingColor(background: Color, preferred: Color): Color {
+    val backgroundArgb = background.toArgb()
+    val preferredContrast = ColorUtils.calculateContrast(preferred.toArgb(), backgroundArgb)
+    val darkContrast = ColorUtils.calculateContrast(HighContrastOnLightAccent.toArgb(), backgroundArgb)
+    return if (darkContrast >= preferredContrast && darkContrast >= 4.5) {
+        HighContrastOnLightAccent
+    } else {
+        preferred
     }
 }
 

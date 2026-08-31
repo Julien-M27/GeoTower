@@ -938,7 +938,7 @@ private fun SpeedtestListCard(
                     label = stringResource(R.string.appstrings_speedtest_upload),
                     value = speedValue(speedtest.uploadSpeed),
                     unit = "Mbps",
-                    color = Color(0xFF2196F3)
+                    color = MaterialTheme.colorScheme.primary
                 )
                 SpeedtestMetric(
                     icon = Icons.Default.Timer,

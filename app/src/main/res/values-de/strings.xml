@@ -341,11 +341,11 @@
     <string name="signalquest_compressed_photo_too_large">Komprimiertes Foto ist zu groß.</string>
     <string name="car_nearby_sites">Nahegelegene Standorte</string>
     <string name="car_menu_title">GeoTower</string>
-    <string name="car_menu_map">Standortkarte</string>
-    <string name="car_menu_map_description">Standorte rund um Ihre Position anzeigen.</string>
-    <string name="car_menu_nearby">Nahegelegene Antennen</string>
-    <string name="car_menu_nearby_description">Die nächsten Standorte als Liste anzeigen.</string>
-    <string name="car_map_title">Standortkarte</string>
+    <string name="car_menu_map">Karte</string>
+    <string name="car_menu_map_description">Nahe Orte</string>
+    <string name="car_menu_nearby">In der Nähe</string>
+    <string name="car_menu_nearby_description">Nächste Orte</string>
+    <string name="car_map_title">Karte</string>
     <string name="car_map_loading">Standortkarte wird geladen...</string>
     <string name="car_sites_around_me">Standorte in meiner Nähe</string>
     <string name="car_no_sites_nearby">Kein Standort in der Nähe deiner Position gefunden.</string>
@@ -446,6 +446,7 @@
     <string name="appstrings_btn_authorize">Autorisieren</string>
     <string name="appstrings_btn_continue">Fortfahren</string>
     <string name="appstrings_btn_download_banner">Download</string>
+    <string name="appstrings_btn_update_banner">Aktualisieren</string>
     <string name="appstrings_btn_rebuild_banner">Neu erstellen</string>
     <string name="appstrings_btn_lets_go">Los geht\'s!</string>
     <string name="appstrings_btn_next">Weiter</string>
@@ -707,9 +708,9 @@
     <string name="appstrings_frequency_reference_4g_desc">LTE-Breitbandnetze</string>
     <string name="appstrings_frequency_reference_5g">5G · NR</string>
     <string name="appstrings_frequency_reference_5g_desc">5G-New-Radio-Netze</string>
-    <string name="appstrings_frequency_reference_uplink">UL:</string>
-    <string name="appstrings_frequency_reference_downlink">DL:</string>
-    <string name="appstrings_frequency_reference_shared">Gemeinsam:</string>
+    <string name="appstrings_frequency_reference_uplink">UL:\u0020</string>
+    <string name="appstrings_frequency_reference_downlink">DL:\u0020</string>
+    <string name="appstrings_frequency_reference_shared">Gemeinsam:\u0020</string>
     <string name="appstrings_frequency_reference_fdd">FDD · getrennte Uplink-/Downlink-Bänder</string>
     <string name="appstrings_frequency_reference_tdd">TDD · gemeinsames Band</string>
     <string name="appstrings_frequency_reference_sdl">SDL · nur Downlink</string>
@@ -1554,7 +1555,15 @@
     <string name="appstrings_generating_db_banner_title">Datenbank wird erstellt</string>
     <string name="appstrings_generating_db_banner_desc">Die Datenbank wird auf dem Gerät erstellt: kein Download nötig.</string>
     <string name="appstrings_db_generation_in_progress">Wird erstellt…</string>
-    <string name="appstrings_update_db_banner_title">Update verfügbar</string>
+    <string name="appstrings_update_db_banner_title">Updates verfügbar</string>
+    <plurals name="appstrings_update_db_banner_summary">
+        <item quantity="one">1 Datenbank zu aktualisieren</item>
+        <item quantity="other">%1$d Datenbanken zu aktualisieren</item>
+    </plurals>
+    <plurals name="appstrings_download_db_banner_summary">
+        <item quantity="one">1 Datenbank zum Herunterladen</item>
+        <item quantity="other">%1$d Datenbanken zum Herunterladen</item>
+    </plurals>
     <string name="appstrings_db_banner_databases">Betroffene Datenbanken: %1$s</string>
     <string name="appstrings_update_db_banner_desc_rebuild">Auf diesem Gerät wird die Datenbank durch Neuerstellen aktualisiert.</string>
     <string name="appstrings_update_notif_setting_desc">Benachrichtigen, wenn eine neue Datenbank oder APK verfügbar ist</string>
@@ -3148,4 +3157,11 @@
     <string name="appstrings_release_v2040_city_stats">Statistiken für Gemeinden, Departements und Regionen enthalten jetzt öffentliche Angaben zu Bevölkerung und Fläche sowie nützlichere Verhältnisse</string>
     <string name="appstrings_release_v2040_map_filters">Das Banner für aktive Filter ist jetzt interaktiv, und die Standardfilter der Karte lassen sich separat konfigurieren</string>
     <string name="appstrings_release_v2040_android_auto">Karten und Listen in Android Auto sind kompatibler und übersichtlicher und zeigen verfügbare Betreibersymbole</string>
+    <string name="appstrings_release_v2041_accessible_themes">Dunkle Designs bieten jetzt stärkeren Kontrast und bessere Lesbarkeit, auch im OLED-Modus</string>
+    <string name="appstrings_release_v2041_theme_colors">Status- und Speedtest-Farben folgen jetzt konsistenter dem ausgewählten App-Design</string>
+    <string name="appstrings_release_v2041_database_banner">Datenbankbanner zeigen jetzt die Anzahl der betroffenen Datenbanken sowie eine klarere Aktualisierungs- oder Download-Aktion</string>
+    <string name="appstrings_release_v2041_android_auto">Android-Auto-Beschriftungen sind kürzer und Betreibersymbole in Karten- und Näherungsansichten sauberer</string>
+    <string name="hidden_sites_anfr_id_label">ANFR-ID</string>
+    <string name="hidden_sites_hide_confirmation">Eintrag gespeichert. Sie können ihn in den Einstellungen wiederherstellen.</string>
+    <string name="hidden_sites_open_settings">Verborgene Standorte anzeigen</string>
 </resources>

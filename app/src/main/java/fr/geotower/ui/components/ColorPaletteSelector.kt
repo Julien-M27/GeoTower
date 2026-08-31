@@ -2,10 +2,8 @@ package fr.geotower.ui.components
 
 import android.content.Context
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -178,7 +176,6 @@ fun ColorPalettePickerContent(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ColorPaletteOptionCard(
     palette: AppColorPalette,
@@ -202,12 +199,11 @@ private fun ColorPaletteOptionCard(
     }
 
     Surface(
+        onClick = onClick,
         shape = shape,
         color = cardColor,
         border = cardBorder,
-        modifier = Modifier
-            .fillMaxWidth()
-            .combinedClickable(onClick = onClick)
+        modifier = Modifier.fillMaxWidth()
     ) {
         Column(
             modifier = Modifier

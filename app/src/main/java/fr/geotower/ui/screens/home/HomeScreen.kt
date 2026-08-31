@@ -69,6 +69,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -1516,29 +1517,49 @@ fun DatabaseWarningBanner(
     onDownloadClick: () -> Unit
 ) {
     val sizing = LocalGeoTowerUiSizing.current
-    val databaseNamesText = databaseNames
+    val normalizedDatabaseNames = databaseNames
         .map(String::trim)
         .filter(String::isNotEmpty)
         .distinct()
+    val databaseNamesText = normalizedDatabaseNames
         .joinToString(separator = " • ")
+    val databaseCount = normalizedDatabaseNames.size
+    val databaseSummary = when {
+        !isDownloading && isUpdateAvailable && databaseCount > 0 ->
+            pluralStringResource(R.plurals.appstrings_update_db_banner_summary, databaseCount)
+        !isDownloading && (isMissing || isInvalid) && databaseCount > 0 ->
+            pluralStringResource(R.plurals.appstrings_download_db_banner_summary, databaseCount)
+        else -> null
+    }
     androidx.compose.animation.AnimatedVisibility(
         visible = isMissing || isInvalid || isUpdateAvailable || isDownloading || isGenerating,
         enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
         exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut(),
-        // ✅ AJOUT DES MARGES (Comme pour le bandeau hors-ligne)
-        modifier = androidx.compose.ui.Modifier.fillMaxWidth().padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(8.dp))
+        modifier = androidx.compose.ui.Modifier
+            .fillMaxWidth()
+            .padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(6.dp))
     ) {
         // Une génération en cours n'est pas un problème : ni rouge, ni icône d'erreur.
         val isProblem = (isMissing || isInvalid) && !isGenerating
         val containerColor = if (isProblem) {
             androidx.compose.material3.MaterialTheme.colorScheme.errorContainer
         } else {
-            androidx.compose.material3.MaterialTheme.colorScheme.primaryContainer
+            androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.78f)
         }
         val contentColor = if (isProblem) {
             androidx.compose.material3.MaterialTheme.colorScheme.onErrorContainer
         } else {
-            androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer
+            androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+        }
+        val accentColor = if (isProblem) {
+            androidx.compose.material3.MaterialTheme.colorScheme.error
+        } else {
+            androidx.compose.material3.MaterialTheme.colorScheme.primary
+        }
+        val actionContentColor = if (isProblem) {
+            androidx.compose.material3.MaterialTheme.colorScheme.onError
+        } else {
+            androidx.compose.material3.MaterialTheme.colorScheme.onPrimary
         }
         val icon = when {
             // La régénération proposée porte la même icône que la génération elle-même : rien ne
@@ -1552,24 +1573,35 @@ fun DatabaseWarningBanner(
             onClick = onBannerClick,
             color = containerColor,
             shape = RoundedCornerShape(16.dp), // ✅ AJOUT DE LA FORME ARRONDIE
-            shadowElevation = 2.dp,            // ✅ AJOUT DE L'OMBRE
+            tonalElevation = 2.dp,
             modifier = androidx.compose.ui.Modifier.fillMaxWidth()
         ) {
-            androidx.compose.foundation.layout.Column(
+            androidx.compose.foundation.layout.Row(
                 modifier = androidx.compose.ui.Modifier
                     .fillMaxWidth()
                     .padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(12.dp)),
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
             ) {
-                androidx.compose.foundation.layout.Row(
-                    modifier = androidx.compose.ui.Modifier.fillMaxWidth(),
-                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                androidx.compose.material3.Surface(
+                    color = accentColor.copy(alpha = 0.14f),
+                    contentColor = accentColor,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = androidx.compose.ui.Modifier.size(sizing.component(40.dp))
                 ) {
                     androidx.compose.material3.Icon(
                         imageVector = icon,
                         contentDescription = null,
-                        tint = contentColor
+                        tint = accentColor,
+                        modifier = androidx.compose.ui.Modifier.padding(sizing.spacing(8.dp))
                     )
-                    androidx.compose.foundation.layout.Spacer(androidx.compose.ui.Modifier.width(sizing.component(12.dp)))
+                }
+
+                androidx.compose.foundation.layout.Spacer(androidx.compose.ui.Modifier.width(sizing.component(12.dp)))
+
+                androidx.compose.foundation.layout.Column(
+                    modifier = androidx.compose.ui.Modifier.weight(1f),
+                    verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center
+                ) {
                     androidx.compose.material3.Text(
                         text = when {
                             isGenerating -> stringResource(R.string.appstrings_generating_db_banner_title)
@@ -1580,9 +1612,47 @@ fun DatabaseWarningBanner(
                         },
                         fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
                         color = contentColor,
-                        style = androidx.compose.material3.MaterialTheme.typography.titleSmall,
-                        modifier = androidx.compose.ui.Modifier.weight(1f)
+                        style = androidx.compose.material3.MaterialTheme.typography.titleSmall
                     )
+
+                    databaseSummary?.let { summary ->
+                        androidx.compose.material3.Text(
+                            text = summary,
+                            color = contentColor,
+                            style = androidx.compose.material3.MaterialTheme.typography.bodySmall
+                        )
+                    } ?: databaseNamesText.takeIf { it.isNotBlank() }?.let { names ->
+                        androidx.compose.material3.Text(
+                            text = names,
+                            color = contentColor,
+                            style = androidx.compose.material3.MaterialTheme.typography.bodySmall
+                        )
+                    }
+
+                    if (isGenerating) {
+                        androidx.compose.material3.Text(
+                            text = stringResource(R.string.appstrings_generating_db_banner_desc),
+                            color = contentColor,
+                            style = androidx.compose.material3.MaterialTheme.typography.bodySmall
+                        )
+                    } else if (isRebuildOffer && !isDownloading) {
+                        androidx.compose.material3.Text(
+                            text = stringResource(R.string.appstrings_update_db_banner_desc_rebuild),
+                            color = contentColor,
+                            style = androidx.compose.material3.MaterialTheme.typography.bodySmall
+                        )
+                    } else if ((isMissing || isInvalid) && !isDownloading) {
+                        androidx.compose.material3.Text(
+                            text = if (isInvalid) {
+                                stringResource(R.string.appstrings_invalid_db_banner_desc)
+                            } else {
+                                stringResource(R.string.appstrings_missing_db_banner_desc)
+                            },
+                            color = contentColor,
+                            style = androidx.compose.material3.MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
 
                     if (isDownloading || isGenerating) {
                         androidx.compose.foundation.layout.Row(
@@ -1610,8 +1680,8 @@ fun DatabaseWarningBanner(
                         androidx.compose.material3.Button(
                             onClick = onDownloadClick,
                             colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                                containerColor = contentColor,
-                                contentColor = containerColor
+                                containerColor = accentColor,
+                                contentColor = actionContentColor
                             ),
                             contentPadding = androidx.compose.foundation.layout.PaddingValues(
                                 horizontal = sizing.spacing(12.dp),
@@ -1622,6 +1692,7 @@ fun DatabaseWarningBanner(
                             androidx.compose.material3.Text(
                                 text = stringResource(
                                     if (isRebuildOffer) R.string.appstrings_btn_rebuild_banner
+                                    else if (isUpdateAvailable) R.string.appstrings_btn_update_banner
                                     else R.string.appstrings_btn_download_banner
                                 ),
                                 fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
@@ -1629,46 +1700,6 @@ fun DatabaseWarningBanner(
                             )
                         }
                     }
-                }
-
-                // Les bases concernées occupent une ligne dédiée, sans être comprimées par le
-                // bouton ou l'indicateur de progression placé à droite de la première ligne.
-                if (databaseNamesText.isNotBlank()) {
-                    androidx.compose.material3.Text(
-                        text = stringResource(R.string.appstrings_db_banner_databases, databaseNamesText),
-                        color = contentColor,
-                        fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
-                        style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
-                        modifier = androidx.compose.ui.Modifier.padding(start = sizing.component(36.dp))
-                    )
-                }
-
-                if (isGenerating) {
-                    androidx.compose.material3.Text(
-                        text = stringResource(R.string.appstrings_generating_db_banner_desc),
-                        color = contentColor,
-                        style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
-                        modifier = androidx.compose.ui.Modifier.padding(start = sizing.component(36.dp))
-                    )
-                } else if (isRebuildOffer && !isDownloading) {
-                    androidx.compose.material3.Text(
-                        text = stringResource(R.string.appstrings_update_db_banner_desc_rebuild),
-                        color = contentColor,
-                        style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
-                        modifier = androidx.compose.ui.Modifier.padding(start = sizing.component(36.dp))
-                    )
-                } else if ((isMissing || isInvalid) && !isDownloading) {
-                    androidx.compose.material3.Text(
-                        text = if (isInvalid) {
-                            stringResource(R.string.appstrings_invalid_db_banner_desc)
-                        } else {
-                            stringResource(R.string.appstrings_missing_db_banner_desc)
-                        },
-                        color = contentColor,
-                        style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
-                        modifier = androidx.compose.ui.Modifier.padding(start = sizing.component(36.dp))
-                    )
-                }
             }
 
         }

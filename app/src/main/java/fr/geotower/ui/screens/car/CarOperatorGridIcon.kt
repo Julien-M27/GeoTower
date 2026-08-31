@@ -55,7 +55,9 @@ internal fun carOperatorGridIcon(context: android.content.Context, rawOperators:
             val spec = key?.let(OperatorColors::specForKey)
             val logoRes = key?.let(OperatorLogos::drawableRes)
             paint.color = when {
-                logoRes != null -> Color.WHITE
+                // Les PNG de certains opérateurs ont déjà leur propre fond. Ajouter un carré blanc
+                // ici créait une bordure visible autour des autres logos (notamment Orange/SFR).
+                logoRes != null -> Color.TRANSPARENT
                 spec != null -> withAlpha(spec.colorArgb.toInt(), 0x26)
                 else -> 0x14000000
             }

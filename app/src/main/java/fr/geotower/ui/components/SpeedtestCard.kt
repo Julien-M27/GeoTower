@@ -134,7 +134,7 @@ private fun SpeedtestCardContent(
                         label = stringResource(R.string.appstrings_speedtest_upload),
                         value = if (speedtestData.uploadSpeed != null) String.format(Locale.US, "%.1f", speedtestData.uploadSpeed) else "--",
                         unit = "Mbps",
-                        color = Color(0xFF2196F3) // Bleu
+                        color = MaterialTheme.colorScheme.primary
                     )
 
                     // Colonne : Ping (Latence)

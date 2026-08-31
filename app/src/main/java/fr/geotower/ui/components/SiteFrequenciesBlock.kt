@@ -190,7 +190,7 @@ fun SiteFrequenciesBlock(
                         val (statusColor, statusText) = when (classifyFrequencyStatus(band.status)) {
                             FrequencyStatusType.InService -> Pair(Color(0xFF4CAF50), txtInService)
                             FrequencyStatusType.TechnicallyOperational -> Pair(Color(0xFF4CAF50), txtTechnically)
-                            FrequencyStatusType.Approved -> Pair(Color(0xFF2196F3), txtProjectApproved)
+                            FrequencyStatusType.Approved -> Pair(MaterialTheme.colorScheme.primary, txtProjectApproved)
                             FrequencyStatusType.Unknown -> Pair(Color.Gray, txtUnknownStatus)
                         }
 
@@ -651,7 +651,7 @@ fun FrequenciesGridView(
                 val statusColor = when (statusType) {
                     FrequencyStatusType.InService -> Color(0xFF4CAF50)
                     FrequencyStatusType.TechnicallyOperational -> MaterialTheme.colorScheme.primary
-                    FrequencyStatusType.Approved -> Color(0xFF2196F3)
+                    FrequencyStatusType.Approved -> MaterialTheme.colorScheme.primary
                     FrequencyStatusType.Unknown -> MaterialTheme.colorScheme.onSurfaceVariant
                 }
                 val statusText = when (statusType) {

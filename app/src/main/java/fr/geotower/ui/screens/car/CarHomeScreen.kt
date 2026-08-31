@@ -24,21 +24,21 @@ class CarHomeScreen(
         val items = ItemList.Builder()
             .addItem(
                 GridItem.Builder()
-                    .setTitle(carContext.getString(R.string.car_menu_map))
-                    .setText(carContext.getString(R.string.car_menu_map_description))
-                    .setImage(carMenuIcon(carContext, R.drawable.ic_car_map), GridItem.IMAGE_TYPE_ICON)
-                    .setOnClickListener {
-                        screenManager.push(CarAntennaMapScreen(carContext, repository))
-                    }
-                    .build()
-            )
-            .addItem(
-                GridItem.Builder()
                     .setTitle(carContext.getString(R.string.car_menu_nearby))
                     .setText(carContext.getString(R.string.car_menu_nearby_description))
                     .setImage(carMenuIcon(carContext, R.drawable.ic_place), GridItem.IMAGE_TYPE_ICON)
                     .setOnClickListener {
                         screenManager.push(CarNearbySitesScreen(carContext, repository))
+                    }
+                    .build()
+            )
+            .addItem(
+                GridItem.Builder()
+                    .setTitle(carContext.getString(R.string.car_menu_map))
+                    .setText(carContext.getString(R.string.car_menu_map_description))
+                    .setImage(carMenuIcon(carContext, R.drawable.ic_car_map), GridItem.IMAGE_TYPE_ICON)
+                    .setOnClickListener {
+                        screenManager.push(CarAntennaMapScreen(carContext, repository))
                     }
                     .build()
             )

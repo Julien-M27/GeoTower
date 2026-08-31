@@ -97,6 +97,7 @@ import fr.geotower.ui.screens.map.MapViewModel
 import fr.geotower.ui.screens.map.MapViewModelFactory
 import fr.geotower.ui.theme.AppColorPalette
 import fr.geotower.ui.theme.GeoTowerUiStyleProvider
+import fr.geotower.ui.theme.appAccessibleDarkColorScheme
 import fr.geotower.ui.theme.appStaticColorScheme
 import java.io.File
 import androidx.compose.runtime.collectAsState
@@ -603,9 +604,10 @@ class MainActivity : ComponentActivity() {
                 appStaticColorScheme(selectedPalette, isDark)
             }
 
+            val accessibleColorScheme = appAccessibleDarkColorScheme(baseColorScheme, isDark)
             val colorScheme = if (isDark && isOled) {
                 // Le mode OLED reste une surcouche : il conserve l'accent choisi et force les fonds en noir pur.
-                baseColorScheme.copy(
+                accessibleColorScheme.copy(
                     background = Color.Black,
                     surface = Color.Black,
                     surfaceContainer = Color.Black,
@@ -614,7 +616,7 @@ class MainActivity : ComponentActivity() {
                     onSurface = Color.White
                 )
             } else {
-                baseColorScheme
+                accessibleColorScheme
             }
 
             GeoTowerLocaleProvider {
