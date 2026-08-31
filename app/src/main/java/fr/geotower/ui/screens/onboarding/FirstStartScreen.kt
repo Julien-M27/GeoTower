@@ -36,6 +36,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Menu
@@ -85,6 +86,7 @@ import fr.geotower.data.AnfrRepository
 import fr.geotower.data.build.LocalBuildCapability
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.db.GeoTowerDatabaseValidator
+import fr.geotower.data.workers.DatabaseBulkUpdate
 import fr.geotower.data.workers.DatabaseDownloadWorker
 import fr.geotower.data.workers.LocalDbBuildWorker
 import fr.geotower.ui.components.SafeClick
@@ -271,7 +273,11 @@ fun FirstStartScreen(
     val buildInfos by workManager.getWorkInfosForUniqueWorkFlow(LocalDbBuildWorker.UNIQUE_WORK_NAME).collectAsState(initial = emptyList())
     val currentBuild = buildInfos.firstOrNull()
     val isBuilding = currentBuild?.state == androidx.work.WorkInfo.State.RUNNING || currentBuild?.state == androidx.work.WorkInfo.State.ENQUEUED
-    val isSyncing = isDownloading || isBuilding
+    val bulkWorkInfos by workManager
+        .getWorkInfosForUniqueWorkFlow(DatabaseBulkUpdate.UNIQUE_WORK_NAME)
+        .collectAsState(initial = emptyList())
+    val isBulkUpdating = bulkWorkInfos.any { workInfo -> !workInfo.state.isFinished }
+    val isSyncing = isDownloading || isBuilding || isBulkUpdating
 
     // ✅ NOUVEAU : On détecte le passage exact de "En téléchargement" à "Terminé"
     LaunchedEffect(isSyncing) {
@@ -1415,6 +1421,13 @@ fun StepMapDesign(useOneUi: Boolean, bubbleColor: Color, onSafeClick: SafeClick)
 fun StepDatabaseDesign(useOneUi: Boolean, cardShape: Shape, cardBorder: BorderStroke?, bubbleColor: Color, onSafeClick: SafeClick) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val workManager = remember { androidx.work.WorkManager.getInstance(context) }
+    val bulkWorkInfos by workManager
+        .getWorkInfosForUniqueWorkFlow(DatabaseBulkUpdate.UNIQUE_WORK_NAME)
+        .collectAsState(initial = emptyList())
+    val isBulkUpdateRunning = bulkWorkInfos.any { workInfo -> !workInfo.state.isFinished }
+    var isCheckingBulkUpdates by remember { mutableStateOf(false) }
     // Génération locale : réservée aux appareils éligibles (RAM/stockage). Dès le 1er lancement, un
     // message « non disponible sur cet appareil » n'apporterait rien : on masque la carte.
     val buildEligibility = remember { LocalBuildCapability.evaluate(context) }
@@ -1461,6 +1474,44 @@ fun StepDatabaseDesign(useOneUi: Boolean, cardShape: Shape, cardBorder: BorderSt
         Spacer(modifier = Modifier.height(sizing.spacing(32.dp)))
 
         if (!generatesInstead) {
+            Button(
+                onClick = {
+                    onSafeClick("onboarding_database_download_all") {
+                        isCheckingBulkUpdates = true
+                        coroutineScope.launch {
+                            val result = DatabaseBulkUpdate.checkAvailableUpdates(context, workManager)
+                            if (result.targetActions.isNotEmpty()) {
+                                DatabaseBulkUpdate.enqueueDetailed(workManager, result.targetActions)
+                            }
+                            isCheckingBulkUpdates = false
+                        }
+                    }
+                },
+                enabled = !isCheckingBulkUpdates && !isBulkUpdateRunning,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(sizing.component(56.dp)),
+                shape = RoundedCornerShape(28.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                )
+            ) {
+                Icon(Icons.Default.CloudDownload, contentDescription = null)
+                Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
+                Text(
+                    text = when {
+                        isCheckingBulkUpdates -> stringResource(R.string.database_update_all_checking)
+                        isBulkUpdateRunning -> stringResource(R.string.database_update_all_running)
+                        else -> stringResource(R.string.database_download_all_action)
+                    },
+                    fontWeight = FontWeight.Bold,
+                    fontSize = sizing.text(18.sp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
+
             // 🚀 APPEL DU NOUVEAU COMPOSANT PARTAGÉ
             fr.geotower.ui.components.DatabaseDownloadCard(
                 useOneUi = useOneUi,

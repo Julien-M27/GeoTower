@@ -315,6 +315,11 @@
     <string name="appstrings_site_network_ids_about">eNB Analytics is an independent, volunteer-run project doing automated analysis of 4G and 5G networks. Its contributors record the cells they come across as they travel, through its Android application, and those readings are cross-checked against ANFR data.\n\nThe project publishes 4G and 5G maps per operator, antenna search tools, and analyses of coverage gaps and TAC areas. It covers France (including overseas territories), Monaco, Spain, Portugal, Luxembourg and Switzerland.\n\nAn independent project, unaffiliated with the operators it covers. GeoTower redistributes its eNB and gNB identifiers with its permission.</string>
     <string name="enb_database_download_action">Download identifiers</string>
     <string name="enb_database_row_count">Identifiers: %1$s</string>
+    <string name="enb_database_operator_counts_title">Identifiers by operator</string>
+    <string name="enb_database_operator_count">%1$s: %2$s eNB · %3$s gNB</string>
+    <string name="enb_database_operator_column">Operator</string>
+    <string name="enb_database_enb_column">eNB</string>
+    <string name="enb_database_gnb_column">gNB</string>
     <string name="enb_database_source_attribution">Source: eNB Analytics</string>
     <string name="database_download_antennas">Download antennas</string>
     <string name="database_replace_generated_with_online">Replace phone-generated database with the online one</string>
@@ -410,6 +415,13 @@
     <string name="signalquest_jpeg_compression_failed">Unable to compress JPEG.</string>
     <string name="signalquest_compressed_photo_too_large">Compressed photo is too large.</string>
     <string name="car_nearby_sites">Nearby sites</string>
+    <string name="car_menu_title">GeoTower</string>
+    <string name="car_menu_map">Site map</string>
+    <string name="car_menu_map_description">Browse sites around your position.</string>
+    <string name="car_menu_nearby">Nearby antennas</string>
+    <string name="car_menu_nearby_description">Show the closest sites as a list.</string>
+    <string name="car_map_title">Site map</string>
+    <string name="car_map_loading">Loading the site map...</string>
     <string name="car_sites_around_me">Sites around me</string>
     <string name="car_no_sites_nearby">No site found around your position.</string>
     <string name="car_grant_permission">Allow location</string>
@@ -3152,4 +3164,8 @@
     <string name="appstrings_release_v2038_map_readability">Mini-maps now scale azimuths more naturally, keep zoom centered on the antenna and offer clearer navigation</string>
     <string name="appstrings_release_v2038_page_customization">Page customization now includes the frequency reference and improved previews for the available sections</string>
     <string name="appstrings_release_v2038_logo_theme">The GeoTower logo can now adapt its waves to the selected Material theme</string>
+    <string name="appstrings_release_section_android_auto">Android Auto</string>
+    <string name="appstrings_release_v2039_android_auto">Android Auto now offers a dedicated home with a site map and nearby antennas, with clearer location and database states</string>
+    <string name="appstrings_release_v2039_enb_operator_counts">The eNB database now shows eNB and gNB identifier counts grouped by operator</string>
+    <string name="appstrings_release_v2039_onboarding_database_download">First launch now offers a single action to check and download all available databases</string>
 </resources>

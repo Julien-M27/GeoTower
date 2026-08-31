@@ -56,7 +56,9 @@ import fr.geotower.R
 import fr.geotower.data.api.EnbDatabaseDownloader
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.db.DbOperationTimings
+import fr.geotower.data.db.EnbDatabaseOperatorCounts
 import fr.geotower.data.db.EnbDatabaseValidator
+import fr.geotower.data.db.EnbOperatorCount
 import fr.geotower.data.workers.EnbDatabaseDownloadWorker
 import fr.geotower.data.workers.OperationPauseStore
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
@@ -121,6 +123,7 @@ fun EnbDatabaseDownloadCard(
     var remoteVersionRaw by remember { mutableStateOf<String?>(null) }
     var localSourceDate by remember { mutableStateOf("") }
     var localRowCount by remember { mutableStateOf<Int?>(null) }
+    var localOperatorCounts by remember { mutableStateOf<List<EnbOperatorCount>>(emptyList()) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var refreshTrigger by remember { mutableIntStateOf(0) }
 
@@ -135,6 +138,7 @@ fun EnbDatabaseDownloadCard(
             var nextLocalVersionRaw: String? = null
             var nextSourceDate = ""
             var nextRowCount: Int? = null
+            var nextOperatorCounts = emptyList<EnbOperatorCount>()
 
             if (dbPath.exists()) {
                 val validation = EnbDatabaseValidator.validateDatabaseFile(dbPath)
@@ -144,6 +148,7 @@ fun EnbDatabaseDownloadCard(
                         nextLocalVersion = formatEnbVersion(metadata.version) ?: txtUnknown
                         nextSourceDate = formatEnbDate(metadata.sourceDate).orEmpty()
                         nextRowCount = metadata.rowCount
+                        nextOperatorCounts = EnbDatabaseOperatorCounts.read(context, dbPath, metadata.version).orEmpty()
                     } ?: run {
                         nextLocalVersion = txtInvalidDb
                     }
@@ -156,6 +161,7 @@ fun EnbDatabaseDownloadCard(
             localVersionRaw = nextLocalVersionRaw
             localSourceDate = nextSourceDate
             localRowCount = nextRowCount
+            localOperatorCounts = nextOperatorCounts
 
             remoteVersion = try {
                 val remote = EnbDatabaseDownloader.getLatestDatabaseVersion()
@@ -258,6 +264,34 @@ fun EnbDatabaseDownloadCard(
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center
+                )
+            }
+
+            if (localOperatorCounts.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
+                Text(
+                    text = stringResource(R.string.enb_database_operator_counts_title),
+                    modifier = Modifier.fillMaxWidth(),
+                    fontSize = sizing.text(12.sp),
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Start,
+                )
+                DatabaseOperatorCountsTable(
+                    rows = localOperatorCounts.map { count ->
+                        DatabaseOperatorCountTableRow(
+                            operator = count.operator,
+                            values = listOf(
+                                "%,d".format(count.enbCount),
+                                "%,d".format(count.gnbCount),
+                            ),
+                        )
+                    },
+                    operatorHeader = stringResource(R.string.enb_database_operator_column),
+                    valueHeaders = listOf(
+                        stringResource(R.string.enb_database_enb_column),
+                        stringResource(R.string.enb_database_gnb_column),
+                    ),
                 )
             }
 

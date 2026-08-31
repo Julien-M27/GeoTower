@@ -1,12 +1,6 @@
 package fr.geotower.ui.screens.car
 
 import android.Manifest
-import android.annotation.SuppressLint
-import android.content.Context
-import android.content.pm.PackageManager
-import android.location.Location
-import android.location.LocationManager
-import android.os.SystemClock
 import androidx.car.app.CarContext
 import androidx.car.app.Screen
 import androidx.car.app.ScreenManager
@@ -17,34 +11,20 @@ import androidx.car.app.model.MessageTemplate
 import androidx.car.app.model.Row
 import androidx.car.app.model.Template
 import androidx.car.app.constraints.ConstraintManager
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import fr.geotower.R
 import fr.geotower.data.AnfrRepository
-import fr.geotower.data.db.GeoTowerDatabaseValidator
-import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.utils.AppFileLog
-import fr.geotower.utils.LocationHelper
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 
 /** Repli si l'hôte ne répond pas : valeur d'Android Auto (`content_limit_list` de car-app). */
 private const val DEFAULT_LIST_CONTENT_LIMIT = 6
-
-/**
- * Attente maximale d'un point GPS frais avant de se rabattre sur la dernière position connue.
- *
- * Assez long pour laisser un récepteur de voiture accrocher au démarrage, assez court pour qu'un
- * échec ne bloque pas l'écran racine.
- */
-private const val LOCATION_TIMEOUT_MS = 8_000L
 
 class CarNearbySitesScreen(
     carContext: CarContext,
@@ -52,6 +32,7 @@ class CarNearbySitesScreen(
 ) : Screen(carContext) {
 
     private val screenScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val sitesLoader = CarNearbySitesLoader(carContext, repository)
     private var state: NearbySitesState = NearbySitesState.Loading
 
     init {
@@ -60,7 +41,7 @@ class CarNearbySitesScreen(
             // accordée ailleurs — typiquement dans les réglages du téléphone pendant une session
             // Android Auto. Sans ça, l'écran reste bloqué sur « autorisation absente ».
             override fun onStart(owner: LifecycleOwner) {
-                if (state == NearbySitesState.MissingLocationPermission && hasLocationPermission()) {
+                if (state == NearbySitesState.MissingLocationPermission && hasCarLocationPermission(carContext)) {
                     loadNearbySites()
                 }
             }
@@ -104,36 +85,13 @@ class CarNearbySitesScreen(
 
         screenScope.launch {
             try {
-                if (!hasLocationPermission()) {
-                    carLog("Sites proches : permission de localisation absente")
-                    state = NearbySitesState.MissingLocationPermission
-                    invalidate()
-                    return@launch
-                }
-
-                val location = getCarLocation()
-                if (location == null) {
-                    carLog("Sites proches : aucune position disponible")
-                    state = NearbySitesState.Error(carContext.getString(R.string.car_location_unavailable))
-                    invalidate()
-                    return@launch
-                }
-
-                val sites = withContext(Dispatchers.IO) {
-                    val antennas = repository.getNearest100(location.latitude, location.longitude)
-                    antennas.toCarSiteListItems(location).take(25)
-                }
-
-                carLog("Sites proches : ${sites.size} site(s) prêts à être affichés")
-                // Liste vide : dire POURQUOI. Sans base installée, le dépôt renvoie une liste vide
-                // sans lever d'erreur, et « aucun site autour de vous » était faux et sans issue —
-                // c'est l'état que rencontre toute première utilisation, la seule qui compte ici.
-                // La vérification n'a lieu que sur liste vide : le repli API live sert des résultats
-                // sans base valide, et l'annoncer manquante serait tout aussi faux.
-                state = when {
-                    sites.isNotEmpty() -> NearbySitesState.Loaded(sites)
-                    !hasUsableDatabase() -> NearbySitesState.DatabaseMissing
-                    else -> NearbySitesState.Empty
+                state = when (val result = sitesLoader.load()) {
+                    CarSitesLoadResult.Loading -> NearbySitesState.Loading
+                    CarSitesLoadResult.MissingLocationPermission -> NearbySitesState.MissingLocationPermission
+                    CarSitesLoadResult.Empty -> NearbySitesState.Empty
+                    CarSitesLoadResult.DatabaseMissing -> NearbySitesState.DatabaseMissing
+                    is CarSitesLoadResult.Error -> NearbySitesState.Error(result.message)
+                    is CarSitesLoadResult.Loaded -> NearbySitesState.Loaded(result.sites)
                 }
                 invalidate()
             } catch (error: CancellationException) {
@@ -267,91 +225,6 @@ class CarNearbySitesScreen(
         return builder.build()
     }
 
-    private suspend fun hasUsableDatabase(): Boolean = withContext(Dispatchers.IO) {
-        GeoTowerDatabaseValidator.getInstalledDatabaseStatus(carContext).state ==
-            GeoTowerDatabaseValidator.LocalDatabaseState.VALID
-    }
-
-    private fun hasLocationPermission(): Boolean {
-        return ContextCompat.checkSelfPermission(carContext, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
-            ContextCompat.checkSelfPermission(carContext, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-    }
-
-    /**
-     * Position de référence, avec une attente bornée.
-     *
-     * `getCurrentLocation()` demande un point frais en haute précision et ne passe aucun jeton
-     * d'annulation : rien ne le borne côté client. Tant que cette recherche partait d'un appui
-     * volontaire, l'attente restait le problème de l'utilisateur ; depuis que la liste est l'écran
-     * racine, elle démarre à l'ouverture de la session — un démarrage à froid sans fix (parking
-     * couvert, voiture qui vient d'être démarrée) laissait l'accueil sur « recherche en cours »
-     * sans limite ni moyen d'en sortir.
-     *
-     * Passé [LOCATION_TIMEOUT_MS], on se rabat sur la dernière position connue ; s'il n'y en a pas,
-     * l'écran bascule sur « position indisponible », qui propose au moins de réessayer.
-     */
-    @SuppressLint("MissingPermission")
-    private suspend fun getCarLocation(): Location? {
-        val startedAt = SystemClock.elapsedRealtime()
-        val fresh = withTimeoutOrNull(LOCATION_TIMEOUT_MS) {
-            LocationHelper(carContext).getCurrentLocation()
-        }
-        if (fresh != null) return fresh
-
-        carLog("Position : aucun point frais en ${SystemClock.elapsedRealtime() - startedAt} ms, repli sur la dernière connue")
-        // Repli hors thread principal : getProviders/getLastKnownLocation sont des appels binder,
-        // et ce chemin s'exécute désormais pendant la création de la session.
-        val known = withContext(Dispatchers.IO) { getLastKnownLocation() }
-        if (known != null) {
-            val ageMinutes = (System.currentTimeMillis() - known.time) / 60_000
-            carLog("Position : dernière position connue retenue (ancienneté $ageMinutes min)")
-        }
-        return known
-    }
-
-    @SuppressLint("MissingPermission")
-    private fun getLastKnownLocation(): Location? {
-        val locationManager = carContext.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-        return locationManager.getProviders(true)
-            .mapNotNull { provider -> locationManager.getLastKnownLocation(provider) }
-            .maxByOrNull { it.time }
-    }
-
-    private suspend fun List<LocalisationEntity>.toCarSiteListItems(location: Location): List<CarSiteListItem> {
-        return groupBy {
-            "${java.lang.String.format(java.util.Locale.US, "%.4f", it.latitude)}_${java.lang.String.format(java.util.Locale.US, "%.4f", it.longitude)}"
-        }
-            .map { (_, antennas) ->
-                val main = antennas.first()
-                val distance = calculateCarDistance(
-                    location.latitude,
-                    location.longitude,
-                    main.latitude,
-                    main.longitude
-                )
-                val technique = repository.getTechniqueDetails(main.idAnfr)
-                val siteTitle = carContext.getString(R.string.site_anfr_title, main.idAnfr)
-                val fullAddress = technique?.adresse?.takeIf { it.isNotBlank() } ?: siteTitle
-                val splitIndex = fullAddress.lastIndexOf(",")
-                val title = if (splitIndex > 0) fullAddress.substring(0, splitIndex).trim() else fullAddress
-                val subtitle = if (splitIndex > 0) fullAddress.substring(splitIndex + 1).trim() else siteTitle
-                val operators = antennas
-                    .flatMap { it.operatorSummary(carContext).split(", ") }
-                    .distinct()
-                    .joinToString(", ")
-
-                CarSiteListItem(
-                    idAnfr = main.idAnfr,
-                    title = title,
-                    subtitle = subtitle,
-                    operators = operators,
-                    distanceMeters = distance,
-                    latitude = main.latitude,
-                    longitude = main.longitude
-                )
-            }
-            .sortedBy { it.distanceMeters }
-    }
 }
 
 private sealed interface NearbySitesState {
