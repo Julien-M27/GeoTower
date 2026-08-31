@@ -3164,4 +3164,5 @@
     <string name="hidden_sites_anfr_id_label">ID ANFR</string>
     <string name="hidden_sites_hide_confirmation">Entrada guardada. Puedes restaurarla desde Ajustes.</string>
     <string name="hidden_sites_open_settings">Ver sitios ocultos</string>
+    <string name="appstrings_release_v2042_database_count">Corregida la cantidad de bases mostrada en los avisos de actualización y descarga</string>
 </resources>

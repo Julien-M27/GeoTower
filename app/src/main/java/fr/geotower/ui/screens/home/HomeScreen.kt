@@ -1526,9 +1526,17 @@ fun DatabaseWarningBanner(
     val databaseCount = normalizedDatabaseNames.size
     val databaseSummary = when {
         !isDownloading && isUpdateAvailable && databaseCount > 0 ->
-            pluralStringResource(R.plurals.appstrings_update_db_banner_summary, databaseCount)
+            pluralStringResource(
+                R.plurals.appstrings_update_db_banner_summary,
+                databaseCount,
+                databaseCount
+            )
         !isDownloading && (isMissing || isInvalid) && databaseCount > 0 ->
-            pluralStringResource(R.plurals.appstrings_download_db_banner_summary, databaseCount)
+            pluralStringResource(
+                R.plurals.appstrings_download_db_banner_summary,
+                databaseCount,
+                databaseCount
+            )
         else -> null
     }
     androidx.compose.animation.AnimatedVisibility(

@@ -3166,4 +3166,5 @@
     <string name="appstrings_release_v2041_theme_colors">Les couleurs des statuts et des speedtests suivent désormais plus fidèlement le thème choisi</string>
     <string name="appstrings_release_v2041_database_banner">Les bandeaux des bases indiquent désormais le nombre de bases concernées et proposent une action de mise à jour ou de téléchargement plus claire</string>
     <string name="appstrings_release_v2041_android_auto">Les libellés Android Auto sont plus courts et les icônes opérateur plus propres dans les vues carte et proximité</string>
+    <string name="appstrings_release_v2042_database_count">Correction de l’affichage du nombre de bases dans les bandeaux de mise à jour et de téléchargement</string>
 </resources>

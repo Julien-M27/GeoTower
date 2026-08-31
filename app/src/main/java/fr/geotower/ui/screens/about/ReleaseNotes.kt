@@ -31,17 +31,8 @@ internal data class ReleaseNoteItem(
  */
 @Composable
 internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
-    section(stringResource(R.string.appstrings_release_section_interface)) {
-        item(stringResource(R.string.appstrings_release_v2041_accessible_themes))
-        item(stringResource(R.string.appstrings_release_v2041_theme_colors))
-    }
-
     section(stringResource(R.string.appstrings_release_section_database)) {
-        item(stringResource(R.string.appstrings_release_v2041_database_banner))
-    }
-
-    section(stringResource(R.string.appstrings_release_section_android_auto)) {
-        item(stringResource(R.string.appstrings_release_v2041_android_auto))
+        item(stringResource(R.string.appstrings_release_v2042_database_count))
     }
 }
 

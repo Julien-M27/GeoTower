@@ -3164,4 +3164,5 @@
     <string name="hidden_sites_anfr_id_label">ID ANFR</string>
     <string name="hidden_sites_hide_confirmation">Elemento salvato. Puoi ripristinarlo dalle impostazioni.</string>
     <string name="hidden_sites_open_settings">Visualizza siti nascosti</string>
+    <string name="appstrings_release_v2042_database_count">Corretta la visualizzazione del numero di database nei banner di aggiornamento e download</string>
 </resources>
