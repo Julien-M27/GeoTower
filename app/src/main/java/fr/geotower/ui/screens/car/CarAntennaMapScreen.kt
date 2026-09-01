@@ -132,6 +132,10 @@ class CarAntennaMapScreen(
 
         val items = ItemList.Builder()
         shownSites.forEachIndexed { index, site ->
+            // PlaceListMapTemplate réutilise le PlaceMarker comme repère de la carte ET de la
+            // liste. L'API interdit donc d'ajouter une image d'opérateurs à cette même Row ; le
+            // bouton « Antennes » ouvre CarNearbySitesScreen, où les logos sont affichés comme
+            // dans l'écran téléphone.
             val place = Place.Builder(CarLocation.create(site.latitude, site.longitude))
                 .setMarker(antennaPlaceMarker(site, index))
                 .build()
@@ -231,8 +235,11 @@ class CarAntennaMapScreen(
             val markerIcon = CarIcon.Builder(
                 IconCompat.createWithBitmap(markerDrawable.bitmap)
             ).build()
+            // TYPE_IMAGE est rendu par l'hôte dans un cartouche blanc avec pointe (visible sur
+            // Android Auto). Le bitmap est déjà transparent autour du dessin : TYPE_ICON permet
+            // à l'hôte de conserver l'antenne directement comme contenu du marqueur.
             PlaceMarker.Builder()
-                .setIcon(markerIcon, PlaceMarker.TYPE_IMAGE)
+                .setIcon(markerIcon, PlaceMarker.TYPE_ICON)
                 .build()
         }.onFailure {
             AppFileLog.e(CAR_LOG_TAG, "Impossible de dessiner le marqueur antenne ${site.idAnfr}", it)

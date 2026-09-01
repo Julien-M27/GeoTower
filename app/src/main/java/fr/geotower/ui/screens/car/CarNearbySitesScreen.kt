@@ -126,13 +126,7 @@ class CarNearbySitesScreen(
                 Row.Builder()
                     .setImage(carOperatorGridIcon(carContext, site.operators), Row.IMAGE_TYPE_LARGE)
                     .setTitle(site.title)
-                    .addText(
-                        carContext.getString(
-                            R.string.car_site_distance_operators,
-                            formatCarDistance(site.distanceMeters),
-                            site.operators
-                        )
-                    )
+                    .addText(formatCarDistance(site.distanceMeters))
                     .addText(site.subtitle)
                     .setOnClickListener {
                         screenManager.push(CarSiteDetailScreen(carContext, site))

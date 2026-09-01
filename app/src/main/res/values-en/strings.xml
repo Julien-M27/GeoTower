@@ -361,7 +361,6 @@
     <string name="car_address">Address</string>
     <string name="car_coordinates">Coordinates</string>
     <string name="car_navigate">Navigate</string>
-    <string name="car_site_distance_operators">%1$s - %2$s</string>
     <string name="car_error_title">GeoTower error</string>
     <string name="site_anfr_title">Site ANFR %1$s</string>
     <string name="widget_title">Nearby antennas</string>
@@ -3171,7 +3170,7 @@
     <string name="appstrings_release_v2042_database_count">Fixed the database count shown in update and download banners</string>
     <string name="appstrings_release_v2043_database">Corrected database update labels and counts</string>
     <string name="appstrings_release_v2043_android_auto">Improved Android Auto resilience for map and location permissions</string>
-    <string name="appstrings_release_v2044_car_map_details">Android Auto groups nearby sites and shows distance, address, operators and cleaner icons</string>
-    <string name="appstrings_release_v2044_car_location_fallback">Nearby searches can use the last known location when a fresh position is unavailable</string>
-    <string name="appstrings_release_v2044_car_resilience">Improved handling of permissions, invalid coordinates and Android Auto host errors</string>
+    <string name="appstrings_release_v2045_car_map_markers">Android Auto now displays antenna markers on the map with clearer icons</string>
+    <string name="appstrings_release_v2045_car_nearby_results">Nearby results are cleaner: distance and operator logos without duplicated text</string>
+    <string name="appstrings_release_v2045_car_host_interactions">Map and list interactions are more reliable within Android Auto host constraints</string>
 </resources>

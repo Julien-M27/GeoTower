@@ -361,7 +361,6 @@
     <string name="car_address">Endereço</string>
     <string name="car_coordinates">Coordenadas</string>
     <string name="car_navigate">Navegar</string>
-    <string name="car_site_distance_operators">%1$s - %2$s</string>
     <string name="car_error_title">Erro do GeoTower</string>
     <string name="site_anfr_title">Site ANFR %1$s</string>
     <string name="widget_title">Antenas próximas</string>
@@ -3171,7 +3170,7 @@
     <string name="appstrings_release_v2042_database_count">Corrigida a apresentação do número de bases nos avisos de atualização e transferência</string>
     <string name="appstrings_release_v2043_database">Corrigidos os textos e contadores das atualizações das bases</string>
     <string name="appstrings_release_v2043_android_auto">O Android Auto gere melhor os erros do mapa e as permissões de localização</string>
-    <string name="appstrings_release_v2044_car_map_details">O Android Auto agrupa os sites próximos e mostra distância, morada, operadores e ícones melhorados</string>
-    <string name="appstrings_release_v2044_car_location_fallback">As pesquisas próximas podem usar a última localização conhecida quando a posição atual não está disponível</string>
-    <string name="appstrings_release_v2044_car_resilience">Melhor gestão de permissões, coordenadas inválidas e erros do anfitrião Android Auto</string>
+    <string name="appstrings_release_v2045_car_map_markers">O Android Auto mostra agora as antenas no mapa com ícones mais claros</string>
+    <string name="appstrings_release_v2045_car_nearby_results">Os resultados próximos estão mais claros: distância e logótipos dos operadores sem texto duplicado</string>
+    <string name="appstrings_release_v2045_car_host_interactions">As interações do mapa e da lista são mais fiáveis dentro das limitações do anfitrião Android Auto</string>
 </resources>
