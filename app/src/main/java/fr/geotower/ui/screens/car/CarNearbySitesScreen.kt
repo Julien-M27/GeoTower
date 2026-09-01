@@ -124,7 +124,7 @@ class CarNearbySitesScreen(
         shownSites.forEach { site ->
             itemListBuilder.addItem(
                 Row.Builder()
-                    .setImage(carOperatorGridIcon(carContext, site.operators))
+                    .setImage(carOperatorGridIcon(carContext, site.operators), Row.IMAGE_TYPE_LARGE)
                     .setTitle(site.title)
                     .addText(
                         carContext.getString(

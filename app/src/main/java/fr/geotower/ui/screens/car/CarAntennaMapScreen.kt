@@ -9,6 +9,7 @@ import androidx.car.app.constraints.ConstraintManager
 import androidx.car.app.model.Action
 import androidx.car.app.model.ActionStrip
 import androidx.car.app.model.CarLocation
+import androidx.car.app.model.CarIcon
 import androidx.car.app.model.Distance
 import androidx.car.app.model.DistanceSpan
 import androidx.car.app.model.ItemList
@@ -20,11 +21,14 @@ import androidx.car.app.model.PlaceListMapTemplate
 import androidx.car.app.model.PlaceMarker
 import androidx.car.app.model.Row
 import androidx.car.app.model.Template
+import androidx.core.graphics.drawable.IconCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import fr.geotower.R
 import fr.geotower.data.AnfrRepository
 import fr.geotower.utils.AppFileLog
+import fr.geotower.utils.AppConfig
+import fr.geotower.utils.MapUtils
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -127,9 +131,9 @@ class CarAntennaMapScreen(
         carLog("Carte : ${sites.size} site(s) trouvé(s), ${shownSites.size} marqueur(s) affiché(s)")
 
         val items = ItemList.Builder()
-        shownSites.forEach { site ->
+        shownSites.forEachIndexed { index, site ->
             val place = Place.Builder(CarLocation.create(site.latitude, site.longitude))
-                .setMarker(PlaceMarker.Builder().setLabel("A").build())
+                .setMarker(antennaPlaceMarker(site, index))
                 .build()
             val row = Row.Builder()
                 .setTitle(titleWithDistance(site))
@@ -181,7 +185,7 @@ class CarAntennaMapScreen(
         val items = ItemList.Builder()
         sites.take(hostLimit).forEach { site ->
             val row = Row.Builder()
-                    .setImage(carOperatorGridIcon(carContext, site.operators))
+                    .setImage(carOperatorGridIcon(carContext, site.operators), Row.IMAGE_TYPE_LARGE)
                     .setTitle(titleWithDistance(site))
                     .setOnClickListener {
                         screenManager.push(CarSiteDetailScreen(carContext, site))
@@ -209,6 +213,32 @@ class CarAntennaMapScreen(
             Spannable.SPAN_INCLUSIVE_INCLUSIVE
         )
         return title
+    }
+
+    /** Réutilise le dessin des marqueurs de la carte téléphone, y compris les secteurs azimutés. */
+    private fun antennaPlaceMarker(site: CarSiteListItem, index: Int): PlaceMarker {
+        if (site.antennas.isEmpty()) {
+            return PlaceMarker.Builder().setLabel((index + 1).toString()).build()
+        }
+
+        return runCatching {
+            val markerDrawable = MapUtils.createAdaptiveMarker(
+                context = carContext,
+                siteAntennas = site.antennas,
+                showAzimuths = true,
+                defaultOp = AppConfig.defaultOperator.value
+            )
+            val markerIcon = CarIcon.Builder(
+                IconCompat.createWithBitmap(markerDrawable.bitmap)
+            ).build()
+            PlaceMarker.Builder()
+                .setIcon(markerIcon, PlaceMarker.TYPE_IMAGE)
+                .build()
+        }.onFailure {
+            AppFileLog.e(CAR_LOG_TAG, "Impossible de dessiner le marqueur antenne ${site.idAnfr}", it)
+        }.getOrElse {
+            PlaceMarker.Builder().setLabel((index + 1).toString()).build()
+        }
     }
 
     private fun distanceForTemplate(distanceMeters: Float): Distance {

@@ -15,10 +15,10 @@ import fr.geotower.utils.OperatorLogos
 import java.util.Locale
 import kotlin.math.roundToInt
 
-private const val OPERATOR_GRID_SIZE = 88
-private const val OPERATOR_GRID_GAP = 4
-private const val OPERATOR_TILE_RADIUS = 9f
-private const val OPERATOR_LOGO_INSET = 5
+private const val OPERATOR_GRID_SIZE = 224
+private const val OPERATOR_GRID_GAP = 8
+private const val OPERATOR_TILE_RADIUS = 18f
+private const val OPERATOR_LOGO_INSET = 10
 
 /**
  * Une seule image est autorisée dans une ligne Android Auto. On compose donc ici le même carré
@@ -70,7 +70,7 @@ internal fun carOperatorGridIcon(context: android.content.Context, rawOperators:
             } else if (spec != null) {
                 paint.color = spec.colorArgb.toInt()
                 paint.textAlign = Paint.Align.CENTER
-                paint.textSize = 22f
+                paint.textSize = 54f
                 paint.isFakeBoldText = true
                 canvas.drawText(
                     spec.label.take(1).uppercase(Locale.ROOT),

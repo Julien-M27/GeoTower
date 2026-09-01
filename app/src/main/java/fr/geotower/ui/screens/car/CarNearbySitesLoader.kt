@@ -92,6 +92,8 @@ internal class CarNearbySitesLoader(
     }
 
     private suspend fun List<LocalisationEntity>.toCarSiteListItems(location: Location): List<CarSiteListItem> {
+        val techniqueById = repository.getTechniqueSummariesByIds(map { it.idAnfr })
+        val siteAnfrLabel = carContext.getString(R.string.appstrings_site_anfr_label)
         return groupBy {
             "${java.lang.String.format(java.util.Locale.US, "%.4f", it.latitude)}_${java.lang.String.format(java.util.Locale.US, "%.4f", it.longitude)}"
         }
@@ -103,12 +105,11 @@ internal class CarNearbySitesLoader(
                     main.latitude,
                     main.longitude
                 )
-                val technique = repository.getTechniqueDetails(main.idAnfr)
-                val siteTitle = carContext.getString(R.string.site_anfr_title, main.idAnfr)
-                val fullAddress = technique?.adresse?.takeIf { it.isNotBlank() } ?: siteTitle
-                val splitIndex = fullAddress.lastIndexOf(",")
-                val title = if (splitIndex > 0) fullAddress.substring(0, splitIndex).trim() else fullAddress
-                val subtitle = if (splitIndex > 0) fullAddress.substring(splitIndex + 1).trim() else siteTitle
+                val fullAddress = antennas.asSequence()
+                    .mapNotNull { techniqueById[it.idAnfr]?.adresse?.trim()?.takeIf(String::isNotBlank) }
+                    .firstOrNull()
+                    ?: carContext.getString(R.string.appstrings_unknown_address)
+                val addressParts = splitCarAddress(fullAddress, main.idAnfr, siteAnfrLabel)
                 val operators = antennas
                     .flatMap { it.operatorSummary(carContext).split(", ") }
                     .distinct()
@@ -116,16 +117,38 @@ internal class CarNearbySitesLoader(
 
                 CarSiteListItem(
                     idAnfr = main.idAnfr,
-                    title = title,
-                    subtitle = subtitle,
+                    title = addressParts.title,
+                    subtitle = addressParts.subtitle,
                     operators = operators,
                     distanceMeters = distance,
                     latitude = main.latitude,
-                    longitude = main.longitude
+                    longitude = main.longitude,
+                    antennas = antennas
                 )
             }
             .sortedBy { it.distanceMeters }
     }
+
+    /** Même découpe que NearEmittersScreen : adresse devant la dernière virgule, ville derrière. */
+    private fun splitCarAddress(fullAddress: String, idAnfr: String, siteAnfrLabel: String): CarAddressParts {
+        val lastCommaIndex = fullAddress.lastIndexOf(',')
+        if (lastCommaIndex < 0) {
+            return CarAddressParts(
+                title = fullAddress,
+                subtitle = "$siteAnfrLabel: $idAnfr"
+            )
+        }
+
+        return CarAddressParts(
+            title = fullAddress.substring(0, lastCommaIndex).trim().ifBlank { fullAddress.trim() },
+            subtitle = fullAddress.substring(lastCommaIndex + 1).trim().ifBlank { "$siteAnfrLabel: $idAnfr" }
+        )
+    }
+
+    private data class CarAddressParts(
+        val title: String,
+        val subtitle: String
+    )
 }
 
 internal fun hasCarLocationPermission(carContext: CarContext): Boolean {
