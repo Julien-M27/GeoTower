@@ -7,6 +7,8 @@ import androidx.car.app.validation.HostValidator
 import fr.geotower.BuildConfig
 import fr.geotower.utils.AppFileLog
 import fr.geotower.utils.AppLogger
+import fr.geotower.utils.AppConfig
+import fr.geotower.utils.PreferenceStores
 
 class GeoTowerCarAppService : CarAppService() {
 
@@ -17,7 +19,21 @@ class GeoTowerCarAppService : CarAppService() {
         AppFileLog.init(applicationContext)
         AppFileLog.i(TAG, "Service voiture créé")
         AppLogger.i(TAG, "Car app service created")
+        loadCarDisplayPreferences()
         logHostPackages()
+    }
+
+    /**
+     * Le service peut être démarré directement par Android Auto, sans passage par MainActivity.
+     * Les écrans voiture doivent donc charger eux-mêmes les préférences déjà communes au téléphone.
+     */
+    private fun loadCarDisplayPreferences() {
+        val prefs = getSharedPreferences(PreferenceStores.APP, MODE_PRIVATE)
+        AppConfig.mapProvider.intValue = prefs.getInt("map_provider", 1)
+        AppConfig.ignStyle.intValue = prefs.getInt("ign_style", 0)
+        AppConfig.distanceUnit.intValue = prefs.getInt("distance_unit", 0)
+        AppConfig.defaultOperator.value = prefs.getString("default_operator", "Aucun") ?: "Aucun"
+        AppConfig.loadMapDisplayPreferences(prefs)
     }
 
     override fun createHostValidator(): HostValidator {

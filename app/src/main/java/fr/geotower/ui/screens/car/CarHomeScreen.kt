@@ -42,6 +42,16 @@ class CarHomeScreen(
                     }
                     .build()
             )
+            .addItem(
+                GridItem.Builder()
+                    .setTitle(carContext.getString(R.string.car_menu_settings))
+                    .setText(carContext.getString(R.string.car_menu_settings_description))
+                    .setImage(carMenuIcon(carContext, R.drawable.ic_car_map_layers), GridItem.IMAGE_TYPE_ICON)
+                    .setOnClickListener {
+                        screenManager.push(CarMapSettingsScreen(carContext))
+                    }
+                    .build()
+            )
             .build()
 
         GridTemplate.Builder()

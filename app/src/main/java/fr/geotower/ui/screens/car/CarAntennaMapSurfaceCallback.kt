@@ -48,6 +48,11 @@ internal class CarAntennaMapSurfaceCallback(
         // de surface restent valables sur écran tactile, où le bouton PAN est masqué.
     }
 
+    /** Redessine le fond après un changement de fournisseur depuis les réglages Android Auto. */
+    fun refresh() {
+        requestRender(previewFirst = true)
+    }
+
     fun updateSites(sites: List<CarSiteListItem>) {
         val first = sites.firstOrNull() ?: return
         val newData = WidgetMapData(

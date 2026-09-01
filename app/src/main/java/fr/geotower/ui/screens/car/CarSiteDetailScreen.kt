@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import androidx.car.app.CarContext
 import androidx.car.app.Screen
+import androidx.car.app.ScreenManager
 import androidx.car.app.model.Action
 import androidx.car.app.model.Pane
 import androidx.car.app.model.PaneTemplate
@@ -25,6 +26,15 @@ class CarSiteDetailScreen(
             .addRow(Row.Builder().setTitle(carContext.getString(R.string.car_distance)).addText(formatCarDistance(site.distanceMeters)).build())
             .addRow(Row.Builder().setTitle(carContext.getString(R.string.car_address)).addText(site.title).addText(site.subtitle).build())
             .addRow(Row.Builder().setTitle(carContext.getString(R.string.car_coordinates)).addText(formatCoordinates()).build())
+            .addAction(
+                Action.Builder()
+                    .setTitle(carContext.getString(R.string.car_site_more_details))
+                    .setOnClickListener {
+                        carContext.getCarService(ScreenManager::class.java)
+                            .push(CarSiteTechnicalDetailScreen(carContext, site))
+                    }
+                    .build()
+            )
             .addAction(
                 Action.Builder()
                     .setTitle(carContext.getString(R.string.car_navigate))

@@ -13,6 +13,8 @@ import fr.geotower.R
 import fr.geotower.data.AnfrRepository
 import fr.geotower.data.db.GeoTowerDatabaseValidator
 import fr.geotower.data.models.LocalisationEntity
+import fr.geotower.data.models.RadioFilterMasks
+import fr.geotower.data.models.isDeclaredActive
 import fr.geotower.utils.LocationHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -115,9 +117,50 @@ internal class CarNearbySitesLoader(
                     .flatMap { it.operatorSummary(carContext).split(", ") }
                     .distinct()
                     .joinToString(", ")
-                val supportTypes = antennas
-                    .flatMap { physiqueById[it.idAnfr].orEmpty() }
+                val techniques = antennas.mapNotNull { techniqueById[it.idAnfr] }
+                val physiques = antennas.flatMap { physiqueById[it.idAnfr].orEmpty() }
+                val supportTypes = physiques
                     .mapNotNull { it.natureSupport?.trim()?.takeIf(String::isNotBlank) }
+                    .distinct()
+                val supportDetails = physiques
+                    .map {
+                        CarSupportInfo(
+                            idSupport = it.idSupport,
+                            nature = it.natureSupport?.trim()?.takeIf(String::isNotBlank),
+                            owner = it.proprietaire?.trim()?.takeIf(String::isNotBlank),
+                            operator = it.exploitant?.trim()?.takeIf(String::isNotBlank),
+                            heightMeters = it.hauteur?.takeIf { height -> height > 0.0 },
+                            azimuthsAndTypes = it.azimutsEtTypes?.trim()?.takeIf(String::isNotBlank)
+                        )
+                    }
+                    .distinctBy {
+                        listOf(it.idSupport, it.nature, it.owner, it.operator, it.heightMeters, it.azimuthsAndTypes)
+                    }
+                val anfrIds = antennas.map { it.idAnfr }.filter(String::isNotBlank).distinct()
+                val supportIds = supportDetails.map { it.idSupport }.filter(String::isNotBlank).distinct()
+                val technicalParts = antennas.flatMap {
+                    listOfNotNull(
+                        RadioFilterMasks.techMaskToString(it.techMask).takeIf(String::isNotBlank),
+                        it.filtres,
+                        it.frequences,
+                        it.azimuts,
+                        it.azimutsFh
+                    )
+                } + techniques.flatMap {
+                    listOfNotNull(it.technologies, it.statut)
+                }
+                val technologies = extractCarTechnologies(technicalParts)
+                val statuses = (antennas.mapNotNull { it.statut } + techniques.mapNotNull { it.statut })
+                    .map { it.trim() }
+                    .filter(String::isNotBlank)
+                    .distinct()
+                val azimuths = (antennas.flatMap { listOfNotNull(it.azimuts, it.azimutsFh) } +
+                    physiques.mapNotNull { it.azimutsEtTypes })
+                    .map { it.trim() }
+                    .filter(String::isNotBlank)
+                    .distinct()
+                val frequencyDetails = techniques.mapNotNull { it.detailsFrequences?.trim() }
+                    .filter(String::isNotBlank)
                     .distinct()
 
                 CarSiteListItem(
@@ -131,7 +174,17 @@ internal class CarNearbySitesLoader(
                     userLatitude = location.latitude,
                     userLongitude = location.longitude,
                     antennas = antennas,
-                    supportTypes = supportTypes
+                    supportTypes = supportTypes,
+                    supportDetails = supportDetails,
+                    technologies = technologies,
+                    statuses = statuses,
+                    anfrIds = anfrIds,
+                    supportIds = supportIds,
+                    azimuths = azimuths,
+                    frequencyDetails = frequencyDetails,
+                    isZoneBlanche = antennas.any { it.isZb == 1 },
+                    hasUndergroundSupport = antennas.any { it.hasUndergroundSupport == 1 },
+                    isEntirelyProject = antennas.none { it.isDeclaredActive() }
                 )
             }
             .sortedBy { it.distanceMeters }
@@ -165,6 +218,21 @@ internal class CarNearbySitesLoader(
         val title: String,
         val subtitle: String
     )
+}
+
+/** Même normalisation compacte que l'écran téléphone, sans recopier le texte brut des filtres. */
+private fun extractCarTechnologies(values: List<String>): List<String> {
+    val text = values.joinToString(" ").uppercase(java.util.Locale.ROOT)
+    return buildList {
+        listOf("5G", "4G", "3G", "2G").forEach { generation ->
+            if (text.contains(generation)) add(generation)
+        }
+        if (Regex("\\bNR\\b").containsMatchIn(text) && "5G" !in this) add("5G")
+        if (Regex("\\bLTE\\b").containsMatchIn(text) && "4G" !in this) add("4G")
+        if (Regex("\\bUMTS\\b").containsMatchIn(text) && "3G" !in this) add("3G")
+        if (Regex("\\bGSM\\b").containsMatchIn(text) && "2G" !in this) add("2G")
+        if (("FH" in text || "FAISCEAU" in text) && "FH" !in this) add("FH")
+    }
 }
 
 internal fun hasCarLocationPermission(carContext: CarContext): Boolean {

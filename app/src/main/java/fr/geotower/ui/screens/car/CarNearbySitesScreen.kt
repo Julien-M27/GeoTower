@@ -127,7 +127,7 @@ class CarNearbySitesScreen(
                     .setImage(carOperatorGridIcon(carContext, site.operators), Row.IMAGE_TYPE_LARGE)
                     .setTitle(site.title)
                     .addText(formatCarDistance(site.distanceMeters))
-                    .addText(siteDescriptionLine(site))
+                    .addText(carSiteDescriptionLine(site))
                     .setOnClickListener {
                         screenManager.push(CarSiteDetailScreen(carContext, site))
                     }
@@ -213,17 +213,6 @@ class CarNearbySitesScreen(
         }
 
         return builder.build()
-    }
-
-    /** Même hiérarchie d'informations que la carte téléphone, compactée dans la seconde ligne. */
-    private fun siteDescriptionLine(site: CarSiteListItem): String {
-        val supportTypes = site.supportTypes
-            .filter { it.isNotBlank() }
-            .distinct()
-            .joinToString(" • ")
-        return listOf(supportTypes, site.subtitle.trim())
-            .filter { it.isNotBlank() }
-            .joinToString(" • ")
     }
 
 }

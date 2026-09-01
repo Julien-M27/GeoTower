@@ -168,7 +168,7 @@ class CarAntennaMapScreen(
                     .setImage(carOperatorGridIcon(carContext, site.operators), Row.IMAGE_TYPE_LARGE)
                     .setTitle(site.title)
                     .addText(formatCarDistance(site.distanceMeters))
-                    .addText(site.subtitle)
+                    .addText(carSiteDescriptionLine(site))
                     .setOnClickListener {
                         screenManager.push(CarSiteDetailScreen(carContext, site))
                     }
@@ -183,9 +183,10 @@ class CarAntennaMapScreen(
                 .setSingleList(items.build())
                 .build()
         } else {
-            // MapWithContentTemplate impose toujours un content template. Un message court garde
-            // la carte active tout en réduisant fortement l'emprise du panneau.
-            MessageTemplate.Builder(carContext.getString(R.string.car_map_list_collapsed))
+            // MapWithContentTemplate impose toujours un content template. Le caractère invisible
+            // conserve donc un template valide sans afficher le message « liste masquée » : le
+            // seul contrôle visible pour la liste est l'icône de l'ActionStrip.
+            MessageTemplate.Builder("\u200B")
                 .setTitle(carContext.getString(R.string.car_map_title))
                 .setHeaderAction(carHeaderAction())
                 .build()
@@ -209,7 +210,7 @@ class CarAntennaMapScreen(
             .setActionStrip(
                 ActionStrip.Builder()
                     .addAction(toggleSiteListAction())
-                    .addAction(mapSwitchAction())
+                    .addAction(mapSettingsAction())
                     .build()
             )
             .build()
@@ -236,21 +237,13 @@ class CarAntennaMapScreen(
             val row = Row.Builder()
                 .setTitle(site.title)
                 .addText(distanceLineWithSpan(site))
-                .addText(site.subtitle)
+                .addText(carSiteDescriptionLine(site))
                 .setMetadata(Metadata.Builder().setPlace(place).build())
                 .setOnClickListener {
                     screenManager.push(CarSiteDetailScreen(carContext, site))
                 }
             items.addItem(row.build())
         }
-
-        val mapSwitch = Action.Builder()
-            .setTitle(carContext.getString(R.string.car_sites_around_me))
-            .setOnClickListener {
-                screenManager.popToRoot()
-                screenManager.push(CarNearbySitesScreen(carContext, repository))
-            }
-            .build()
 
         return runCatching {
             PlaceListMapTemplate.Builder()
@@ -260,7 +253,7 @@ class CarAntennaMapScreen(
                 // jamais activer cette option si l'autorisation a été retirée entre deux rendus.
                 .setCurrentLocationEnabled(hasCarLocationPermission(carContext))
                 .setItemList(items.build())
-                .setActionStrip(ActionStrip.Builder().addAction(mapSwitch).build())
+                .setActionStrip(ActionStrip.Builder().addAction(mapSettingsAction()).build())
                 .build()
         }.onFailure {
             AppFileLog.e(CAR_LOG_TAG, "Echec de construction du template carte", it)
@@ -271,24 +264,25 @@ class CarAntennaMapScreen(
         }
     }
 
-    private fun mapSwitchAction(): Action {
+    private fun mapSettingsAction(): Action {
         val screenManager = carContext.getCarService(ScreenManager::class.java)
         return Action.Builder()
-            .setTitle(carContext.getString(R.string.car_sites_around_me))
+            .setTitle(carContext.getString(R.string.car_map_settings_action))
             .setOnClickListener {
-                screenManager.popToRoot()
-                screenManager.push(CarNearbySitesScreen(carContext, repository))
+                screenManager.push(
+                    CarMapSettingsScreen(carContext) {
+                        mapSurfaceCallback.refresh()
+                    }
+                )
             }
             .build()
     }
 
     private fun toggleSiteListAction(): Action {
         return Action.Builder()
-            .setTitle(
-                carContext.getString(
-                    if (siteListExpanded) R.string.car_map_hide_list else R.string.car_map_show_list
-                )
-            )
+            // Sans titre, Android Auto rend l'action comme un contrôle circulaire d'icône, ce qui
+            // évite le large bouton « Masquer/Afficher la liste » visible dans la vidéo.
+            .setIcon(CarIcon.Builder(IconCompat.createWithResource(carContext, R.drawable.ic_car_map_list)).build())
             .setOnClickListener {
                 siteListExpanded = !siteListExpanded
                 invalidate()
@@ -340,7 +334,7 @@ class CarAntennaMapScreen(
                     .setImage(carOperatorGridIcon(carContext, site.operators), Row.IMAGE_TYPE_LARGE)
                     .setTitle(site.title)
                     .addText(formatCarDistance(site.distanceMeters))
-                    .addText(site.subtitle)
+                    .addText(carSiteDescriptionLine(site))
                     .setOnClickListener {
                         screenManager.push(CarSiteDetailScreen(carContext, site))
                     }

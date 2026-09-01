@@ -75,6 +75,21 @@ internal fun formatCarDistance(distanceMeters: Float): String {
     return formatSiteDistanceMeters(distanceMeters.toDouble())
 }
 
+/**
+ * Hiérarchie commune aux lignes « proximité » du téléphone et d'Android Auto : adresse, nature
+ * du support, puis code postal/commune. Les informations complémentaires restent dans la fiche
+ * du site afin de ne pas transformer une ligne de conduite en paragraphe illisible.
+ */
+internal fun carSiteDescriptionLine(site: CarSiteListItem): String {
+    val supportTypes = site.supportTypes
+        .filter { it.isNotBlank() }
+        .distinct()
+        .joinToString(" • ")
+    return listOf(supportTypes, site.subtitle.trim())
+        .filter { it.isNotBlank() }
+        .joinToString(" • ")
+}
+
 internal fun calculateCarDistance(
     fromLatitude: Double,
     fromLongitude: Double,
