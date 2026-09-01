@@ -1,5 +1,6 @@
 package fr.geotower.ui.components
 
+import android.content.Context
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -36,10 +37,13 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
+import fr.geotower.utils.AppConfig
+import fr.geotower.utils.LocalizedDateLabels
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -63,6 +67,8 @@ fun GeoTowerDateScrollbar(
 ) {
     if (timestamps.isEmpty()) return
 
+    val context = LocalContext.current
+    val appLanguage = AppConfig.appLanguage.value
     val sizing = LocalGeoTowerUiStyle.current.sizing
     val thumbHeight = sizing.component(DATE_SCROLLBAR_THUMB_HEIGHT)
     var isDragging by remember { mutableStateOf(false) }
@@ -118,7 +124,7 @@ fun GeoTowerDateScrollbar(
     } else {
         listState.firstVisibleItemIndex
     }.coerceIn(0, timestamps.lastIndex)
-    val dayLabel = formatHistoryDay(timestamps[labelIndex])
+    val dayLabel = formatHistoryDay(context, timestamps[labelIndex], appLanguage)
 
     BoxWithConstraints(modifier = modifier.alpha(barAlpha)) {
         val thumbHeightPx = with(LocalDensity.current) { thumbHeight.toPx() }
@@ -226,7 +232,13 @@ fun GeoTowerDateScrollbar(
 
 fun formatHistoryDay(timestamp: Long): String {
     return runCatching {
-        SimpleDateFormat("d MMM yyyy", Locale.getDefault()).format(Date(timestamp))
+        SimpleDateFormat("d MMMM yyyy", Locale.getDefault()).format(Date(timestamp))
+    }.getOrDefault("-")
+}
+
+fun formatHistoryDay(context: Context, timestamp: Long, languagePreference: String? = null): String {
+    return runCatching {
+        LocalizedDateLabels.formatLongDate(context, timestamp, languagePreference)
     }.getOrDefault("-")
 }
 

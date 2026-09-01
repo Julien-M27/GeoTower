@@ -718,6 +718,7 @@
     <string name="appstrings_frequency_reference_sort_spectrum">Fréquence du spectre (du plus bas au plus haut)</string>
     <string name="appstrings_frequency_reference_sort_band">Nom de bande (B1, B2, B3…)</string>
     <string name="appstrings_frequency_reference_sort_desc">Choisissez l’ordre d’affichage des bandes dans chaque technologie.</string>
+    <string name="appstrings_frequency_reference_technology_order">Ordre des technologies</string>
     <string name="appstrings_frequency_reference_open">Ouvrir le référentiel des bandes</string>
     <string name="appstrings_frequency_reference_intro">Plages de référence des bandes radio mobiles. Une bande peut être autorisée ou utilisée différemment selon le pays, l’opérateur, le terminal et la zone.</string>
     <string name="appstrings_frequency_reference_france_tab">France</string>
@@ -3198,5 +3199,6 @@
     <string name="appstrings_release_v2042_database_count">Correction de l’affichage du nombre de bases dans les bandeaux de mise à jour et de téléchargement</string>
     <string name="appstrings_release_v2043_database">Correction des libellés et compteurs des mises à jour de bases</string>
     <string name="appstrings_release_v2043_android_auto">Android Auto gère mieux les erreurs de carte et les permissions de localisation</string>
-    <string name="appstrings_release_v2048_car_summary">Carte Android Auto plus interactive, réglages simplifiés et détails techniques des antennes</string>
+    <string name="appstrings_release_v2049_summary_localization">Meilleure gestion des dates et des langues dans toute l’application, y compris les fenêtres modales</string>
+    <string name="appstrings_release_v2049_summary_settings">Affichage 2G/3G/4G/5G personnalisable et Android Auto et téléchargements plus fiables</string>
 </resources>

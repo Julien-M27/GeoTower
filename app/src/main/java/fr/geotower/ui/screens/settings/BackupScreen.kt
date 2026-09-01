@@ -1,5 +1,6 @@
 package fr.geotower.ui.screens.settings
 
+import android.content.Context
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
@@ -60,8 +61,8 @@ import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.components.geoTowerFadingEdge
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
-import java.text.DateFormat
-import java.util.Date
+import fr.geotower.utils.AppConfig
+import fr.geotower.utils.LocalizedDateLabels
 
 /**
  * Page « Sauvegarde et restauration » : produire le fichier qui emporte les données personnelles
@@ -287,6 +288,7 @@ fun BackupScreen(navController: NavController) {
 
     importPreview?.let { preview ->
         BackupImportPreviewDialog(
+            context = context,
             preview = preview,
             selectedSections = importSections,
             onToggleSection = { section, checked ->
@@ -321,6 +323,7 @@ fun BackupScreen(navController: NavController) {
 
 @Composable
 private fun BackupImportPreviewDialog(
+    context: Context,
     preview: BackupImportPreview,
     selectedSections: Set<String>,
     onToggleSection: (String, Boolean) -> Unit,
@@ -346,7 +349,9 @@ private fun BackupImportPreviewDialog(
                         preview.deviceLabel.takeIf { it.isNotBlank() },
                         preview.appVersionName.takeIf { it.isNotBlank() }
                             ?.let { stringResource(R.string.backup_import_preview_version, it) },
-                        preview.exportedAtMillis.takeIf { it > 0L }?.let { formatBackupDate(it) }
+                        preview.exportedAtMillis.takeIf { it > 0L }?.let {
+                            formatBackupDate(context, it, AppConfig.appLanguage.value)
+                        }
                     ).joinToString(" · "),
                     style = sizing.textStyle(MaterialTheme.typography.labelSmall),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -544,5 +549,5 @@ private fun backupSectionTitleRes(section: String): Int = when (section) {
     else -> R.string.backup_section_unknown
 }
 
-private fun formatBackupDate(millis: Long): String =
-    DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(millis))
+private fun formatBackupDate(context: Context, millis: Long, languagePreference: String): String =
+    LocalizedDateLabels.formatLongDateTime(context, millis, languagePreference)

@@ -37,6 +37,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import fr.geotower.R
+import fr.geotower.ui.components.ModalSheetSystemBars
 import fr.geotower.ui.components.settingsPopupFadingEdge
 import fr.geotower.ui.screens.map.MapFiltersControls
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
@@ -80,10 +81,12 @@ fun MapFiltersDefaultsSheet(
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = bg) {
+        ModalSheetSystemBars()
         if (onBack != null) BackHandler(onBack = onBack)
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .navigationBarsPadding()
                 .settingsPopupFadingEdge(scrollState)
                 .verticalScroll(scrollState)
                 .padding(start = sizing.spacing(24.dp), end = sizing.spacing(24.dp), bottom = sizing.spacing(48.dp))
@@ -130,7 +133,7 @@ fun MapFiltersDefaultsSheet(
                     color = MaterialTheme.colorScheme.primary
                 )
             }
-            Spacer(Modifier.height(sizing.spacing(16.dp)).navigationBarsPadding())
+            Spacer(Modifier.height(sizing.spacing(16.dp)))
         }
     }
 }

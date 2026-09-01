@@ -203,6 +203,16 @@ class MainActivity : ComponentActivity() {
         const val MAP_DEEP_LINK_MAX_ZOOM = 22.0
     }
 
+    override fun attachBaseContext(newBase: Context) {
+        // API < 33 ne propose pas de locale par application. Il faut donc appliquer la langue
+        // avant la création de l'Activity, sinon les fenêtres des feuilles modales utilisent les
+        // Resources par défaut même si le contenu Compose principal est déjà traduit.
+        val preferences = newBase.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+        val language = preferences.getString("app_language", AppLocale.LANGUAGE_SYSTEM)
+            ?: AppLocale.LANGUAGE_SYSTEM
+        super.attachBaseContext(AppLocale.localizedContext(newBase, language))
+    }
+
     // 🌟 1. LE CANAL POUR LA NOTIFICATION
     private val navigateToSiteFlow = MutableSharedFlow<String>(
         replay = 0,

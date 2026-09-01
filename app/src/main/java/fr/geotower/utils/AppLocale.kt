@@ -84,9 +84,34 @@ object AppLocale {
     }
 
     fun applyApplicationLocale(context: Context, language: String) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
-
         val languageTag = languageTagForPreference(language)
+
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            // Android 7-12 ne connaissent pas les locales par application. Mettre à jour les
+            // ressources de l'Activity est indispensable ici : les Dialog/ModalBottomSheet
+            // créent une fenêtre avec ce contexte et sinon retombent sur values/ (anglais).
+            val configuration = Configuration(context.resources.configuration).apply {
+                val locales = languageTag?.let(LocaleList::forLanguageTags) ?: LocaleList.getDefault()
+                setLocales(locales)
+                setLayoutDirection(locales[0] ?: Locale.getDefault())
+            }
+
+            @Suppress("DEPRECATION")
+            context.resources.updateConfiguration(configuration, context.resources.displayMetrics)
+
+            // Les services qui construisent une fenêtre à partir de l'application peuvent
+            // conserver ses Resources plutôt que celles de l'Activity.
+            val applicationContext = context.applicationContext
+            if (applicationContext !== context) {
+                @Suppress("DEPRECATION")
+                applicationContext.resources.updateConfiguration(
+                    configuration,
+                    applicationContext.resources.displayMetrics
+                )
+            }
+            return
+        }
+
         val locales = if (languageTag == null) {
             LocaleList.getEmptyLocaleList()
         } else {

@@ -32,7 +32,8 @@ internal data class ReleaseNoteItem(
 @Composable
 internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
     section(stringResource(R.string.appstrings_release_section_android_auto)) {
-        item(stringResource(R.string.appstrings_release_v2048_car_summary))
+        item(stringResource(R.string.appstrings_release_v2049_summary_localization))
+        item(stringResource(R.string.appstrings_release_v2049_summary_settings))
     }
 }
 

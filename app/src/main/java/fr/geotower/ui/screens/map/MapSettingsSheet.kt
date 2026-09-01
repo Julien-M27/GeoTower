@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -47,6 +48,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.geotower.R
+import fr.geotower.ui.components.ModalSheetSystemBars
 import fr.geotower.ui.components.settingsPopupFadingEdge
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.db.RadioDatabaseValidator
@@ -85,9 +87,11 @@ fun MapSettingsSheet(
         scrimColor = Color.Transparent,
         dragHandle = { BottomSheetDefaults.DragHandle() }
     ) {
+        ModalSheetSystemBars()
         MapFiltersControls(
             modifier = Modifier
                 .fillMaxWidth()
+                .navigationBarsPadding()
                 .padding(horizontal = sizing.spacing(24.dp))
                 .settingsPopupFadingEdge(scrollState)
                 .verticalScroll(scrollState)

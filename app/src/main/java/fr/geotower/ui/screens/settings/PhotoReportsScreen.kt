@@ -1,5 +1,6 @@
 package fr.geotower.ui.screens.settings
 
+import android.content.Context
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -51,8 +52,8 @@ import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.components.geoTowerFadingEdge
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
-import java.text.DateFormat
-import java.util.Date
+import fr.geotower.utils.AppConfig
+import fr.geotower.utils.LocalizedDateLabels
 
 /**
  * Page « Mes signalements » : ce que l'utilisateur a signalé à SignalQuest, et où ça en est.
@@ -164,6 +165,7 @@ private fun PhotoReportRow(
     entry: PhotoReportHistoryEntry,
     onDelete: () -> Unit
 ) {
+    val context = LocalContext.current
     val sizing = LocalGeoTowerUiStyle.current.sizing
     val removed = entry.status == PhotoReportHistoryStore.STATUS_REMOVED
 
@@ -210,7 +212,7 @@ private fun PhotoReportRow(
                 val subtitle = listOfNotNull(
                     entry.operatorLabel?.takeIf { it.isNotBlank() },
                     entry.siteId.takeIf { it.isNotBlank() },
-                    formatReportDate(entry.createdAtMillis)
+                    formatReportDate(context, entry.createdAtMillis, AppConfig.appLanguage.value)
                 ).joinToString(" · ")
                 Text(
                     text = subtitle,
@@ -230,8 +232,8 @@ private fun PhotoReportRow(
     }
 }
 
-private fun formatReportDate(millis: Long): String =
-    DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(millis))
+private fun formatReportDate(context: Context, millis: Long, languagePreference: String): String =
+    LocalizedDateLabels.formatLongDate(context, millis, languagePreference)
 
 private fun photoReportReasonLabelRes(reason: String): Int = when (reason) {
     SignalQuestPhotoReportReasons.WRONG_LOCATION -> R.string.appstrings_photo_report_reason_wrong_location

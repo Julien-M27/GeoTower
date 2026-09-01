@@ -16,7 +16,7 @@ import java.util.Locale
  */
 fun defaultTripName(context: Context, millis: Long, locale: Locale): String = context.getString(
     R.string.trips_default_name_pattern,
-    DateFormat.getDateInstance(DateFormat.MEDIUM, locale).format(Date(millis))
+    DateFormat.getDateInstance(DateFormat.LONG, locale).format(Date(millis))
 )
 
 /**

@@ -70,6 +70,82 @@ object LocalizedDateLabels {
         return "$date\n$timeAtLabel $time"
     }
 
+    /** Format court date + heure dans la langue choisie dans GeoTower, pas celle du système. */
+    fun formatShortDateTime(
+        context: Context,
+        millis: Long,
+        languagePreference: String? = null
+    ): String {
+        val locale = localeFor(context, languagePreference)
+
+        // Sur Android 7, les données ICU de certaines images système peuvent conserver un
+        // indicateur AM/PM même pour la locale française (selon le réglage 12/24 h du téléphone).
+        // La convention française attendue par l'application est toujours une heure sur 24 h.
+        if (locale.language == Locale.FRENCH.language) {
+            return SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.FRANCE)
+                .format(java.util.Date(millis))
+        }
+
+        return DateFormat.getDateTimeInstance(
+            DateFormat.SHORT,
+            DateFormat.SHORT,
+            locale
+        ).format(java.util.Date(millis))
+    }
+
+    /** Format court d'une date dans la langue choisie dans GeoTower, pas celle du système. */
+    fun formatShortDate(
+        context: Context,
+        millis: Long,
+        languagePreference: String? = null
+    ): String {
+        val locale = localeFor(context, languagePreference)
+        return if (locale.language == Locale.FRENCH.language) {
+            SimpleDateFormat("dd/MM/yyyy", Locale.FRANCE).format(java.util.Date(millis))
+        } else {
+            DateFormat.getDateInstance(DateFormat.SHORT, locale).format(java.util.Date(millis))
+        }
+    }
+
+    /** Format long d'une date, avec le nom complet du mois. */
+    fun formatLongDate(
+        context: Context,
+        millis: Long,
+        languagePreference: String? = null
+    ): String {
+        val locale = localeFor(context, languagePreference)
+        return if (locale.language == Locale.FRENCH.language) {
+            SimpleDateFormat("d MMMM yyyy", Locale.FRANCE).format(java.util.Date(millis))
+        } else {
+            DateFormat.getDateInstance(DateFormat.LONG, locale).format(java.util.Date(millis))
+        }
+    }
+
+    /** Format long d'une date et d'une heure, avec le nom complet du mois. */
+    fun formatLongDateTime(
+        context: Context,
+        millis: Long,
+        languagePreference: String? = null
+    ): String {
+        val locale = localeFor(context, languagePreference)
+        return if (locale.language == Locale.FRENCH.language) {
+            SimpleDateFormat("d MMMM yyyy HH:mm", Locale.FRANCE).format(java.util.Date(millis))
+        } else {
+            DateFormat.getDateTimeInstance(
+                DateFormat.LONG,
+                DateFormat.SHORT,
+                locale
+            ).format(java.util.Date(millis))
+        }
+    }
+
+    private fun localeFor(context: Context, languagePreference: String?): Locale {
+        return languagePreference
+            ?.let(AppLocale::languageTagForPreference)
+            ?.let(Locale::forLanguageTag)
+            ?: context.currentLocale()
+    }
+
     /**
      * Horodatage ISO 8601 produit par le serveur (« 2026-08-02T04:15:00Z » pour les sites HS,
      * « 2026-07-24T02:15:00+00:00 » pour la base eNB) -> millisecondes, 0 si absent ou illisible.

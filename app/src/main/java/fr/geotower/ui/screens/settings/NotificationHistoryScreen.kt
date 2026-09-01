@@ -86,7 +86,6 @@ import fr.geotower.data.notifications.NotificationHistoryEntry
 import fr.geotower.data.notifications.NotificationHistoryStore
 import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.components.PageScrollEdgeButtons
-import fr.geotower.ui.components.formatHistoryDay
 import fr.geotower.ui.components.formatHistoryDateTime
 import fr.geotower.ui.components.formatHistoryStorageBytes
 import fr.geotower.ui.components.geoTowerLazyListFadingEdge
@@ -95,6 +94,7 @@ import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppNotifications
+import fr.geotower.utils.LocalizedDateLabels
 import fr.geotower.utils.PageScrollPrefs
 import fr.geotower.utils.PreferenceStores
 
@@ -246,6 +246,7 @@ fun NotificationHistoryScreen(
 
     val themeMode by AppConfig.themeMode
     val isOled by AppConfig.isOledMode
+    val appLanguage = AppConfig.appLanguage.value
     val isDark = themeMode == 2 || (themeMode == 0 && isSystemInDarkTheme())
     val pageColor = if (isDark && isOled) Color.Black else MaterialTheme.colorScheme.background
     val cardColor = if (AppConfig.useOneUiDesign) {
@@ -413,8 +414,14 @@ fun NotificationHistoryScreen(
                     }
 
                     itemsIndexed(visibleItems, key = { _, item -> item.id }) { index, item ->
-                        val day = formatHistoryDay(item.createdAtMillis)
-                        val previousDay = visibleItems.getOrNull(index - 1)?.createdAtMillis?.let(::formatHistoryDay)
+                        val day = LocalizedDateLabels.formatLongDate(
+                            context,
+                            item.createdAtMillis,
+                            appLanguage
+                        )
+                        val previousDay = visibleItems.getOrNull(index - 1)?.createdAtMillis?.let {
+                            LocalizedDateLabels.formatLongDate(context, it, appLanguage)
+                        }
                         if (index == 0 || day != previousDay) {
                             Text(
                                 text = day,

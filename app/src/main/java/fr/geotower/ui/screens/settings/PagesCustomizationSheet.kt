@@ -124,6 +124,7 @@ import kotlin.math.roundToInt
 import androidx.compose.runtime.mutableIntStateOf
 import fr.geotower.ui.screens.emitters.loadElevationProfileIncludeObstacles
 import fr.geotower.ui.screens.emitters.saveElevationProfileIncludeObstacles
+import fr.geotower.ui.screens.emitters.FrequencyReferenceTechnology
 import fr.geotower.utils.AboutPagePrefs
 import fr.geotower.utils.DepartmentStatsPreferences
 import fr.geotower.utils.HomePrefs
@@ -195,6 +196,14 @@ object FrequencyReferencePagePreferences {
     const val SORT_BAND = "band"
     const val DEFAULT_SORT_ORDER = SORT_SPECTRUM
 
+    const val TECHNOLOGY_ORDER = "page_frequency_reference_technology_order"
+    const val TECHNOLOGY_2G_VISIBLE = "page_frequency_reference_2g_visible"
+    const val TECHNOLOGY_3G_VISIBLE = "page_frequency_reference_3g_visible"
+    const val TECHNOLOGY_4G_VISIBLE = "page_frequency_reference_4g_visible"
+    const val TECHNOLOGY_5G_VISIBLE = "page_frequency_reference_5g_visible"
+    val DEFAULT_TECHNOLOGY_ORDER = listOf("2G", "3G", "4G", "5G")
+    val TECHNOLOGY_IDS = DEFAULT_TECHNOLOGY_ORDER
+
     fun normalizeSortOrder(value: String?): String = when (value) {
         SORT_BAND -> SORT_BAND
         else -> SORT_SPECTRUM
@@ -208,7 +217,54 @@ object FrequencyReferencePagePreferences {
     }
 
     fun reset(prefs: SharedPreferences) {
-        write(prefs, DEFAULT_SORT_ORDER)
+        prefs.edit()
+            .putString(SORT_ORDER, DEFAULT_SORT_ORDER)
+            .putString(TECHNOLOGY_ORDER, DEFAULT_TECHNOLOGY_ORDER.joinToString(","))
+            .putBoolean(TECHNOLOGY_2G_VISIBLE, true)
+            .putBoolean(TECHNOLOGY_3G_VISIBLE, true)
+            .putBoolean(TECHNOLOGY_4G_VISIBLE, true)
+            .putBoolean(TECHNOLOGY_5G_VISIBLE, true)
+            .apply()
+    }
+
+    fun normalizeTechnologyOrder(values: List<String>): List<String> {
+        val normalized = values
+            .map { it.trim().uppercase() }
+            .filter { it in TECHNOLOGY_IDS }
+            .distinct()
+        return normalized + TECHNOLOGY_IDS.filterNot { it in normalized }
+    }
+
+    fun readTechnologyOrder(prefs: SharedPreferences): List<String> {
+        val stored = prefs.getString(TECHNOLOGY_ORDER, null)
+            ?.split(",")
+            ?: DEFAULT_TECHNOLOGY_ORDER
+        return normalizeTechnologyOrder(stored)
+    }
+
+    fun writeTechnologyOrder(prefs: SharedPreferences, value: List<String>) {
+        prefs.edit()
+            .putString(TECHNOLOGY_ORDER, normalizeTechnologyOrder(value).joinToString(","))
+            .apply()
+    }
+
+    fun technologyVisibilityKey(technologyId: String): String? = when (technologyId.uppercase()) {
+        "2G" -> TECHNOLOGY_2G_VISIBLE
+        "3G" -> TECHNOLOGY_3G_VISIBLE
+        "4G" -> TECHNOLOGY_4G_VISIBLE
+        "5G" -> TECHNOLOGY_5G_VISIBLE
+        else -> null
+    }
+
+    fun readVisibleTechnologies(prefs: SharedPreferences): Set<String> =
+        TECHNOLOGY_IDS.filter { technologyId ->
+            prefs.getBoolean(requireNotNull(technologyVisibilityKey(technologyId)), true)
+        }.toSet()
+
+    fun writeTechnologyVisibility(prefs: SharedPreferences, technologyId: String, visible: Boolean) {
+        technologyVisibilityKey(technologyId)?.let { key ->
+            prefs.edit().putBoolean(key, visible).apply()
+        }
     }
 }
 
@@ -347,6 +403,10 @@ fun FrequencyReferenceSettingsSheet(
     sortOrder: String,
     onSortOrderChange: (String) -> Unit,
     onReset: () -> Unit,
+    technologyOrder: List<String>,
+    visibleTechnologies: Set<String>,
+    onTechnologyOrderChange: (List<String>) -> Unit,
+    onTechnologyVisibilityChange: (String, Boolean) -> Unit,
     onDismiss: () -> Unit,
     onBack: () -> Unit,
     sheetState: SheetState,
@@ -419,6 +479,79 @@ fun FrequencyReferenceSettingsSheet(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.fillMaxWidth().padding(top = sizing.spacing(8.dp))
             )
+
+            Spacer(Modifier.height(sizing.spacing(20.dp)))
+            Text(
+                text = stringResource(R.string.appstrings_frequency_reference_technology_order),
+                style = sizing.textStyle(MaterialTheme.typography.titleMedium),
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Text(
+                text = stringResource(R.string.appstrings_drag_to_reorder_hint),
+                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth().padding(top = sizing.spacing(4.dp)),
+                textAlign = TextAlign.Center
+            )
+
+            val technologyDragState = rememberReorderableDragState(
+                items = technologyOrder,
+                itemHeight = sizing.component(52.dp),
+                onOrderChange = onTechnologyOrderChange
+            )
+            Spacer(Modifier.height(sizing.spacing(8.dp)))
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            ) {
+                Column(modifier = Modifier.padding(sizing.spacing(12.dp))) {
+                    technologyOrder.forEach { technologyId ->
+                        val technology = FrequencyReferenceTechnology.entries.firstOrNull { it.id == technologyId }
+                            ?: return@forEach
+                        key(technologyId) {
+                            val isDragged = technologyDragState.isDragged(technologyId)
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .zIndex(if (isDragged) 1f else 0f)
+                                    .graphicsLayer {
+                                        translationY = if (isDragged) technologyDragState.offsetFor(technologyId) else 0f
+                                        scaleX = if (isDragged) 1.02f else 1f
+                                        scaleY = if (isDragged) 1.02f else 1f
+                                    }
+                                    .background(
+                                        if (isDragged) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
+                                        RoundedCornerShape(sizing.component(8.dp))
+                                    )
+                                    .then(technologyDragState.dragModifier(technologyId))
+                                    .padding(vertical = sizing.spacing(4.dp), horizontal = sizing.spacing(4.dp))
+                            ) {
+                                Icon(
+                                    Icons.Default.DragHandle,
+                                    contentDescription = stringResource(R.string.appstrings_move),
+                                    modifier = Modifier.size(sizing.component(20.dp)),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                )
+                                Text(
+                                    text = stringResource(technology.titleRes),
+                                    modifier = Modifier.weight(1f).padding(start = sizing.spacing(12.dp)),
+                                    style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
+                                    fontWeight = if (isDragged) FontWeight.Bold else FontWeight.Normal
+                                )
+                                fr.geotower.ui.components.GeoTowerSwitch(
+                                    checked = technologyId in visibleTechnologies,
+                                    onCheckedChange = { onTechnologyVisibilityChange(technologyId, it) },
+                                    modifier = Modifier.scale(if (useOneUi) 0.85f else 0.8f),
+                                    useOneUi = useOneUi,
+                                    checkedColor = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    }
+                }
+            }
 
             Spacer(Modifier.height(sizing.spacing(16.dp)))
             PageScrollAidsCards(

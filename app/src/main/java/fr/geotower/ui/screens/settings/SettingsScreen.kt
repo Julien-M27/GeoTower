@@ -8,6 +8,7 @@ import android.net.Uri
 import android.provider.Settings
 import android.widget.ImageView
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
@@ -283,6 +284,7 @@ fun SettingsScreen(
     targetOfflineMapFilename: String? = null
 ) {
     val context = LocalContext.current
+    val activity = LocalActivity.current
     val configuration = LocalConfiguration.current
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
@@ -711,6 +713,12 @@ fun SettingsScreen(
     var pageSiteMiniMapMode by remember { mutableStateOf(MiniMapViewMode.fromStorageKey(prefs.getString(SitePagePrefs.MINI_MAP_MODE, null))) }
     var pageFrequencyReferenceSortOrder by remember {
         mutableStateOf(FrequencyReferencePagePreferences.read(prefs))
+    }
+    var pageFrequencyReferenceTechnologyOrder by remember {
+        mutableStateOf(FrequencyReferencePagePreferences.readTechnologyOrder(prefs))
+    }
+    var pageFrequencyReferenceVisibleTechnologies by remember {
+        mutableStateOf(FrequencyReferencePagePreferences.readVisibleTechnologies(prefs))
     }
     var pageThroughputOrder by remember {
         mutableStateOf(ThroughputPrefs.blockOrder(prefs))
@@ -1790,7 +1798,7 @@ fun SettingsScreen(
                 onSelect = { nouvelleLangue ->
                     appLanguage = nouvelleLangue
                     AppConfig.appLanguage.value = nouvelleLangue
-                    AppLocale.applyApplicationLocale(context, nouvelleLangue)
+                    AppLocale.applyApplicationLocale(activity ?: context, nouvelleLangue)
                     prefs.edit().putString("app_language", nouvelleLangue).apply()
                 },
                 onDismiss = { showLanguageSheet = false },
@@ -2265,7 +2273,22 @@ fun SettingsScreen(
                 },
                 onReset = {
                     pageFrequencyReferenceSortOrder = FrequencyReferencePagePreferences.DEFAULT_SORT_ORDER
+                    pageFrequencyReferenceTechnologyOrder = FrequencyReferencePagePreferences.DEFAULT_TECHNOLOGY_ORDER
+                    pageFrequencyReferenceVisibleTechnologies = FrequencyReferencePagePreferences.TECHNOLOGY_IDS.toSet()
                     FrequencyReferencePagePreferences.reset(prefs)
+                },
+                technologyOrder = pageFrequencyReferenceTechnologyOrder,
+                visibleTechnologies = pageFrequencyReferenceVisibleTechnologies,
+                onTechnologyOrderChange = { newOrder ->
+                    val normalized = FrequencyReferencePagePreferences.normalizeTechnologyOrder(newOrder)
+                    pageFrequencyReferenceTechnologyOrder = normalized
+                    FrequencyReferencePagePreferences.writeTechnologyOrder(prefs, normalized)
+                },
+                onTechnologyVisibilityChange = { technologyId, visible ->
+                    pageFrequencyReferenceVisibleTechnologies = pageFrequencyReferenceVisibleTechnologies.toMutableSet().apply {
+                        if (visible) add(technologyId) else remove(technologyId)
+                    }
+                    FrequencyReferencePagePreferences.writeTechnologyVisibility(prefs, technologyId, visible)
                 },
                 onDismiss = { showFrequencyReferenceSettingsSheet = false },
                 onBack = { safeClick { showFrequencyReferenceSettingsSheet = false } },
@@ -4100,7 +4123,8 @@ fun SectionDatabase(
                     border = border,
                     bubbleColor = bubbleColor,
                     title = stringResource(R.string.settings_database_online_title),
-                    refreshState = refreshState
+                    refreshState = refreshState,
+                    disableDownloadAction = updateAllButtonBusy
                 )
             }
 
@@ -4114,7 +4138,8 @@ fun SectionDatabase(
                     shape = shape,
                     border = border,
                     bubbleColor = bubbleColor,
-                    refreshState = refreshState
+                    refreshState = refreshState,
+                    disableDownloadAction = updateAllButtonBusy
                 )
             }
 
@@ -4130,7 +4155,8 @@ fun SectionDatabase(
                     shape = shape,
                     border = border,
                     bubbleColor = bubbleColor,
-                    refreshState = refreshState
+                    refreshState = refreshState,
+                    disableDownloadAction = updateAllButtonBusy
                 )
             }
 

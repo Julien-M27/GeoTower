@@ -41,11 +41,10 @@ import fr.geotower.data.outages.labelRes
 import fr.geotower.data.workers.OutageBackgroundScheduler
 import fr.geotower.data.workers.OutageGenerationWorker
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
+import fr.geotower.utils.AppConfig
+import fr.geotower.utils.LocalizedDateLabels
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.text.DateFormat
-import java.util.Date
-import java.util.Locale
 
 /**
  * Action et état de la récupération LOCALE des pannes : verrou « base ANFR manquante », bouton
@@ -214,9 +213,11 @@ fun OutageLocalGenerationControls(modifier: Modifier = Modifier) {
         }
 
         val lastText = if (lastGenerated > 0L) {
-            val formatted = DateFormat
-                .getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT, Locale.getDefault())
-                .format(Date(lastGenerated))
+            val formatted = LocalizedDateLabels.formatShortDateTime(
+                context,
+                lastGenerated,
+                AppConfig.appLanguage.value
+            )
             stringResource(R.string.outage_source_last_generated, formatted)
         } else {
             stringResource(R.string.outage_source_never)

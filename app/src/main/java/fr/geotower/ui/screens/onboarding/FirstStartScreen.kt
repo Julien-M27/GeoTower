@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.widget.ImageView
+import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -241,6 +242,7 @@ fun FirstStartScreen(
     }
 
     val context = LocalContext.current
+    val activity = LocalActivity.current
     val prefs = remember { context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE) }
     val defaultOperator by AppConfig.defaultOperator // Récupération de l'opérateur actuel
 
@@ -621,7 +623,7 @@ fun FirstStartScreen(
             onSelect = { nouvelleLangue ->
                 appLanguage = nouvelleLangue
                 AppConfig.appLanguage.value = nouvelleLangue
-                AppLocale.applyApplicationLocale(context, nouvelleLangue)
+                AppLocale.applyApplicationLocale(activity ?: context, nouvelleLangue)
                 prefs.edit().putString("app_language", nouvelleLangue).apply()
             },
             onDismiss = { showLanguageSheet = false },

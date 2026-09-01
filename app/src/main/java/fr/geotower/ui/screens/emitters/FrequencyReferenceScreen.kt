@@ -73,14 +73,15 @@ private enum class FrequencyReferenceScope {
     INTERNATIONAL
 }
 
-private enum class FrequencyReferenceTechnology(
+enum class FrequencyReferenceTechnology(
+    val id: String,
     val titleRes: Int,
     val descriptionRes: Int
 ) {
-    GSM_2G(R.string.appstrings_frequency_reference_2g, R.string.appstrings_frequency_reference_2g_desc),
-    UMTS_3G(R.string.appstrings_frequency_reference_3g, R.string.appstrings_frequency_reference_3g_desc),
-    LTE_4G(R.string.appstrings_frequency_reference_4g, R.string.appstrings_frequency_reference_4g_desc),
-    NR_5G(R.string.appstrings_frequency_reference_5g, R.string.appstrings_frequency_reference_5g_desc)
+    GSM_2G("2G", R.string.appstrings_frequency_reference_2g, R.string.appstrings_frequency_reference_2g_desc),
+    UMTS_3G("3G", R.string.appstrings_frequency_reference_3g, R.string.appstrings_frequency_reference_3g_desc),
+    LTE_4G("4G", R.string.appstrings_frequency_reference_4g, R.string.appstrings_frequency_reference_4g_desc),
+    NR_5G("5G", R.string.appstrings_frequency_reference_5g, R.string.appstrings_frequency_reference_5g_desc)
 }
 
 private enum class FrequencyReferenceDuplex {
@@ -280,6 +281,12 @@ fun FrequencyReferenceScreen(navController: NavController) {
     var sortOrder by rememberSaveable {
         mutableStateOf(FrequencyReferencePagePreferences.read(prefs))
     }
+    var technologyOrder by remember {
+        mutableStateOf(FrequencyReferencePagePreferences.readTechnologyOrder(prefs))
+    }
+    var visibleTechnologies by remember {
+        mutableStateOf(FrequencyReferencePagePreferences.readVisibleTechnologies(prefs))
+    }
     var showSettingsSheet by rememberSaveable { mutableStateOf(false) }
     val settingsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = if (selectedTab == 0) FrequencyReferenceScope.FRANCE else FrequencyReferenceScope.INTERNATIONAL
@@ -402,9 +409,11 @@ fun FrequencyReferenceScreen(navController: NavController) {
                     fontWeight = FontWeight.Bold
                 )
 
-                FrequencyReferenceTechnology.entries.forEach { technology ->
+                technologyOrder.forEach { technologyId ->
+                    val technology = FrequencyReferenceTechnology.entries.firstOrNull { it.id == technologyId }
+                        ?: return@forEach
                     val technologyBands = bands.filter { it.technology == technology }
-                    if (technologyBands.isNotEmpty()) {
+                    if (technologyId in visibleTechnologies && technologyBands.isNotEmpty()) {
                         FrequencyTechnologyCard(
                             technology = technology,
                             bands = technologyBands,
@@ -436,7 +445,22 @@ fun FrequencyReferenceScreen(navController: NavController) {
             },
             onReset = {
                 sortOrder = FrequencyReferencePagePreferences.DEFAULT_SORT_ORDER
+                technologyOrder = FrequencyReferencePagePreferences.DEFAULT_TECHNOLOGY_ORDER
+                visibleTechnologies = FrequencyReferencePagePreferences.TECHNOLOGY_IDS.toSet()
                 FrequencyReferencePagePreferences.reset(prefs)
+            },
+            technologyOrder = technologyOrder,
+            visibleTechnologies = visibleTechnologies,
+            onTechnologyOrderChange = { newOrder ->
+                val normalized = FrequencyReferencePagePreferences.normalizeTechnologyOrder(newOrder)
+                technologyOrder = normalized
+                FrequencyReferencePagePreferences.writeTechnologyOrder(prefs, normalized)
+            },
+            onTechnologyVisibilityChange = { technologyId, visible ->
+                visibleTechnologies = visibleTechnologies.toMutableSet().apply {
+                    if (visible) add(technologyId) else remove(technologyId)
+                }
+                FrequencyReferencePagePreferences.writeTechnologyVisibility(prefs, technologyId, visible)
             },
             onDismiss = { showSettingsSheet = false },
             onBack = { showSettingsSheet = false },

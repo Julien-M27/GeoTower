@@ -62,12 +62,10 @@ import fr.geotower.data.outages.OutageTechRow
 import fr.geotower.data.outages.ServerOutageCache
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppConfig
+import fr.geotower.utils.LocalizedDateLabels
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.text.DateFormat
-import java.util.Date
-import java.util.Locale
 
 /** Ce que la carte sait de la copie conservée : lu d'un coup, hors du fil principal. */
 private data class ServerOutageSummary(
@@ -243,7 +241,11 @@ private fun OutageServerCopySection(
         },
         label = stringResource(R.string.outage_download_server_data),
         value = when {
-            summary.serverGeneratedAtMillis > 0L -> formatOutageDateTime(summary.serverGeneratedAtMillis)
+            summary.serverGeneratedAtMillis > 0L -> LocalizedDateLabels.formatShortDateTime(
+                context,
+                summary.serverGeneratedAtMillis,
+                AppConfig.appLanguage.value
+            )
             summary.serverDate != "-" -> summary.serverDate
             else -> txtNever
         },
@@ -261,7 +263,11 @@ private fun OutageServerCopySection(
         },
         label = stringResource(R.string.outage_download_local_copy),
         value = if (summary.hasCopy && summary.downloadedAtMillis > 0L) {
-            formatOutageDateTime(summary.downloadedAtMillis)
+            LocalizedDateLabels.formatShortDateTime(
+                context,
+                summary.downloadedAtMillis,
+                AppConfig.appLanguage.value
+            )
         } else {
             stringResource(R.string.outage_download_no_copy)
         },
@@ -502,6 +508,3 @@ private fun techBreakdownOrBackfill(
     if (rebuilt.isNotEmpty()) OutageServerInfo.recordTechBreakdown(prefs, rebuilt)
     return rebuilt
 }
-
-private fun formatOutageDateTime(millis: Long): String =
-    DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT, Locale.getDefault()).format(Date(millis))

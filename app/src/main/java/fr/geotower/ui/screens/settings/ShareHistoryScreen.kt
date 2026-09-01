@@ -231,6 +231,7 @@ fun ShareHistoryScreen(
 
     val themeMode by AppConfig.themeMode
     val isOled by AppConfig.isOledMode
+    val appLanguage = AppConfig.appLanguage.value
     val isDark = themeMode == 2 || (themeMode == 0 && isSystemInDarkTheme())
     val pageColor = if (isDark && isOled) Color.Black else MaterialTheme.colorScheme.background
     val cardColor = if (AppConfig.useOneUiDesign) {
@@ -366,8 +367,10 @@ fun ShareHistoryScreen(
                     }
 
                     itemsIndexed(visibleItems, key = { _, item -> item.id }) { index, item ->
-                        val day = formatHistoryDay(item.createdAtMillis)
-                        val previousDay = visibleItems.getOrNull(index - 1)?.createdAtMillis?.let(::formatHistoryDay)
+                        val day = formatHistoryDay(context, item.createdAtMillis, appLanguage)
+                        val previousDay = visibleItems.getOrNull(index - 1)?.createdAtMillis?.let {
+                            formatHistoryDay(context, it, appLanguage)
+                        }
                         if (index == 0 || day != previousDay) {
                             Text(
                                 text = day,

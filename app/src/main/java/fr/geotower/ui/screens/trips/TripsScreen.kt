@@ -262,7 +262,7 @@ fun TripsScreen(
                             distanceUnit = distanceUnit,
                             dateFormat = remember(configuration) {
                                 DateFormat.getDateTimeInstance(
-                                    DateFormat.MEDIUM,
+                                    DateFormat.LONG,
                                     DateFormat.SHORT,
                                     configuration.locales[0]
                                 )

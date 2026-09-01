@@ -12,12 +12,13 @@ import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.drawable.BitmapDrawable
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import androidx.core.graphics.ColorUtils
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.MapUtils
 import fr.geotower.utils.OperatorColors
-import fr.geotower.utils.isNetworkAvailable
 import org.mapsforge.map.android.graphics.AndroidGraphicFactory
 import org.mapsforge.map.rendertheme.InternalRenderTheme
 import org.osmdroid.mapsforge.MapsForgeTileSource
@@ -367,9 +368,18 @@ object AntennaMapWidgetRenderer {
             for (tileXRaw in startTileX..endTileX) {
                 val tileX = floorMod(tileXRaw, tilesPerAxis)
                 val tileBitmap = loadTile(context, source, viewport.zoom, tileX, tileY) ?: continue
-                val dstLeft = (tileXRaw * TILE_SIZE - sourceOriginX).toFloat()
-                val dstTop = (tileY * TILE_SIZE - sourceOriginY).toFloat()
-                sourceCanvas.drawBitmap(tileBitmap, dstLeft, dstTop, tilePaint)
+                try {
+                    val dstLeft = (tileXRaw * TILE_SIZE - sourceOriginX).toFloat()
+                    val dstTop = (tileY * TILE_SIZE - sourceOriginY).toFloat()
+                    sourceCanvas.drawBitmap(tileBitmap, dstLeft, dstTop, tilePaint)
+                } finally {
+                    // Les tuiles réseau/cache sont décodées pour ce rendu uniquement. Les tuiles
+                    // MapsForge appartiennent en revanche au moteur MapsForge et ne doivent pas
+                    // être recyclées ici.
+                    if (source.mapsForgeTileSource == null && !tileBitmap.isRecycled) {
+                        tileBitmap.recycle()
+                    }
+                }
                 drawn++
             }
         }
@@ -399,6 +409,9 @@ object AntennaMapWidgetRenderer {
         val tileFile = File(context.cacheDir, "widget_tiles/${source.cacheKey}/$zoom/$x/$y.png")
         if (tileFile.isFile) {
             BitmapFactory.decodeFile(tileFile.absolutePath)?.let { return it }
+            // Une ancienne réponse HTTP (HTML d'erreur, réponse vide…) a pu être enregistrée
+            // avec l'extension PNG. La supprimer permet de retenter proprement le téléchargement.
+            runCatching { tileFile.delete() }
         }
 
         source.mapsForgeTileSource?.let { mapsForgeSource ->
@@ -419,14 +432,25 @@ object AntennaMapWidgetRenderer {
                 connectTimeout = 2500
                 readTimeout = 3500
                 instanceFollowRedirects = true
+                useCaches = true
+                doInput = true
                 setRequestProperty("User-Agent", "${context.packageName} GeoTower widget")
+                setRequestProperty("Accept", "image/png,image/jpeg,image/*;q=0.8")
             }
-            connection.inputStream.use { input ->
-                val bytes = input.readBytes()
-                if (bytes.isEmpty()) return@runCatching null
-                tileFile.parentFile?.mkdirs()
-                tileFile.writeBytes(bytes)
-                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+            try {
+                val responseCode = connection.responseCode
+                if (responseCode !in 200..299) return@runCatching null
+                connection.inputStream.use { input ->
+                    val bytes = input.readBytes()
+                    if (bytes.isEmpty()) return@runCatching null
+                    val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                        ?: return@runCatching null
+                    tileFile.parentFile?.mkdirs()
+                    FileOutputStream(tileFile).use { output -> output.write(bytes) }
+                    bitmap
+                }
+            } finally {
+                connection.disconnect()
             }
         }.getOrNull()
     }
@@ -755,7 +779,7 @@ object AntennaMapWidgetRenderer {
     }
 
     private fun tileSourceFor(context: Context, mapProvider: Int, ignStyle: Int): WidgetTileSource {
-        if (!isNetworkAvailable(context)) {
+        if (!hasNetworkTransport(context)) {
             return offlineTileSource(context) ?: fallbackTileSource()
         }
 
@@ -788,6 +812,24 @@ object AntennaMapWidgetRenderer {
             4 -> offlineTileSource(context) ?: osmTileSource(ignStyle)
             else -> osmTileSource(ignStyle)
         }
+    }
+
+    /**
+     * Pour les tuiles, « réseau disponible » ne doit pas exiger NET_CAPABILITY_VALIDATED.
+     * Android Auto peut fournir un réseau de projection/voiture utilisable avant que le système
+     * n'ait terminé sa validation captive. Le téléchargement vérifie ensuite le code HTTP et le
+     * décodage de l'image ; un réseau réellement inutilisable retombe donc proprement sur le fond
+     * de secours.
+     */
+    private fun hasNetworkTransport(context: Context): Boolean {
+        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE)
+            as? ConnectivityManager ?: return false
+        val network = connectivityManager.activeNetwork ?: return false
+        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
+        if (!capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) return false
+        return capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
+            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
     }
 
     private fun fallbackTileSource(): WidgetTileSource {

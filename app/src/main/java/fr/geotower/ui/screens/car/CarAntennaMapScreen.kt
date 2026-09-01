@@ -17,6 +17,8 @@ import androidx.car.app.model.ItemList
 import androidx.car.app.model.ListTemplate
 import androidx.car.app.model.Metadata
 import androidx.car.app.model.MessageTemplate
+import androidx.car.app.model.Pane
+import androidx.car.app.model.PaneTemplate
 import androidx.car.app.model.Place
 import androidx.car.app.model.PlaceListMapTemplate
 import androidx.car.app.model.PlaceMarker
@@ -183,10 +185,11 @@ class CarAntennaMapScreen(
                 .setSingleList(items.build())
                 .build()
         } else {
-            // MapWithContentTemplate impose toujours un content template. Le caractère invisible
-            // conserve donc un template valide sans afficher le message « liste masquée » : le
-            // seul contrôle visible pour la liste est l'icône de l'ActionStrip.
-            MessageTemplate.Builder("\u200B")
+            // MapWithContentTemplate impose toujours un content template. Un Pane vide est le
+            // contenu le plus compact autorisé par l'API : il évite de réserver une grande zone
+            // pour un faux message « liste masquée ». Le seul contrôle visible reste l'icône de
+            // l'ActionStrip.
+            PaneTemplate.Builder(Pane.Builder().build())
                 .setTitle(carContext.getString(R.string.car_map_title))
                 .setHeaderAction(carHeaderAction())
                 .build()

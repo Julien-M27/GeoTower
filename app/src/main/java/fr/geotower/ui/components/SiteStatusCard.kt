@@ -1,5 +1,6 @@
 package fr.geotower.ui.components
 
+import android.content.Context
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.automirrored.filled.Launch
 import androidx.compose.material.icons.Icons
@@ -22,12 +23,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import fr.geotower.ui.theme.LocalGeoTowerUiSizing
 import androidx.compose.ui.unit.sp
-import java.text.DateFormat
 import java.text.SimpleDateFormat
 import java.util.Locale
 import androidx.compose.ui.res.stringResource
@@ -35,6 +36,8 @@ import fr.geotower.R
 import fr.geotower.data.models.SiteHsEntity
 import fr.geotower.data.outages.OutageStatusCodes
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
+import fr.geotower.utils.AppConfig
+import fr.geotower.utils.LocalizedDateLabels
 
 /** Couleur d'un « ? » quand l'état précis de la génération n'est pas publié. */
 enum class UncertainServiceColor {
@@ -253,6 +256,7 @@ fun SiteStatusCard(
     showDataRow: Boolean = true
 ) {
     val sizing = LocalGeoTowerUiSizing.current
+    val context = LocalContext.current
     // Couleurs
     val colorOk = Color(0xFF4CAF50) // Vert
     val colorKo = Color(0xFFE53935) // Rouge
@@ -352,8 +356,8 @@ fun SiteStatusCard(
             }
 
             if (displayIsOutage) {
-                val formattedStartDate = formatOutageStatusDate(outageStartDate)
-                val formattedRestorationDate = formatOutageStatusDate(outageExpectedRestorationDate)
+                val formattedStartDate = formatOutageStatusDate(context, outageStartDate)
+                val formattedRestorationDate = formatOutageStatusDate(context, outageExpectedRestorationDate)
 
                 if (formattedStartDate != null || formattedRestorationDate != null) {
                     Spacer(modifier = Modifier.height(sizing.spacing(6.dp)))
@@ -471,7 +475,7 @@ fun SiteStatusCard(
             // service n'est porté par aucun enregistrement, et une panne déduite (zone blanche) est
             // fabriquée côté app. Dans ces deux cas la date n'est pas « inconnue », elle n'existe
             // pas — l'annoncer comme manquante laisserait croire à un téléchargement raté.
-            val sourceDate = formatOutageStatusDate(outageDetails?.sourceLastUpdate)
+            val sourceDate = formatOutageStatusDate(context, outageDetails?.sourceLastUpdate)
             val hasDeclaredOutage = outageDetails != null && !isPotentialOutage
             val footerText = when {
                 sourceDate != null -> "${stringResource(R.string.appstrings_outage_source_date)} $sourceDate"
@@ -629,6 +633,7 @@ private fun OutageDetailsSection(
     techStatus: Map<String, ServiceStatus>
 ) {
     val sizing = LocalGeoTowerUiSizing.current
+    val context = LocalContext.current
     var expanded by remember(details.idAnfr, details.dateDebut, details.dateFin) {
         mutableStateOf(false)
     }
@@ -665,7 +670,7 @@ private fun OutageDetailsSection(
     fun displayValue(value: String?): String = cleanOutageValue(value) ?: unavailableText
 
     fun displayDate(value: String?): String {
-        return formatOutageStatusDate(value) ?: unavailableText
+        return formatOutageStatusDate(context, value) ?: unavailableText
     }
 
     fun detailRow(label: String, value: String?): OutageDetailDisplayRow {
@@ -819,7 +824,7 @@ private fun OutageDateLine(
     }
 }
 
-private fun formatOutageStatusDate(rawDate: String?): String? {
+private fun formatOutageStatusDate(context: Context, rawDate: String?): String? {
     val cleanDate = rawDate
         ?.trim()
         ?.takeIf { it.isNotBlank() && it != "-" && !it.equals("null", ignoreCase = true) }
@@ -840,12 +845,20 @@ private fun formatOutageStatusDate(rawDate: String?): String? {
             }.parse(candidate)
 
             if (parsedDate != null) {
-                val formatter = if (pattern.contains("HH")) {
-                    DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT, Locale.getDefault())
+                val formatted = if (pattern.contains("HH")) {
+                    LocalizedDateLabels.formatShortDateTime(
+                        context,
+                        parsedDate.time,
+                        AppConfig.appLanguage.value
+                    )
                 } else {
-                    DateFormat.getDateInstance(DateFormat.SHORT, Locale.getDefault())
+                    LocalizedDateLabels.formatShortDate(
+                        context,
+                        parsedDate.time,
+                        AppConfig.appLanguage.value
+                    )
                 }
-                return formatter.format(parsedDate)
+                return formatted
             }
         }
     }
