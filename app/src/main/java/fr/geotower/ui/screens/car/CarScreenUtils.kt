@@ -11,6 +11,7 @@ import androidx.car.app.model.Template
 import fr.geotower.R
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.utils.AppFileLog
+import fr.geotower.utils.formatSiteDistanceMeters
 import java.util.Locale
 
 internal const val CAR_LOG_TAG = "GeoTowerCar"
@@ -71,11 +72,7 @@ internal fun Screen.carHeaderAction(): Action =
     if (screenManager.stackSize <= 1) Action.APP_ICON else Action.BACK
 
 internal fun formatCarDistance(distanceMeters: Float): String {
-    return if (distanceMeters >= 1000f) {
-        String.format(Locale.FRANCE, "%.1f km", distanceMeters / 1000f)
-    } else {
-        "${distanceMeters.toInt()} m"
-    }
+    return formatSiteDistanceMeters(distanceMeters.toDouble())
 }
 
 internal fun calculateCarDistance(

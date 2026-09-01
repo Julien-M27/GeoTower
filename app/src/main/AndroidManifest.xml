@@ -6,6 +6,9 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Permission de bibliothèque requise par PlaceListMapTemplate pour les apps POI. -->
     <uses-permission android:name="androidx.car.app.MAP_TEMPLATES" />
+    <!-- Requise uniquement pour MapWithContentTemplate : la carte et ses antennes sont dessinées
+         par l'application dans la surface fournie par Android Auto. -->
+    <uses-permission android:name="androidx.car.app.ACCESS_SURFACE" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <!-- Utilisée séparément par les widgets et le suivi en arrière-plan, jamais demandée par Android Auto. -->

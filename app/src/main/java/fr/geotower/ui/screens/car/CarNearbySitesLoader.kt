@@ -123,25 +123,35 @@ internal class CarNearbySitesLoader(
                     distanceMeters = distance,
                     latitude = main.latitude,
                     longitude = main.longitude,
+                    userLatitude = location.latitude,
+                    userLongitude = location.longitude,
                     antennas = antennas
                 )
             }
             .sortedBy { it.distanceMeters }
     }
 
-    /** Même découpe que NearEmittersScreen : adresse devant la dernière virgule, ville derrière. */
+    /** Même découpe que NearEmittersScreen, avec repli sur le code postal si la virgule manque. */
     private fun splitCarAddress(fullAddress: String, idAnfr: String, siteAnfrLabel: String): CarAddressParts {
-        val lastCommaIndex = fullAddress.lastIndexOf(',')
+        val normalizedAddress = fullAddress.replace(Regex("\\s+"), " ").trim()
+        val lastCommaIndex = normalizedAddress.lastIndexOf(',')
         if (lastCommaIndex < 0) {
+            val postalMatch = Regex("\\b\\d{5}\\b").find(normalizedAddress)
+            if (postalMatch != null && postalMatch.range.first > 0) {
+                return CarAddressParts(
+                    title = normalizedAddress.substring(0, postalMatch.range.first).trim(),
+                    subtitle = normalizedAddress.substring(postalMatch.range.first).trim()
+                )
+            }
             return CarAddressParts(
-                title = fullAddress,
+                title = normalizedAddress,
                 subtitle = "$siteAnfrLabel: $idAnfr"
             )
         }
 
         return CarAddressParts(
-            title = fullAddress.substring(0, lastCommaIndex).trim().ifBlank { fullAddress.trim() },
-            subtitle = fullAddress.substring(lastCommaIndex + 1).trim().ifBlank { "$siteAnfrLabel: $idAnfr" }
+            title = normalizedAddress.substring(0, lastCommaIndex).trim().ifBlank { normalizedAddress },
+            subtitle = normalizedAddress.substring(lastCommaIndex + 1).trim().ifBlank { "$siteAnfrLabel: $idAnfr" }
         )
     }
 

@@ -3170,7 +3170,8 @@
     <string name="appstrings_release_v2042_database_count">Corretta la visualizzazione del numero di database nei banner di aggiornamento e download</string>
     <string name="appstrings_release_v2043_database">Corretti i testi e i contatori degli aggiornamenti dei database</string>
     <string name="appstrings_release_v2043_android_auto">Android Auto gestisce meglio gli errori della mappa e i permessi di posizione</string>
-    <string name="appstrings_release_v2045_car_map_markers">Android Auto ora mostra le antenne sulla mappa con icone più leggibili</string>
-    <string name="appstrings_release_v2045_car_nearby_results">I risultati vicini sono più chiari: distanza e loghi degli operatori senza testo duplicato</string>
-    <string name="appstrings_release_v2045_car_host_interactions">Le interazioni tra mappa ed elenco sono più affidabili nei limiti dell’host Android Auto</string>
+    <string name="appstrings_release_v2045_car_map_surface">Android Auto ora mostra una mappa GeoTower integrata con icone delle antenne più leggibili e un ripiego per gli host meno recenti</string>
+    <string name="appstrings_release_v2045_car_nearby_display">I siti vicini mostrano indirizzi più chiari, la distanza nell’unità scelta e i loghi degli operatori senza testo duplicato</string>
+    <string name="appstrings_release_v2045_car_reliability">Mappe, coordinate e interazioni Android Auto sono più affidabili, anche sugli host meno recenti</string>
+    <string name="appstrings_release_v2045_database_downloads">I download individuali vengono disattivati durante gli aggiornamenti collettivi e i pulsanti si adattano meglio ai testi più grandi</string>
 </resources>

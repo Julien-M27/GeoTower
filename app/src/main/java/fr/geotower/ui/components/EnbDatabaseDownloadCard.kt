@@ -81,7 +81,8 @@ fun EnbDatabaseDownloadCard(
     border: BorderStroke?,
     bubbleColor: Color,
     onSafeClick: SafeClick? = null,
-    refreshState: DatabaseRefreshState? = null
+    refreshState: DatabaseRefreshState? = null,
+    disableDownloadAction: Boolean = false
 ) {
     val context = LocalContext.current
     val sizing = LocalGeoTowerUiStyle.current.sizing
@@ -396,7 +397,7 @@ fun EnbDatabaseDownloadCard(
                             }
                         }
                     },
-                    enabled = canDownload && !isUpToDate && !isSearching,
+                    enabled = !disableDownloadAction && canDownload && !isUpToDate && !isSearching,
                     modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = sizing.component(56.dp)),
                     shape = RoundedCornerShape(sizing.component(12.dp)),
                     colors = ButtonDefaults.buttonColors(
@@ -405,7 +406,9 @@ fun EnbDatabaseDownloadCard(
                             MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                         } else {
                             MaterialTheme.colorScheme.onPrimary
-                        }
+                        },
+                        disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                     )
                 ) {
                     if (isUpToDate) {

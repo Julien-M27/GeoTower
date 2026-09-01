@@ -73,7 +73,8 @@ fun RadioDatabaseDownloadCard(
     border: BorderStroke?,
     bubbleColor: Color,
     onSafeClick: SafeClick? = null,
-    refreshState: DatabaseRefreshState? = null
+    refreshState: DatabaseRefreshState? = null,
+    disableDownloadAction: Boolean = false
 ) {
     val context = LocalContext.current
     val sizing = LocalGeoTowerUiStyle.current.sizing
@@ -349,12 +350,15 @@ fun RadioDatabaseDownloadCard(
                             }
                         }
                     },
-                    enabled = canDownload && !showAsUpToDate && !isSearching && !isGeneratingRadio,
+                    enabled = !disableDownloadAction && canDownload &&
+                        !showAsUpToDate && !isSearching && !isGeneratingRadio,
                     modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = sizing.component(56.dp)),
                     shape = RoundedCornerShape(sizing.component(12.dp)),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (showAsUpToDate) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.primary,
-                        contentColor = if (showAsUpToDate) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onPrimary
+                        contentColor = if (showAsUpToDate) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onPrimary,
+                        disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                     )
                 ) {
                     if (showAsUpToDate) {

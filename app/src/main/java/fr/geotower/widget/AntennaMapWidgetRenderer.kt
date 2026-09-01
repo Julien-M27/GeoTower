@@ -151,6 +151,36 @@ object AntennaMapWidgetRenderer {
         )
     }
 
+    /**
+     * Rend une carte directement dans une surface Android Auto.
+     *
+     * La surface n'a pas les dimensions fixes d'un widget : on réutilise donc exactement le
+     * moteur de tuiles et les marqueurs du widget avec une spécification adaptée à la surface.
+     */
+    fun renderForSurface(
+        context: Context,
+        data: WidgetMapData,
+        mapProvider: Int,
+        ignStyle: Int,
+        width: Int,
+        height: Int,
+        options: WidgetMapRenderOptions
+    ): Bitmap {
+        val safeWidth = width.coerceAtLeast(1)
+        val safeHeight = height.coerceAtLeast(1)
+        val spec = RenderSpec(
+            fileSuffix = "surface",
+            width = safeWidth,
+            height = safeHeight,
+            logicalWidth = safeWidth,
+            logicalHeight = safeHeight,
+            paddingPx = minOf(72.0, safeWidth / 8.0, safeHeight / 8.0),
+            viewportScale = 1.0,
+            renderZoomBoost = 1
+        )
+        return render(context, data, mapProvider, ignStyle, spec, options)
+    }
+
     private fun renderAndSave(
         context: Context,
         data: WidgetMapData,

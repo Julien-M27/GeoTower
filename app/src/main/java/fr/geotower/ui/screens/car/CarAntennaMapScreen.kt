@@ -3,6 +3,7 @@ package fr.geotower.ui.screens.car
 import android.text.Spannable
 import android.text.SpannableString
 import androidx.car.app.CarContext
+import androidx.car.app.AppManager
 import androidx.car.app.Screen
 import androidx.car.app.ScreenManager
 import androidx.car.app.constraints.ConstraintManager
@@ -21,6 +22,7 @@ import androidx.car.app.model.PlaceListMapTemplate
 import androidx.car.app.model.PlaceMarker
 import androidx.car.app.model.Row
 import androidx.car.app.model.Template
+import androidx.car.app.navigation.model.MapWithContentTemplate
 import androidx.core.graphics.drawable.IconCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
@@ -38,7 +40,7 @@ import kotlinx.coroutines.launch
 
 private const val DEFAULT_MAP_PLACE_LIMIT = 6
 
-/** Carte Android Auto : le host dessine le fond et les marqueurs à partir des coordonnées ANFR. */
+/** Carte Android Auto : surface GeoTower sur les hôtes récents, repli hôte sur les anciens. */
 class CarAntennaMapScreen(
     carContext: CarContext,
     private val repository: AnfrRepository
@@ -46,17 +48,27 @@ class CarAntennaMapScreen(
 
     private val screenScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val sitesLoader = CarNearbySitesLoader(carContext, repository)
+    private val mapSurfaceCallback = CarAntennaMapSurfaceCallback(carContext)
     private var state: CarSitesLoadResult = CarSitesLoadResult.Loading
+    private var mapSurfaceRegistered = false
 
     init {
         lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStart(owner: LifecycleOwner) {
+                registerMapSurfaceIfSupported()
                 if (state == CarSitesLoadResult.MissingLocationPermission && hasCarLocationPermission(carContext)) {
                     loadSites()
                 }
             }
 
+            override fun onStop(owner: LifecycleOwner) {
+                unregisterMapSurface()
+                mapSurfaceCallback.detachSurface()
+            }
+
             override fun onDestroy(owner: LifecycleOwner) {
+                unregisterMapSurface()
+                mapSurfaceCallback.close()
                 screenScope.cancel()
             }
         })
@@ -122,6 +134,60 @@ class CarAntennaMapScreen(
     }
 
     private fun loadedTemplate(sites: List<CarSiteListItem>): Template {
+        if (registerMapSurfaceIfSupported()) {
+            val customTemplate = runCatching { customMapTemplate(sites) }
+                .onFailure {
+                    AppFileLog.e(CAR_LOG_TAG, "Echec de construction de la carte applicative", it)
+                    unregisterMapSurface()
+                    mapSurfaceCallback.detachSurface()
+                }
+                .getOrNull()
+            if (customTemplate != null) return customTemplate
+        }
+
+        return placeListMapTemplate(sites)
+    }
+
+    /** Carte applicative : logos dans les lignes, dessin des antennes directement sur la surface. */
+    private fun customMapTemplate(sites: List<CarSiteListItem>): Template {
+        val screenManager = carContext.getCarService(ScreenManager::class.java)
+        val hostLimit = runCatching {
+            carContext.getCarService(ConstraintManager::class.java)
+                .getContentLimit(ConstraintManager.CONTENT_LIMIT_TYPE_LIST)
+        }.getOrElse { DEFAULT_MAP_PLACE_LIMIT }.coerceAtLeast(1)
+        val shownSites = sites.take(hostLimit)
+        carLog("Carte applicative : ${sites.size} site(s) trouvé(s), ${shownSites.size} ligne(s) affichée(s)")
+        mapSurfaceCallback.updateSites(sites)
+
+        val items = ItemList.Builder()
+        shownSites.forEach { site ->
+            items.addItem(
+                Row.Builder()
+                    .setImage(carOperatorGridIcon(carContext, site.operators), Row.IMAGE_TYPE_LARGE)
+                    .setTitle(site.title)
+                    .addText(formatCarDistance(site.distanceMeters))
+                    .addText(site.subtitle)
+                    .setOnClickListener {
+                        screenManager.push(CarSiteDetailScreen(carContext, site))
+                    }
+                    .build()
+            )
+        }
+
+        return MapWithContentTemplate.Builder()
+            .setContentTemplate(
+                ListTemplate.Builder()
+                    .setTitle(carContext.getString(R.string.car_map_title))
+                    .setHeaderAction(carHeaderAction())
+                    .setSingleList(items.build())
+                    .build()
+            )
+            .setActionStrip(ActionStrip.Builder().addAction(mapSwitchAction()).build())
+            .build()
+    }
+
+    /** Repli hôte : la carte reste utilisable même si MapWithContentTemplate n'est pas disponible. */
+    private fun placeListMapTemplate(sites: List<CarSiteListItem>): Template {
         val screenManager = carContext.getCarService(ScreenManager::class.java)
         val hostLimit = runCatching {
             carContext.getCarService(ConstraintManager::class.java)
@@ -133,22 +199,19 @@ class CarAntennaMapScreen(
         val items = ItemList.Builder()
         shownSites.forEachIndexed { index, site ->
             // PlaceListMapTemplate réutilise le PlaceMarker comme repère de la carte ET de la
-            // liste. L'API interdit donc d'ajouter une image d'opérateurs à cette même Row ; le
-            // bouton « Antennes » ouvre CarNearbySitesScreen, où les logos sont affichés comme
-            // dans l'écran téléphone.
+            // liste. L'API interdit donc d'ajouter une image d'opérateurs à cette même Row. Le
+            // chemin MapWithContentTemplate ci-dessus est utilisé sur les hôtes compatibles.
             val place = Place.Builder(CarLocation.create(site.latitude, site.longitude))
                 .setMarker(antennaPlaceMarker(site, index))
                 .build()
             val row = Row.Builder()
-                .setTitle(titleWithDistance(site))
+                .setTitle(site.title)
+                .addText(distanceLineWithSpan(site))
+                .addText(site.subtitle)
                 .setMetadata(Metadata.Builder().setPlace(place).build())
                 .setOnClickListener {
                     screenManager.push(CarSiteDetailScreen(carContext, site))
                 }
-            listOf(site.operators, site.subtitle)
-                .filter { it.isNotBlank() }
-                .take(2)
-                .forEach(row::addText)
             items.addItem(row.build())
         }
 
@@ -179,6 +242,41 @@ class CarAntennaMapScreen(
         }
     }
 
+    private fun mapSwitchAction(): Action {
+        val screenManager = carContext.getCarService(ScreenManager::class.java)
+        return Action.Builder()
+            .setTitle(carContext.getString(R.string.car_menu_nearby))
+            .setOnClickListener {
+                screenManager.popToRoot()
+                screenManager.push(CarNearbySitesScreen(carContext, repository))
+            }
+            .build()
+    }
+
+    private fun registerMapSurfaceIfSupported(): Boolean {
+        if (!runCatching { carContext.getCarAppApiLevel() >= 7 }.getOrDefault(false)) return false
+        if (mapSurfaceRegistered) return true
+
+        return runCatching {
+            carContext.getCarService(AppManager::class.java)
+                .setSurfaceCallback(mapSurfaceCallback)
+            mapSurfaceRegistered = true
+            true
+        }.onFailure {
+            AppFileLog.e(CAR_LOG_TAG, "La surface de carte n'est pas disponible sur cet hôte", it)
+        }.getOrDefault(false)
+    }
+
+    private fun unregisterMapSurface() {
+        if (!mapSurfaceRegistered) return
+        runCatching {
+            carContext.getCarService(AppManager::class.java).setSurfaceCallback(null)
+        }.onFailure {
+            AppFileLog.e(CAR_LOG_TAG, "Impossible de libérer la surface de carte", it)
+        }
+        mapSurfaceRegistered = false
+    }
+
     private fun fallbackListTemplate(sites: List<CarSiteListItem>): Template {
         val screenManager = carContext.getCarService(ScreenManager::class.java)
         val hostLimit = runCatching {
@@ -190,14 +288,12 @@ class CarAntennaMapScreen(
         sites.take(hostLimit).forEach { site ->
             val row = Row.Builder()
                     .setImage(carOperatorGridIcon(carContext, site.operators), Row.IMAGE_TYPE_LARGE)
-                    .setTitle(titleWithDistance(site))
+                    .setTitle(site.title)
+                    .addText(formatCarDistance(site.distanceMeters))
+                    .addText(site.subtitle)
                     .setOnClickListener {
                         screenManager.push(CarSiteDetailScreen(carContext, site))
                     }
-            listOf(site.operators, site.subtitle)
-                .filter { it.isNotBlank() }
-                .take(2)
-                .forEach(row::addText)
             items.addItem(row.build())
         }
 
@@ -208,15 +304,15 @@ class CarAntennaMapScreen(
             .build()
     }
 
-    private fun titleWithDistance(site: CarSiteListItem): CharSequence {
-        val title = SpannableString(" ${site.title}")
-        title.setSpan(
+    private fun distanceLineWithSpan(site: CarSiteListItem): CharSequence {
+        val distance = SpannableString(" ")
+        distance.setSpan(
             DistanceSpan.create(distanceForTemplate(site.distanceMeters)),
             0,
             1,
             Spannable.SPAN_INCLUSIVE_INCLUSIVE
         )
-        return title
+        return distance
     }
 
     /** Réutilise le dessin des marqueurs de la carte téléphone, y compris les secteurs azimutés. */
@@ -249,10 +345,18 @@ class CarAntennaMapScreen(
     }
 
     private fun distanceForTemplate(distanceMeters: Float): Distance {
-        return if (distanceMeters >= 1_000f) {
-            Distance.create(distanceMeters / 1_000.0, Distance.UNIT_KILOMETERS)
+        val meters = distanceMeters.toDouble().coerceAtLeast(0.0)
+        return if (AppConfig.distanceUnit.intValue == 1) {
+            val miles = meters / 1_609.344
+            if (miles < 0.1) {
+                Distance.create(meters * 3.28084, Distance.UNIT_FEET)
+            } else {
+                Distance.create(miles, Distance.UNIT_MILES)
+            }
+        } else if (meters >= 1_000.0) {
+            Distance.create(meters / 1_000.0, Distance.UNIT_KILOMETERS)
         } else {
-            Distance.create(distanceMeters.toDouble().coerceAtLeast(0.0), Distance.UNIT_METERS)
+            Distance.create(meters, Distance.UNIT_METERS)
         }
     }
 
@@ -297,10 +401,14 @@ class CarAntennaMapScreen(
     private fun hasValidCoordinates(site: CarSiteListItem): Boolean {
         return site.latitude.isFinite() &&
             site.longitude.isFinite() &&
+            site.userLatitude.isFinite() &&
+            site.userLongitude.isFinite() &&
             site.distanceMeters.isFinite() &&
             site.distanceMeters >= 0f &&
             site.latitude in -90.0..90.0 &&
-            site.longitude in -180.0..180.0
+            site.longitude in -180.0..180.0 &&
+            site.userLatitude in -90.0..90.0 &&
+            site.userLongitude in -180.0..180.0
     }
 
     private fun messageTemplate(

@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -1428,6 +1429,7 @@ fun StepDatabaseDesign(useOneUi: Boolean, cardShape: Shape, cardBorder: BorderSt
         .collectAsState(initial = emptyList())
     val isBulkUpdateRunning = bulkWorkInfos.any { workInfo -> !workInfo.state.isFinished }
     var isCheckingBulkUpdates by remember { mutableStateOf(false) }
+    val disableIndividualDownloads = isCheckingBulkUpdates || isBulkUpdateRunning
     // Génération locale : réservée aux appareils éligibles (RAM/stockage). Dès le 1er lancement, un
     // message « non disponible sur cet appareil » n'apporterait rien : on masque la carte.
     val buildEligibility = remember { LocalBuildCapability.evaluate(context) }
@@ -1490,7 +1492,11 @@ fun StepDatabaseDesign(useOneUi: Boolean, cardShape: Shape, cardBorder: BorderSt
                 enabled = !isCheckingBulkUpdates && !isBulkUpdateRunning,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(sizing.component(56.dp)),
+                    // Le libellé peut occuper deux lignes lorsque la taille de police système ou
+                    // celle de l'interface est augmentée. Une hauteur fixe coupait alors la ligne
+                    // inférieure ; 56 dp reste la hauteur minimale du bouton, qui peut désormais
+                    // grandir pour contenir tout son contenu.
+                    .heightIn(min = sizing.component(56.dp)),
                 shape = RoundedCornerShape(28.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.primary,
@@ -1506,7 +1512,8 @@ fun StepDatabaseDesign(useOneUi: Boolean, cardShape: Shape, cardBorder: BorderSt
                         else -> stringResource(R.string.database_download_all_action)
                     },
                     fontWeight = FontWeight.Bold,
-                    fontSize = sizing.text(18.sp)
+                    fontSize = sizing.text(18.sp),
+                    textAlign = TextAlign.Center
                 )
             }
 
@@ -1519,7 +1526,8 @@ fun StepDatabaseDesign(useOneUi: Boolean, cardShape: Shape, cardBorder: BorderSt
                 border = cardBorder,
                 bubbleColor = bubbleColor,
                 title = stringResource(R.string.settings_section_database),
-                onSafeClick = onSafeClick
+                onSafeClick = onSafeClick,
+                disableDownloadAction = disableIndividualDownloads
             )
 
             Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
@@ -1529,7 +1537,8 @@ fun StepDatabaseDesign(useOneUi: Boolean, cardShape: Shape, cardBorder: BorderSt
                 shape = cardShape,
                 border = cardBorder,
                 bubbleColor = bubbleColor,
-                onSafeClick = onSafeClick
+                onSafeClick = onSafeClick,
+                disableDownloadAction = disableIndividualDownloads
             )
         }
 
@@ -1544,7 +1553,8 @@ fun StepDatabaseDesign(useOneUi: Boolean, cardShape: Shape, cardBorder: BorderSt
                 shape = cardShape,
                 border = cardBorder,
                 bubbleColor = bubbleColor,
-                onSafeClick = onSafeClick
+                onSafeClick = onSafeClick,
+                disableDownloadAction = disableIndividualDownloads
             )
         }
 

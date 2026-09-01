@@ -10,6 +10,9 @@ data class CarSiteListItem(
     val distanceMeters: Float,
     val latitude: Double,
     val longitude: Double,
+    /** Position de la voiture utilisée pour cadrer la carte applicative. */
+    val userLatitude: Double,
+    val userLongitude: Double,
     /** Antennes du site, conservées pour construire le même marqueur que sur la carte téléphone. */
     val antennas: List<LocalisationEntity> = emptyList()
 )

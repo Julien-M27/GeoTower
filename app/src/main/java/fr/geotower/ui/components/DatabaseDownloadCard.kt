@@ -50,7 +50,8 @@ fun DatabaseDownloadCard(
     bubbleColor: Color,
     title: String? = null,
     onSafeClick: SafeClick? = null,
-    refreshState: DatabaseRefreshState? = null
+    refreshState: DatabaseRefreshState? = null,
+    disableDownloadAction: Boolean = false
 ) {
     val context = LocalContext.current
     val sizing = LocalGeoTowerUiStyle.current.sizing
@@ -556,7 +557,8 @@ fun DatabaseDownloadCard(
                             }
                         }
                     },
-                    enabled = canDownloadRemoteDatabase && !showAsUpToDate && !isSearchingDatabaseInfo && !isGeneratingMobile,
+                    enabled = !disableDownloadAction && canDownloadRemoteDatabase &&
+                        !showAsUpToDate && !isSearchingDatabaseInfo && !isGeneratingMobile,
                     modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = sizing.component(56.dp)),
                     shape = RoundedCornerShape(sizing.component(12.dp)),
                     colors = ButtonDefaults.buttonColors(
@@ -571,7 +573,9 @@ fun DatabaseDownloadCard(
                             showAsUpToDate -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                             offerRebuild -> MaterialTheme.colorScheme.onSecondaryContainer
                             else -> MaterialTheme.colorScheme.onPrimary
-                        }
+                        },
+                        disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                     )
                 ) {
                     if (showAsUpToDate) {
