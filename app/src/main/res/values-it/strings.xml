@@ -3171,4 +3171,7 @@
     <string name="appstrings_release_v2042_database_count">Corretta la visualizzazione del numero di database nei banner di aggiornamento e download</string>
     <string name="appstrings_release_v2043_database">Corretti i testi e i contatori degli aggiornamenti dei database</string>
     <string name="appstrings_release_v2043_android_auto">Android Auto gestisce meglio gli errori della mappa e i permessi di posizione</string>
+    <string name="appstrings_release_v2044_car_map_details">Android Auto raggruppa i siti vicini e mostra distanza, indirizzo, operatori e icone migliori</string>
+    <string name="appstrings_release_v2044_car_location_fallback">Le ricerche vicine possono usare l’ultima posizione nota quando quella attuale non è disponibile</string>
+    <string name="appstrings_release_v2044_car_resilience">Migliorata la gestione di permessi, coordinate non valide ed errori dell’host Android Auto</string>
 </resources>

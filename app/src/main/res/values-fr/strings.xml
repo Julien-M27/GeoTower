@@ -3173,4 +3173,7 @@
     <string name="appstrings_release_v2042_database_count">Correction de l’affichage du nombre de bases dans les bandeaux de mise à jour et de téléchargement</string>
     <string name="appstrings_release_v2043_database">Correction des libellés et compteurs des mises à jour de bases</string>
     <string name="appstrings_release_v2043_android_auto">Android Auto gère mieux les erreurs de carte et les permissions de localisation</string>
+    <string name="appstrings_release_v2044_car_map_details">Android Auto regroupe les sites proches et affiche distance, adresse, opérateurs et icônes améliorées</string>
+    <string name="appstrings_release_v2044_car_location_fallback">Les recherches proches peuvent utiliser la dernière position connue si la position actuelle est indisponible</string>
+    <string name="appstrings_release_v2044_car_resilience">Meilleure gestion des permissions, coordonnées invalides et erreurs de l’hôte Android Auto</string>
 </resources>
