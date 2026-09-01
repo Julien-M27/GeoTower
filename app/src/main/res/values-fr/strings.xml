@@ -3199,6 +3199,6 @@
     <string name="appstrings_release_v2042_database_count">Correction de l’affichage du nombre de bases dans les bandeaux de mise à jour et de téléchargement</string>
     <string name="appstrings_release_v2043_database">Correction des libellés et compteurs des mises à jour de bases</string>
     <string name="appstrings_release_v2043_android_auto">Android Auto gère mieux les erreurs de carte et les permissions de localisation</string>
-    <string name="appstrings_release_v2049_summary_localization">Meilleure gestion des dates et des langues dans toute l’application, y compris les fenêtres modales</string>
-    <string name="appstrings_release_v2049_summary_settings">Affichage 2G/3G/4G/5G personnalisable et Android Auto et téléchargements plus fiables</string>
+    <string name="appstrings_release_v2050_summary_map">Android Auto : carte plus fiable et diagnostic amélioré</string>
+    <string name="appstrings_release_v2050_summary_tiles">Chargement des tuiles et gestion du réseau renforcés</string>
 </resources>

@@ -23,6 +23,7 @@ import org.mapsforge.map.android.graphics.AndroidGraphicFactory
 import org.mapsforge.map.rendertheme.InternalRenderTheme
 import org.osmdroid.mapsforge.MapsForgeTileSource
 import org.osmdroid.util.MapTileIndex
+import fr.geotower.utils.AppFileLog
 import java.io.File
 import java.io.FileOutputStream
 import java.net.HttpURLConnection
@@ -43,6 +44,8 @@ internal const val PREF_WIDGET_MAP_IMAGE_SQUARE_EXPANDED_PATH = "widget_map_imag
 internal const val PREF_WIDGET_MAP_SITE_COUNT = "widget_map_site_count"
 internal const val PREF_WIDGET_MAP_CENTER_LAT = "widget_map_center_lat"
 internal const val PREF_WIDGET_MAP_CENTER_LON = "widget_map_center_lon"
+
+private const val MAP_RENDER_LOG_TAG = "GeoTowerCarMap"
 
 data class WidgetMapData(
     val userLat: Double,
@@ -265,11 +268,17 @@ object AntennaMapWidgetRenderer {
         } else {
             fallbackTileSource()
         }
+        val tileTrace = TileRenderTrace(tileSource.cacheKey, drawBaseTiles)
         val viewport = widgetViewport(data, spec, tileSource.maxRenderZoom, camera)
 
         try {
             if (drawBaseTiles) {
-                runCatching { drawTileBackground(context, canvas, viewport, tileSource, spec) }
+                runCatching {
+                    drawTileBackground(context, canvas, viewport, tileSource, spec, tileTrace)
+                }.onFailure {
+                    tileTrace.failure("drawTileBackground:${it.javaClass.simpleName}")
+                    AppFileLog.e(MAP_RENDER_LOG_TAG, "Rendu des tuiles en échec", it)
+                }
             }
             // Un site malformé ne doit pas empêcher l'affichage du fond et des autres sites.
             runCatching { drawSites(context, canvas, data, viewport, density, spec, options) }
@@ -278,6 +287,7 @@ object AntennaMapWidgetRenderer {
             }
         } finally {
             tileSource.mapsForgeTileSource?.dispose()
+            tileTrace.log()
         }
         return bitmap
     }
@@ -340,7 +350,8 @@ object AntennaMapWidgetRenderer {
         canvas: Canvas,
         viewport: WidgetViewport,
         source: WidgetTileSource,
-        spec: RenderSpec
+        spec: RenderSpec,
+        trace: TileRenderTrace
     ): Int {
         val tilesPerAxis = 1 shl viewport.zoom
         val sourceOriginX = floor(viewport.topLeftPixelX).toInt()
@@ -367,7 +378,11 @@ object AntennaMapWidgetRenderer {
             if (tileY !in 0 until tilesPerAxis) continue
             for (tileXRaw in startTileX..endTileX) {
                 val tileX = floorMod(tileXRaw, tilesPerAxis)
-                val tileBitmap = loadTile(context, source, viewport.zoom, tileX, tileY) ?: continue
+                trace.requested++
+                val tileBitmap = loadTile(context, source, viewport.zoom, tileX, tileY, trace) ?: run {
+                    trace.missing++
+                    continue
+                }
                 try {
                     val dstLeft = (tileXRaw * TILE_SIZE - sourceOriginX).toFloat()
                     val dstTop = (tileY * TILE_SIZE - sourceOriginY).toFloat()
@@ -381,6 +396,7 @@ object AntennaMapWidgetRenderer {
                     }
                 }
                 drawn++
+                trace.drawn++
             }
         }
 
@@ -404,31 +420,49 @@ object AntennaMapWidgetRenderer {
         source: WidgetTileSource,
         zoom: Int,
         x: Int,
-        y: Int
+        y: Int,
+        trace: TileRenderTrace
     ): Bitmap? {
         val tileFile = File(context.cacheDir, "widget_tiles/${source.cacheKey}/$zoom/$x/$y.png")
         if (tileFile.isFile) {
-            BitmapFactory.decodeFile(tileFile.absolutePath)?.let { return it }
+            BitmapFactory.decodeFile(tileFile.absolutePath)?.let {
+                trace.cacheHits++
+                return it
+            }
             // Une ancienne réponse HTTP (HTML d'erreur, réponse vide…) a pu être enregistrée
             // avec l'extension PNG. La supprimer permet de retenter proprement le téléchargement.
+            trace.invalidCache++
+            trace.failure("cacheCorrompu:$zoom/$x/$y")
             runCatching { tileFile.delete() }
         }
 
         source.mapsForgeTileSource?.let { mapsForgeSource ->
+            trace.offlineAttempts++
             return runCatching {
                 val drawable = mapsForgeSource.renderTile(MapTileIndex.getTileIndex(zoom, x, y))
-                val bitmap = (drawable as? BitmapDrawable)?.bitmap ?: return@runCatching null
+                val bitmap = (drawable as? BitmapDrawable)?.bitmap ?: run {
+                    trace.failure("offlineDrawableInvalide:$zoom/$x/$y")
+                    return@runCatching null
+                }
                 tileFile.parentFile?.mkdirs()
                 FileOutputStream(tileFile).use { output ->
                     bitmap.compress(Bitmap.CompressFormat.PNG, 92, output)
                 }
+                trace.offlineSuccess++
                 bitmap
+            }.onFailure {
+                trace.failure("offlineException:${it.javaClass.simpleName}")
             }.getOrNull()
         }
 
         return runCatching {
-            val urlFor = source.urlFor ?: return@runCatching null
-            val connection = (URL(urlFor(zoom, x, y)).openConnection() as HttpURLConnection).apply {
+            val urlFor = source.urlFor ?: run {
+                trace.failure("aucuneUrl")
+                return@runCatching null
+            }
+            val url = urlFor(zoom, x, y)
+            trace.networkAttempts++
+            val connection = (URL(url).openConnection() as HttpURLConnection).apply {
                 connectTimeout = 2500
                 readTimeout = 3500
                 instanceFollowRedirects = true
@@ -439,19 +473,35 @@ object AntennaMapWidgetRenderer {
             }
             try {
                 val responseCode = connection.responseCode
-                if (responseCode !in 200..299) return@runCatching null
+                if (responseCode !in 200..299) {
+                    trace.httpFailures++
+                    trace.failure("http:$responseCode:$zoom/$x/$y")
+                    return@runCatching null
+                }
                 connection.inputStream.use { input ->
                     val bytes = input.readBytes()
-                    if (bytes.isEmpty()) return@runCatching null
+                    if (bytes.isEmpty()) {
+                        trace.emptyResponses++
+                        trace.failure("réponseVide:$zoom/$x/$y")
+                        return@runCatching null
+                    }
                     val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                        ?: return@runCatching null
+                        ?: run {
+                            trace.decodeFailures++
+                            trace.failure("decodeEchec:${bytes.size}o:$zoom/$x/$y")
+                            return@runCatching null
+                        }
                     tileFile.parentFile?.mkdirs()
                     FileOutputStream(tileFile).use { output -> output.write(bytes) }
+                    trace.networkSuccess++
                     bitmap
                 }
             } finally {
                 connection.disconnect()
             }
+        }.onFailure {
+            trace.networkExceptions++
+            trace.failure("networkException:${it.javaClass.simpleName}:${it.message ?: "-"}")
         }.getOrNull()
     }
 
@@ -780,10 +830,17 @@ object AntennaMapWidgetRenderer {
 
     private fun tileSourceFor(context: Context, mapProvider: Int, ignStyle: Int): WidgetTileSource {
         if (!hasNetworkTransport(context)) {
-            return offlineTileSource(context) ?: fallbackTileSource()
+            val offline = offlineTileSource(context)
+            val source = offline ?: fallbackTileSource()
+            AppFileLog.i(
+                MAP_RENDER_LOG_TAG,
+                "Source tuiles: pas de transport réseau utilisable, choix=${source.cacheKey}, " +
+                    "provider=$mapProvider, ignStyle=$ignStyle"
+            )
+            return source
         }
 
-        return when (mapProvider) {
+        val source = when (mapProvider) {
             0 -> WidgetTileSource(
                 cacheKey = if (ignStyle == 2) "ign_satellite" else "ign_plan_${ignStyle}",
                 invertColors = ignStyle == 1,
@@ -812,6 +869,12 @@ object AntennaMapWidgetRenderer {
             4 -> offlineTileSource(context) ?: osmTileSource(ignStyle)
             else -> osmTileSource(ignStyle)
         }
+        AppFileLog.i(
+            MAP_RENDER_LOG_TAG,
+            "Source tuiles: choix=${source.cacheKey}, provider=$mapProvider, ignStyle=$ignStyle, " +
+                "offline=${source.mapsForgeTileSource != null}"
+        )
+        return source
     }
 
     /**
@@ -823,13 +886,30 @@ object AntennaMapWidgetRenderer {
      */
     private fun hasNetworkTransport(context: Context): Boolean {
         val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE)
-            as? ConnectivityManager ?: return false
-        val network = connectivityManager.activeNetwork ?: return false
-        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
-        if (!capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) return false
-        return capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+            as? ConnectivityManager ?: run {
+                AppFileLog.w(MAP_RENDER_LOG_TAG, "Réseau tuiles: ConnectivityManager absent")
+                return false
+            }
+        val network = connectivityManager.activeNetwork ?: run {
+            AppFileLog.i(MAP_RENDER_LOG_TAG, "Réseau tuiles: aucun activeNetwork")
+            return false
+        }
+        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: run {
+            AppFileLog.i(MAP_RENDER_LOG_TAG, "Réseau tuiles: capacités absentes pour activeNetwork")
+            return false
+        }
+        val hasInternetCapability = capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        val hasTransport = capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
             capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
             capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
+        AppFileLog.i(
+            MAP_RENDER_LOG_TAG,
+            "Réseau tuiles: internetCapability=$hasInternetCapability, transport=$hasTransport, " +
+                "wifi=${capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)}, " +
+                "cellulaire=${capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)}, " +
+                "ethernet=${capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)}"
+        )
+        return hasInternetCapability && hasTransport
     }
 
     private fun fallbackTileSource(): WidgetTileSource {
@@ -920,6 +1000,44 @@ object AntennaMapWidgetRenderer {
     private fun floorMod(value: Int, divisor: Int): Int {
         val mod = value % divisor
         return if (mod < 0) mod + divisor else mod
+    }
+
+    /** Statistiques d'un rendu : assez détaillées pour diagnostiquer le réseau sans écrire une
+     * ligne de journal pour chaque tuile réussie. Les premières anomalies sont conservées. */
+    private class TileRenderTrace(
+        private val sourceKey: String,
+        private val drawBaseTiles: Boolean
+    ) {
+        var requested = 0
+        var drawn = 0
+        var missing = 0
+        var cacheHits = 0
+        var invalidCache = 0
+        var offlineAttempts = 0
+        var offlineSuccess = 0
+        var networkAttempts = 0
+        var networkSuccess = 0
+        var httpFailures = 0
+        var emptyResponses = 0
+        var decodeFailures = 0
+        var networkExceptions = 0
+        private val failureSamples = ArrayList<String>(8)
+
+        fun failure(description: String) {
+            if (failureSamples.size < 8) failureSamples += description
+        }
+
+        fun log() {
+            AppFileLog.i(
+                MAP_RENDER_LOG_TAG,
+                "TileTrace: source=$sourceKey, fond=$drawBaseTiles, demandées=$requested, " +
+                    "dessinées=$drawn, manquantes=$missing, cache=$cacheHits, cacheCorrompu=$invalidCache, " +
+                    "offline=$offlineSuccess/$offlineAttempts, réseau=$networkSuccess/$networkAttempts, " +
+                    "http4xx5xx=$httpFailures, réponsesVides=$emptyResponses, " +
+                    "decodeÉchecs=$decodeFailures, exceptionsRéseau=$networkExceptions, " +
+                    "échantillons=${failureSamples.joinToString("|").ifBlank { "aucun" }}"
+            )
+        }
     }
 
     private data class WidgetTileSource(
