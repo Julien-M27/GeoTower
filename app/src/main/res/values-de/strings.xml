@@ -3197,6 +3197,6 @@
     <string name="appstrings_release_v2042_database_count">Die Anzeige der Datenbankanzahl in Aktualisierungs- und Downloadbannern wurde korrigiert</string>
     <string name="appstrings_release_v2043_database">Bezeichnungen und Zähler für Datenbankaktualisierungen korrigiert</string>
     <string name="appstrings_release_v2043_android_auto">Android Auto behandelt Kartenfehler und Standortberechtigungen jetzt robuster</string>
-    <string name="appstrings_release_v2050_summary_map">Android Auto: zuverlässigere Karte und verbesserte Diagnose</string>
-    <string name="appstrings_release_v2050_summary_tiles">Robusteres Laden von Kartenkacheln und Netzwerkverhalten</string>
+    <string name="appstrings_release_v2051_summary_map">Android Auto-Kartenanzeige bei eingeklappter Liste korrigiert</string>
+    <string name="appstrings_release_v2051_summary_stability">Verbesserte Stabilität der Android Auto-Oberfläche</string>
 </resources>

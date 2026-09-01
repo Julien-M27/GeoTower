@@ -221,11 +221,12 @@ class CarAntennaMapScreen(
                 .setSingleList(items.build())
                 .build()
         } else {
-            // MapWithContentTemplate impose toujours un content template. Un Pane vide est le
-            // contenu le plus compact autorisé par l'API : il évite de réserver une grande zone
-            // pour un faux message « liste masquée ». Le seul contrôle visible reste l'icône de
-            // l'ActionStrip.
-            PaneTemplate.Builder(Pane.Builder().build())
+            // MapWithContentTemplate impose toujours un content template. AndroidX Car App
+            // n'autorise un Pane sans ligne que lorsqu'il est explicitement en chargement :
+            // Pane.Builder().build() lève sinon une IllegalStateException dans Pane.Builder.
+            // Cette variante conserve le volet replié très compact, sans faux message visible,
+            // et laisse l'icône de l'ActionStrip comme seul contrôle de réouverture.
+            PaneTemplate.Builder(Pane.Builder().setLoading(true).build())
                 .setTitle(carContext.getString(R.string.car_map_title))
                 .setHeaderAction(carHeaderAction())
                 .build()

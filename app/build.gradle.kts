@@ -38,8 +38,8 @@ android {
         targetSdk = 37
         // Google Play ne compare QUE versionCode : il doit augmenter a chaque envoi et un numero
         // deja envoye ne peut jamais etre reutilise. versionName n'est qu'un libelle d'affichage.
-        versionCode = 52
-        versionName = "2.0.50"
+        versionCode = 53
+        versionName = "2.0.51"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         val manifestPublicKeys = providers
