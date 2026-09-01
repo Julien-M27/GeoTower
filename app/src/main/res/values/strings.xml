@@ -414,15 +414,18 @@
     <string name="signalquest_image_prepare_failed">Unable to prepare image.</string>
     <string name="signalquest_jpeg_compression_failed">Unable to compress JPEG.</string>
     <string name="signalquest_compressed_photo_too_large">Compressed photo is too large.</string>
-    <string name="car_nearby_sites">Nearby sites</string>
+    <string name="car_nearby_sites">Nearby antennas</string>
     <string name="car_menu_title">GeoTower</string>
     <string name="car_menu_map">Map</string>
     <string name="car_menu_map_description">Nearby sites</string>
-    <string name="car_menu_nearby">Nearby</string>
-    <string name="car_menu_nearby_description">Closest sites</string>
+    <string name="car_menu_nearby">Nearby antennas</string>
+    <string name="car_menu_nearby_description">Closest antennas</string>
     <string name="car_map_title">Map</string>
+    <string name="car_map_hide_list">Hide list</string>
+    <string name="car_map_show_list">Show list</string>
+    <string name="car_map_list_collapsed">Site list hidden</string>
     <string name="car_map_loading">Loading the site map...</string>
-    <string name="car_sites_around_me">Sites around me</string>
+    <string name="car_sites_around_me">Nearby antennas</string>
     <string name="car_no_sites_nearby">No site found around your position.</string>
     <string name="car_grant_permission">Allow location</string>
     <string name="car_permission_denied">Location denied. GeoTower cannot list nearby sites.</string>
@@ -3193,8 +3196,8 @@
     <string name="appstrings_release_v2042_database_count">Fixed the database count shown in update and download banners</string>
     <string name="appstrings_release_v2043_database">Corrected database update labels and counts</string>
     <string name="appstrings_release_v2043_android_auto">Improved Android Auto resilience for map and location permissions</string>
-    <string name="appstrings_release_v2045_car_map_surface">Android Auto now displays an integrated GeoTower map with clearer antenna markers and a fallback for older hosts</string>
-    <string name="appstrings_release_v2045_car_nearby_display">Nearby sites show cleaner addresses, distance in the selected unit and operator logos without duplicate text</string>
-    <string name="appstrings_release_v2045_car_reliability">Android Auto maps, coordinates and interactions are more reliable, including on older hosts</string>
-    <string name="appstrings_release_v2045_database_downloads">Individual downloads are disabled during bulk updates and buttons adapt better to larger text</string>
+    <string name="appstrings_release_v2046_car_interactive_map">Android Auto now offers an integrated interactive map with zoom, pan, recenter and collapsible list, with a fallback for older hosts</string>
+    <string name="appstrings_release_v2046_car_nearby_display">Nearby antennas are clearer with addresses, support types, distance in the selected unit and operator logos</string>
+    <string name="appstrings_release_v2046_car_reliability">Map rendering and Android Auto surface handling are more robust, even with missing tiles or invalid coordinates</string>
+    <string name="appstrings_release_v2046_database_downloads">Individual downloads are blocked during bulk updates and buttons adapt better to long text</string>
 </resources>

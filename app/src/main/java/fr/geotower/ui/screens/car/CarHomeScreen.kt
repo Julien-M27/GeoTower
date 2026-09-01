@@ -24,7 +24,7 @@ class CarHomeScreen(
         val items = ItemList.Builder()
             .addItem(
                 GridItem.Builder()
-                    .setTitle(carContext.getString(R.string.car_menu_nearby))
+                    .setTitle(carContext.getString(R.string.car_sites_around_me))
                     .setText(carContext.getString(R.string.car_menu_nearby_description))
                     .setImage(carMenuIcon(carContext, R.drawable.ic_place), GridItem.IMAGE_TYPE_ICON)
                     .setOnClickListener {

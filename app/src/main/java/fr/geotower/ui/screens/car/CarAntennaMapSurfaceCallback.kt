@@ -1,10 +1,12 @@
 package fr.geotower.ui.screens.car
 
 import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.content.Context
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Rect
+import android.os.Build
 import android.view.Surface
 import androidx.car.app.SurfaceCallback
 import androidx.car.app.SurfaceContainer
@@ -14,6 +16,7 @@ import fr.geotower.widget.AntennaMapWidgetRenderer
 import fr.geotower.widget.WidgetMapData
 import fr.geotower.widget.WidgetMapSiteData
 import fr.geotower.widget.WidgetMapAntennaData
+import fr.geotower.widget.WidgetMapCamera
 import fr.geotower.widget.WidgetMapRenderOptions
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -23,6 +26,9 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicLong
+import kotlin.math.ceil
+import kotlin.math.floor
+import kotlin.math.ln
 
 /** Dessine la carte GeoTower dans la surface fournie par l'hôte Android Auto. */
 internal class CarAntennaMapSurfaceCallback(
@@ -34,10 +40,17 @@ internal class CarAntennaMapSurfaceCallback(
     private val lock = Any()
     @Volatile private var latestData: WidgetMapData? = null
     @Volatile private var surfaceContainer: SurfaceContainer? = null
+    private var camera: WidgetMapCamera? = null
+    private var scaleRemainder = 0.0
+
+    fun setPanMode(isPanMode: Boolean) {
+        // Le host utilise ce retour pour synchroniser son mode panoramique. Les mêmes callbacks
+        // de surface restent valables sur écran tactile, où le bouton PAN est masqué.
+    }
 
     fun updateSites(sites: List<CarSiteListItem>) {
         val first = sites.firstOrNull() ?: return
-        latestData = WidgetMapData(
+        val newData = WidgetMapData(
             userLat = first.userLatitude,
             userLon = first.userLongitude,
             sites = sites.map { site ->
@@ -66,6 +79,17 @@ internal class CarAntennaMapSurfaceCallback(
                 )
             }
         )
+        synchronized(lock) {
+            val previousData = latestData
+            latestData = newData
+            if (previousData == null ||
+                previousData.userLat != newData.userLat ||
+                previousData.userLon != newData.userLon
+            ) {
+                camera = null
+                scaleRemainder = 0.0
+            }
+        }
         requestRender()
     }
 
@@ -78,7 +102,15 @@ internal class CarAntennaMapSurfaceCallback(
         if (previous !== container) {
             previous?.getSurface()?.release()
         }
-        requestRender()
+        AppFileLog.i(
+            CAR_LOG_TAG,
+            "Surface carte disponible : ${container.getWidth()}x${container.getHeight()}, " +
+                "valide=${container.getSurface()?.isValid == true}"
+        )
+        // Peindre immédiatement évite une surface entièrement vide pendant le téléchargement des
+        // tuiles. Le rendu détaillé prend place ensuite sur le thread IO.
+        postFallback(container)
+        requestRender(previewFirst = true)
     }
 
     override fun onSurfaceDestroyed(container: SurfaceContainer) {
@@ -100,6 +132,64 @@ internal class CarAntennaMapSurfaceCallback(
         requestRender()
     }
 
+    override fun onStableAreaChanged(stableArea: Rect) {
+        requestRender()
+    }
+
+    override fun onScroll(distanceX: Float, distanceY: Float) {
+        updateCamera { current ->
+            AntennaMapWidgetRenderer.panSurfaceCamera(current, distanceX, distanceY)
+        }
+    }
+
+    override fun onFling(velocityX: Float, velocityY: Float) {
+        // Certains hôtes n'envoient pas de dernier onScroll au relâchement. Une courte
+        // translation conserve donc l'inertie attendue sans lancer une animation incontrôlée.
+        updateCamera { current ->
+            AntennaMapWidgetRenderer.panSurfaceCamera(current, velocityX * 0.12f, velocityY * 0.12f)
+        }
+    }
+
+    override fun onScale(focusX: Float, focusY: Float, scaleFactor: Float) {
+        if (!scaleFactor.isFinite() || scaleFactor <= 0f) return
+        val delta = ln(scaleFactor.toDouble()) / ln(2.0)
+        synchronized(lock) {
+            scaleRemainder += delta
+        }
+        val steps = synchronized(lock) {
+            if (scaleRemainder >= 0.0) floor(scaleRemainder).toInt() else ceil(scaleRemainder).toInt()
+        }
+        if (steps == 0) return
+        synchronized(lock) {
+            scaleRemainder -= steps
+        }
+        updateCamera { current ->
+            AntennaMapWidgetRenderer.zoomSurfaceCamera(current, steps)
+        }
+    }
+
+    fun zoomIn() {
+        updateCamera { current -> AntennaMapWidgetRenderer.zoomSurfaceCamera(current, 1) }
+    }
+
+    fun zoomOut() {
+        updateCamera { current -> AntennaMapWidgetRenderer.zoomSurfaceCamera(current, -1) }
+    }
+
+    fun recenter() {
+        synchronized(lock) {
+            val container = surfaceContainer ?: return
+            val data = latestData ?: return
+            camera = AntennaMapWidgetRenderer.initialSurfaceCamera(
+                data,
+                container.getWidth(),
+                container.getHeight()
+            )
+            scaleRemainder = 0.0
+        }
+        requestRender()
+    }
+
     fun detachSurface() {
         val old = synchronized(lock) {
             val value = surfaceContainer
@@ -116,18 +206,45 @@ internal class CarAntennaMapSurfaceCallback(
         renderScope.cancel()
     }
 
-    private fun requestRender() {
+    private fun requestRender(previewFirst: Boolean = false) {
         val requestedGeneration = generation.incrementAndGet()
         val snapshot = synchronized(lock) {
             val container = surfaceContainer ?: return
             val surface = container.getSurface() ?: return
             if (!surface.isValid || container.getWidth() <= 0 || container.getHeight() <= 0) return
-            SurfaceSnapshot(surface, container.getWidth(), container.getHeight())
+            val data = latestData ?: return
+            val currentCamera = camera ?: AntennaMapWidgetRenderer.initialSurfaceCamera(
+                data,
+                container.getWidth(),
+                container.getHeight()
+            ).also { camera = it }
+            SurfaceSnapshot(surface, container.getWidth(), container.getHeight(), currentCamera)
         }
         val data = latestData ?: return
 
         renderScope.launch(Dispatchers.IO) {
             try {
+                if (previewFirst) {
+                    val preview = runCatching {
+                        AntennaMapWidgetRenderer.renderForSurface(
+                            context = context,
+                            data = data,
+                            mapProvider = AppConfig.mapProvider.intValue,
+                            ignStyle = AppConfig.ignStyle.intValue,
+                            width = snapshot.width,
+                            height = snapshot.height,
+                            options = currentRenderOptions(),
+                            camera = snapshot.camera,
+                            drawBaseTiles = false
+                        )
+                    }.getOrNull()
+                    if (preview != null) {
+                        withContext(Dispatchers.Main.immediate) {
+                            if (requestedGeneration == generation.get()) postBitmap(snapshot, preview)
+                            preview.recycle()
+                        }
+                    }
+                }
                 val bitmap = AntennaMapWidgetRenderer.renderForSurface(
                     context = context,
                     data = data,
@@ -135,12 +252,8 @@ internal class CarAntennaMapSurfaceCallback(
                     ignStyle = AppConfig.ignStyle.intValue,
                     width = snapshot.width,
                     height = snapshot.height,
-                    options = WidgetMapRenderOptions(
-                        defaultOperator = AppConfig.defaultOperator.value,
-                        showAzimuths = AppConfig.showAzimuths.value,
-                        showAzimuthCones = AppConfig.showAzimuthsCone.value,
-                        showTechnoFh = AppConfig.showTechnoFH.value
-                    )
+                    options = currentRenderOptions(),
+                    camera = snapshot.camera
                 )
                 withContext(Dispatchers.Main.immediate) {
                     if (requestedGeneration == generation.get()) {
@@ -152,12 +265,38 @@ internal class CarAntennaMapSurfaceCallback(
                 throw cancelled
             } catch (error: Throwable) {
                 AppFileLog.e(CAR_LOG_TAG, "Echec du rendu de la carte applicative", error)
+                withContext(Dispatchers.Main.immediate) {
+                    if (requestedGeneration == generation.get()) postFallback(snapshot)
+                }
             }
         }
     }
 
+    private fun currentRenderOptions(): WidgetMapRenderOptions {
+        return WidgetMapRenderOptions(
+            defaultOperator = AppConfig.defaultOperator.value,
+            showAzimuths = AppConfig.showAzimuths.value,
+            showAzimuthCones = AppConfig.showAzimuthsCone.value,
+            showTechnoFh = AppConfig.showTechnoFH.value
+        )
+    }
+
+    private fun updateCamera(transform: (WidgetMapCamera) -> WidgetMapCamera) {
+        synchronized(lock) {
+            val container = surfaceContainer ?: return
+            val data = latestData ?: return
+            val current = camera ?: AntennaMapWidgetRenderer.initialSurfaceCamera(
+                data,
+                container.getWidth(),
+                container.getHeight()
+            )
+            camera = transform(current)
+        }
+        requestRender()
+    }
+
     private fun postBitmap(snapshot: SurfaceSnapshot, bitmap: Bitmap) {
-        val canvas = runCatching { snapshot.surface.lockCanvas(null) }.getOrNull() ?: return
+        val canvas = lockSurfaceCanvas(snapshot.surface) ?: return
         try {
             canvas.drawColor(Color.rgb(18, 29, 40))
             canvas.drawBitmap(
@@ -171,9 +310,38 @@ internal class CarAntennaMapSurfaceCallback(
         }
     }
 
+    private fun postFallback(snapshot: SurfaceSnapshot) {
+        val canvas = lockSurfaceCanvas(snapshot.surface) ?: return
+        try {
+            canvas.drawColor(Color.rgb(18, 29, 40))
+        } finally {
+            runCatching { snapshot.surface.unlockCanvasAndPost(canvas) }
+        }
+    }
+
+    private fun postFallback(container: SurfaceContainer) {
+        val surface = container.getSurface() ?: return
+        val canvas = lockSurfaceCanvas(surface) ?: return
+        try {
+            canvas.drawColor(Color.rgb(18, 29, 40))
+        } finally {
+            runCatching { surface.unlockCanvasAndPost(canvas) }
+        }
+    }
+
+    /** Android Auto fournit généralement une surface matérielle pour cette zone cartographique. */
+    private fun lockSurfaceCanvas(surface: Surface): Canvas? {
+        if (!surface.isValid) return null
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            runCatching { surface.lockHardwareCanvas() }.getOrNull()?.let { return it }
+        }
+        return runCatching { surface.lockCanvas(null) }.getOrNull()
+    }
+
     private data class SurfaceSnapshot(
         val surface: Surface,
         val width: Int,
-        val height: Int
+        val height: Int,
+        val camera: WidgetMapCamera
     )
 }

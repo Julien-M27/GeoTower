@@ -339,15 +339,18 @@
     <string name="signalquest_image_prepare_failed">Préparation de l\'image impossible.</string>
     <string name="signalquest_jpeg_compression_failed">Compression JPEG impossible.</string>
     <string name="signalquest_compressed_photo_too_large">Photo compressée trop volumineuse.</string>
-    <string name="car_nearby_sites">Sites proches</string>
+    <string name="car_nearby_sites">Antennes à proximité</string>
     <string name="car_menu_title">GeoTower</string>
     <string name="car_menu_map">Carte</string>
     <string name="car_menu_map_description">Sites proches</string>
-    <string name="car_menu_nearby">Antennes</string>
-    <string name="car_menu_nearby_description">Liste proche</string>
+    <string name="car_menu_nearby">Antennes à proximité</string>
+    <string name="car_menu_nearby_description">Antennes les plus proches</string>
     <string name="car_map_title">Carte</string>
+    <string name="car_map_hide_list">Masquer la liste</string>
+    <string name="car_map_show_list">Afficher la liste</string>
+    <string name="car_map_list_collapsed">Liste des sites masquée</string>
     <string name="car_map_loading">Chargement de la carte des sites...</string>
-    <string name="car_sites_around_me">Sites autour de moi</string>
+    <string name="car_sites_around_me">Antennes à proximité</string>
     <string name="car_no_sites_nearby">Aucun site trouvé autour de votre position.</string>
     <string name="car_grant_permission">Autoriser la localisation</string>
     <string name="car_permission_denied">Localisation refusée. GeoTower ne peut pas lister les sites proches.</string>
@@ -3172,8 +3175,8 @@
     <string name="appstrings_release_v2042_database_count">Correction de l’affichage du nombre de bases dans les bandeaux de mise à jour et de téléchargement</string>
     <string name="appstrings_release_v2043_database">Correction des libellés et compteurs des mises à jour de bases</string>
     <string name="appstrings_release_v2043_android_auto">Android Auto gère mieux les erreurs de carte et les permissions de localisation</string>
-    <string name="appstrings_release_v2045_car_map_surface">Android Auto affiche désormais une carte GeoTower intégrée avec des repères d’antennes plus lisibles, avec repli pour les anciens hôtes</string>
-    <string name="appstrings_release_v2045_car_nearby_display">Les sites proches présentent une adresse plus claire, la distance dans l’unité choisie et les logos opérateurs sans doublon</string>
-    <string name="appstrings_release_v2045_car_reliability">Carte, coordonnées et interactions Android Auto sont plus fiables, y compris sur les hôtes moins récents</string>
-    <string name="appstrings_release_v2045_database_downloads">Les téléchargements individuels sont désactivés pendant une mise à jour groupée et les boutons s’adaptent mieux aux grands textes</string>
+    <string name="appstrings_release_v2046_car_interactive_map">Android Auto propose une carte interactive intégrée : zoom, déplacement, recentrage et liste masquable, avec repli pour les anciens hôtes</string>
+    <string name="appstrings_release_v2046_car_nearby_display">Les antennes proches sont mieux présentées avec adresses, types de supports, distance selon l’unité choisie et logos opérateurs</string>
+    <string name="appstrings_release_v2046_car_reliability">Le rendu de carte et la gestion des surfaces Android Auto sont plus robustes, même en cas de tuiles ou coordonnées invalides</string>
+    <string name="appstrings_release_v2046_database_downloads">Les téléchargements individuels sont bloqués pendant les mises à jour groupées et les boutons s’adaptent mieux aux textes longs</string>
 </resources>

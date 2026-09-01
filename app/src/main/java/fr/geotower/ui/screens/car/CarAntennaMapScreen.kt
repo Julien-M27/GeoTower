@@ -22,6 +22,7 @@ import androidx.car.app.model.PlaceListMapTemplate
 import androidx.car.app.model.PlaceMarker
 import androidx.car.app.model.Row
 import androidx.car.app.model.Template
+import androidx.car.app.navigation.model.MapController
 import androidx.car.app.navigation.model.MapWithContentTemplate
 import androidx.core.graphics.drawable.IconCompat
 import androidx.lifecycle.DefaultLifecycleObserver
@@ -51,6 +52,7 @@ class CarAntennaMapScreen(
     private val mapSurfaceCallback = CarAntennaMapSurfaceCallback(carContext)
     private var state: CarSitesLoadResult = CarSitesLoadResult.Loading
     private var mapSurfaceRegistered = false
+    private var siteListExpanded = true
 
     init {
         lifecycle.addObserver(object : DefaultLifecycleObserver {
@@ -174,15 +176,42 @@ class CarAntennaMapScreen(
             )
         }
 
+        val contentTemplate: Template = if (siteListExpanded) {
+            ListTemplate.Builder()
+                .setTitle(carContext.getString(R.string.car_map_title))
+                .setHeaderAction(carHeaderAction())
+                .setSingleList(items.build())
+                .build()
+        } else {
+            // MapWithContentTemplate impose toujours un content template. Un message court garde
+            // la carte active tout en réduisant fortement l'emprise du panneau.
+            MessageTemplate.Builder(carContext.getString(R.string.car_map_list_collapsed))
+                .setTitle(carContext.getString(R.string.car_map_title))
+                .setHeaderAction(carHeaderAction())
+                .build()
+        }
+
         return MapWithContentTemplate.Builder()
-            .setContentTemplate(
-                ListTemplate.Builder()
-                    .setTitle(carContext.getString(R.string.car_map_title))
-                    .setHeaderAction(carHeaderAction())
-                    .setSingleList(items.build())
+            .setContentTemplate(contentTemplate)
+            .setMapController(
+                MapController.Builder()
+                    .setMapActionStrip(
+                        ActionStrip.Builder()
+                            .addAction(Action.PAN)
+                            .addAction(mapZoomAction(R.drawable.ic_car_map_zoom_in) { mapSurfaceCallback.zoomIn() })
+                            .addAction(mapZoomAction(R.drawable.ic_car_map_zoom_out) { mapSurfaceCallback.zoomOut() })
+                            .addAction(mapZoomAction(R.drawable.ic_car_map_recenter) { mapSurfaceCallback.recenter() })
+                            .build()
+                    )
+                    .setPanModeListener { mapSurfaceCallback.setPanMode(it) }
                     .build()
             )
-            .setActionStrip(ActionStrip.Builder().addAction(mapSwitchAction()).build())
+            .setActionStrip(
+                ActionStrip.Builder()
+                    .addAction(toggleSiteListAction())
+                    .addAction(mapSwitchAction())
+                    .build()
+            )
             .build()
     }
 
@@ -216,7 +245,7 @@ class CarAntennaMapScreen(
         }
 
         val mapSwitch = Action.Builder()
-            .setTitle(carContext.getString(R.string.car_menu_nearby))
+            .setTitle(carContext.getString(R.string.car_sites_around_me))
             .setOnClickListener {
                 screenManager.popToRoot()
                 screenManager.push(CarNearbySitesScreen(carContext, repository))
@@ -245,11 +274,32 @@ class CarAntennaMapScreen(
     private fun mapSwitchAction(): Action {
         val screenManager = carContext.getCarService(ScreenManager::class.java)
         return Action.Builder()
-            .setTitle(carContext.getString(R.string.car_menu_nearby))
+            .setTitle(carContext.getString(R.string.car_sites_around_me))
             .setOnClickListener {
                 screenManager.popToRoot()
                 screenManager.push(CarNearbySitesScreen(carContext, repository))
             }
+            .build()
+    }
+
+    private fun toggleSiteListAction(): Action {
+        return Action.Builder()
+            .setTitle(
+                carContext.getString(
+                    if (siteListExpanded) R.string.car_map_hide_list else R.string.car_map_show_list
+                )
+            )
+            .setOnClickListener {
+                siteListExpanded = !siteListExpanded
+                invalidate()
+            }
+            .build()
+    }
+
+    private fun mapZoomAction(iconRes: Int, action: () -> Unit): Action {
+        return Action.Builder()
+            .setIcon(CarIcon.Builder(IconCompat.createWithResource(carContext, iconRes)).build())
+            .setOnClickListener(action)
             .build()
     }
 

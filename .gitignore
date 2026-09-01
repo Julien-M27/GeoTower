@@ -40,6 +40,10 @@ geotower-release
 # Pour reversionner une partie precise, ajouter une exception, par exemple :
 #   !docs/branding/
 docs/
+# Inventaire d'architecture du projet, demandé pour faciliter la maintenance.
+!docs/
+docs/*
+!docs/ARBORESCENCE_PROJET.md
 
 # Artefacts Python des scripts serveur. 25 fichiers .pyc avaient fini dans l'historique : ils
 # exposent le bytecode des modules sans rien apporter, et changent a chaque execution.

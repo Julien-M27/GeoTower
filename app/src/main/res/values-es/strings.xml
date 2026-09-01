@@ -339,15 +339,18 @@
     <string name="signalquest_image_prepare_failed">No se pudo preparar la imagen.</string>
     <string name="signalquest_jpeg_compression_failed">Compresión JPEG imposible.</string>
     <string name="signalquest_compressed_photo_too_large">Foto comprimida demasiado grande.</string>
-    <string name="car_nearby_sites">Sitios cercanos</string>
+    <string name="car_nearby_sites">Antenas cercanas</string>
     <string name="car_menu_title">GeoTower</string>
     <string name="car_menu_map">Mapa</string>
     <string name="car_menu_map_description">Sitios cerca</string>
-    <string name="car_menu_nearby">Cercanas</string>
-    <string name="car_menu_nearby_description">Lista cercana</string>
+    <string name="car_menu_nearby">Antenas cercanas</string>
+    <string name="car_menu_nearby_description">Antenas más cercanas</string>
     <string name="car_map_title">Mapa</string>
+    <string name="car_map_hide_list">Ocultar lista</string>
+    <string name="car_map_show_list">Mostrar lista</string>
+    <string name="car_map_list_collapsed">Lista de sitios oculta</string>
     <string name="car_map_loading">Cargando el mapa de sitios...</string>
-    <string name="car_sites_around_me">Sitios a mi alrededor</string>
+    <string name="car_sites_around_me">Antenas a mi alrededor</string>
     <string name="car_no_sites_nearby">No se encontró ningún sitio cerca de tu posición.</string>
     <string name="car_grant_permission">Permitir la ubicación</string>
     <string name="car_permission_denied">Ubicación denegada. GeoTower no puede mostrar los emplazamientos cercanos.</string>
@@ -3170,8 +3173,8 @@
     <string name="appstrings_release_v2042_database_count">Corregida la cantidad de bases mostrada en los avisos de actualización y descarga</string>
     <string name="appstrings_release_v2043_database">Corregidos los textos y contadores de las actualizaciones de bases</string>
     <string name="appstrings_release_v2043_android_auto">Android Auto gestiona mejor los errores del mapa y los permisos de ubicación</string>
-    <string name="appstrings_release_v2045_car_map_surface">Android Auto ahora muestra un mapa GeoTower integrado con iconos de antena más claros y un modo alternativo para anfitriones antiguos</string>
-    <string name="appstrings_release_v2045_car_nearby_display">Los sitios cercanos muestran direcciones más claras, la distancia en la unidad seleccionada e iconos de operadores sin texto duplicado</string>
-    <string name="appstrings_release_v2045_car_reliability">Los mapas, las coordenadas y las interacciones de Android Auto son más fiables, incluso en anfitriones antiguos</string>
-    <string name="appstrings_release_v2045_database_downloads">Las descargas individuales se desactivan durante las actualizaciones masivas y los botones se adaptan mejor a textos grandes</string>
+    <string name="appstrings_release_v2046_car_interactive_map">Android Auto ahora ofrece un mapa interactivo integrado con zoom, desplazamiento, recentrado y lista plegable, con modo alternativo para anfitriones antiguos</string>
+    <string name="appstrings_release_v2046_car_nearby_display">Las antenas cercanas se muestran con más claridad, con direcciones, tipos de soporte, distancia en la unidad seleccionada e iconos de operadores</string>
+    <string name="appstrings_release_v2046_car_reliability">El renderizado del mapa y la gestión de la superficie de Android Auto son más robustos, incluso con teselas ausentes o coordenadas no válidas</string>
+    <string name="appstrings_release_v2046_database_downloads">Las descargas individuales se bloquean durante las actualizaciones masivas y los botones se adaptan mejor a textos largos</string>
 </resources>

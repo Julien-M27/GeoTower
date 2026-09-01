@@ -57,19 +57,19 @@ class CarNearbySitesScreen(
             NearbySitesState.Loading -> loadingTemplate()
             NearbySitesState.MissingLocationPermission -> missingPermissionTemplate()
             NearbySitesState.Empty -> messageTemplate(
-                title = carContext.getString(R.string.car_nearby_sites),
+                title = carContext.getString(R.string.car_sites_around_me),
                 message = carContext.getString(R.string.car_no_sites_nearby),
                 actionTitle = carContext.getString(R.string.common_try_again),
                 action = ::loadNearbySites
             )
             NearbySitesState.DatabaseMissing -> messageTemplate(
-                title = carContext.getString(R.string.car_nearby_sites),
+                title = carContext.getString(R.string.car_sites_around_me),
                 message = carContext.getString(R.string.car_database_missing),
                 actionTitle = carContext.getString(R.string.common_try_again),
                 action = ::loadNearbySites
             )
             is NearbySitesState.Error -> messageTemplate(
-                title = carContext.getString(R.string.car_nearby_sites),
+                title = carContext.getString(R.string.car_sites_around_me),
                 message = currentState.message,
                 actionTitle = carContext.getString(R.string.common_try_again),
                 action = ::loadNearbySites
@@ -127,7 +127,7 @@ class CarNearbySitesScreen(
                     .setImage(carOperatorGridIcon(carContext, site.operators), Row.IMAGE_TYPE_LARGE)
                     .setTitle(site.title)
                     .addText(formatCarDistance(site.distanceMeters))
-                    .addText(site.subtitle)
+                    .addText(siteDescriptionLine(site))
                     .setOnClickListener {
                         screenManager.push(CarSiteDetailScreen(carContext, site))
                     }
@@ -213,6 +213,17 @@ class CarNearbySitesScreen(
         }
 
         return builder.build()
+    }
+
+    /** Même hiérarchie d'informations que la carte téléphone, compactée dans la seconde ligne. */
+    private fun siteDescriptionLine(site: CarSiteListItem): String {
+        val supportTypes = site.supportTypes
+            .filter { it.isNotBlank() }
+            .distinct()
+            .joinToString(" • ")
+        return listOf(supportTypes, site.subtitle.trim())
+            .filter { it.isNotBlank() }
+            .joinToString(" • ")
     }
 
 }

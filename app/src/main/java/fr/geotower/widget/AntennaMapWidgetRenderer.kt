@@ -81,6 +81,13 @@ data class WidgetMapRenderOptions(
     val showTechnoFh: Boolean
 )
 
+/** Caméra persistante de la carte voiture, exprimée en centre géographique et niveau de zoom. */
+data class WidgetMapCamera(
+    val centerLat: Double,
+    val centerLon: Double,
+    val zoom: Int
+)
+
 object AntennaMapWidgetRenderer {
     private const val TILE_SIZE = 256
     private const val METERS_PER_DEGREE_LAT = 111_320.0
@@ -164,11 +171,46 @@ object AntennaMapWidgetRenderer {
         ignStyle: Int,
         width: Int,
         height: Int,
-        options: WidgetMapRenderOptions
+        options: WidgetMapRenderOptions,
+        camera: WidgetMapCamera? = null,
+        drawBaseTiles: Boolean = true
     ): Bitmap {
+        return render(
+            context = context,
+            data = data,
+            mapProvider = mapProvider,
+            ignStyle = ignStyle,
+            spec = surfaceRenderSpec(width, height),
+            options = options,
+            camera = camera,
+            drawBaseTiles = drawBaseTiles
+        )
+    }
+
+    fun initialSurfaceCamera(data: WidgetMapData, width: Int, height: Int): WidgetMapCamera {
+        val viewport = widgetViewport(data, surfaceRenderSpec(width, height), MAX_ZOOM)
+        return WidgetMapCamera(viewport.centerLat, viewport.centerLon, viewport.logicalZoom)
+    }
+
+    fun panSurfaceCamera(camera: WidgetMapCamera, distanceX: Float, distanceY: Float): WidgetMapCamera {
+        val worldSize = (1 shl camera.zoom) * TILE_SIZE.toDouble()
+        val centerX = lonToPixelX(camera.centerLon, camera.zoom) - distanceX
+        val centerY = latToPixelY(camera.centerLat, camera.zoom) - distanceY
+        val wrappedX = ((centerX % worldSize) + worldSize) % worldSize
+        return camera.copy(
+            centerLat = pixelYToLat(centerY, camera.zoom).coerceIn(-85.05112878, 85.05112878),
+            centerLon = pixelXToLon(wrappedX, camera.zoom)
+        )
+    }
+
+    fun zoomSurfaceCamera(camera: WidgetMapCamera, zoomDelta: Int): WidgetMapCamera {
+        return camera.copy(zoom = (camera.zoom + zoomDelta).coerceIn(MIN_ZOOM, MAX_ZOOM))
+    }
+
+    private fun surfaceRenderSpec(width: Int, height: Int): RenderSpec {
         val safeWidth = width.coerceAtLeast(1)
         val safeHeight = height.coerceAtLeast(1)
-        val spec = RenderSpec(
+        return RenderSpec(
             fileSuffix = "surface",
             width = safeWidth,
             height = safeHeight,
@@ -178,7 +220,6 @@ object AntennaMapWidgetRenderer {
             viewportScale = 1.0,
             renderZoomBoost = 1
         )
-        return render(context, data, mapProvider, ignStyle, spec, options)
     }
 
     private fun renderAndSave(
@@ -207,46 +248,62 @@ object AntennaMapWidgetRenderer {
         mapProvider: Int,
         ignStyle: Int,
         spec: RenderSpec = WIDE_SPEC,
-        options: WidgetMapRenderOptions = defaultRenderOptions()
+        options: WidgetMapRenderOptions = defaultRenderOptions(),
+        camera: WidgetMapCamera? = null,
+        drawBaseTiles: Boolean = true
     ): Bitmap {
         val bitmap = Bitmap.createBitmap(spec.width, spec.height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         val density = spec.width.toFloat() / spec.logicalWidth
-        val tileSource = tileSourceFor(context, mapProvider, ignStyle)
-        val viewport = widgetViewport(data, spec, tileSource.maxRenderZoom)
+        // Le fond de secours est posé avant les tuiles : une tuile manquante ou un fournisseur
+        // momentanément indisponible ne laisse jamais une bitmap transparente sur la surface.
+        drawFallbackBackground(canvas, density, spec)
+        val tileSource = if (drawBaseTiles) {
+            runCatching { tileSourceFor(context, mapProvider, ignStyle) }
+                .getOrElse { fallbackTileSource() }
+        } else {
+            fallbackTileSource()
+        }
+        val viewport = widgetViewport(data, spec, tileSource.maxRenderZoom, camera)
 
         try {
-            val tilesDrawn = drawTileBackground(context, canvas, viewport, tileSource, spec)
-            if (tilesDrawn == 0) {
-                drawFallbackBackground(canvas, density, spec)
+            if (drawBaseTiles) {
+                runCatching { drawTileBackground(context, canvas, viewport, tileSource, spec) }
             }
-
-            drawSites(context, canvas, data, viewport, density, spec, options)
-            drawUserMarker(canvas, viewport.projectX(data.userLon), viewport.projectY(data.userLat), density)
+            // Un site malformé ne doit pas empêcher l'affichage du fond et des autres sites.
+            runCatching { drawSites(context, canvas, data, viewport, density, spec, options) }
+            runCatching {
+                drawUserMarker(canvas, viewport.projectX(data.userLon), viewport.projectY(data.userLat), density)
+            }
         } finally {
             tileSource.mapsForgeTileSource?.dispose()
         }
         return bitmap
     }
 
-    private fun widgetViewport(data: WidgetMapData, spec: RenderSpec, maxRenderZoom: Int): WidgetViewport {
+    private fun widgetViewport(
+        data: WidgetMapData,
+        spec: RenderSpec,
+        maxRenderZoom: Int,
+        camera: WidgetMapCamera? = null
+    ): WidgetViewport {
         val fitSites = chooseFitSites(data)
         val points = buildList {
             add(data.userLat to data.userLon)
             fitSites.forEach { add(it.latitude to it.longitude) }
         }
 
-        val logicalZoom = (MAX_ZOOM downTo MIN_ZOOM).firstOrNull { candidateZoom ->
+        val fitZoom = (MAX_ZOOM downTo MIN_ZOOM).firstOrNull { candidateZoom ->
             val bounds = pixelBounds(points, candidateZoom)
             bounds.width <= spec.logicalWidth - spec.paddingPx * 2.0 &&
                 bounds.height <= spec.logicalHeight - spec.paddingPx * 2.0
         } ?: MIN_ZOOM
 
-        val bounds = pixelBounds(points, logicalZoom)
-        val centerPixelX = bounds.centerX
-        val centerPixelY = bounds.centerY
-        val centerLat = pixelYToLat(centerPixelY, logicalZoom)
-        val centerLon = pixelXToLon(centerPixelX, logicalZoom)
+        val logicalZoom = camera?.zoom?.coerceIn(MIN_ZOOM, MAX_ZOOM) ?: fitZoom
+        val bounds = pixelBounds(points, fitZoom)
+        val centerLat = camera?.centerLat?.coerceIn(-85.05112878, 85.05112878)
+            ?: pixelYToLat(bounds.centerY, fitZoom)
+        val centerLon = camera?.centerLon ?: pixelXToLon(bounds.centerX, fitZoom)
         val renderZoom = (logicalZoom + spec.renderZoomBoost).coerceAtMost(maxRenderZoom)
         val effectiveZoomBoost = (renderZoom - logicalZoom).coerceAtLeast(0)
         val sourcePixelsPerOutputPixel =

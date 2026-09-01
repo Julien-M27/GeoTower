@@ -93,6 +93,7 @@ internal class CarNearbySitesLoader(
 
     private suspend fun List<LocalisationEntity>.toCarSiteListItems(location: Location): List<CarSiteListItem> {
         val techniqueById = repository.getTechniqueSummariesByIds(map { it.idAnfr })
+        val physiqueById = repository.getPhysiqueSummariesByIds(map { it.idAnfr })
         val siteAnfrLabel = carContext.getString(R.string.appstrings_site_anfr_label)
         return groupBy {
             "${java.lang.String.format(java.util.Locale.US, "%.4f", it.latitude)}_${java.lang.String.format(java.util.Locale.US, "%.4f", it.longitude)}"
@@ -114,6 +115,10 @@ internal class CarNearbySitesLoader(
                     .flatMap { it.operatorSummary(carContext).split(", ") }
                     .distinct()
                     .joinToString(", ")
+                val supportTypes = antennas
+                    .flatMap { physiqueById[it.idAnfr].orEmpty() }
+                    .mapNotNull { it.natureSupport?.trim()?.takeIf(String::isNotBlank) }
+                    .distinct()
 
                 CarSiteListItem(
                     idAnfr = main.idAnfr,
@@ -125,7 +130,8 @@ internal class CarNearbySitesLoader(
                     longitude = main.longitude,
                     userLatitude = location.latitude,
                     userLongitude = location.longitude,
-                    antennas = antennas
+                    antennas = antennas,
+                    supportTypes = supportTypes
                 )
             }
             .sortedBy { it.distanceMeters }

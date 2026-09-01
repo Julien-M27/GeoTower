@@ -14,5 +14,7 @@ data class CarSiteListItem(
     val userLatitude: Double,
     val userLongitude: Double,
     /** Antennes du site, conservées pour construire le même marqueur que sur la carte téléphone. */
-    val antennas: List<LocalisationEntity> = emptyList()
+    val antennas: List<LocalisationEntity> = emptyList(),
+    /** Natures de supports affichées entre l'adresse et la commune sur l'écran téléphone. */
+    val supportTypes: List<String> = emptyList()
 )
