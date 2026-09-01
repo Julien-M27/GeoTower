@@ -1616,7 +1616,15 @@ fun DatabaseWarningBanner(
                             isDownloading -> stringResource(R.string.appstrings_downloading_db_banner_title)
                             isInvalid -> stringResource(R.string.appstrings_invalid_db_banner_title)
                             isMissing -> stringResource(R.string.appstrings_missing_db_banner_title)
-                            else -> stringResource(R.string.appstrings_update_db_banner_title)
+                            else -> if (databaseCount > 0) {
+                                pluralStringResource(
+                                    R.plurals.appstrings_update_db_banner_title_plural,
+                                    databaseCount,
+                                    databaseCount
+                                )
+                            } else {
+                                stringResource(R.string.appstrings_update_db_banner_title)
+                            }
                         },
                         fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
                         color = contentColor,

@@ -1556,6 +1556,10 @@
     <string name="appstrings_generating_db_banner_desc">La base se está generando en el dispositivo: no hace falta descargar nada.</string>
     <string name="appstrings_db_generation_in_progress">Generando…</string>
     <string name="appstrings_update_db_banner_title">Actualizaciones disponibles</string>
+    <plurals name="appstrings_update_db_banner_title_plural">
+        <item quantity="one">Actualización disponible</item>
+        <item quantity="other">Actualizaciones disponibles</item>
+    </plurals>
     <plurals name="appstrings_update_db_banner_summary">
         <item quantity="one">1 base de datos por actualizar</item>
         <item quantity="other">%1$d bases de datos por actualizar</item>
@@ -3165,4 +3169,6 @@
     <string name="hidden_sites_hide_confirmation">Entrada guardada. Puedes restaurarla desde Ajustes.</string>
     <string name="hidden_sites_open_settings">Ver sitios ocultos</string>
     <string name="appstrings_release_v2042_database_count">Corregida la cantidad de bases mostrada en los avisos de actualización y descarga</string>
+    <string name="appstrings_release_v2043_database">Corregidos los textos y contadores de las actualizaciones de bases</string>
+    <string name="appstrings_release_v2043_android_auto">Android Auto gestiona mejor los errores del mapa y los permisos de ubicación</string>
 </resources>

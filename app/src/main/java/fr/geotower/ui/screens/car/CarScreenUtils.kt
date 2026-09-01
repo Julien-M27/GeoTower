@@ -1,5 +1,6 @@
 package fr.geotower.ui.screens.car
 
+import android.Manifest
 import android.content.Context
 import android.location.Location
 import androidx.car.app.CarContext
@@ -13,6 +14,17 @@ import fr.geotower.utils.AppFileLog
 import java.util.Locale
 
 internal const val CAR_LOG_TAG = "GeoTowerCar"
+
+/**
+ * Permissions de localisation de premier plan pour les écrans voiture.
+ * Android 12+ demande de fournir FINE et COARSE dans la même requête pour laisser l'utilisateur
+ * choisir la précision. ACCESS_BACKGROUND_LOCATION ne fait volontairement pas partie de cette
+ * liste : aucun écran Android Auto n'en a besoin.
+ */
+internal val CAR_LOCATION_PERMISSIONS = listOf(
+    Manifest.permission.ACCESS_COARSE_LOCATION,
+    Manifest.permission.ACCESS_FINE_LOCATION
+)
 
 /** Un template ne doit pas dépasser la largeur d'un écran de voiture, message d'erreur compris. */
 private const val CAR_ERROR_DETAIL_MAX_CHARS = 240

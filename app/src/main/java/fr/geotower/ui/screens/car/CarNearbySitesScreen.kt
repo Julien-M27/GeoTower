@@ -1,6 +1,5 @@
 package fr.geotower.ui.screens.car
 
-import android.Manifest
 import androidx.car.app.CarContext
 import androidx.car.app.Screen
 import androidx.car.app.ScreenManager
@@ -180,14 +179,10 @@ class CarNearbySitesScreen(
      * Android Automotive OS.
      */
     private fun requestLocationPermission() {
-        val permissions = listOf(
-            Manifest.permission.ACCESS_FINE_LOCATION,
-            Manifest.permission.ACCESS_COARSE_LOCATION
-        )
         // L'hôte refuse la demande dans certains états de conduite : sans garde, l'exception
         // remonterait jusqu'à lui et on retomberait sur son écran d'erreur générique.
         runCatching {
-            carContext.requestPermissions(permissions) { granted, _ ->
+            carContext.requestPermissions(CAR_LOCATION_PERMISSIONS) { granted, _ ->
                 if (granted.isEmpty()) {
                     carLog("Sites proches : localisation refusée")
                     state = NearbySitesState.MissingLocationPermission

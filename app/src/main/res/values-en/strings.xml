@@ -1556,6 +1556,10 @@
     <string name="appstrings_generating_db_banner_desc">The database is being built on this device: no download needed.</string>
     <string name="appstrings_db_generation_in_progress">Building…</string>
     <string name="appstrings_update_db_banner_title">Updates available</string>
+    <plurals name="appstrings_update_db_banner_title_plural">
+        <item quantity="one">Update available</item>
+        <item quantity="other">Updates available</item>
+    </plurals>
     <plurals name="appstrings_update_db_banner_summary">
         <item quantity="one">1 database to update</item>
         <item quantity="other">%1$d databases to update</item>
@@ -3165,4 +3169,6 @@
     <string name="hidden_sites_hide_confirmation">Hidden entry saved. You can restore it from Settings.</string>
     <string name="hidden_sites_open_settings">View hidden sites</string>
     <string name="appstrings_release_v2042_database_count">Fixed the database count shown in update and download banners</string>
+    <string name="appstrings_release_v2043_database">Corrected database update labels and counts</string>
+    <string name="appstrings_release_v2043_android_auto">Improved Android Auto resilience for map and location permissions</string>
 </resources>
