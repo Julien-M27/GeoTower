@@ -3197,6 +3197,6 @@
     <string name="appstrings_release_v2042_database_count">Corretta la visualizzazione del numero di database nei banner di aggiornamento e download</string>
     <string name="appstrings_release_v2043_database">Corretti i testi e i contatori degli aggiornamenti dei database</string>
     <string name="appstrings_release_v2043_android_auto">Android Auto gestisce meglio gli errori della mappa e i permessi di posizione</string>
-    <string name="appstrings_release_v2052_summary_map">Android Auto: annullamento dei rendering obsoleti e ricentraggio più robusto</string>
-    <string name="appstrings_release_v2052_summary_diagnostics">Diagnostica della mappa e registri più precisi</string>
+    <string name="appstrings_release_v2053_summary_map">Visualizzazione della mappa Android Auto più stabile su diversi veicoli</string>
+    <string name="appstrings_release_v2053_summary_diagnostics">Rendering delle immagini e diagnostica migliorati</string>
 </resources>

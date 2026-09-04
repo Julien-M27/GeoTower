@@ -47,6 +47,12 @@ internal class CarAntennaMapSurfaceCallback(
     @Volatile private var surfaceContainer: SurfaceContainer? = null
     private var camera: WidgetMapCamera? = null
     private var scaleRemainder = 0.0
+    /**
+     * Un Canvas matériel peut consommer une bitmap après le retour de
+     * unlockCanvasAndPost(). On conserve donc quelques images publiées comme le fait un
+     * TextureView, au lieu de laisser la dernière image devenir éligible au GC immédiatement.
+     */
+    private val postedBitmaps = ArrayList<Bitmap>(3)
 
     fun setPanMode(isPanMode: Boolean) {
         // Le host utilise ce retour pour synchroniser son mode panoramique. Les mêmes callbacks
@@ -127,6 +133,7 @@ internal class CarAntennaMapSurfaceCallback(
         val previous = synchronized(lock) {
             val old = surfaceContainer
             surfaceContainer = container
+            if (old !== container) postedBitmaps.clear()
             old
         }
         if (previous !== container) {
@@ -156,6 +163,7 @@ internal class CarAntennaMapSurfaceCallback(
         val shouldRelease = synchronized(lock) {
             if (surfaceContainer === container) {
                 surfaceContainer = null
+                postedBitmaps.clear()
                 true
             } else {
                 false
@@ -282,6 +290,7 @@ internal class CarAntennaMapSurfaceCallback(
         val old = synchronized(lock) {
             val value = surfaceContainer
             surfaceContainer = null
+            postedBitmaps.clear()
             value
         }
         val newGeneration = generation.incrementAndGet()
@@ -458,7 +467,8 @@ internal class CarAntennaMapSurfaceCallback(
             .onSuccess {
                 trace(
                     "render[$requestedGeneration] $label préparée pour le Canvas, " +
-                        "taille=${bitmap.width}x${bitmap.height}, config=${bitmap.config}"
+                        "taille=${bitmap.width}x${bitmap.height}, config=${bitmap.config}, " +
+                        "échantillons=${bitmapSampleSummary(bitmap)}"
                 )
             }
             .onFailure {
@@ -467,6 +477,21 @@ internal class CarAntennaMapSurfaceCallback(
                         "${it.javaClass.simpleName}: ${it.message ?: "-"}"
                 )
             }
+    }
+
+    private fun bitmapSampleSummary(bitmap: Bitmap): String {
+        return runCatching {
+            val points = listOf(
+                0 to 0,
+                bitmap.width / 2 to bitmap.height / 2,
+                (bitmap.width * 0.25f).toInt() to (bitmap.height * 0.25f).toInt(),
+                (bitmap.width * 0.75f).toInt() to (bitmap.height * 0.75f).toInt(),
+                (bitmap.width - 1).coerceAtLeast(0) to (bitmap.height - 1).coerceAtLeast(0)
+            )
+            points.joinToString(";") { (x, y) ->
+                "${x},${y}=#${Integer.toHexString(bitmap.getPixel(x, y)).padStart(8, '0')}"
+            }
+        }.getOrElse { "indisponibles:${it.javaClass.simpleName}" }
     }
 
     private fun updateCamera(transform: (WidgetMapCamera) -> WidgetMapCamera) {
@@ -493,7 +518,10 @@ internal class CarAntennaMapSurfaceCallback(
             postFallback(snapshot)
             return
         }
-        val canvas = lockSurfaceCanvas(snapshot.surface) ?: run {
+        // La carte est déjà rasterisée par notre renderer. Un Canvas logiciel rend la copie de
+        // cette bitmap synchrone et évite les particularités GPU de certains hôtes Android Auto.
+        // Le helper repasse automatiquement au Canvas matériel si le logiciel est refusé.
+        val canvas = lockSurfaceCanvas(snapshot.surface, preferSoftware = true) ?: run {
             trace("postBitmap: impossible de verrouiller la surface=${System.identityHashCode(snapshot.surface)}")
             return
         }
@@ -503,23 +531,40 @@ internal class CarAntennaMapSurfaceCallback(
                 "canvasMatériel=${canvas.isHardwareAccelerated}, " +
                 "surface=${System.identityHashCode(snapshot.surface)}"
         )
+        var unlockSucceeded = false
         try {
             canvas.drawColor(Color.rgb(18, 29, 40))
-            canvas.drawBitmap(
-                bitmap,
-                null,
-                Rect(0, 0, snapshot.width, snapshot.height),
-                Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-            )
+            if (bitmap.width == snapshot.width && bitmap.height == snapshot.height) {
+                // La bitmap est déjà à la taille de la surface : il n'est donc pas nécessaire de
+                // demander une mise à l'échelle au Canvas.
+                canvas.drawBitmap(bitmap, 0f, 0f, null)
+            } else {
+                canvas.drawBitmap(
+                    bitmap,
+                    null,
+                    Rect(0, 0, snapshot.width, snapshot.height),
+                    Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+                )
+            }
         } finally {
             runCatching { snapshot.surface.unlockCanvasAndPost(canvas) }
-                .onSuccess { trace("postBitmap: unlockCanvasAndPost réussi") }
+                .onSuccess {
+                    unlockSucceeded = true
+                    trace("postBitmap: unlockCanvasAndPost réussi")
+                }
                 .onFailure {
                     trace(
                         "postBitmap: unlockCanvasAndPost échoué=" +
                             "${it.javaClass.simpleName}: ${it.message ?: "-"}"
                     )
                 }
+        }
+        if (unlockSucceeded) {
+            synchronized(lock) {
+                postedBitmaps += bitmap
+                while (postedBitmaps.size > 3) postedBitmaps.removeAt(0)
+            }
+            trace("postBitmap: référence forte conservée, images retenues=${synchronized(lock) { postedBitmaps.size }}")
         }
         trace(
             "postBitmap: image=${bitmap.width}x${bitmap.height} publiée; " +
@@ -570,10 +615,27 @@ internal class CarAntennaMapSurfaceCallback(
     }
 
     /** Android Auto fournit généralement une surface matérielle pour cette zone cartographique. */
-    private fun lockSurfaceCanvas(surface: Surface): Canvas? {
+    private fun lockSurfaceCanvas(surface: Surface, preferSoftware: Boolean = false): Canvas? {
         if (!surface.isValid) {
             trace("lockSurfaceCanvas: surface invalide=${System.identityHashCode(surface)}")
             return null
+        }
+        if (preferSoftware) {
+            runCatching { surface.lockCanvas(null) }
+                .onSuccess {
+                    trace(
+                        "lockSurfaceCanvas: Canvas logiciel préféré obtenu, " +
+                            "matériel=${it.isHardwareAccelerated}, surface=${System.identityHashCode(surface)}"
+                    )
+                }
+                .onFailure {
+                    trace(
+                        "lockSurfaceCanvas: Canvas logiciel préféré échoué=" +
+                            "${it.javaClass.simpleName}: ${it.message ?: "-"}"
+                    )
+                }
+                .getOrNull()
+                ?.let { return it }
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             runCatching { surface.lockHardwareCanvas() }
