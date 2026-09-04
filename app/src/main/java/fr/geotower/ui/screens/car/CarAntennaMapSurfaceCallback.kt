@@ -6,9 +6,14 @@ import android.content.Context
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Rect
+import android.graphics.drawable.ColorDrawable
+import android.hardware.display.DisplayManager
+import android.hardware.display.VirtualDisplay
 import android.os.Build
 import android.os.SystemClock
+import android.app.Presentation
 import android.view.Surface
+import android.view.View
 import androidx.car.app.SurfaceCallback
 import androidx.car.app.SurfaceContainer
 import fr.geotower.utils.AppConfig
@@ -47,6 +52,15 @@ internal class CarAntennaMapSurfaceCallback(
     @Volatile private var surfaceContainer: SurfaceContainer? = null
     private var camera: WidgetMapCamera? = null
     private var scaleRemainder = 0.0
+    /**
+     * Chemin recommandé par la documentation Android for Cars pour rendre des vues dans la
+     * Surface fournie par l'hôte. Certains hôtes Android Auto acceptent lockHardwareCanvas() et
+     * postent bien le buffer sans toutefois le composer à l'écran. La VirtualDisplay force ici un
+     * vrai pipeline de vue, tout en gardant le Canvas direct comme repli.
+     */
+    private var virtualDisplay: VirtualDisplay? = null
+    private var presentation: Presentation? = null
+    private var surfaceView: MapSurfaceView? = null
     /**
      * Un Canvas matériel peut consommer une bitmap après le retour de
      * unlockCanvasAndPost(). On conserve donc quelques images publiées comme le fait un
@@ -141,16 +155,18 @@ internal class CarAntennaMapSurfaceCallback(
                 "onSurfaceAvailable: remplacement de la surface précédente=" +
                     "${previous?.let { System.identityHashCode(it) } ?: "null"}"
             )
-            previous?.getSurface()?.release()
+            releaseRenderingTarget(previous?.getSurface(), "remplacement")
         }
         AppFileLog.i(
             CAR_LOG_TAG,
             "Surface carte disponible : ${container.getWidth()}x${container.getHeight()}, " +
                 "valide=${container.getSurface()?.isValid == true}"
         )
-        // Peindre immédiatement évite une surface entièrement vide pendant le téléchargement des
-        // tuiles. Le rendu détaillé prend place ensuite sur le thread IO.
-        postFallback(container)
+        // La VirtualDisplay affiche immédiatement le fond de la vue pendant le téléchargement des
+        // tuiles. Si l'hôte refuse ce chemin, postFallback utilise le Canvas direct.
+        val virtualDisplayAttached = attachVirtualDisplay(container)
+        trace("onSurfaceAvailable: VirtualDisplay attachée=$virtualDisplayAttached")
+        if (!virtualDisplayAttached) postFallback(container)
         requestRender(previewFirst = true)
     }
 
@@ -179,7 +195,7 @@ internal class CarAntennaMapSurfaceCallback(
                 trace("onSurfaceDestroyed: rendu actif annulé car la surface a disparu")
                 job.cancel()
             }
-            container.getSurface()?.release()
+            releaseRenderingTarget(container.getSurface(), "destruction")
         } else {
             trace("onSurfaceDestroyed: ancienne surface ignorée")
         }
@@ -295,7 +311,7 @@ internal class CarAntennaMapSurfaceCallback(
         }
         val newGeneration = generation.incrementAndGet()
         trace("detachSurface: ancienne surface=${old?.let { System.identityHashCode(it) } ?: "null"}, génération=$newGeneration")
-        old?.getSurface()?.release()
+        releaseRenderingTarget(old?.getSurface(), "détachement")
     }
 
     fun close() {
@@ -518,6 +534,7 @@ internal class CarAntennaMapSurfaceCallback(
             postFallback(snapshot)
             return
         }
+        if (postBitmapToVirtualDisplay(snapshot, bitmap)) return
         // La carte est déjà rasterisée par notre renderer. Un Canvas logiciel rend la copie de
         // cette bitmap synchrone et évite les particularités GPU de certains hôtes Android Auto.
         // Le helper repasse automatiquement au Canvas matériel si le logiciel est refusé.
@@ -574,6 +591,7 @@ internal class CarAntennaMapSurfaceCallback(
     }
 
     private fun postFallback(snapshot: SurfaceSnapshot) {
+        if (clearVirtualDisplay(snapshot)) return
         val canvas = lockSurfaceCanvas(snapshot.surface) ?: run {
             trace("postFallback(snapshot): impossible de verrouiller la surface")
             return
@@ -594,6 +612,7 @@ internal class CarAntennaMapSurfaceCallback(
     }
 
     private fun postFallback(container: SurfaceContainer) {
+        if (clearVirtualDisplay(container)) return
         val surface = container.getSurface() ?: return
         val canvas = lockSurfaceCanvas(surface) ?: run {
             trace("postFallback(container): impossible de verrouiller la surface")
@@ -612,6 +631,162 @@ internal class CarAntennaMapSurfaceCallback(
                 }
         }
         trace("postFallback(container): fond uni publié sur container=${System.identityHashCode(container)}")
+    }
+
+    /**
+     * Rend la bitmap via une vraie vue attachée à une Presentation sur la VirtualDisplay de la
+     * Surface Auto. Android documente explicitement ce chemin pour les cartes, en complément du
+     * Canvas direct.
+     */
+    private fun attachVirtualDisplay(container: SurfaceContainer): Boolean {
+        val surface = container.getSurface() ?: run {
+            trace("attachVirtualDisplay: surface absente")
+            return false
+        }
+        if (!surface.isValid || container.getWidth() <= 0 || container.getHeight() <= 0) {
+            trace(
+                "attachVirtualDisplay: surface/dimensions invalides, " +
+                    "valide=${surface.isValid}, taille=${container.getWidth()}x${container.getHeight()}"
+            )
+            return false
+        }
+        val alreadyAttached = synchronized(lock) {
+            surfaceContainer?.getSurface() === surface &&
+                virtualDisplay != null &&
+                surfaceView != null
+        }
+        if (alreadyAttached) {
+            trace(
+                "attachVirtualDisplay: cible déjà attachée, " +
+                    "surface=${System.identityHashCode(surface)}"
+            )
+            return true
+        }
+
+        var createdDisplay: VirtualDisplay? = null
+        var createdPresentation: Presentation? = null
+        return runCatching {
+            val displayManager = context.getSystemService(DisplayManager::class.java)
+                ?: error("DisplayManager indisponible")
+            val dpi = container.getDpi().coerceAtLeast(1)
+            trace(
+                "attachVirtualDisplay: création, surface=${System.identityHashCode(surface)}, " +
+                    "taille=${container.getWidth()}x${container.getHeight()}, dpi=$dpi"
+            )
+            val displayInstance = displayManager.createVirtualDisplay(
+                VIRTUAL_DISPLAY_NAME,
+                container.getWidth(),
+                container.getHeight(),
+                dpi,
+                surface,
+                0
+            ) ?: error("createVirtualDisplay a renvoyé null")
+            createdDisplay = displayInstance
+            val display = displayInstance.display
+            val view = MapSurfaceView(context, container.getWidth(), container.getHeight())
+            createdPresentation = Presentation(context, display).also { presentation ->
+                presentation.window?.setBackgroundDrawable(
+                    ColorDrawable(Color.rgb(18, 29, 40))
+                )
+                presentation.setContentView(view)
+                presentation.show()
+            }
+            synchronized(lock) {
+                virtualDisplay = createdDisplay
+                presentation = createdPresentation
+                surfaceView = view
+            }
+            trace(
+                "attachVirtualDisplay: succès, display=${display.displayId}, " +
+                    "view=${System.identityHashCode(view)}, " +
+                    "présentation=${System.identityHashCode(createdPresentation)}"
+            )
+            true
+        }.onFailure { error ->
+            trace(
+                "attachVirtualDisplay: échec=${error.javaClass.simpleName}: " +
+                    (error.message ?: "-")
+            )
+            AppFileLog.e(CAR_LOG_TAG, "Impossible d'attacher la carte à une VirtualDisplay", error)
+            runCatching { createdPresentation?.dismiss() }
+            runCatching { createdDisplay?.release() }
+        }.getOrDefault(false)
+    }
+
+    private fun postBitmapToVirtualDisplay(snapshot: SurfaceSnapshot, bitmap: Bitmap): Boolean {
+        val view = synchronized(lock) {
+            val currentSurface = surfaceContainer?.getSurface()
+            if (currentSurface === snapshot.surface) surfaceView else null
+        } ?: return false
+        view.setBitmap(bitmap)
+        synchronized(lock) {
+            postedBitmaps += bitmap
+            while (postedBitmaps.size > 3) postedBitmaps.removeAt(0)
+        }
+        trace(
+            "postBitmap: bitmap remise à la vue VirtualDisplay, " +
+                "image=${bitmap.width}x${bitmap.height}, view=${System.identityHashCode(view)}, " +
+                "matériel=${view.isHardwareAccelerated}, imagesRetenues=" +
+                synchronized(lock) { postedBitmaps.size }
+        )
+        return true
+    }
+
+    private fun clearVirtualDisplay(snapshot: SurfaceSnapshot): Boolean {
+        val view = synchronized(lock) {
+            if (surfaceContainer?.getSurface() === snapshot.surface) surfaceView else null
+        } ?: return false
+        view.clearBitmap()
+        trace("postFallback: fond uni remis à la vue VirtualDisplay")
+        return true
+    }
+
+    private fun clearVirtualDisplay(container: SurfaceContainer): Boolean {
+        val view = synchronized(lock) {
+            if (surfaceContainer === container) surfaceView else null
+        } ?: return false
+        view.clearBitmap()
+        trace("postFallback: fond uni remis à la vue VirtualDisplay")
+        return true
+    }
+
+    /** Libère la Presentation et la VirtualDisplay, ou la Surface directement en mode Canvas. */
+    private fun releaseRenderingTarget(surface: Surface?, reason: String) {
+        val target = synchronized(lock) {
+            val value = ReleaseTarget(virtualDisplay, presentation)
+            virtualDisplay = null
+            presentation = null
+            surfaceView = null
+            value
+        }
+        if (target.presentation != null) {
+            runCatching { target.presentation.dismiss() }
+                .onFailure {
+                    trace(
+                        "releaseRenderingTarget[$reason]: dismiss échoué=" +
+                            "${it.javaClass.simpleName}: ${it.message ?: "-"}"
+                    )
+                }
+        }
+        if (target.virtualDisplay != null) {
+            runCatching { target.virtualDisplay.release() }
+                .onSuccess { trace("releaseRenderingTarget[$reason]: VirtualDisplay libérée") }
+                .onFailure {
+                    trace(
+                        "releaseRenderingTarget[$reason]: release VirtualDisplay échoué=" +
+                            "${it.javaClass.simpleName}: ${it.message ?: "-"}"
+                    )
+                }
+        } else if (surface != null) {
+            runCatching { surface.release() }
+                .onSuccess { trace("releaseRenderingTarget[$reason]: Surface libérée directement") }
+                .onFailure {
+                    trace(
+                        "releaseRenderingTarget[$reason]: release Surface échoué=" +
+                            "${it.javaClass.simpleName}: ${it.message ?: "-"}"
+                    )
+                }
+        }
     }
 
     /** Android Auto fournit généralement une surface matérielle pour cette zone cartographique. */
@@ -694,4 +869,67 @@ internal class CarAntennaMapSurfaceCallback(
         val height: Int,
         val camera: WidgetMapCamera
     )
+
+    private data class ReleaseTarget(
+        val virtualDisplay: VirtualDisplay?,
+        val presentation: Presentation?
+    )
+
+    private class MapSurfaceView(
+        context: Context,
+        private val expectedWidth: Int,
+        private val expectedHeight: Int
+    ) : View(context) {
+        private val bitmapPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+        @Volatile private var bitmap: Bitmap? = null
+        private var firstDrawLogged = false
+
+        init {
+            setBackgroundColor(Color.rgb(18, 29, 40))
+            isFocusable = false
+        }
+
+        fun setBitmap(value: Bitmap) {
+            bitmap = value
+            postInvalidateOnAnimation()
+        }
+
+        fun clearBitmap() {
+            bitmap = null
+            postInvalidateOnAnimation()
+        }
+
+        override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
+            super.onSizeChanged(width, height, oldWidth, oldHeight)
+            AppFileLog.i(
+                CAR_LOG_TAG,
+                "MapSurfaceView: taille=${width}x${height}, attendue=${expectedWidth}x${expectedHeight}, " +
+                    "ancienne=${oldWidth}x${oldHeight}"
+            )
+        }
+
+        override fun onDraw(canvas: Canvas) {
+            super.onDraw(canvas)
+            canvas.drawColor(Color.rgb(18, 29, 40))
+            val value = bitmap
+            if (value != null && !value.isRecycled) {
+                if (value.width == width && value.height == height) {
+                    canvas.drawBitmap(value, 0f, 0f, null)
+                } else {
+                    canvas.drawBitmap(value, null, Rect(0, 0, width, height), bitmapPaint)
+                }
+            }
+            if (!firstDrawLogged) {
+                firstDrawLogged = true
+                AppFileLog.i(
+                    CAR_LOG_TAG,
+                    "MapSurfaceView: premier onDraw, view=${width}x${height}, " +
+                        "bitmap=${value?.let { "${it.width}x${it.height},recyclée=${it.isRecycled}" } ?: "null"}, " +
+                        "canvasMatériel=${canvas.isHardwareAccelerated}"
+                )
+            }
+        }
+    }
 }
+
+private const val VIRTUAL_DISPLAY_NAME = "GeoTower Android Auto Map"
