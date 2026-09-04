@@ -259,17 +259,34 @@ object AntennaMapWidgetRenderer {
         val bitmap = Bitmap.createBitmap(spec.width, spec.height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         val density = spec.width.toFloat() / spec.logicalWidth
+        AppFileLog.i(
+            MAP_RENDER_LOG_TAG,
+            "Rendu démarré: sourceDemandée=$mapProvider, ignStyle=$ignStyle, " +
+                "fond=$drawBaseTiles, bitmap=${spec.width}x${spec.height}, " +
+                "sites=${data.sites.size}, antennes=${data.sites.sumOf { it.antennas.size }}, " +
+                "caméra=${camera ?: "automatique"}"
+        )
         // Le fond de secours est posé avant les tuiles : une tuile manquante ou un fournisseur
         // momentanément indisponible ne laisse jamais une bitmap transparente sur la surface.
         drawFallbackBackground(canvas, density, spec)
         val tileSource = if (drawBaseTiles) {
             runCatching { tileSourceFor(context, mapProvider, ignStyle) }
+                .onFailure {
+                    AppFileLog.e(MAP_RENDER_LOG_TAG, "Sélection de la source de tuiles en échec", it)
+                }
                 .getOrElse { fallbackTileSource() }
         } else {
             fallbackTileSource()
         }
         val tileTrace = TileRenderTrace(tileSource.cacheKey, drawBaseTiles)
         val viewport = widgetViewport(data, spec, tileSource.maxRenderZoom, camera)
+        AppFileLog.i(
+            MAP_RENDER_LOG_TAG,
+            "Viewport calculé: source=${tileSource.cacheKey}, zoom=${viewport.zoom}, " +
+                "zoomLogique=${viewport.logicalZoom}, centre=${viewport.centerLat},${viewport.centerLon}, " +
+                "topLeft=${viewport.topLeftPixelX},${viewport.topLeftPixelY}, " +
+                "pixelsSourceParPixel=${viewport.sourcePixelsPerOutputPixel}"
+        )
 
         try {
             if (drawBaseTiles) {
@@ -282,11 +299,22 @@ object AntennaMapWidgetRenderer {
             }
             // Un site malformé ne doit pas empêcher l'affichage du fond et des autres sites.
             runCatching { drawSites(context, canvas, data, viewport, density, spec, options) }
+                .onFailure {
+                    tileTrace.failure("drawSites:${it.javaClass.simpleName}")
+                    AppFileLog.e(MAP_RENDER_LOG_TAG, "Rendu des antennes en échec", it)
+                }
             runCatching {
                 drawUserMarker(canvas, viewport.projectX(data.userLon), viewport.projectY(data.userLat), density)
+            }.onFailure {
+                tileTrace.failure("drawUserMarker:${it.javaClass.simpleName}")
+                AppFileLog.e(MAP_RENDER_LOG_TAG, "Rendu de la position utilisateur en échec", it)
             }
         } finally {
-            tileSource.mapsForgeTileSource?.dispose()
+            runCatching { tileSource.mapsForgeTileSource?.dispose() }
+                .onFailure {
+                    tileTrace.failure("disposeSource:${it.javaClass.simpleName}")
+                    AppFileLog.e(MAP_RENDER_LOG_TAG, "Libération de la source de tuiles en échec", it)
+                }
             tileTrace.log()
         }
         return bitmap

@@ -7,6 +7,7 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Rect
 import android.os.Build
+import android.os.SystemClock
 import android.view.Surface
 import androidx.car.app.SurfaceCallback
 import androidx.car.app.SurfaceContainer
@@ -21,6 +22,7 @@ import fr.geotower.widget.WidgetMapRenderOptions
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
@@ -38,7 +40,9 @@ internal class CarAntennaMapSurfaceCallback(
     private val renderScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val generation = AtomicLong(0L)
     private val traceSequence = AtomicLong(0L)
+    private val traceStartedAt = SystemClock.elapsedRealtime()
     private val lock = Any()
+    private var renderJob: Job? = null
     @Volatile private var latestData: WidgetMapData? = null
     @Volatile private var surfaceContainer: SurfaceContainer? = null
     private var camera: WidgetMapCamera? = null
@@ -160,6 +164,13 @@ internal class CarAntennaMapSurfaceCallback(
         if (shouldRelease) {
             val newGeneration = generation.incrementAndGet()
             trace("onSurfaceDestroyed: surface libérée, génération=$newGeneration")
+            val job = synchronized(lock) {
+                renderJob.also { renderJob = null }
+            }
+            if (job?.isActive == true) {
+                trace("onSurfaceDestroyed: rendu actif annulé car la surface a disparu")
+                job.cancel()
+            }
             container.getSurface()?.release()
         } else {
             trace("onSurfaceDestroyed: ancienne surface ignorée")
@@ -222,18 +233,48 @@ internal class CarAntennaMapSurfaceCallback(
     }
 
     fun recenter() {
-        trace("recenter")
-        synchronized(lock) {
-            val container = surfaceContainer ?: return
-            val data = latestData ?: return
-            camera = AntennaMapWidgetRenderer.initialSurfaceCamera(
-                data,
-                container.getWidth(),
-                container.getHeight()
+        trace("recenter demandé")
+        val shouldRender = try {
+            synchronized(lock) {
+                val container = surfaceContainer
+                val data = latestData
+                when {
+                    container == null -> {
+                        trace("recenter ignoré: aucune surface disponible")
+                        false
+                    }
+                    data == null -> {
+                        trace("recenter ignoré: données de carte absentes")
+                        false
+                    }
+                    container.getWidth() <= 0 || container.getHeight() <= 0 -> {
+                        trace(
+                            "recenter ignoré: dimensions invalides " +
+                                "${container.getWidth()}x${container.getHeight()}"
+                        )
+                        false
+                    }
+                    else -> {
+                        camera = AntennaMapWidgetRenderer.initialSurfaceCamera(
+                            data,
+                            container.getWidth(),
+                            container.getHeight()
+                        )
+                        scaleRemainder = 0.0
+                        trace("recenter appliqué: caméra=$camera")
+                        true
+                    }
+                }
+            }
+        } catch (error: Throwable) {
+            AppFileLog.e(CAR_LOG_TAG, "Echec du recentrage de la carte", error)
+            trace(
+                "recenter en échec: ${error.javaClass.simpleName}: " +
+                    (error.message ?: "-")
             )
-            scaleRemainder = 0.0
+            false
         }
-        requestRender()
+        if (shouldRender) requestRender()
     }
 
     fun detachSurface() {
@@ -252,6 +293,13 @@ internal class CarAntennaMapSurfaceCallback(
         val newGeneration = generation.incrementAndGet()
         trace("close: génération=$newGeneration")
         detachSurface()
+        val job = synchronized(lock) {
+            renderJob.also { renderJob = null }
+        }
+        if (job != null) {
+            trace("close: annulation du rendu actif=${job.isActive}")
+            job.cancel()
+        }
         renderScope.cancel()
     }
 
@@ -261,6 +309,13 @@ internal class CarAntennaMapSurfaceCallback(
             "requestRender: génération=$requestedGeneration, preview=$previewFirst, " +
                 "provider=${AppConfig.mapProvider.intValue}, ignStyle=${AppConfig.ignStyle.intValue}"
         )
+        val previousJob = synchronized(lock) {
+            renderJob.also { renderJob = null }
+        }
+        if (previousJob?.isActive == true) {
+            trace("requestRender[$requestedGeneration]: ancien rendu annulé pour éviter les rendus concurrents")
+            previousJob.cancel()
+        }
         val snapshot = synchronized(lock) {
             val container = surfaceContainer ?: run {
                 trace("requestRender[$requestedGeneration] abandonné: aucune surface")
@@ -299,7 +354,7 @@ internal class CarAntennaMapSurfaceCallback(
                 "antennes=${data.sites.sumOf { it.antennas.size }}, caméra=${snapshot.camera}"
         )
 
-        renderScope.launch(Dispatchers.IO) {
+        val newJob = renderScope.launch(Dispatchers.IO) {
             val startedAt = android.os.SystemClock.elapsedRealtime()
             trace("render[$requestedGeneration] début sur thread=${Thread.currentThread().name}")
             try {
@@ -319,14 +374,19 @@ internal class CarAntennaMapSurfaceCallback(
                         )
                     }.getOrNull()
                     if (preview != null) {
+                        prepareBitmapForSurface(preview, requestedGeneration, "aperçu")
                         withContext(Dispatchers.Main.immediate) {
                             val current = requestedGeneration == generation.get()
                             trace(
                                 "render[$requestedGeneration] aperçu prêt, " +
                                     "générationCourante=${generation.get()}, post=$current"
                             )
-                            if (current) postBitmap(snapshot, preview)
-                            preview.recycle()
+                            if (current) {
+                                postBitmap(snapshot, preview)
+                            } else {
+                                // Un aperçu obsolète n'a jamais été remis à la surface.
+                                preview.recycle()
+                            }
                         }
                     } else {
                         trace("render[$requestedGeneration] aperçu indisponible")
@@ -347,6 +407,7 @@ internal class CarAntennaMapSurfaceCallback(
                     "render[$requestedGeneration] rendu complet terminé en " +
                         "${android.os.SystemClock.elapsedRealtime() - startedAt} ms"
                 )
+                prepareBitmapForSurface(bitmap, requestedGeneration, "carte complète")
                 withContext(Dispatchers.Main.immediate) {
                     val current = requestedGeneration == generation.get()
                     trace(
@@ -355,8 +416,11 @@ internal class CarAntennaMapSurfaceCallback(
                     )
                     if (current) {
                         postBitmap(snapshot, bitmap)
+                    } else {
+                        // Une image obsolète peut être libérée immédiatement : elle n'est pas
+                        // référencée par un Canvas matériel.
+                        bitmap.recycle()
                     }
-                    bitmap.recycle()
                 }
             } catch (cancelled: CancellationException) {
                 trace("render[$requestedGeneration] annulé après ${android.os.SystemClock.elapsedRealtime() - startedAt} ms")
@@ -375,6 +439,9 @@ internal class CarAntennaMapSurfaceCallback(
                 }
             }
         }
+        synchronized(lock) {
+            renderJob = newJob
+        }
     }
 
     private fun currentRenderOptions(): WidgetMapRenderOptions {
@@ -384,6 +451,22 @@ internal class CarAntennaMapSurfaceCallback(
             showAzimuthCones = AppConfig.showAzimuthsCone.value,
             showTechnoFh = AppConfig.showTechnoFH.value
         )
+    }
+
+    private fun prepareBitmapForSurface(bitmap: Bitmap, requestedGeneration: Long, label: String) {
+        runCatching { bitmap.prepareToDraw() }
+            .onSuccess {
+                trace(
+                    "render[$requestedGeneration] $label préparée pour le Canvas, " +
+                        "taille=${bitmap.width}x${bitmap.height}, config=${bitmap.config}"
+                )
+            }
+            .onFailure {
+                trace(
+                    "render[$requestedGeneration] préparation de $label impossible=" +
+                        "${it.javaClass.simpleName}: ${it.message ?: "-"}"
+                )
+            }
     }
 
     private fun updateCamera(transform: (WidgetMapCamera) -> WidgetMapCamera) {
@@ -401,10 +484,25 @@ internal class CarAntennaMapSurfaceCallback(
     }
 
     private fun postBitmap(snapshot: SurfaceSnapshot, bitmap: Bitmap) {
+        if (bitmap.isRecycled) {
+            trace(
+                "postBitmap: bitmap déjà recyclée avant affichage, " +
+                    "surface=${System.identityHashCode(snapshot.surface)}"
+            )
+            AppFileLog.w(CAR_LOG_TAG, "Bitmap de carte recyclée avant publication")
+            postFallback(snapshot)
+            return
+        }
         val canvas = lockSurfaceCanvas(snapshot.surface) ?: run {
             trace("postBitmap: impossible de verrouiller la surface=${System.identityHashCode(snapshot.surface)}")
             return
         }
+        trace(
+            "postBitmap: début image=${bitmap.width}x${bitmap.height}, " +
+                "config=${bitmap.config}, recyclée=${bitmap.isRecycled}, " +
+                "canvasMatériel=${canvas.isHardwareAccelerated}, " +
+                "surface=${System.identityHashCode(snapshot.surface)}"
+        )
         try {
             canvas.drawColor(Color.rgb(18, 29, 40))
             canvas.drawBitmap(
@@ -415,8 +513,19 @@ internal class CarAntennaMapSurfaceCallback(
             )
         } finally {
             runCatching { snapshot.surface.unlockCanvasAndPost(canvas) }
+                .onSuccess { trace("postBitmap: unlockCanvasAndPost réussi") }
+                .onFailure {
+                    trace(
+                        "postBitmap: unlockCanvasAndPost échoué=" +
+                            "${it.javaClass.simpleName}: ${it.message ?: "-"}"
+                    )
+                }
         }
-        trace("postBitmap: image=${bitmap.width}x${bitmap.height} publiée sur surface=${System.identityHashCode(snapshot.surface)}")
+        trace(
+            "postBitmap: image=${bitmap.width}x${bitmap.height} publiée; " +
+                "bitmap non recyclée après publication pour préserver sa durée de vie GPU; " +
+                "surface=${System.identityHashCode(snapshot.surface)}"
+        )
     }
 
     private fun postFallback(snapshot: SurfaceSnapshot) {
@@ -428,6 +537,13 @@ internal class CarAntennaMapSurfaceCallback(
             canvas.drawColor(Color.rgb(18, 29, 40))
         } finally {
             runCatching { snapshot.surface.unlockCanvasAndPost(canvas) }
+                .onSuccess { trace("postFallback(snapshot): unlockCanvasAndPost réussi") }
+                .onFailure {
+                    trace(
+                        "postFallback(snapshot): unlockCanvasAndPost échoué=" +
+                            "${it.javaClass.simpleName}: ${it.message ?: "-"}"
+                    )
+                }
         }
         trace("postFallback(snapshot): fond uni publié")
     }
@@ -442,6 +558,13 @@ internal class CarAntennaMapSurfaceCallback(
             canvas.drawColor(Color.rgb(18, 29, 40))
         } finally {
             runCatching { surface.unlockCanvasAndPost(canvas) }
+                .onSuccess { trace("postFallback(container): unlockCanvasAndPost réussi") }
+                .onFailure {
+                    trace(
+                        "postFallback(container): unlockCanvasAndPost échoué=" +
+                            "${it.javaClass.simpleName}: ${it.message ?: "-"}"
+                    )
+                }
         }
         trace("postFallback(container): fond uni publié sur container=${System.identityHashCode(container)}")
     }
@@ -454,6 +577,12 @@ internal class CarAntennaMapSurfaceCallback(
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             runCatching { surface.lockHardwareCanvas() }
+                .onSuccess {
+                    trace(
+                        "lockSurfaceCanvas: lockHardwareCanvas réussi, " +
+                            "matériel=${it.isHardwareAccelerated}, surface=${System.identityHashCode(surface)}"
+                    )
+                }
                 .onFailure {
                     trace(
                         "lockSurfaceCanvas: lockHardwareCanvas échoué=" +
@@ -464,6 +593,12 @@ internal class CarAntennaMapSurfaceCallback(
                 ?.let { return it }
         }
         return runCatching { surface.lockCanvas(null) }
+            .onSuccess {
+                trace(
+                    "lockSurfaceCanvas: lockCanvas réussi, " +
+                        "matériel=${it.isHardwareAccelerated}, surface=${System.identityHashCode(surface)}"
+                )
+            }
             .onFailure {
                 trace(
                     "lockSurfaceCanvas: lockCanvas échoué=" +
@@ -483,9 +618,11 @@ internal class CarAntennaMapSurfaceCallback(
     }
 
     private fun trace(message: String) {
+        val elapsed = SystemClock.elapsedRealtime() - traceStartedAt
         AppFileLog.i(
             CAR_LOG_TAG,
-            "SurfaceMap#${traceSequence.incrementAndGet()}: $message"
+            "SurfaceMap#${traceSequence.incrementAndGet()} (+${elapsed}ms, " +
+                "thread=${Thread.currentThread().name}): $message"
         )
     }
 

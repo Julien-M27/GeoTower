@@ -17,8 +17,8 @@ import java.util.Locale
  * démarrage. [AppLogger] ne parle qu'à logcat et seulement en debug ; ici on garde une trace lisible
  * depuis l'appareil, exportable depuis la page Diagnostic.
  *
- * Le volume est volontairement faible — étapes clés et erreurs uniquement — et le fichier est
- * plafonné, on n'écrit donc jamais sur un chemin chaud.
+ * Le volume est borné pour conserver les dernières sessions, mais les traces détaillées utiles au
+ * diagnostic (surface, permissions, rendu, réseau et exceptions) restent conservées.
  */
 object AppFileLog {
     private const val TAG = "AppFileLog"
@@ -34,7 +34,7 @@ object AppFileLog {
     private val lock = Any()
 
     // SimpleDateFormat n'est pas thread-safe : toutes les écritures passent par `lock`.
-    private val stampFormat = SimpleDateFormat("MM-dd HH:mm:ss.SSS", Locale.US)
+    private val stampFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS Z", Locale.US)
 
     @Volatile
     private var appContext: Context? = null
