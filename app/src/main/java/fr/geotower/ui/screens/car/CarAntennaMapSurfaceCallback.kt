@@ -10,6 +10,7 @@ import android.graphics.drawable.ColorDrawable
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
 import android.os.Build
+import android.os.Looper
 import android.os.SystemClock
 import android.app.Presentation
 import android.view.Surface
@@ -896,20 +897,42 @@ internal class CarAntennaMapSurfaceCallback(
         private val bitmapPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
         @Volatile private var bitmap: Bitmap? = null
         private var firstDrawLogged = false
+        private var drawCount = 0
 
         init {
             setBackgroundColor(Color.rgb(18, 29, 40))
             isFocusable = false
+            // Le contenu est une bitmap déjà rasterisée. Une couche logicielle évite qu'un hôte
+            // Android Auto compose mal le buffer GPU de la Presentation sur la Surface fournie.
+            setLayerType(View.LAYER_TYPE_SOFTWARE, null)
         }
 
         fun setBitmap(value: Bitmap) {
             bitmap = value
-            postInvalidateOnAnimation()
+            AppFileLog.i(
+                CAR_LOG_TAG,
+                "MapSurfaceView: bitmap reçue=${value.width}x${value.height}, " +
+                    "vue=${width}x${height}, attachée=$isAttachedToWindow, visible=$isShown, " +
+                    "visibilité=$visibility, fenêtre=$windowVisibility, " +
+                    "thread=${Thread.currentThread().name}"
+            )
+            // postInvalidateOnAnimation() peut ne pas être relayé par le Choreographer d'une
+            // Presentation sur écran secondaire. Les publications viennent normalement du main
+            // thread ; invalidate() force alors le passage par ViewRootImpl.
+            if (Looper.myLooper() == Looper.getMainLooper()) {
+                invalidate()
+            } else {
+                postInvalidate()
+            }
         }
 
         fun clearBitmap() {
             bitmap = null
-            postInvalidateOnAnimation()
+            if (Looper.myLooper() == Looper.getMainLooper()) {
+                invalidate()
+            } else {
+                postInvalidate()
+            }
         }
 
         override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
@@ -923,22 +946,26 @@ internal class CarAntennaMapSurfaceCallback(
 
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
+            drawCount += 1
             canvas.drawColor(Color.rgb(18, 29, 40))
             val value = bitmap
+            var bitmapDrawn = false
             if (value != null && !value.isRecycled) {
                 if (value.width == width && value.height == height) {
                     canvas.drawBitmap(value, 0f, 0f, null)
                 } else {
                     canvas.drawBitmap(value, null, Rect(0, 0, width, height), bitmapPaint)
                 }
+                bitmapDrawn = true
             }
-            if (!firstDrawLogged) {
+            if (!firstDrawLogged || bitmapDrawn) {
                 firstDrawLogged = true
                 AppFileLog.i(
                     CAR_LOG_TAG,
-                    "MapSurfaceView: premier onDraw, view=${width}x${height}, " +
+                    "MapSurfaceView: onDraw#$drawCount, view=${width}x${height}, " +
                         "bitmap=${value?.let { "${it.width}x${it.height},recyclée=${it.isRecycled}" } ?: "null"}, " +
-                        "canvasMatériel=${canvas.isHardwareAccelerated}"
+                        "bitmapDessiné=$bitmapDrawn, canvasMatériel=${canvas.isHardwareAccelerated}, " +
+                        "attachée=$isAttachedToWindow, visible=$isShown"
                 )
             }
         }

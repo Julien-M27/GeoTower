@@ -3220,6 +3220,6 @@
     <string name="appstrings_release_v2042_database_count">Fixed the database count shown in update and download banners</string>
     <string name="appstrings_release_v2043_database">Corrected database update labels and counts</string>
     <string name="appstrings_release_v2043_android_auto">Improved Android Auto resilience for map and location permissions</string>
-    <string name="appstrings_release_v2055_summary_map">Android Auto map framing and visible areas improved</string>
-    <string name="appstrings_release_v2055_summary_diagnostics">Stronger rendering and site diagnostics</string>
+    <string name="appstrings_release_v2056_summary_map">More consistent Android Auto map display on secondary screens</string>
+    <string name="appstrings_release_v2056_summary_diagnostics">Improved software refresh and diagnostics</string>
 </resources>
