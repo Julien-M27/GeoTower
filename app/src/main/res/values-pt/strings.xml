@@ -3197,6 +3197,6 @@
     <string name="appstrings_release_v2042_database_count">Corrigida a apresentação do número de bases nos avisos de atualização e transferência</string>
     <string name="appstrings_release_v2043_database">Corrigidos os textos e contadores das atualizações das bases</string>
     <string name="appstrings_release_v2043_android_auto">O Android Auto gere melhor os erros do mapa e as permissões de localização</string>
-    <string name="appstrings_release_v2054_summary_map">Renderização do mapa do Android Auto mais compatível com diferentes veículos</string>
-    <string name="appstrings_release_v2054_summary_stability">Maior estabilidade da renderização e da atualização</string>
+    <string name="appstrings_release_v2055_summary_map">Android Auto: enquadramento e áreas visíveis do mapa melhorados</string>
+    <string name="appstrings_release_v2055_summary_diagnostics">Diagnóstico da renderização e dos locais reforçado</string>
 </resources>

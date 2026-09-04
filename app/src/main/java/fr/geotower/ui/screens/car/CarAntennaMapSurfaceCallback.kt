@@ -14,6 +14,7 @@ import android.os.SystemClock
 import android.app.Presentation
 import android.view.Surface
 import android.view.View
+import android.view.ViewGroup
 import androidx.car.app.SurfaceCallback
 import androidx.car.app.SurfaceContainer
 import fr.geotower.utils.AppConfig
@@ -52,6 +53,8 @@ internal class CarAntennaMapSurfaceCallback(
     @Volatile private var surfaceContainer: SurfaceContainer? = null
     private var camera: WidgetMapCamera? = null
     private var scaleRemainder = 0.0
+    private var visibleArea: Rect? = null
+    private var stableArea: Rect? = null
     /**
      * Chemin recommandé par la documentation Android for Cars pour rendre des vues dans la
      * Surface fournie par l'hôte. Certains hôtes Android Auto acceptent lockHardwareCanvas() et
@@ -202,12 +205,14 @@ internal class CarAntennaMapSurfaceCallback(
     }
 
     override fun onVisibleAreaChanged(visibleArea: Rect) {
-        trace("onVisibleAreaChanged: $visibleArea")
+        synchronized(lock) { this.visibleArea = Rect(visibleArea) }
+        trace("onVisibleAreaChanged: $visibleArea, ${surfaceDescription()}")
         requestRender()
     }
 
     override fun onStableAreaChanged(stableArea: Rect) {
-        trace("onStableAreaChanged: $stableArea")
+        synchronized(lock) { this.stableArea = Rect(stableArea) }
+        trace("onStableAreaChanged: $stableArea, ${surfaceDescription()}")
         requestRender()
     }
 
@@ -474,7 +479,8 @@ internal class CarAntennaMapSurfaceCallback(
             defaultOperator = AppConfig.defaultOperator.value,
             showAzimuths = AppConfig.showAzimuths.value,
             showAzimuthCones = AppConfig.showAzimuthsCone.value,
-            showTechnoFh = AppConfig.showTechnoFH.value
+            showTechnoFh = AppConfig.showTechnoFH.value,
+            drawSiteOverlays = DRAW_CAR_MAP_SITE_OVERLAYS
         )
     }
 
@@ -684,12 +690,17 @@ internal class CarAntennaMapSurfaceCallback(
             createdDisplay = displayInstance
             val display = displayInstance.display
             val view = MapSurfaceView(context, container.getWidth(), container.getHeight())
+            view.layoutParams = ViewGroup.LayoutParams(
+                container.getWidth(),
+                container.getHeight()
+            )
             createdPresentation = Presentation(context, display).also { presentation ->
                 presentation.window?.setBackgroundDrawable(
                     ColorDrawable(Color.rgb(18, 29, 40))
                 )
                 presentation.setContentView(view)
                 presentation.show()
+                presentation.window?.setLayout(container.getWidth(), container.getHeight())
             }
             synchronized(lock) {
                 virtualDisplay = createdDisplay
@@ -851,7 +862,9 @@ internal class CarAntennaMapSurfaceCallback(
         "container=${System.identityHashCode(container)}, " +
             "surface=${surface?.let { System.identityHashCode(it) } ?: "null"}, " +
             "taille=${container.getWidth()}x${container.getHeight()}, " +
-            "valide=${surface?.isValid == true}"
+            "valide=${surface?.isValid == true}, " +
+            "visible=$visibleArea, stable=$stableArea, " +
+            "virtualDisplay=${virtualDisplay != null}, view=${surfaceView?.let { System.identityHashCode(it) } ?: "null"}"
     }
 
     private fun trace(message: String) {
@@ -933,3 +946,7 @@ internal class CarAntennaMapSurfaceCallback(
 }
 
 private const val VIRTUAL_DISPLAY_NAME = "GeoTower Android Auto Map"
+
+// Variante normale. Pour l'essai A/B demandé, cette constante est temporairement passée à false
+// lors de la génération d'un APK de diagnostic, puis remise à true pour l'APK courant.
+private const val DRAW_CAR_MAP_SITE_OVERLAYS = true

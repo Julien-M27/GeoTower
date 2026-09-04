@@ -82,7 +82,9 @@ data class WidgetMapRenderOptions(
     val defaultOperator: String,
     val showAzimuths: Boolean,
     val showAzimuthCones: Boolean,
-    val showTechnoFh: Boolean
+    val showTechnoFh: Boolean,
+    /** Permet d'isoler le pipeline de fond du dessin des sites pendant un diagnostic Android Auto. */
+    val drawSiteOverlays: Boolean = true
 )
 
 /** Caméra persistante de la carte voiture, exprimée en centre géographique et niveau de zoom. */
@@ -264,6 +266,7 @@ object AntennaMapWidgetRenderer {
             "Rendu démarré: sourceDemandée=$mapProvider, ignStyle=$ignStyle, " +
                 "fond=$drawBaseTiles, bitmap=${spec.width}x${spec.height}, " +
                 "sites=${data.sites.size}, antennes=${data.sites.sumOf { it.antennas.size }}, " +
+                "sitesSurCarte=${options.drawSiteOverlays}, " +
                 "caméra=${camera ?: "automatique"}"
         )
         // Le fond de secours est posé avant les tuiles : une tuile manquante ou un fournisseur
@@ -297,12 +300,17 @@ object AntennaMapWidgetRenderer {
                     AppFileLog.e(MAP_RENDER_LOG_TAG, "Rendu des tuiles en échec", it)
                 }
             }
-            // Un site malformé ne doit pas empêcher l'affichage du fond et des autres sites.
-            runCatching { drawSites(context, canvas, data, viewport, density, spec, options) }
-                .onFailure {
-                    tileTrace.failure("drawSites:${it.javaClass.simpleName}")
-                    AppFileLog.e(MAP_RENDER_LOG_TAG, "Rendu des antennes en échec", it)
-                }
+            if (options.drawSiteOverlays) {
+                // Un site malformé ne doit pas empêcher l'affichage du fond et des autres sites.
+                runCatching { drawSites(context, canvas, data, viewport, density, spec, options) }
+                    .onFailure {
+                        tileTrace.failure("drawSites:${it.javaClass.simpleName}")
+                        AppFileLog.e(MAP_RENDER_LOG_TAG, "Rendu des antennes en échec", it)
+                    }
+            } else {
+                tileTrace.failure("drawSites:diagnosticDésactivé")
+                AppFileLog.i(MAP_RENDER_LOG_TAG, "Dessin des sites désactivé pour ce rendu de diagnostic")
+            }
             runCatching {
                 drawUserMarker(canvas, viewport.projectX(data.userLon), viewport.projectY(data.userLat), density)
             }.onFailure {
