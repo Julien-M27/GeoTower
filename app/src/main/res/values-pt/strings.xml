@@ -2333,8 +2333,23 @@
     <string name="appstrings_diagnostic_api_mode_mirror">Sempre o espelho</string>
     <string name="appstrings_diagnostic_api_never">Nunca</string>
     <string name="appstrings_diagnostic_action_choose_api_server">Escolher o servidor</string>
+    <string name="appstrings_diagnostic_action_ping_api_server">Testar</string>
     <string name="appstrings_diagnostic_api_dialog_title">Servidor GeoTower</string>
     <string name="appstrings_diagnostic_api_dialog_desc">O GeoTower é servido por dois servidores idênticos. O modo automático usa o principal e muda para o espelho quando este deixa de responder.</string>
+    <string name="appstrings_diagnostic_ping_dialog_title">Testar servidor</string>
+    <string name="appstrings_diagnostic_ping_dialog_desc">Testa o servidor selecionado, com 1 segundo entre passagens.</string>
+    <string name="appstrings_diagnostic_ping_server_label">Servidor</string>
+    <string name="appstrings_diagnostic_ping_passes_label">Passagens</string>
+    <string name="appstrings_diagnostic_ping_passes_option">%1$d passagens</string>
+    <string name="appstrings_diagnostic_ping_running">Em curso… %1$d/%2$d</string>
+    <string name="appstrings_diagnostic_ping_run">Testar</string>
+    <string name="appstrings_diagnostic_ping_result_summary">%1$d/%2$d respostas</string>
+    <string name="appstrings_diagnostic_ping_result_stats">Média %1$d ms · mín. %2$d · máx. %3$d</string>
+    <string name="appstrings_diagnostic_ping_result_failures">%1$d falhas</string>
+    <string name="appstrings_diagnostic_ping_failed">O teste falhou.</string>
+    <string name="appstrings_diagnostic_ping_terminal_ready">Pronto</string>
+    <string name="appstrings_diagnostic_ping_terminal_reply">  #%1$d  %2$d ms</string>
+    <string name="appstrings_diagnostic_ping_terminal_timeout">  #%1$d  falhou</string>
     <string name="appstrings_diagnostic_action_open_database_settings">Abrir definições dos dados</string>
     <string name="appstrings_diagnostic_action_open_offline_maps">Abrir mapas offline</string>
     <string name="appstrings_diagnostic_action_open_app_settings">Abrir definições Android da aplicação</string>
@@ -3197,6 +3212,6 @@
     <string name="appstrings_release_v2042_database_count">Corrigida a apresentação do número de bases nos avisos de atualização e transferência</string>
     <string name="appstrings_release_v2043_database">Corrigidos os textos e contadores das atualizações das bases</string>
     <string name="appstrings_release_v2043_android_auto">O Android Auto gere melhor os erros do mapa e as permissões de localização</string>
-    <string name="appstrings_release_v2056_summary_map">Apresentação do mapa do Android Auto mais consistente em ecrãs secundários</string>
-    <string name="appstrings_release_v2056_summary_diagnostics">Melhorias na atualização por software e no diagnóstico</string>
+    <string name="appstrings_release_v2057_summary_ping">Novo teste de latência dos servidores GeoTower no diagnóstico</string>
+    <string name="appstrings_release_v2057_summary_diagnostics">Diagnóstico mais interativo com resultados mais claros</string>
 </resources>

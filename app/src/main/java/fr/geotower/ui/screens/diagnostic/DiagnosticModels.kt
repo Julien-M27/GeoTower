@@ -15,6 +15,9 @@ sealed class DiagnosticAction {
 
     /** Ouvre le choix « serveur principal / miroir / automatique » (voir `ApiEndpoints`). */
     object ChooseApiServer : DiagnosticAction()
+
+    /** Lance un test de latence vers l'un des deux serveurs GeoTower. */
+    object PingApiServer : DiagnosticAction()
 }
 
 data class DiagnosticItem(
@@ -24,7 +27,9 @@ data class DiagnosticItem(
     val severity: DiagnosticSeverity,
     val details: List<String> = emptyList(),
     val actionLabel: String? = null,
-    val action: DiagnosticAction? = null
+    val action: DiagnosticAction? = null,
+    val secondaryActionLabel: String? = null,
+    val secondaryAction: DiagnosticAction? = null
 )
 
 data class DiagnosticState(

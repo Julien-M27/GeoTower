@@ -2333,8 +2333,23 @@
     <string name="appstrings_diagnostic_api_mode_mirror">Always the mirror</string>
     <string name="appstrings_diagnostic_api_never">Never</string>
     <string name="appstrings_diagnostic_action_choose_api_server">Choose the server</string>
+    <string name="appstrings_diagnostic_action_ping_api_server">Test</string>
     <string name="appstrings_diagnostic_api_dialog_title">GeoTower server</string>
     <string name="appstrings_diagnostic_api_dialog_desc">GeoTower is served by two identical servers. Automatic mode uses the main one and falls back to the mirror when it stops responding.</string>
+    <string name="appstrings_diagnostic_ping_dialog_title">Server test</string>
+    <string name="appstrings_diagnostic_ping_dialog_desc">Tests the selected server, with 1 second between passes.</string>
+    <string name="appstrings_diagnostic_ping_server_label">Server</string>
+    <string name="appstrings_diagnostic_ping_passes_label">Passes</string>
+    <string name="appstrings_diagnostic_ping_passes_option">%1$d passes</string>
+    <string name="appstrings_diagnostic_ping_running">Running… %1$d/%2$d</string>
+    <string name="appstrings_diagnostic_ping_run">Run</string>
+    <string name="appstrings_diagnostic_ping_result_summary">%1$d/%2$d responses</string>
+    <string name="appstrings_diagnostic_ping_result_stats">Average %1$d ms · min %2$d · max %3$d</string>
+    <string name="appstrings_diagnostic_ping_result_failures">%1$d failed</string>
+    <string name="appstrings_diagnostic_ping_failed">Test failed.</string>
+    <string name="appstrings_diagnostic_ping_terminal_ready">Ready</string>
+    <string name="appstrings_diagnostic_ping_terminal_reply">  #%1$d  %2$d ms</string>
+    <string name="appstrings_diagnostic_ping_terminal_timeout">  #%1$d  failed</string>
     <string name="appstrings_diagnostic_action_open_database_settings">Open data settings</string>
     <string name="appstrings_diagnostic_action_open_offline_maps">Open offline maps</string>
     <string name="appstrings_diagnostic_action_open_app_settings">Open Android application settings</string>
@@ -3197,6 +3212,6 @@
     <string name="appstrings_release_v2042_database_count">Fixed the database count shown in update and download banners</string>
     <string name="appstrings_release_v2043_database">Corrected database update labels and counts</string>
     <string name="appstrings_release_v2043_android_auto">Improved Android Auto resilience for map and location permissions</string>
-    <string name="appstrings_release_v2056_summary_map">More consistent Android Auto map display on secondary screens</string>
-    <string name="appstrings_release_v2056_summary_diagnostics">Improved software refresh and diagnostics</string>
+    <string name="appstrings_release_v2057_summary_ping">New GeoTower server latency test in Diagnostics</string>
+    <string name="appstrings_release_v2057_summary_diagnostics">More interactive diagnostics with clearer results</string>
 </resources>

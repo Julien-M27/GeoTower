@@ -2333,8 +2333,23 @@
     <string name="appstrings_diagnostic_api_mode_mirror">Toujours le miroir</string>
     <string name="appstrings_diagnostic_api_never">Jamais</string>
     <string name="appstrings_diagnostic_action_choose_api_server">Choisir le serveur</string>
+    <string name="appstrings_diagnostic_action_ping_api_server">Tester</string>
     <string name="appstrings_diagnostic_api_dialog_title">Serveur GeoTower</string>
     <string name="appstrings_diagnostic_api_dialog_desc">GeoTower est servi par deux serveurs identiques. Le mode automatique utilise le principal et bascule sur le miroir quand il ne répond plus.</string>
+    <string name="appstrings_diagnostic_ping_dialog_title">Test du serveur</string>
+    <string name="appstrings_diagnostic_ping_dialog_desc">Teste le serveur choisi, avec 1 s entre chaque passe.</string>
+    <string name="appstrings_diagnostic_ping_server_label">Serveur</string>
+    <string name="appstrings_diagnostic_ping_passes_label">Passes</string>
+    <string name="appstrings_diagnostic_ping_passes_option">%1$d passes</string>
+    <string name="appstrings_diagnostic_ping_running">En cours… %1$d/%2$d</string>
+    <string name="appstrings_diagnostic_ping_run">Tester</string>
+    <string name="appstrings_diagnostic_ping_result_summary">%1$d/%2$d réponses</string>
+    <string name="appstrings_diagnostic_ping_result_stats">Moyenne %1$d ms · min %2$d · max %3$d</string>
+    <string name="appstrings_diagnostic_ping_result_failures">%1$d échec(s)</string>
+    <string name="appstrings_diagnostic_ping_failed">Le test a échoué.</string>
+    <string name="appstrings_diagnostic_ping_terminal_ready">Prêt</string>
+    <string name="appstrings_diagnostic_ping_terminal_reply">  #%1$d  %2$d ms</string>
+    <string name="appstrings_diagnostic_ping_terminal_timeout">  #%1$d  échec</string>
     <string name="appstrings_diagnostic_action_open_database_settings">Ouvrir les réglages des données</string>
     <string name="appstrings_diagnostic_action_open_offline_maps">Ouvrir les cartes hors-ligne</string>
     <string name="appstrings_diagnostic_action_open_app_settings">Ouvrir les réglages Android de l’application</string>
@@ -3199,6 +3214,6 @@
     <string name="appstrings_release_v2042_database_count">Correction de l’affichage du nombre de bases dans les bandeaux de mise à jour et de téléchargement</string>
     <string name="appstrings_release_v2043_database">Correction des libellés et compteurs des mises à jour de bases</string>
     <string name="appstrings_release_v2043_android_auto">Android Auto gère mieux les erreurs de carte et les permissions de localisation</string>
-    <string name="appstrings_release_v2056_summary_map">Carte Android Auto affichée plus régulièrement sur les écrans secondaires</string>
-    <string name="appstrings_release_v2056_summary_diagnostics">Rafraîchissement logiciel et diagnostic améliorés</string>
+    <string name="appstrings_release_v2057_summary_ping">Nouveau test de latence des serveurs GeoTower depuis le diagnostic</string>
+    <string name="appstrings_release_v2057_summary_diagnostics">Diagnostic plus interactif avec des résultats plus détaillés</string>
 </resources>

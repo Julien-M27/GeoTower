@@ -31,6 +31,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -57,16 +59,21 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearWavyProgressIndicator
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -75,9 +82,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -85,6 +94,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -93,6 +103,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import fr.geotower.data.api.ServerPingResult
+import fr.geotower.data.api.ServerPingSample
 import fr.geotower.data.share.ShareHistoryStore
 import fr.geotower.ui.theme.LocalGeoTowerUiSizing
 import androidx.core.app.NotificationManagerCompat
@@ -116,6 +131,7 @@ import fr.geotower.ui.components.PageScrollEdgeButtons
 import fr.geotower.ui.components.apiServerModeLabelRes
 import fr.geotower.ui.components.applyApiServerMode
 import fr.geotower.ui.components.geoTowerFadingEdge
+import fr.geotower.ui.components.isGeoTowerFadingEdgeActive
 import fr.geotower.ui.components.pageScrollbar
 import fr.geotower.utils.PageScrollPrefs
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
@@ -127,6 +143,7 @@ import fr.geotower.utils.PreferenceStores
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.text.SimpleDateFormat
@@ -154,9 +171,39 @@ fun DiagnosticScreen(navController: NavController) {
     var state by remember { mutableStateOf<DiagnosticState?>(null) }
     var isRefreshing by remember { mutableStateOf(false) }
     var showApiServerDialog by remember { mutableStateOf(false) }
+    var showApiServerPingDialog by remember { mutableStateOf(false) }
+    var pingServer by remember { mutableStateOf(ApiEndpoints.active()) }
+    var pingPasses by remember { mutableStateOf(ServerReachability.DEFAULT_PING_PASSES) }
+    var pingState by remember { mutableStateOf<DiagnosticPingState>(DiagnosticPingState.Idle) }
+    var pendingScrollTargetId by remember { mutableStateOf<String?>(null) }
     val scrollState = rememberScrollState()
     val uiStyle = LocalGeoTowerUiStyle.current
     val sizing = LocalGeoTowerUiSizing.current
+    val density = LocalDensity.current
+    val diagnosticFadeHeight = if (isGeoTowerFadingEdgeActive()) {
+        uiStyle.sizing.component(72.dp)
+    } else {
+        0.dp
+    }
+    val diagnosticCardTopPositions = remember { mutableStateMapOf<String, Float>() }
+    var scrollViewportTopInRoot by remember { mutableStateOf(0f) }
+
+    LaunchedEffect(pendingScrollTargetId) {
+        val targetId = pendingScrollTargetId ?: return@LaunchedEffect
+        val targetTopInRoot = diagnosticCardTopPositions[targetId] ?: return@LaunchedEffect
+        val targetTopInContent = targetTopInRoot - scrollViewportTopInRoot + scrollState.value
+        val topBreathingRoomPx = with(density) { sizing.spacing(8.dp).toPx() }
+        val targetScroll = with(density) {
+            (
+                targetTopInContent -
+                    diagnosticFadeHeight.toPx() -
+                    topBreathingRoomPx
+                ).roundToInt()
+        }.coerceIn(0, scrollState.maxValue)
+
+        scrollState.animateScrollTo(targetScroll)
+        pendingScrollTargetId = null
+    }
 
     fun refresh() {
         if (isRefreshing) return
@@ -243,11 +290,18 @@ fun DiagnosticScreen(navController: NavController) {
             ) {
                 DiagnosticScanProgressBar(visible = isRefreshing)
 
-                Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .onGloballyPositioned { coordinates ->
+                            scrollViewportTopInRoot = coordinates.positionInRoot().y
+                        }
+                ) {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .geoTowerFadingEdge(scrollState, fadeHeight = uiStyle.sizing.component(72.dp))
+                        .geoTowerFadingEdge(scrollState, fadeHeight = diagnosticFadeHeight)
                         .pageScrollbar(PageScrollPrefs.DIAGNOSTIC, scrollState)
                         .verticalScroll(scrollState)
                         .navigationBarsPadding()
@@ -268,17 +322,34 @@ fun DiagnosticScreen(navController: NavController) {
                         modifier = Modifier.alpha(staleAlpha),
                         verticalArrangement = Arrangement.spacedBy(uiStyle.sizing.spacing(14.dp))
                     ) {
-                        DiagnosticStatusGrid(items = currentState.items)
+                        DiagnosticStatusGrid(
+                            items = currentState.items,
+                            onItemClick = { item -> pendingScrollTargetId = item.id }
+                        )
 
                         currentState.items.forEach { item ->
-                            DiagnosticItemCard(
-                                item = item,
-                                onAction = { action ->
-                                    handleDiagnosticAction(context, navController, action) {
-                                        showApiServerDialog = true
+                            key(item.id) {
+                                DiagnosticItemCard(
+                                    item = item,
+                                    onPositioned = { coordinates ->
+                                        diagnosticCardTopPositions[item.id] = coordinates.positionInRoot().y
+                                    },
+                                    onAction = { action ->
+                                        handleDiagnosticAction(
+                                            context = context,
+                                            navController = navController,
+                                            action = action,
+                                            onChooseApiServer = { showApiServerDialog = true },
+                                            onPingApiServer = {
+                                                pingServer = ApiEndpoints.active()
+                                                pingPasses = ServerReachability.DEFAULT_PING_PASSES
+                                                pingState = DiagnosticPingState.Idle
+                                                showApiServerPingDialog = true
+                                            }
+                                        )
                                     }
-                                }
-                            )
+                                )
+                            }
                         }
                     }
 
@@ -350,6 +421,345 @@ fun DiagnosticScreen(navController: NavController) {
             }
         )
     }
+
+    if (showApiServerPingDialog) {
+        DiagnosticApiServerPingDialog(
+            selectedServer = pingServer,
+            selectedPasses = pingPasses,
+            state = pingState,
+            onServerSelected = { pingServer = it },
+            onPassesSelected = { pingPasses = it },
+            onRun = {
+                if (pingState !is DiagnosticPingState.Running) {
+                    scope.launch {
+                        pingState = DiagnosticPingState.Running(
+                            server = pingServer,
+                            passes = pingPasses,
+                            completedPasses = 0,
+                            samples = emptyList()
+                        )
+                        runCatching {
+                            ServerReachability.runPing(pingServer, pingPasses) { sample ->
+                                val previousSamples = (pingState as? DiagnosticPingState.Running)
+                                    ?.samples
+                                    .orEmpty()
+                                pingState = DiagnosticPingState.Running(
+                                    server = pingServer,
+                                    passes = pingPasses,
+                                    completedPasses = sample.attempt,
+                                    samples = previousSamples + sample
+                                )
+                            }
+                        }.onSuccess { result ->
+                            pingState = DiagnosticPingState.Completed(result)
+                        }.onFailure { error ->
+                            if (error is kotlinx.coroutines.CancellationException) throw error
+                            pingState = DiagnosticPingState.Failed
+                        }
+                    }
+                }
+            },
+            onDismiss = { showApiServerPingDialog = false }
+        )
+    }
+}
+
+private sealed interface DiagnosticPingState {
+    object Idle : DiagnosticPingState
+    data class Running(
+        val server: ApiServer,
+        val passes: Int,
+        val completedPasses: Int,
+        val samples: List<ServerPingSample>
+    ) : DiagnosticPingState
+    data class Completed(val result: ServerPingResult) : DiagnosticPingState
+    object Failed : DiagnosticPingState
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun DiagnosticApiServerPingDialog(
+    selectedServer: ApiServer,
+    selectedPasses: Int,
+    state: DiagnosticPingState,
+    onServerSelected: (ApiServer) -> Unit,
+    onPassesSelected: (Int) -> Unit,
+    onRun: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val sizing = LocalGeoTowerUiSizing.current
+    val isRunning = state is DiagnosticPingState.Running
+
+    AlertDialog(
+        onDismissRequest = { if (!isRunning) onDismiss() },
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurface,
+        title = {
+            Text(
+                text = stringResource(R.string.appstrings_diagnostic_ping_dialog_title),
+                color = MaterialTheme.colorScheme.onSurface,
+                style = sizing.textStyle(MaterialTheme.typography.headlineSmall),
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(sizing.spacing(6.dp))
+            ) {
+                Text(
+                    text = stringResource(R.string.appstrings_diagnostic_ping_dialog_desc),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(sizing.spacing(4.dp)))
+                Text(
+                    text = stringResource(R.string.appstrings_diagnostic_ping_server_label),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                ApiServer.entries.forEach { server ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(enabled = !isRunning) { onServerSelected(server) },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = server == selectedServer,
+                            onClick = if (isRunning) null else { { onServerSelected(server) } }
+                        )
+                        Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
+                        Text(
+                            text = "${if (server == selectedServer) ">" else " "} ${server.host}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = if (server == selectedServer) {
+                                MaterialTheme.colorScheme.onSurface
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                        )
+                    }
+                }
+                Text(
+                    text = stringResource(R.string.appstrings_diagnostic_ping_passes_label),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                listOf(
+                    ServerReachability.DEFAULT_PING_PASSES,
+                    ServerReachability.EXTENDED_PING_PASSES
+                ).forEach { passes ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(enabled = !isRunning) { onPassesSelected(passes) },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = passes == selectedPasses,
+                            onClick = if (isRunning) null else { { onPassesSelected(passes) } }
+                        )
+                        Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
+                        Text(
+                            text = "${if (passes == selectedPasses) ">" else " "} " +
+                                stringResource(R.string.appstrings_diagnostic_ping_passes_option, passes),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = if (passes == selectedPasses) {
+                                MaterialTheme.colorScheme.onSurface
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                        )
+                    }
+                }
+
+                DiagnosticPingTerminal(
+                    state = state,
+                    selectedServer = selectedServer,
+                    selectedPasses = selectedPasses
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = onRun, enabled = !isRunning) {
+                if (isRunning) {
+                    LoadingIndicator(
+                        modifier = Modifier.size(sizing.component(18.dp)),
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                } else {
+                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(sizing.component(18.dp)))
+                }
+                Spacer(modifier = Modifier.width(sizing.spacing(6.dp)))
+                Text(stringResource(R.string.appstrings_diagnostic_ping_run))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !isRunning) {
+                Text(stringResource(R.string.appstrings_close))
+            }
+        }
+    )
+}
+
+@Composable
+private fun DiagnosticPingTerminal(
+    state: DiagnosticPingState,
+    selectedServer: ApiServer,
+    selectedPasses: Int
+) {
+    val terminalTextStyle = MaterialTheme.typography.bodySmall
+    val terminalPanelShape = RoundedCornerShape(14.dp)
+    val terminalBackground = MaterialTheme.colorScheme.surfaceContainerHigh
+    val terminalText = MaterialTheme.colorScheme.onSurface
+    val terminalMuted = MaterialTheme.colorScheme.onSurfaceVariant
+    val terminalAccent = MaterialTheme.colorScheme.primary
+    val terminalError = MaterialTheme.colorScheme.error
+    val progressTarget = when (state) {
+        DiagnosticPingState.Idle -> 0f
+        is DiagnosticPingState.Running -> state.completedPasses.toFloat() / state.passes
+        is DiagnosticPingState.Completed -> 1f
+        DiagnosticPingState.Failed -> 0f
+    }.coerceIn(0f, 1f)
+    val animatedProgress by animateFloatAsState(
+        targetValue = progressTarget,
+        animationSpec = tween(
+            durationMillis = if (PowerProfile.richAnimations) 420 else 0,
+            easing = FastOutSlowInEasing
+        ),
+        label = "diagnostic-ping-terminal-progress"
+    )
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = terminalBackground,
+        contentColor = terminalText,
+        shape = terminalPanelShape,
+        tonalElevation = 2.dp,
+        border = BorderStroke(1.dp, terminalAccent.copy(alpha = 0.32f))
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(
+                text = "$ ping --count $selectedPasses ${selectedServer.host}",
+                style = terminalTextStyle,
+                color = terminalAccent,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (state is DiagnosticPingState.Running || state is DiagnosticPingState.Completed) {
+                LinearWavyProgressIndicator(
+                    progress = { animatedProgress },
+                    modifier = Modifier.fillMaxWidth().height(6.dp),
+                    color = terminalAccent,
+                    trackColor = terminalMuted.copy(alpha = 0.22f)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            when (state) {
+                DiagnosticPingState.Idle -> TerminalPrompt(
+                    text = stringResource(R.string.appstrings_diagnostic_ping_terminal_ready)
+                )
+                is DiagnosticPingState.Running -> {
+                    state.samples.forEach { sample ->
+                        key(sample.attempt) {
+                            AnimatedVisibility(visible = true) {
+                                DiagnosticPingTerminalLine(sample)
+                            }
+                        }
+                    }
+                    TerminalPrompt(
+                        text = stringResource(
+                            R.string.appstrings_diagnostic_ping_running,
+                            state.completedPasses,
+                            state.passes
+                        )
+                    )
+                }
+                is DiagnosticPingState.Completed -> {
+                    state.result.samples.forEach { sample ->
+                        key(sample.attempt) {
+                            AnimatedVisibility(visible = true) {
+                                DiagnosticPingTerminalLine(sample)
+                            }
+                        }
+                    }
+                    AnimatedVisibility(visible = true) {
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(
+                                text = stringResource(
+                                    R.string.appstrings_diagnostic_ping_result_summary,
+                                    state.result.successfulPasses,
+                                    state.result.requestedPasses
+                                ),
+                                style = terminalTextStyle,
+                                color = terminalText,
+                                fontWeight = FontWeight.Bold
+                            )
+                            state.result.averageMs?.let { average ->
+                                Text(
+                                    text = stringResource(
+                                        R.string.appstrings_diagnostic_ping_result_stats,
+                                        average,
+                                        state.result.minimumMs ?: average,
+                                        state.result.maximumMs ?: average
+                                    ),
+                                    style = terminalTextStyle,
+                                    color = terminalAccent
+                                )
+                            }
+                            if (state.result.failedPasses > 0) {
+                                Text(
+                                    text = stringResource(
+                                        R.string.appstrings_diagnostic_ping_result_failures,
+                                        state.result.failedPasses
+                                    ),
+                                    style = terminalTextStyle,
+                                    color = terminalError
+                                )
+                            }
+                        }
+                    }
+                }
+                DiagnosticPingState.Failed -> TerminalPrompt(
+                    text = stringResource(R.string.appstrings_diagnostic_ping_failed),
+                    color = terminalError
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TerminalPrompt(
+    text: String,
+    color: Color = MaterialTheme.colorScheme.onSurfaceVariant
+) {
+    Text(
+        text = "> $text",
+        style = MaterialTheme.typography.bodySmall,
+        color = color
+    )
+}
+
+@Composable
+private fun DiagnosticPingTerminalLine(sample: ServerPingSample) {
+    val textStyle = MaterialTheme.typography.bodySmall
+    val (text, color) = if (sample.latencyMs != null) {
+        stringResource(
+            R.string.appstrings_diagnostic_ping_terminal_reply,
+            sample.attempt,
+            sample.latencyMs
+        ) to MaterialTheme.colorScheme.onSurface
+    } else {
+        stringResource(R.string.appstrings_diagnostic_ping_terminal_timeout, sample.attempt) to MaterialTheme.colorScheme.error
+    }
+    Text(text = text, style = textStyle, color = color)
 }
 
 @Composable
@@ -462,7 +872,10 @@ private fun DiagnosticGlobalCard(
 }
 
 @Composable
-private fun DiagnosticStatusGrid(items: List<DiagnosticItem>) {
+private fun DiagnosticStatusGrid(
+    items: List<DiagnosticItem>,
+    onItemClick: (DiagnosticItem) -> Unit
+) {
     val uiStyle = LocalGeoTowerUiStyle.current
     val sizing = uiStyle.sizing
 
@@ -479,7 +892,8 @@ private fun DiagnosticStatusGrid(items: List<DiagnosticItem>) {
                     rowItems.forEach { item ->
                         DiagnosticStatusTile(
                             item = item,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f),
+                            onClick = { onItemClick(item) }
                         )
                     }
                     repeat(columns - rowItems.size) {
@@ -494,7 +908,8 @@ private fun DiagnosticStatusGrid(items: List<DiagnosticItem>) {
 @Composable
 private fun DiagnosticStatusTile(
     item: DiagnosticItem,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
 ) {
     val uiStyle = LocalGeoTowerUiStyle.current
     val sizing = uiStyle.sizing
@@ -506,6 +921,7 @@ private fun DiagnosticStatusTile(
         shape = uiStyle.smallItemShape,
         border = uiStyle.subtleBorder,
         modifier = modifier
+            .clickable(onClick = onClick)
             .semantics {
                 contentDescription = "${item.title}. $statusLabel. ${item.summary}"
             }
@@ -553,6 +969,7 @@ private fun DiagnosticStatusTile(
 @Composable
 private fun DiagnosticItemCard(
     item: DiagnosticItem,
+    onPositioned: (LayoutCoordinates) -> Unit,
     onAction: (DiagnosticAction) -> Unit
 ) {
     val uiStyle = LocalGeoTowerUiStyle.current
@@ -574,6 +991,7 @@ private fun DiagnosticItemCard(
         border = uiStyle.cardBorder,
         modifier = Modifier
             .fillMaxWidth()
+            .onGloballyPositioned(onPositioned)
             .semantics {
                 contentDescription = "${item.title}. $statusLabel. ${item.summary}"
                 stateDescription = stateLabel
@@ -630,13 +1048,24 @@ private fun DiagnosticItemCard(
 
             val action = item.action
             val label = item.actionLabel
-            if (action != null && label != null) {
+            val secondaryAction = item.secondaryAction
+            val secondaryLabel = item.secondaryActionLabel
+            if ((action != null && label != null) || (secondaryAction != null && secondaryLabel != null)) {
                 Spacer(modifier = Modifier.height(sizing.spacing(10.dp)))
-                TextButton(
-                    onClick = { onAction(action) },
-                    modifier = Modifier.align(Alignment.End)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
                 ) {
-                    Text(label)
+                    if (action != null && label != null) {
+                        TextButton(onClick = { onAction(action) }) {
+                            Text(label)
+                        }
+                    }
+                    if (secondaryAction != null && secondaryLabel != null) {
+                        TextButton(onClick = { onAction(secondaryAction) }) {
+                            Text(secondaryLabel)
+                        }
+                    }
                 }
             }
         }
@@ -1227,7 +1656,9 @@ private fun buildApiServerItem(context: Context): DiagnosticItem {
         severity = severity,
         details = details,
         actionLabel = context.getString(R.string.appstrings_diagnostic_action_choose_api_server),
-        action = DiagnosticAction.ChooseApiServer
+        action = DiagnosticAction.ChooseApiServer,
+        secondaryActionLabel = context.getString(R.string.appstrings_diagnostic_action_ping_api_server),
+        secondaryAction = DiagnosticAction.PingApiServer
     )
 }
 
@@ -1337,13 +1768,15 @@ private fun handleDiagnosticAction(
     context: Context,
     navController: NavController,
     action: DiagnosticAction,
-    onChooseApiServer: () -> Unit
+    onChooseApiServer: () -> Unit,
+    onPingApiServer: () -> Unit
 ) {
     when (action) {
         is DiagnosticAction.Navigate -> navController.navigate(action.route)
         DiagnosticAction.OpenAppSettings -> openAppSettings(context)
         DiagnosticAction.OpenNotificationSettings -> openNotificationSettings(context)
         DiagnosticAction.ChooseApiServer -> onChooseApiServer()
+        DiagnosticAction.PingApiServer -> onPingApiServer()
     }
 }
 
