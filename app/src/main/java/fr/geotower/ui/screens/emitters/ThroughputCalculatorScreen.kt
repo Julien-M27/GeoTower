@@ -36,6 +36,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Settings
@@ -51,11 +53,13 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -93,10 +97,17 @@ import fr.geotower.data.models.PhysiqueEntity
 import fr.geotower.data.models.TechniqueEntity
 import fr.geotower.R
 import fr.geotower.radio.MobileOperator
+import fr.geotower.radio.DuplexMode
 import fr.geotower.radio.RadioThroughputEngine
+import fr.geotower.radio.RadioTechnology
 import fr.geotower.radio.RatAssumptions
+import fr.geotower.radio.SpectrumAllocationsFrMetro
+import fr.geotower.radio.ThroughputBandOverride
+import fr.geotower.radio.ThroughputBandOverrideCodec
+import fr.geotower.radio.ThroughputAggregationSettings
 import fr.geotower.radio.ThroughputProfile
 import fr.geotower.radio.ThroughputProfiles
+import fr.geotower.radio.withAggregationSettings
 import fr.geotower.ui.components.buildThroughputRadioSystems
 import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.components.GeoTowerBreadcrumbItem
@@ -224,6 +235,12 @@ fun ThroughputCalculatorScreen(
     var customSettings by remember {
         mutableStateOf(readThroughputCustomSettings(prefs))
     }
+    var bandOverrides by remember(prefs) {
+        mutableStateOf(readThroughputBandOverrides(prefs))
+    }
+    var aggregationSettings by remember(prefs) {
+        mutableStateOf(readThroughputAggregationSettings(prefs))
+    }
     fun updateCustomSettings(newSettings: CustomModulationSettings) {
         customSettings = newSettings
         val editor = prefs.edit()
@@ -253,6 +270,24 @@ fun ThroughputCalculatorScreen(
         }
         editor.apply()
     }
+    fun updateBandOverride(key: String, override: ThroughputBandOverride?) {
+        val updated = if (override == null || override.isEmpty()) {
+            bandOverrides - key
+        } else {
+            bandOverrides + (key to override)
+        }
+        bandOverrides = updated
+        prefs.edit()
+            .putString(ThroughputPrefs.BAND_OVERRIDES, ThroughputBandOverrideCodec.encode(updated))
+            .apply()
+    }
+    fun updateAggregationSettings(updated: ThroughputAggregationSettings) {
+        aggregationSettings = updated
+        prefs.edit()
+            .putInt(ThroughputPrefs.MAX_LTE_CA_COMPONENTS, updated.lteMaxComponents)
+            .putInt(ThroughputPrefs.MAX_NR_CA_COMPONENTS, updated.nrMaxComponents)
+            .apply()
+    }
     var enabledBandKeys by remember(antennaId) { mutableStateOf<Set<String>>(emptySet()) }
     var bandKeysInitialized by remember(antennaId) { mutableStateOf(false) }
     var include4G by remember { mutableStateOf(ThroughputPrefs.include4G.read(prefs)) }
@@ -263,6 +298,7 @@ fun ThroughputCalculatorScreen(
     // Bloc visé par un appui long : le panneau défile jusqu'à sa ligne et la met en surbrillance.
     var settingsHighlightBlock by remember { mutableStateOf<String?>(null) }
     var showThroughputDefaultsSheet by remember { mutableStateOf(false) }
+    var showThroughputAdvancedSheet by remember { mutableStateOf(false) }
     var throughputDefaultsVersion by remember { mutableStateOf(0) }
     val settingsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var throughputBlockOrder by remember(prefs) {
@@ -326,12 +362,14 @@ fun ThroughputCalculatorScreen(
     }
     val effectiveEnabledBandKeys = if (bandKeysInitialized) enabledBandKeys else availableBandKeys
     val supportHeightMeters = physique?.hauteur
-    val result = remember(parsedBands, site?.operateur, customSettings, include4G, include5G, includePlanned, supportHeightMeters, effectiveEnabledBandKeys) {
+    val result = remember(parsedBands, site?.operateur, customSettings, bandOverrides, aggregationSettings, include4G, include5G, includePlanned, supportHeightMeters, effectiveEnabledBandKeys) {
         calculateThroughput(
             bands = parsedBands,
             operatorName = site?.operateur,
             preset = ThroughputPreset.Conservative,
             customSettings = customSettings,
+            bandOverrides = bandOverrides,
+            aggregationSettings = aggregationSettings,
             include4G = include4G,
             include5G = include5G,
             includePlanned = includePlanned,
@@ -429,6 +467,7 @@ fun ThroughputCalculatorScreen(
                 onInclude5GChange = { include5G = it },
                 includePlanned = includePlanned,
                 onIncludePlannedChange = { includePlanned = it },
+                onOpenAdvanced = { showThroughputAdvancedSheet = true },
                 enabledBandKeys = effectiveEnabledBandKeys,
                 onBandEnabledChange = { key, enabled ->
                     val currentKeys = if (bandKeysInitialized) enabledBandKeys else availableBandKeys
@@ -453,6 +492,8 @@ fun ThroughputCalculatorScreen(
 
     fun refreshThroughputDefaultsFromPrefs() {
         customSettings = readThroughputCustomSettings(prefs)
+        bandOverrides = readThroughputBandOverrides(prefs)
+        aggregationSettings = readThroughputAggregationSettings(prefs)
         include4G = ThroughputPrefs.include4G.read(prefs)
         include5G = ThroughputPrefs.include5G.read(prefs)
         includePlanned = ThroughputPrefs.includePlanned.read(prefs)
@@ -532,6 +573,31 @@ fun ThroughputCalculatorScreen(
             bubbleColor = uiStyle.bubbleColor
         )
     }
+
+    if (showThroughputAdvancedSheet) {
+        ThroughputAdvancedSheet(
+            bands = parsedBands,
+            operatorName = site?.operateur,
+            overrides = bandOverrides,
+            enabledBandKeys = effectiveEnabledBandKeys,
+            onOverrideChange = ::updateBandOverride,
+            onBandEnabledChange = { key, enabled ->
+                val currentKeys = if (bandKeysInitialized) enabledBandKeys else availableBandKeys
+                enabledBandKeys = if (enabled) currentKeys + key else currentKeys - key
+                bandKeysInitialized = true
+            },
+            onReset = {
+                bandOverrides = emptyMap()
+                aggregationSettings = ThroughputAggregationSettings()
+                prefs.edit()
+                    .remove(ThroughputPrefs.BAND_OVERRIDES)
+                    .remove(ThroughputPrefs.MAX_LTE_CA_COMPONENTS)
+                    .remove(ThroughputPrefs.MAX_NR_CA_COMPONENTS)
+                    .apply()
+            },
+            onDismiss = { showThroughputAdvancedSheet = false }
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -581,6 +647,7 @@ private fun ThroughputContent(
     blockShape: Shape,
     customSettings: CustomModulationSettings,
     onCustomSettingsChange: (CustomModulationSettings) -> Unit,
+    onOpenAdvanced: () -> Unit,
     include4G: Boolean,
     onInclude4GChange: (Boolean) -> Unit,
     include5G: Boolean,
@@ -639,6 +706,7 @@ private fun ThroughputContent(
                     onInclude5GChange = onInclude5GChange,
                     includePlanned = includePlanned,
                     onIncludePlannedChange = onIncludePlannedChange,
+                    onOpenAdvanced = onOpenAdvanced,
                     bands = result.bands,
                     enabledBandKeys = enabledBandKeys,
                     onBandEnabledChange = onBandEnabledChange
@@ -688,6 +756,8 @@ fun ThroughputShareContent(
         parseAndSortFrequencies(rawFrequencies, txtUnknown, txtAzimuthNotSpecified)
     }
     val customSettings = remember(prefs) { readThroughputCustomSettings(prefs) }
+    val bandOverrides = remember(prefs) { readThroughputBandOverrides(prefs) }
+    val aggregationSettings = remember(prefs) { readThroughputAggregationSettings(prefs) }
     val include4G = remember(prefs) { ThroughputPrefs.include4G.read(prefs) }
     val include5G = remember(prefs) { ThroughputPrefs.include5G.read(prefs) }
     val includePlanned = remember(prefs) { ThroughputPrefs.includePlanned.read(prefs) }
@@ -697,12 +767,14 @@ fun ThroughputShareContent(
             .map { throughputBandKey(it) }
             .toSet()
     }
-    val result = remember(parsedBands, customSettings, include4G, include5G, includePlanned, enabledBandKeys, physique?.hauteur) {
+    val result = remember(parsedBands, customSettings, bandOverrides, aggregationSettings, include4G, include5G, includePlanned, enabledBandKeys, physique?.hauteur) {
         calculateThroughput(
             bands = parsedBands,
             operatorName = site.operateur,
             preset = ThroughputPreset.Conservative,
             customSettings = customSettings,
+            bandOverrides = bandOverrides,
+            aggregationSettings = aggregationSettings,
             include4G = include4G,
             include5G = include5G,
             includePlanned = includePlanned,
@@ -1143,7 +1215,6 @@ private fun ThroughputConeCard(
                         valueRange = RECEIVER_HEIGHT_MIN_METERS..RECEIVER_HEIGHT_MAX_METERS,
                         steps = (RECEIVER_HEIGHT_MAX_METERS - RECEIVER_HEIGHT_MIN_METERS).roundToInt() - 1,
                         unit = "m",
-                        useOneUi = LocalGeoTowerUiStyle.current.useOneUi,
                         onValueChange = { newHeight ->
                             onCustomSettingsChange(customSettings.copy(receiverHeightMeters = snapReceiverHeight(newHeight)))
                         },
@@ -1346,6 +1417,7 @@ private fun ThroughputControlsCard(
     onInclude5GChange: (Boolean) -> Unit,
     includePlanned: Boolean,
     onIncludePlannedChange: (Boolean) -> Unit,
+    onOpenAdvanced: () -> Unit,
     bands: List<ThroughputBandResult>,
     enabledBandKeys: Set<String>,
     onBandEnabledChange: (String, Boolean) -> Unit
@@ -1373,6 +1445,18 @@ private fun ThroughputControlsCard(
                     label = { Text(stringResource(R.string.appstrings_throughput_include_planned)) }
                 )
             }
+            OutlinedButton(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = onOpenAdvanced
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = null,
+                    modifier = Modifier.size(sizing.component(18.dp))
+                )
+                Spacer(Modifier.width(sizing.spacing(8.dp)))
+                Text(stringResource(R.string.appstrings_throughput_advanced_button))
+            }
             if (bands.isNotEmpty()) {
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
                 Text(
@@ -1395,11 +1479,388 @@ private fun ThroughputControlsCard(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ThroughputAdvancedSheet(
+    bands: List<FreqBand>,
+    operatorName: String?,
+    overrides: Map<String, ThroughputBandOverride>,
+    enabledBandKeys: Set<String>,
+    onOverrideChange: (String, ThroughputBandOverride?) -> Unit,
+    onBandEnabledChange: (String, Boolean) -> Unit,
+    onReset: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scrollState = rememberScrollState()
+    val calculationBands = remember(bands) { throughputCalculationBands(bands) }
+    var expandedKey by remember(calculationBands) { mutableStateOf(calculationBands.firstOrNull()?.let(::throughputBandKey)) }
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState
+    ) {
+        BackHandler(onBack = onDismiss)
+        Column(
+            modifier = Modifier
+                .navigationBarsPadding()
+                .verticalScroll(scrollState)
+                .padding(
+                    start = sizing.spacing(20.dp),
+                    end = sizing.spacing(20.dp),
+                    bottom = sizing.spacing(40.dp)
+                ),
+            verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))
+        ) {
+            Text(
+                text = stringResource(R.string.appstrings_throughput_advanced_title),
+                style = sizing.textStyle(MaterialTheme.typography.titleLarge),
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = stringResource(R.string.appstrings_throughput_advanced_desc),
+                style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (overrides.isNotEmpty()) {
+                TextButton(onClick = onReset) {
+                    Text(stringResource(R.string.appstrings_throughput_advanced_reset))
+                }
+            }
+            if (calculationBands.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.appstrings_throughput_no_bands),
+                    style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                calculationBands.forEach { band ->
+                    val key = throughputBandKey(band)
+                    ThroughputAdvancedBandCard(
+                        band = band,
+                        operatorName = operatorName,
+                        override = overrides[key],
+                        enabled = enabledBandKeys.contains(key),
+                        expanded = expandedKey == key,
+                        onExpandedChange = { expandedKey = if (expandedKey == key) null else key },
+                        onEnabledChange = { onBandEnabledChange(key, it) },
+                        onOverrideChange = { onOverrideChange(key, it) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ThroughputAdvancedBandCard(
+    band: FreqBand,
+    operatorName: String?,
+    override: ThroughputBandOverride?,
+    enabled: Boolean,
+    expanded: Boolean,
+    onExpandedChange: () -> Unit,
+    onEnabledChange: (Boolean) -> Unit,
+    onOverrideChange: (ThroughputBandOverride?) -> Unit
+) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    val defaults = advancedBandDefaults(band, operatorName)
+    val current = override ?: ThroughputBandOverride()
+    val title = throughputBandLabel(band)
+    val subtitle = frequencyDetailsLabel(band)
+    val labelColor = if (override?.isEmpty() == false) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    }
+    fun update(updated: ThroughputBandOverride) {
+        onOverrideChange(updated.takeIf { !it.isEmpty() })
+    }
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(modifier = Modifier.padding(sizing.spacing(12.dp))) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(
+                    checked = enabled,
+                    onCheckedChange = onEnabledChange
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(title, fontWeight = FontWeight.Bold, color = labelColor)
+                    Text(
+                        text = if (override?.isEmpty() == false) {
+                            "$subtitle · ${stringResource(R.string.appstrings_throughput_advanced_modified)}"
+                        } else {
+                            subtitle
+                        },
+                        style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                IconButton(onClick = onExpandedChange) {
+                    Icon(
+                        imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = null
+                    )
+                }
+            }
+            if (expanded) {
+                Spacer(Modifier.height(sizing.spacing(8.dp)))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+                Spacer(Modifier.height(sizing.spacing(8.dp)))
+                AdvancedDiscreteSlider(
+                    label = stringResource(R.string.appstrings_throughput_advanced_bandwidth),
+                    options = advancedBandwidthOptions(band.gen).map(::formatAdvancedBandwidth),
+                    selectedIndex = nearestOptionIndex(
+                        advancedBandwidthOptions(band.gen),
+                        current.bandwidthMHz ?: defaults.bandwidthMHz
+                    ),
+                    onSelectedIndexChange = { index ->
+                        update(current.copy(bandwidthMHz = advancedBandwidthOptions(band.gen)[index]))
+                    }
+                )
+                AdvancedDuplexChoice(
+                    selected = current.duplexMode ?: defaults.duplexMode,
+                    onSelected = { update(current.copy(duplexMode = it)) }
+                )
+
+                val dlModulationOptions = if (band.gen == 5) nrDownModulationOptions else lteDownModulationOptions
+                val ulModulationOptions = if (band.gen == 5) nrUpModulationOptions else lteUpModulationOptions
+                ModulationSlider(
+                    label = stringResource(R.string.appstrings_throughput_advanced_dl_modulation),
+                    options = dlModulationOptions,
+                    selectedIndex = modulationOptionIndex(
+                        dlModulationOptions,
+                        current.dlModulationOrder ?: defaults.assumptions.dlModulationOrder
+                    ),
+                    onSelectedIndexChange = { index -> update(current.copy(dlModulationOrder = dlModulationOptions[index].modulationOrder)) }
+                )
+                ModulationSlider(
+                    label = stringResource(R.string.appstrings_throughput_advanced_ul_modulation),
+                    options = ulModulationOptions,
+                    selectedIndex = modulationOptionIndex(
+                        ulModulationOptions,
+                        current.ulModulationOrder ?: defaults.assumptions.ulModulationOrder
+                    ),
+                    onSelectedIndexChange = { index -> update(current.copy(ulModulationOrder = ulModulationOptions[index].modulationOrder)) }
+                )
+
+                val mimoOptions = remember { (1..8).map { "MIMO ${it}x$it" } }
+                AdvancedDiscreteSlider(
+                    label = stringResource(R.string.appstrings_throughput_advanced_dl_mimo),
+                    options = mimoOptions,
+                    selectedIndex = ((current.dlMimoLayers ?: defaults.assumptions.dlMimoLayers) - 1).coerceIn(0, mimoOptions.lastIndex),
+                    onSelectedIndexChange = { index -> update(current.copy(dlMimoLayers = index + 1)) }
+                )
+                AdvancedDiscreteSlider(
+                    label = stringResource(R.string.appstrings_throughput_advanced_ul_mimo),
+                    options = mimoOptions,
+                    selectedIndex = ((current.ulMimoLayers ?: defaults.assumptions.ulMimoLayers) - 1).coerceIn(0, mimoOptions.lastIndex),
+                    onSelectedIndexChange = { index -> update(current.copy(ulMimoLayers = index + 1)) }
+                )
+
+                if (band.gen == 5) {
+                    if ((current.duplexMode ?: defaults.duplexMode) == DuplexMode.TDD) {
+                        SignalSlider(
+                            label = stringResource(R.string.appstrings_throughput_advanced_tdd_dl_ratio),
+                            value = ((current.tddDlRatio ?: defaults.assumptions.tddDlRatio) * 100.0).toFloat(),
+                            valueRange = 0f..100f,
+                            steps = 99,
+                            unit = "%",
+                            onValueChange = {
+                                val dlRatio = it.toDouble() / 100.0
+                                val ulRatio = (current.tddUlRatio ?: defaults.assumptions.tddUlRatio).coerceAtMost(1.0 - dlRatio)
+                                update(current.copy(tddDlRatio = dlRatio, tddUlRatio = ulRatio))
+                            }
+                        )
+                        SignalSlider(
+                            label = stringResource(R.string.appstrings_throughput_advanced_tdd_ul_ratio),
+                            value = ((current.tddUlRatio ?: defaults.assumptions.tddUlRatio) * 100.0).toFloat(),
+                            valueRange = 0f..100f,
+                            steps = 99,
+                            unit = "%",
+                            onValueChange = {
+                                val ulRatio = it.toDouble() / 100.0
+                                val dlRatio = (current.tddDlRatio ?: defaults.assumptions.tddDlRatio).coerceAtMost(1.0 - ulRatio)
+                                update(current.copy(tddDlRatio = dlRatio, tddUlRatio = ulRatio))
+                            }
+                        )
+                    }
+                }
+                if (override?.isEmpty() == false) {
+                    TextButton(
+                        onClick = { onOverrideChange(null) },
+                        modifier = Modifier.align(Alignment.End)
+                    ) {
+                        Text(stringResource(R.string.appstrings_throughput_advanced_reset_band))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AdvancedDuplexChoice(
+    selected: DuplexMode,
+    onSelected: (DuplexMode) -> Unit
+) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(4.dp))) {
+        Text(
+            text = stringResource(R.string.appstrings_throughput_advanced_duplex),
+            style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Row(
+            modifier = Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))
+        ) {
+            DuplexMode.entries.forEach { mode ->
+                FilterChip(
+                    selected = mode == selected,
+                    onClick = { onSelected(mode) },
+                    label = { Text(mode.name) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AdvancedDiscreteSlider(
+    label: String,
+    options: List<String>,
+    selectedIndex: Int,
+    onSelectedIndexChange: (Int) -> Unit
+) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    val safeIndex = selectedIndex.coerceIn(0, options.lastIndex)
+    Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(2.dp))) {
+        Text(
+            text = "$label : ${options[safeIndex]}",
+            style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        StyledSlider(
+            value = safeIndex.toFloat(),
+            onValueChange = { onSelectedIndexChange(it.roundToInt().coerceIn(0, options.lastIndex)) },
+            valueRange = 0f..options.lastIndex.toFloat(),
+            steps = (options.size - 2).coerceAtLeast(0),
+            tickCount = options.size
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun StyledSlider(
+    value: Float,
+    valueRange: ClosedFloatingPointRange<Float>,
+    steps: Int,
+    tickCount: Int,
+    onValueChange: (Float) -> Unit
+) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    val safeValue = value.coerceIn(valueRange.start, valueRange.endInclusive)
+    val valueSpan = (valueRange.endInclusive - valueRange.start).coerceAtLeast(1f)
+    val valueFraction = ((safeValue - valueRange.start) / valueSpan).coerceIn(0f, 1f)
+    val safeTickCount = tickCount.coerceAtLeast(2)
+    val inactiveTrackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.18f)
+    val activeTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.82f)
+    val tickColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.28f)
+
+    Slider(
+        value = safeValue,
+        onValueChange = onValueChange,
+        valueRange = valueRange,
+        steps = steps.coerceAtLeast(0),
+        thumb = {
+            Box(
+                modifier = Modifier
+                    .size(sizing.component(22.dp))
+                    .background(MaterialTheme.colorScheme.surface, CircleShape)
+                    .border(3.dp, MaterialTheme.colorScheme.primary, CircleShape)
+            )
+        },
+        track = { _ ->
+            Canvas(modifier = Modifier.fillMaxWidth().height(sizing.component(12.dp))) {
+                val centerY = size.height / 2
+                drawLine(
+                    color = inactiveTrackColor,
+                    start = Offset(0f, centerY),
+                    end = Offset(size.width, centerY),
+                    strokeWidth = 10.dp.toPx(),
+                    cap = StrokeCap.Round
+                )
+                drawLine(
+                    color = activeTrackColor,
+                    start = Offset(0f, centerY),
+                    end = Offset(size.width * valueFraction, centerY),
+                    strokeWidth = 10.dp.toPx(),
+                    cap = StrokeCap.Round
+                )
+                val lastIndex = (safeTickCount - 1).coerceAtLeast(1)
+                val tickRadius = if (safeTickCount > 52) 0.85.dp.toPx() else 1.15.dp.toPx()
+                for (index in 0 until safeTickCount) {
+                    drawCircle(
+                        color = tickColor,
+                        radius = tickRadius,
+                        center = Offset(size.width * index / lastIndex.toFloat(), centerY)
+                    )
+                }
+            }
+        }
+    )
+}
+
+private data class AdvancedBandDefaults(
+    val bandwidthMHz: Double,
+    val duplexMode: DuplexMode,
+    val assumptions: RatAssumptions
+)
+
+private fun advancedBandDefaults(band: FreqBand, operatorName: String?): AdvancedBandDefaults {
+    val technology = if (band.gen == 5) RadioTechnology.NR_5G else RadioTechnology.LTE_4G
+    val allocation = MobileOperator.fromLabel(operatorName)?.let { operator ->
+        SpectrumAllocationsFrMetro.find(operator, technology, band.value.toString())
+    }
+    val assumptions = if (band.gen == 5) ThroughputProfiles.prudent.nr else ThroughputProfiles.prudent.lte
+    return AdvancedBandDefaults(
+        bandwidthMHz = allocation?.bandwidthMHz ?: resolveThroughputBandwidth(band).valueMHz,
+        duplexMode = allocation?.duplexMode ?: DuplexMode.FDD,
+        assumptions = assumptions
+    )
+}
+
+private fun advancedBandwidthOptions(generation: Int): List<Double> {
+    return if (generation == 4) {
+        listOf(1.4, 3.0, 5.0, 10.0, 15.0, 20.0)
+    } else {
+        listOf(5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 90.0, 100.0)
+    }
+}
+
+private fun nearestOptionIndex(options: List<Double>, value: Double): Int {
+    return options.indices.minByOrNull { kotlin.math.abs(options[it] - value) } ?: 0
+}
+
+private fun formatAdvancedBandwidth(valueMHz: Double): String {
+    return if (valueMHz % 1.0 == 0.0) "${valueMHz.toInt()} MHz" else "${valueMHz} MHz"
+}
+
+private fun modulationOptionIndex(options: List<ModulationOption>, value: Int): Int {
+    return options.indexOfFirst { it.modulationOrder == value }.takeIf { it >= 0 } ?: 0
+}
+
 @Composable
 private fun CustomModulationControls(
     settings: CustomModulationSettings,
-    onSettingsChange: (CustomModulationSettings) -> Unit,
-    useOneUi: Boolean
+    onSettingsChange: (CustomModulationSettings) -> Unit
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
     Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp))) {
@@ -1413,29 +1874,25 @@ private fun CustomModulationControls(
             label = stringResource(R.string.appstrings_throughput4g_download_label),
             options = lteDownModulationOptions,
             selectedIndex = settings.lteDownIndex,
-            onSelectedIndexChange = { onSettingsChange(settings.copy(lteDownIndex = it)) },
-            useOneUi = useOneUi
+            onSelectedIndexChange = { onSettingsChange(settings.copy(lteDownIndex = it)) }
         )
         ModulationSlider(
             label = stringResource(R.string.appstrings_throughput4g_upload_label),
             options = lteUpModulationOptions,
             selectedIndex = settings.lteUpIndex,
-            onSelectedIndexChange = { onSettingsChange(settings.copy(lteUpIndex = it)) },
-            useOneUi = useOneUi
+            onSelectedIndexChange = { onSettingsChange(settings.copy(lteUpIndex = it)) }
         )
         ModulationSlider(
             label = stringResource(R.string.appstrings_throughput5g_download_label),
             options = nrDownModulationOptions,
             selectedIndex = settings.nrDownIndex,
-            onSelectedIndexChange = { onSettingsChange(settings.copy(nrDownIndex = it)) },
-            useOneUi = useOneUi
+            onSelectedIndexChange = { onSettingsChange(settings.copy(nrDownIndex = it)) }
         )
         ModulationSlider(
             label = stringResource(R.string.appstrings_throughput5g_upload_label),
             options = nrUpModulationOptions,
             selectedIndex = settings.nrUpIndex,
-            onSelectedIndexChange = { onSettingsChange(settings.copy(nrUpIndex = it)) },
-            useOneUi = useOneUi
+            onSelectedIndexChange = { onSettingsChange(settings.copy(nrUpIndex = it)) }
         )
 
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
@@ -1457,7 +1914,6 @@ private fun CustomModulationControls(
             valueRange = -125f..-60f,
             steps = 64,
             unit = "dBm",
-            useOneUi = useOneUi,
             onValueChange = { onSettingsChange(settings.copy(lteRsrpDbm = it)) }
         )
         SignalSlider(
@@ -1466,7 +1922,6 @@ private fun CustomModulationControls(
             valueRange = -10f..35f,
             steps = 44,
             unit = "dB",
-            useOneUi = useOneUi,
             onValueChange = { onSettingsChange(settings.copy(lteSinrDb = it)) }
         )
         SignalSlider(
@@ -1475,7 +1930,6 @@ private fun CustomModulationControls(
             valueRange = -125f..-60f,
             steps = 64,
             unit = "dBm",
-            useOneUi = useOneUi,
             onValueChange = { onSettingsChange(settings.copy(nrRsrpDbm = it)) }
         )
         SignalSlider(
@@ -1484,7 +1938,6 @@ private fun CustomModulationControls(
             valueRange = -10f..40f,
             steps = 49,
             unit = "dB",
-            useOneUi = useOneUi,
             onValueChange = { onSettingsChange(settings.copy(nrSinrDb = it)) }
         )
 
@@ -1616,7 +2069,6 @@ private fun CustomExplanationLine(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SignalSlider(
     label: String,
@@ -1624,18 +2076,11 @@ private fun SignalSlider(
     valueRange: ClosedFloatingPointRange<Float>,
     steps: Int,
     unit: String,
-    useOneUi: Boolean,
     onValueChange: (Float) -> Unit,
     valueLabel: (@Composable (Int) -> String)? = null
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
     val roundedValue = value.roundToInt().coerceIn(valueRange.start.roundToInt(), valueRange.endInclusive.roundToInt())
-    val valueSpan = (valueRange.endInclusive - valueRange.start).coerceAtLeast(1f)
-    val valueFraction = ((roundedValue - valueRange.start) / valueSpan).coerceIn(0f, 1f)
-    val tickCount = steps.coerceAtLeast(0) + 2
-    val inactiveTrackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.18f)
-    val activeTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.82f)
-    val dotColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.28f)
     val valueText = valueLabel?.invoke(roundedValue) ?: "$roundedValue $unit"
     Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(2.dp))) {
         Text(
@@ -1643,58 +2088,13 @@ private fun SignalSlider(
             style = sizing.textStyle(MaterialTheme.typography.bodySmall),
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        if (useOneUi) {
-            Slider(
-                value = roundedValue.toFloat(),
-                onValueChange = { onValueChange(it.roundToInt().toFloat()) },
-                valueRange = valueRange,
-                steps = steps.coerceAtLeast(0),
-                thumb = {
-                    Box(
-                        modifier = Modifier
-                            .size(sizing.component(22.dp))
-                            .background(MaterialTheme.colorScheme.surface, CircleShape)
-                            .border(3.dp, MaterialTheme.colorScheme.primary, CircleShape)
-                    )
-                },
-                track = { _ ->
-                    Canvas(modifier = Modifier.fillMaxWidth().height(sizing.component(12.dp))) {
-                        val centerY = size.height / 2
-                        drawLine(
-                            color = inactiveTrackColor,
-                            start = Offset(0f, centerY),
-                            end = Offset(size.width, centerY),
-                            strokeWidth = 10.dp.toPx(),
-                            cap = StrokeCap.Round
-                        )
-                        drawLine(
-                            color = activeTrackColor,
-                            start = Offset(0f, centerY),
-                            end = Offset(size.width * valueFraction, centerY),
-                            strokeWidth = 10.dp.toPx(),
-                            cap = StrokeCap.Round
-                        )
-                        val dotRadius = if (tickCount > 52) 0.85.dp.toPx() else 1.15.dp.toPx()
-                        val lastIndex = (tickCount - 1).coerceAtLeast(1)
-                        for (i in 0 until tickCount) {
-                            val x = size.width * (i.toFloat() / lastIndex.toFloat())
-                            drawCircle(
-                                color = dotColor,
-                                radius = dotRadius,
-                                center = Offset(x, centerY)
-                            )
-                        }
-                    }
-                }
-            )
-        } else {
-            Slider(
-                value = roundedValue.toFloat(),
-                onValueChange = { onValueChange(it.roundToInt().toFloat()) },
-                valueRange = valueRange,
-                steps = steps.coerceAtLeast(0)
-            )
-        }
+        StyledSlider(
+            value = roundedValue.toFloat(),
+            onValueChange = { onValueChange(it.roundToInt().toFloat()) },
+            valueRange = valueRange,
+            steps = steps.coerceAtLeast(0),
+            tickCount = steps.coerceAtLeast(0) + 2
+        )
     }
 }
 
@@ -1731,21 +2131,16 @@ private fun CustomChoiceRow(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ModulationSlider(
     label: String,
     options: List<ModulationOption>,
     selectedIndex: Int,
-    onSelectedIndexChange: (Int) -> Unit,
-    useOneUi: Boolean
+    onSelectedIndexChange: (Int) -> Unit
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
     val coercedIndex = selectedIndex.coerceIn(0, options.lastIndex)
     val selectedOption = options[coercedIndex]
-    val onSliderChange: (Float) -> Unit = { value ->
-        onSelectedIndexChange(value.roundToInt().coerceIn(0, options.lastIndex))
-    }
 
     Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(2.dp))) {
         Text(
@@ -1753,49 +2148,15 @@ private fun ModulationSlider(
             style = sizing.textStyle(MaterialTheme.typography.bodySmall),
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        if (useOneUi) {
-            Slider(
-                value = coercedIndex.toFloat(),
-                onValueChange = onSliderChange,
-                valueRange = 0f..options.lastIndex.toFloat(),
-                steps = (options.size - 2).coerceAtLeast(0),
-                thumb = {
-                    Box(
-                        modifier = Modifier
-                            .size(sizing.component(24.dp))
-                            .background(MaterialTheme.colorScheme.surface, CircleShape)
-                            .border(3.dp, MaterialTheme.colorScheme.primary, CircleShape)
-                    )
-                },
-                track = { _ ->
-                    Canvas(modifier = Modifier.fillMaxWidth().height(sizing.component(14.dp))) {
-                        val centerY = size.height / 2
-                        drawLine(
-                            color = Color.Gray.copy(alpha = 0.3f),
-                            start = Offset(0f, centerY),
-                            end = Offset(size.width, centerY),
-                            strokeWidth = 14.dp.toPx(),
-                            cap = StrokeCap.Round
-                        )
-                        val stepWidth = size.width / options.lastIndex.coerceAtLeast(1)
-                        for (i in options.indices) {
-                            drawCircle(
-                                color = Color.Gray.copy(alpha = 0.6f),
-                                radius = 4.dp.toPx(),
-                                center = Offset(i * stepWidth, centerY)
-                            )
-                        }
-                    }
-                }
-            )
-        } else {
-            Slider(
-                value = coercedIndex.toFloat(),
-                onValueChange = onSliderChange,
-                valueRange = 0f..options.lastIndex.toFloat(),
-                steps = (options.size - 2).coerceAtLeast(0)
-            )
-        }
+        StyledSlider(
+            value = coercedIndex.toFloat(),
+            onValueChange = { value ->
+                onSelectedIndexChange(value.roundToInt().coerceIn(0, options.lastIndex))
+            },
+            valueRange = 0f..options.lastIndex.toFloat(),
+            steps = (options.size - 2).coerceAtLeast(0),
+            tickCount = options.size
+        )
     }
 }
 
@@ -2023,11 +2384,23 @@ private fun readThroughputCustomSettings(prefs: SharedPreferences): CustomModula
     )
 }
 
-private const val THROUGHPUT_SHARE_CONFIG_VERSION = "v1"
+private fun readThroughputBandOverrides(prefs: SharedPreferences): Map<String, ThroughputBandOverride> {
+    return ThroughputBandOverrideCodec.decode(prefs.getString(ThroughputPrefs.BAND_OVERRIDES, null))
+}
+
+private fun readThroughputAggregationSettings(prefs: SharedPreferences): ThroughputAggregationSettings {
+    return ThroughputAggregationSettings(
+        lteMaxComponents = prefs.getInt(ThroughputPrefs.MAX_LTE_CA_COMPONENTS, 3).coerceIn(1, 5),
+        nrMaxComponents = prefs.getInt(ThroughputPrefs.MAX_NR_CA_COMPONENTS, 1).coerceIn(1, 5)
+    )
+}
+
+private const val THROUGHPUT_SHARE_CONFIG_VERSION = "v3"
 
 /**
  * Encodes the settings that actually influence the calculator result (generation toggles, planned
- * bands, arrival height, selected position) into a compact string carried by the QR deep link.
+ * bands, arrival height, selected position and per-frequency overrides) into a compact string
+ * carried by the QR deep link.
  */
 fun encodeThroughputShareConfig(prefs: SharedPreferences): String {
     val include4G = if (ThroughputPrefs.include4G.read(prefs)) "1" else "0"
@@ -2036,14 +2409,19 @@ fun encodeThroughputShareConfig(prefs: SharedPreferences): String {
     val receiverHeight = prefs.getFloat(ThroughputPrefs.CUSTOM_RECEIVER_HEIGHT, DEFAULT_RECEIVER_HEIGHT_METERS).roundToInt().toString()
     val latitude = prefs.getString(ThroughputPrefs.CUSTOM_SELECTED_LAT, null).orEmpty()
     val longitude = prefs.getString(ThroughputPrefs.CUSTOM_SELECTED_LON, null).orEmpty()
-    return listOf(THROUGHPUT_SHARE_CONFIG_VERSION, include4G, include5G, includePlanned, receiverHeight, latitude, longitude)
+    val bandOverrides = ThroughputBandOverrideCodec.encode(
+        ThroughputBandOverrideCodec.decode(prefs.getString(ThroughputPrefs.BAND_OVERRIDES, null))
+    )
+    val maxLteComponents = prefs.getInt(ThroughputPrefs.MAX_LTE_CA_COMPONENTS, 3).coerceIn(1, 5).toString()
+    val maxNrComponents = prefs.getInt(ThroughputPrefs.MAX_NR_CA_COMPONENTS, 1).coerceIn(1, 5).toString()
+    return listOf(THROUGHPUT_SHARE_CONFIG_VERSION, include4G, include5G, includePlanned, receiverHeight, latitude, longitude, maxLteComponents, maxNrComponents, bandOverrides)
         .joinToString(";")
 }
 
 /** Writes a config string produced by [encodeThroughputShareConfig] back into the throughput prefs. */
 fun applyThroughputShareConfig(prefs: SharedPreferences, config: String) {
-    val parts = config.split(";")
-    if (parts.size < 5 || parts[0] != THROUGHPUT_SHARE_CONFIG_VERSION) return
+    val parts = config.split(";", limit = 10)
+    if (parts.size < 5 || parts[0] !in setOf("v1", "v2", THROUGHPUT_SHARE_CONFIG_VERSION)) return
     val editor = prefs.edit()
     ThroughputPrefs.include4G.write(editor, parts[1] == "1")
     ThroughputPrefs.include5G.write(editor, parts[2] == "1")
@@ -2059,6 +2437,28 @@ fun applyThroughputShareConfig(prefs: SharedPreferences, config: String) {
     } else {
         editor.remove(ThroughputPrefs.CUSTOM_SELECTED_LAT).remove(ThroughputPrefs.CUSTOM_SELECTED_LON)
     }
+    if (parts[0] == THROUGHPUT_SHARE_CONFIG_VERSION) {
+        val maxLteComponents = parts.getOrNull(7)?.toIntOrNull()?.coerceIn(1, 5) ?: 3
+        val maxNrComponents = parts.getOrNull(8)?.toIntOrNull()?.coerceIn(1, 5) ?: 1
+        editor
+            .putInt(ThroughputPrefs.MAX_LTE_CA_COMPONENTS, maxLteComponents)
+            .putInt(ThroughputPrefs.MAX_NR_CA_COMPONENTS, maxNrComponents)
+            .putString(
+                ThroughputPrefs.BAND_OVERRIDES,
+                ThroughputBandOverrideCodec.encode(ThroughputBandOverrideCodec.decode(parts.getOrNull(9)))
+            )
+    } else if (parts[0] == "v2") {
+        editor.putString(
+            ThroughputPrefs.BAND_OVERRIDES,
+            ThroughputBandOverrideCodec.encode(ThroughputBandOverrideCodec.decode(parts.getOrNull(7)))
+        )
+        editor.remove(ThroughputPrefs.MAX_LTE_CA_COMPONENTS).remove(ThroughputPrefs.MAX_NR_CA_COMPONENTS)
+    } else {
+        editor
+            .remove(ThroughputPrefs.BAND_OVERRIDES)
+            .remove(ThroughputPrefs.MAX_LTE_CA_COMPONENTS)
+            .remove(ThroughputPrefs.MAX_NR_CA_COMPONENTS)
+    }
     editor.apply()
 }
 
@@ -2067,6 +2467,8 @@ private fun calculateThroughput(
     operatorName: String?,
     preset: ThroughputPreset,
     customSettings: CustomModulationSettings,
+    bandOverrides: Map<String, ThroughputBandOverride> = emptyMap(),
+    aggregationSettings: ThroughputAggregationSettings = ThroughputAggregationSettings(),
     include4G: Boolean,
     include5G: Boolean,
     includePlanned: Boolean,
@@ -2081,7 +2483,7 @@ private fun calculateThroughput(
     val engineProfile = engineProfileFor(preset, customSettings)
     val engineResult = if (operator != null) {
         val systems = buildThroughputRadioSystems(bands, operator, supportHeightMeters)
-        RadioThroughputEngine.estimate(systems, engineProfile)
+        RadioThroughputEngine.estimate(systems, engineProfile, bandOverrides = bandOverrides)
     } else {
         null
     }
@@ -2166,7 +2568,8 @@ private fun calculateThroughput(
         }
     }
 
-    val aggregationAwareBands = applyCarrierAggregationPolicy(positionedBands, engineProfile)
+    val aggregationProfile = engineProfile.withAggregationSettings(aggregationSettings)
+    val aggregationAwareBands = applyCarrierAggregationPolicy(positionedBands, aggregationProfile)
     val aggregationWarnings = aggregationAwareBands
         .mapNotNull { it.downAggregationExcludedReason }
         .distinct()
@@ -2756,7 +3159,8 @@ private val nrDownModulationOptions = listOf(
     ModulationOption("QPSK", 2),
     ModulationOption("16-QAM", 4),
     ModulationOption("64-QAM", 6),
-    ModulationOption("256-QAM", 8)
+    ModulationOption("256-QAM", 8),
+    ModulationOption("1024-QAM", 10)
 )
 
 private val nrUpModulationOptions = listOf(

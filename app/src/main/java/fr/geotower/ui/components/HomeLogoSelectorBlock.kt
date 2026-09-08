@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppIconManager
+import fr.geotower.utils.AppLogoDrawingResources
 import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.OperatorLogos
 import androidx.compose.ui.res.stringResource
@@ -42,6 +43,12 @@ fun HomeLogoSelectorBlock(
 
     // On récupère le logo actuel de l'application
     val appLogoRes by AppIconManager.currentIconRes
+    val appLogoDrawingChoice by AppConfig.appLogoDrawingChoice
+    val appLogoDrawingRes = AppLogoDrawingResources.resolve(
+        choice = appLogoDrawingChoice,
+        activeIconRes = appLogoRes,
+        isDark = LocalGeoTowerUiStyle.current.isDark
+    )
 
     // ---> 1. ON ÉCOUTE L'OPÉRATEUR PAR DÉFAUT EN TEMPS RÉEL <---
     val defaultOp by AppConfig.defaultOperator
@@ -70,7 +77,7 @@ fun HomeLogoSelectorBlock(
 
     // ---> 4. LISTE FINALE (Application toujours en premier) <---
     val options = listOf(
-        HomeLogoOption("app", stringResource(R.string.appstrings_logo_app), appLogoRes.takeIf { it != 0 })
+        HomeLogoOption("app", stringResource(R.string.appstrings_logo_app), appLogoDrawingRes)
     ) + sortedOperators
 
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -112,17 +119,12 @@ fun HomeLogoSelectorBlock(
                     ) {
                         if (option.resId != null && option.resId != 0) {
 
-                            // ---> CORRECTION DU CRASH ICI <---
-                            // On remplace Image() par AndroidView pour supporter les icônes Mipmap
-                            androidx.compose.ui.viewinterop.AndroidView(
+                            // Le même renderer sert au logo de l'application et aux logos
+                            // opérateurs. Il supporte les ressources vectorielles, mipmap et PNG,
+                            // tout en appliquant l'accent Material aux logos d'application.
+                            AppLogoImage(
                                 modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(sizing.component(12.dp))),
-                                factory = { ctx ->
-                                    android.widget.ImageView(ctx).apply {
-                                        scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
-                                        setImageResource(option.resId)
-                                    }
-                                },
-                                update = { view -> view.setImageResource(option.resId) }
+                                resId = option.resId
                             )
                         }
                     }

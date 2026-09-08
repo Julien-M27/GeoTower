@@ -2443,6 +2443,9 @@ fun ThroughputCalculationDefaultsSheet(
                 bandSelection = throughputBandDefaults.flatMap { it.bands }.associate { it.prefSuffix to true }
                 val editor = prefs.edit()
                     .putString(ThroughputPrefs.DEFAULT_PRESET, ThroughputPrefs.DEFAULT_PRESET_VALUE)
+                    .remove(ThroughputPrefs.BAND_OVERRIDES)
+                    .remove(ThroughputPrefs.MAX_LTE_CA_COMPONENTS)
+                    .remove(ThroughputPrefs.MAX_NR_CA_COMPONENTS)
                     .putInt(ThroughputPrefs.CUSTOM_LTE_DOWN, 3)
                     .putInt(ThroughputPrefs.CUSTOM_LTE_UP, 2)
                     .putInt(ThroughputPrefs.CUSTOM_NR_DOWN, 3)

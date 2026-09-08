@@ -3,6 +3,7 @@ package fr.geotower.utils
 import android.content.ComponentName
 import android.content.Context
 import android.content.pm.PackageManager
+import android.os.Build
 import androidx.compose.runtime.mutableIntStateOf
 
 object AppIconManager {
@@ -13,12 +14,20 @@ object AppIconManager {
     // État réactif global
     var currentIconRes = mutableIntStateOf(0)
 
+    /**
+     * Changes the launcher alias without restarting or killing the running activity.
+     *
+     * Android 13+ can apply all alias changes as one package-manager transaction. Older versions
+     * enable the new alias before disabling the old ones, so the launcher never briefly loses its
+     * only entry.
+     */
     fun setIcon(context: Context, iconIndex: Int) {
         val packageManager = context.packageManager
         val packageName = context.packageName
+        val normalizedIndex = iconIndex.coerceIn(0, 2)
 
         // On identifie quel alias doit être allumé
-        val componentToEnable = when (iconIndex) {
+        val componentToEnable = when (normalizedIndex) {
             1 -> COMPONENT_ALT
             2 -> COMPONENT_ALT2
             else -> COMPONENT_DEFAULT
@@ -28,23 +37,44 @@ object AppIconManager {
         val allComponents = listOf(COMPONENT_DEFAULT, COMPONENT_ALT, COMPONENT_ALT2)
 
         try {
-            // On boucle sur les 3 : on active le bon, on désactive les autres !
-            for (component in allComponents) {
-                val state = if (component == componentToEnable) {
-                    PackageManager.COMPONENT_ENABLED_STATE_ENABLED
-                } else {
-                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+            val flags = PackageManager.DONT_KILL_APP
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                // Un seul changement vu par le launcher : pas de phase intermédiaire avec zéro
+                // icône active, ni de rafraîchissement trois fois de suite.
+                packageManager.setComponentEnabledSettings(
+                    allComponents.map { component ->
+                        PackageManager.ComponentEnabledSetting(
+                            ComponentName(packageName, component),
+                            if (component == componentToEnable) {
+                                PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+                            } else {
+                                PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+                            },
+                            flags
+                        )
+                    }
+                )
+            } else {
+                // Compatibilité Android 7 à 12 : activer avant de désactiver évite de supprimer
+                // brièvement l'entrée du launcher pendant le changement.
+                packageManager.setComponentEnabledSetting(
+                    ComponentName(packageName, componentToEnable),
+                    PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+                    flags
+                )
+                allComponents
+                    .filter { it != componentToEnable }
+                    .forEach { component ->
+                        packageManager.setComponentEnabledSetting(
+                            ComponentName(packageName, component),
+                            PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                            flags
+                        )
+                    }
                 }
 
-                packageManager.setComponentEnabledSetting(
-                    ComponentName(packageName, component),
-                    state,
-                    PackageManager.DONT_KILL_APP
-                )
-            }
-
             // MISE À JOUR DE L'ÉTAT IMMÉDIATE
-            currentIconRes.intValue = when (iconIndex) {
+            currentIconRes.intValue = when (normalizedIndex) {
                 1 -> fr.geotower.R.mipmap.ic_launcher_georadio
                 2 -> fr.geotower.R.mipmap.ic_launcher_funny // Le nouveau logo !
                 else -> fr.geotower.R.mipmap.ic_launcher_geotower

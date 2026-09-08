@@ -2,6 +2,7 @@ package fr.geotower.radio
 
 import kotlin.math.pow
 import kotlin.math.abs
+import kotlin.math.roundToInt
 import fr.geotower.utils.ThroughputTextKey
 
 object RadioThroughputEngine {
@@ -28,7 +29,8 @@ object RadioThroughputEngine {
     fun estimate(
         systems: List<SiteRadioSystem>,
         profile: ThroughputProfile,
-        allocations: List<SpectrumAllocation> = SpectrumAllocationsFrMetro.allocations
+        allocations: List<SpectrumAllocation> = SpectrumAllocationsFrMetro.allocations,
+        bandOverrides: Map<String, ThroughputBandOverride> = emptyMap()
     ): ThroughputEngineResult {
         val warnings = mutableListOf(
             ThroughputTextKey.THROUGHPUT_WARNING_NETWORK_UNKNOWN,
@@ -63,7 +65,7 @@ object RadioThroughputEngine {
                 return@mapNotNull null
             }
 
-            calculateCarrier(system, allocation, profile)
+            calculateCarrier(system, allocation, profile, bandOverrides[system.sourceKey])
         }
 
         val dssFiltered = applyDssPolicy(initialResults, profile, excluded, warnings)
@@ -90,49 +92,63 @@ object RadioThroughputEngine {
     fun calculateCarrier(
         system: SiteRadioSystem,
         allocation: SpectrumAllocation,
-        profile: ThroughputProfile
+        profile: ThroughputProfile,
+        bandOverride: ThroughputBandOverride? = null
     ): CarrierThroughputResult {
         val ratBand = mapAnfrBandToRatBand(system.operator, system.technology, system.bandLabel)
         val dlMbps: Double
         val ulMbps: Double
         val assumptions = mutableListOf<String>()
+        val baseAssumptions = if (system.technology == RadioTechnology.NR_5G) profile.nr else profile.lte
+        val effectiveAssumptions = baseAssumptions.copy(
+            dlModulationOrder = bandOverride?.dlModulationOrder ?: baseAssumptions.dlModulationOrder,
+            ulModulationOrder = bandOverride?.ulModulationOrder ?: baseAssumptions.ulModulationOrder,
+            dlMimoLayers = bandOverride?.dlMimoLayers ?: baseAssumptions.dlMimoLayers,
+            ulMimoLayers = bandOverride?.ulMimoLayers ?: baseAssumptions.ulMimoLayers,
+            tddDlRatio = bandOverride?.tddDlRatio ?: baseAssumptions.tddDlRatio,
+            tddUlRatio = bandOverride?.tddUlRatio ?: baseAssumptions.tddUlRatio
+        )
+        val effectiveBandwidthMHz = bandOverride?.bandwidthMHz ?: allocation.bandwidthMHz
+        val effectiveDuplexMode = bandOverride?.duplexMode ?: allocation.duplexMode
 
         if (system.technology == RadioTechnology.NR_5G) {
-            val nPrb = nrPrbFor(allocation.bandwidthMHz, profile.nr.scsKHz)
+            val nPrb = nrPrbFor(effectiveBandwidthMHz, effectiveAssumptions.scsKHz)
             dlMbps = calculateNrRateMbps(
-                bandwidthMHz = allocation.bandwidthMHz,
-                scsKHz = profile.nr.scsKHz,
+                bandwidthMHz = effectiveBandwidthMHz,
+                scsKHz = effectiveAssumptions.scsKHz,
                 nPrb = nPrb,
-                layers = profile.nr.dlMimoLayers,
-                modulationOrder = profile.nr.dlModulationOrder,
-                overhead = profile.nr.overheadDl,
-                tddRatio = if (allocation.duplexMode == DuplexMode.TDD) profile.nr.tddDlRatio else 1.0
+                layers = effectiveAssumptions.dlMimoLayers,
+                modulationOrder = effectiveAssumptions.dlModulationOrder,
+                overhead = effectiveAssumptions.overheadDl,
+                tddRatio = if (effectiveDuplexMode == DuplexMode.TDD) effectiveAssumptions.tddDlRatio else 1.0
             )
             ulMbps = calculateNrRateMbps(
-                bandwidthMHz = allocation.bandwidthMHz,
-                scsKHz = profile.nr.scsKHz,
+                bandwidthMHz = effectiveBandwidthMHz,
+                scsKHz = effectiveAssumptions.scsKHz,
                 nPrb = nPrb,
-                layers = profile.nr.ulMimoLayers,
-                modulationOrder = profile.nr.ulModulationOrder,
-                overhead = profile.nr.overheadUl,
-                tddRatio = if (allocation.duplexMode == DuplexMode.TDD) profile.nr.tddUlRatio else 1.0
+                layers = effectiveAssumptions.ulMimoLayers,
+                modulationOrder = effectiveAssumptions.ulModulationOrder,
+                overhead = effectiveAssumptions.overheadUl,
+                tddRatio = if (effectiveDuplexMode == DuplexMode.TDD) effectiveAssumptions.tddUlRatio else 1.0
             )
-            assumptions += "NR_TS_38_306_PRB_SCS_${profile.nr.scsKHz}_KHZ"
-            if (allocation.duplexMode == DuplexMode.TDD) {
-                assumptions += "TDD DL ${profile.nr.tddDlRatio} / UL ${profile.nr.tddUlRatio}"
+            assumptions += "NR_TS_38_306_PRB_SCS_${effectiveAssumptions.scsKHz}_KHZ"
+            if (effectiveDuplexMode == DuplexMode.TDD) {
+                assumptions += "TDD DL ${effectiveAssumptions.tddDlRatio} / UL ${effectiveAssumptions.tddUlRatio}"
             }
         } else {
             dlMbps = calculateLteApproxMbps(
-                bandwidthMHz = allocation.bandwidthMHz,
-                modulationOrder = profile.lte.dlModulationOrder,
-                layers = profile.lte.dlMimoLayers,
-                downlink = true
+                bandwidthMHz = effectiveBandwidthMHz,
+                modulationOrder = effectiveAssumptions.dlModulationOrder,
+                layers = effectiveAssumptions.dlMimoLayers,
+                downlink = true,
+                overhead = effectiveAssumptions.overheadDl
             )
             ulMbps = calculateLteApproxMbps(
-                bandwidthMHz = allocation.bandwidthMHz,
-                modulationOrder = profile.lte.ulModulationOrder,
-                layers = profile.lte.ulMimoLayers,
-                downlink = false
+                bandwidthMHz = effectiveBandwidthMHz,
+                modulationOrder = effectiveAssumptions.ulModulationOrder,
+                layers = effectiveAssumptions.ulMimoLayers,
+                downlink = false,
+                overhead = effectiveAssumptions.overheadUl
             )
             assumptions += "LTE_APPROX_V1"
         }
@@ -143,14 +159,14 @@ object RadioThroughputEngine {
             technology = system.technology,
             bandLabel = SpectrumAllocationsFrMetro.normalizeBandLabel(system.bandLabel),
             ratBand = ratBand,
-            bandwidthMHz = allocation.bandwidthMHz,
-            duplexMode = allocation.duplexMode,
+            bandwidthMHz = effectiveBandwidthMHz,
+            duplexMode = effectiveDuplexMode,
             dlMbps = dlMbps,
             ulMbps = ulMbps,
-            dlModulationOrder = if (system.technology == RadioTechnology.NR_5G) profile.nr.dlModulationOrder else profile.lte.dlModulationOrder,
-            ulModulationOrder = if (system.technology == RadioTechnology.NR_5G) profile.nr.ulModulationOrder else profile.lte.ulModulationOrder,
-            dlMimoLayers = if (system.technology == RadioTechnology.NR_5G) profile.nr.dlMimoLayers else profile.lte.dlMimoLayers,
-            ulMimoLayers = if (system.technology == RadioTechnology.NR_5G) profile.nr.ulMimoLayers else profile.lte.ulMimoLayers,
+            dlModulationOrder = effectiveAssumptions.dlModulationOrder,
+            ulModulationOrder = effectiveAssumptions.ulModulationOrder,
+            dlMimoLayers = effectiveAssumptions.dlMimoLayers,
+            ulMimoLayers = effectiveAssumptions.ulMimoLayers,
             included = true,
             sourceName = allocation.sourceName,
             sourceUrl = allocation.sourceUrl,
@@ -190,21 +206,26 @@ object RadioThroughputEngine {
         bandwidthMHz: Double,
         modulationOrder: Int,
         layers: Int,
-        downlink: Boolean
+        downlink: Boolean,
+        overhead: Double = 0.0
     ): Double {
         val base = if (downlink) LTE_APPROX_BASE_DL_20MHZ_2X2_64QAM_MBPS else LTE_APPROX_BASE_UL_20MHZ_1X1_64QAM_MBPS
         val baseLayers = if (downlink) 2.0 else 1.0
         return base *
             (bandwidthMHz / 20.0) *
             (modulationOrder / 6.0) *
-            (layers / baseLayers)
+            (layers / baseLayers) *
+            (1.0 - overhead).coerceIn(0.0, 1.0)
     }
 
     fun nrPrbFor(bandwidthMHz: Double, scsKHz: Int): Int {
-        require(scsKHz == 30) { "FR_RADIO_THROUGHPUT_V1 only ships FR1 SCS 30 kHz PRB values for now." }
+        require(scsKHz in setOf(15, 30, 60, 120)) {
+            "Unsupported NR FR1 SCS: $scsKHz kHz."
+        }
         val key = nrPrbTableScs30Khz.keys.minBy { abs(it - bandwidthMHz) }
-        return nrPrbTableScs30Khz[key]
+        val referencePrb = nrPrbTableScs30Khz[key]
             ?: error("No NR PRB value for ${bandwidthMHz} MHz at SCS $scsKHz kHz.")
+        return (referencePrb * 30.0 / scsKHz).roundToInt().coerceAtLeast(1)
     }
 
     fun mapAnfrBandToRatBand(

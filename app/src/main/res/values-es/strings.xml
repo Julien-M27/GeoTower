@@ -175,8 +175,8 @@
     <string name="appearance_scroll_blur_desc">Activar o desactivar el desenfoque (consume más batería)</string>
     <string name="appearance_app_icon_title">Icono de la aplicación</string>
     <string name="appearance_in_app_logo_title">Logo en la aplicación</string>
-    <string name="appearance_logo_material_waves_title">Ondas del logo con Material</string>
-    <string name="appearance_logo_material_waves_desc">Usar el color del tema Material seleccionado para las ondas de GeoTower</string>
+    <string name="appearance_logo_material_waves_title">Acento de color del logo con Material</string>
+    <string name="appearance_logo_material_waves_desc">Usar el color del tema Material seleccionado para el acento de color de los logos GeoTower, GeoRadio y Fun</string>
     <string name="appearance_menu_size_title">Tamaño del menú principal</string>
     <string name="appearance_menu_size_small">Pequeño</string>
     <string name="appearance_menu_size_normal">Normal</string>
@@ -1080,7 +1080,7 @@
     <string name="appstrings_release_section_statistics_data">Estadísticas y datos</string>
     <string name="appstrings_release_section_image_sharing">Compartir imágenes</string>
     <string name="appstrings_release_section_refresh">Actualización</string>
-    <string name="appstrings_release_section_throughput_calculator">Cálculo de velocidad</string>
+    <string name="appstrings_release_section_throughput_calculator">Estimación de velocidad</string>
     <string name="appstrings_release_section_preference_profiles">Perfiles de preferencias</string>
     <string name="appstrings_release_section_database">Base de datos</string>
     <string name="appstrings_release_section_live_tracking">Seguimiento en directo</string>
@@ -1363,7 +1363,7 @@
     <string name="appstrings_site_photos_settings_title">Ajustes de fotos y esquemas</string>
     <string name="appstrings_site_share_option">Botón Compartir</string>
     <string name="appstrings_site_support_details_option">Detalles del soporte</string>
-    <string name="appstrings_site_throughput_calculator_option">Botón Calculadora de velocidad</string>
+    <string name="appstrings_site_throughput_calculator_option">Botón Estimador de velocidad</string>
     <string name="appstrings_sites_in_service_label">En servicio</string>
     <string name="appstrings_sites_label">Sitios</string>
     <string name="appstrings_sites_out_of_service_label">Averiado</string>
@@ -1499,8 +1499,22 @@
     <string name="appstrings_throughput5g_upload_label">Subida 5G</string>
     <string name="appstrings_throughput_attention_title">Notas importantes</string>
     <string name="appstrings_throughput_calculation_settings_title">Ajustes de cálculo</string>
-    <string name="appstrings_throughput_calculator_button">Calculadora de velocidad</string>
-    <string name="appstrings_throughput_calculator_title">Calculadora de velocidad</string>
+    <string name="appstrings_throughput_calculator_button">Estimador de velocidad</string>
+    <string name="appstrings_throughput_calculator_title">Estimador de velocidad</string>
+    <string name="appstrings_throughput_advanced_button">Avanzado</string>
+    <string name="appstrings_throughput_advanced_title">Ajustes de radio avanzados</string>
+    <string name="appstrings_throughput_advanced_desc">Ajusta las hipótesis de radio de forma independiente para cada frecuencia. Los cambios se guardan automáticamente y recalculan la estimación.</string>
+    <string name="appstrings_throughput_advanced_bandwidth">Ancho de banda</string>
+    <string name="appstrings_throughput_advanced_duplex">Modo dúplex</string>
+    <string name="appstrings_throughput_advanced_dl_modulation">Modulación de bajada</string>
+    <string name="appstrings_throughput_advanced_ul_modulation">Modulación de subida</string>
+    <string name="appstrings_throughput_advanced_dl_mimo">MIMO de bajada</string>
+    <string name="appstrings_throughput_advanced_ul_mimo">MIMO de subida</string>
+    <string name="appstrings_throughput_advanced_tdd_dl_ratio">Parte de bajada TDD</string>
+    <string name="appstrings_throughput_advanced_tdd_ul_ratio">Parte de subida TDD</string>
+    <string name="appstrings_throughput_advanced_modified">personalizada</string>
+    <string name="appstrings_throughput_advanced_reset">Restablecer todas las frecuencias</string>
+    <string name="appstrings_throughput_advanced_reset_band">Restablecer esta frecuencia</string>
     <string name="appstrings_throughput_choose_map_point">Elegir un punto en el mapa</string>
     <string name="appstrings_throughput_clear_position">Quitar ubicación del cálculo</string>
     <string name="appstrings_throughput_cone_assumption">Supuesto: altura panel/soporte, teléfono a 1,5 m, inclinación vertical típica 4°-8° con punto nominal a 6°.</string>
@@ -1881,7 +1895,7 @@
     <string name="help_topic_title_support">Support details</string>
     <string name="help_topic_title_site">Site details</string>
     <string name="help_topic_title_elevation">Elevation profile</string>
-    <string name="help_topic_title_throughput">Throughput calculator</string>
+    <string name="help_topic_title_throughput">Throughput estimator</string>
     <string name="help_topic_title_photos">Community photos</string>
     <string name="help_topic_title_share">Sharing</string>
     <string name="help_topic_title_settings">Settings</string>
@@ -2025,7 +2039,7 @@
     <string name="help_action_desc_photos">Shows community photos and diagrams if available.</string>
     <string name="help_action_desc_operator_site">Opens the detail page for an operator installed on the support.</string>
     <string name="help_action_desc_elevation_profile">Calculates terrain between your position and the site.</string>
-    <string name="help_action_desc_throughput">Opens the throughput calculator based on frequencies and radio assumptions.</string>
+    <string name="help_action_desc_throughput">Opens the throughput estimator based on frequencies and radio assumptions.</string>
     <string name="help_action_desc_settings_gear">Opens page block customization when available.</string>
     <string name="help_action_desc_recalculate">Runs the analysis again with current position and data.</string>
     <string name="help_action_desc_calculate_later">Temporarily saves the request to run it when the connection returns.</string>
@@ -3214,4 +3228,6 @@
     <string name="appstrings_release_v2043_android_auto">Android Auto gestiona mejor los errores del mapa y los permisos de ubicación</string>
     <string name="appstrings_release_v2057_summary_ping">Nuevo test de latencia de los servidores GeoTower en Diagnóstico</string>
     <string name="appstrings_release_v2057_summary_diagnostics">Diagnóstico más interactivo con resultados más claros</string>
+    <string name="appstrings_release_v2058_summary_throughput">Calculadora de velocidad 4G/5G más completa y personalizable</string>
+    <string name="appstrings_release_v2058_summary_logos">Nuevos ajustes avanzados por banda y logos GeoRadio/Fun mejorados</string>
 </resources>

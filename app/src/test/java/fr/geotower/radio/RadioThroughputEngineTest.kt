@@ -61,6 +61,93 @@ class RadioThroughputEngineTest {
     }
 
     @Test
+    fun bandOverrideChangesOnlyTheSelectedCarrierParameters() {
+        val allocation = SpectrumAllocation(
+            operator = MobileOperator.ORANGE,
+            bandLabel = "700",
+            ratBandLte = "B28",
+            duplexMode = DuplexMode.FDD,
+            bandwidthMHz = 20.0,
+            validFrom = "2026-01-01",
+            validTo = null,
+            sourceName = "test",
+            sourceUrl = "https://example.test",
+            confidence = 100
+        )
+        val profile = ThroughputProfiles.prudent
+        val defaultResult = RadioThroughputEngine.calculateCarrier(
+            system = SiteRadioSystem(
+                sourceKey = "lte-700",
+                supportId = "site-1",
+                operator = MobileOperator.ORANGE,
+                technology = RadioTechnology.LTE_4G,
+                bandLabel = "700"
+            ),
+            allocation = allocation,
+            profile = profile
+        )
+        val overriddenResult = RadioThroughputEngine.calculateCarrier(
+            system = SiteRadioSystem(
+                sourceKey = "lte-700",
+                supportId = "site-1",
+                operator = MobileOperator.ORANGE,
+                technology = RadioTechnology.LTE_4G,
+                bandLabel = "700"
+            ),
+            allocation = allocation,
+            profile = profile,
+            bandOverride = ThroughputBandOverride(
+                bandwidthMHz = 10.0,
+                dlModulationOrder = 8,
+                dlMimoLayers = 4
+            )
+        )
+
+        assertEquals(150.0, defaultResult.dlMbps, 0.01)
+        assertEquals(200.0, overriddenResult.dlMbps, 0.01)
+        assertEquals(25.0, overriddenResult.ulMbps, 0.01)
+        assertEquals(8, overriddenResult.dlModulationOrder)
+        assertEquals(4, overriddenResult.dlMimoLayers)
+        assertEquals(4, overriddenResult.ulModulationOrder)
+        assertEquals(1, overriddenResult.ulMimoLayers)
+    }
+
+    @Test
+    fun estimateResolvesOverrideByCarrierSourceKey() {
+        val allocation = SpectrumAllocation(
+            operator = MobileOperator.ORANGE,
+            bandLabel = "700",
+            ratBandLte = "B28",
+            duplexMode = DuplexMode.FDD,
+            bandwidthMHz = 20.0,
+            validFrom = "2026-01-01",
+            validTo = null,
+            sourceName = "test",
+            sourceUrl = "https://example.test",
+            confidence = 100
+        )
+        val system = SiteRadioSystem(
+            sourceKey = "lte-700",
+            supportId = "site-1",
+            operator = MobileOperator.ORANGE,
+            technology = RadioTechnology.LTE_4G,
+            bandLabel = "700"
+        )
+
+        val result = RadioThroughputEngine.estimate(
+            systems = listOf(system),
+            profile = ThroughputProfiles.prudent,
+            allocations = listOf(allocation),
+            bandOverrides = mapOf(
+                "lte-700" to ThroughputBandOverride(bandwidthMHz = 10.0)
+            )
+        )
+
+        assertEquals(75.0, result.totalDlMbps, 0.01)
+        assertEquals(10.0, result.perCarrierResults.single().bandwidthMHz, 0.01)
+    }
+
+    @Test
     fun dssPolicyDoesNotDoubleCountSameFddBand() {
         val systems = listOf(
             SiteRadioSystem(

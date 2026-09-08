@@ -1,6 +1,9 @@
 package fr.geotower.ui.components
 
 import android.widget.ImageView
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -13,8 +16,8 @@ import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogoDrawingResources
 
 /**
- * Renders an in-app logo while keeping the optional Material-colored wave layer isolated from the
- * rest of the artwork. Non-logo drawables passed here are rendered normally.
+ * Renders an in-app logo while keeping its optional Material-colored accent isolated from the rest
+ * of the artwork. Non-logo drawables passed here are rendered normally.
  */
 @Composable
 fun AppLogoImage(
@@ -34,18 +37,25 @@ fun AppLogoImage(
         )
     }
 
-    AndroidView(
-        modifier = modifier,
-        factory = { ctx ->
-            ImageView(ctx).apply {
-                scaleType = ImageView.ScaleType.FIT_CENTER
-                this.contentDescription = contentDescription
-                setImageDrawable(drawable)
+    Crossfade(
+        targetState = drawable,
+        animationSpec = tween(durationMillis = 180),
+        label = "app_logo_transition",
+        modifier = modifier
+    ) { targetDrawable ->
+        AndroidView(
+            modifier = Modifier.fillMaxSize(),
+            factory = { ctx ->
+                ImageView(ctx).apply {
+                    scaleType = ImageView.ScaleType.FIT_CENTER
+                    this.contentDescription = contentDescription
+                    setImageDrawable(targetDrawable)
+                }
+            },
+            update = { imageView ->
+                imageView.setImageDrawable(targetDrawable)
+                imageView.contentDescription = contentDescription
             }
-        },
-        update = { imageView ->
-            imageView.setImageDrawable(drawable)
-            imageView.contentDescription = contentDescription
-        }
-    )
+        )
+    }
 }

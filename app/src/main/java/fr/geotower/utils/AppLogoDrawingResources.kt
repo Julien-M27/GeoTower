@@ -85,25 +85,25 @@ object AppLogoDrawingResources {
     }
 
     /**
-     * Returns the in-app logo drawable, optionally replacing only GeoTower's wave layer with the
-     * current Material accent. Other logo families and monochrome variants remain unchanged.
+     * Returns the in-app logo drawable, optionally replacing its colored accent with the current
+     * Material accent. Monochrome variants and the contrasting structure layer remain unchanged.
      */
     fun displayDrawable(context: Context, @DrawableRes drawableRes: Int, materialWavesEnabled: Boolean, materialColor: Int): Drawable? {
-        val layers = if (materialWavesEnabled) dynamicGeoTowerLayers(drawableRes) else null
+        val layers = if (materialWavesEnabled) dynamicLogoLayers(drawableRes) else null
         if (layers == null) return ContextCompat.getDrawable(context, drawableRes)
 
         val structure = ContextCompat.getDrawable(context, layers.structureRes) ?: return null
-        val waves = ContextCompat.getDrawable(context, layers.wavesRes)?.mutate() ?: return structure
-        waves.setTint(materialColor)
-        return LayerDrawable(arrayOf(structure, waves))
+        val accent = ContextCompat.getDrawable(context, layers.accentRes)?.mutate() ?: return structure
+        accent.setTint(materialColor)
+        return LayerDrawable(arrayOf(structure, accent))
     }
 
     private data class DynamicLogoLayers(
         @DrawableRes val structureRes: Int,
-        @DrawableRes val wavesRes: Int
+        @DrawableRes val accentRes: Int
     )
 
-    private fun dynamicGeoTowerLayers(@DrawableRes drawableRes: Int): DynamicLogoLayers? = when (drawableRes) {
+    private fun dynamicLogoLayers(@DrawableRes drawableRes: Int): DynamicLogoLayers? = when (drawableRes) {
         R.drawable.logo_geotower_color_on_light -> DynamicLogoLayers(
             R.drawable.logo_geotower_structure_on_light,
             R.drawable.logo_geotower_waves
@@ -111,6 +111,22 @@ object AppLogoDrawingResources {
         R.drawable.logo_geotower_color_on_dark -> DynamicLogoLayers(
             R.drawable.logo_geotower_structure_on_dark,
             R.drawable.logo_geotower_waves
+        )
+        R.drawable.logo_georadio_color_on_light -> DynamicLogoLayers(
+            R.drawable.logo_georadio_structure_on_light,
+            R.drawable.logo_georadio_accent
+        )
+        R.drawable.logo_georadio_color_on_dark -> DynamicLogoLayers(
+            R.drawable.logo_georadio_structure_on_dark,
+            R.drawable.logo_georadio_accent
+        )
+        R.drawable.logo_fun_color_on_light -> DynamicLogoLayers(
+            R.drawable.logo_fun_structure_on_light,
+            R.drawable.logo_fun_accent
+        )
+        R.drawable.logo_fun_color_on_dark -> DynamicLogoLayers(
+            R.drawable.logo_fun_structure_on_dark,
+            R.drawable.logo_fun_accent
         )
         else -> null
     }

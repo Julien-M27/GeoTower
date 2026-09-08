@@ -422,6 +422,9 @@ object ThroughputPrefs {
     const val CUSTOM_SELECTED_LAT = "throughput_custom_selected_lat"
     const val CUSTOM_SELECTED_LON = "throughput_custom_selected_lon"
     const val CUSTOM_RECEIVER_HEIGHT = "throughput_custom_receiver_height"
+    const val BAND_OVERRIDES = "throughput_band_overrides_v1"
+    const val MAX_LTE_CA_COMPONENTS = "throughput_max_lte_ca_components"
+    const val MAX_NR_CA_COMPONENTS = "throughput_max_nr_ca_components"
     val include4G = BooleanPreference("throughput_include_4g", true)
     val include5G = BooleanPreference("throughput_include_5g", true)
     val includePlanned = BooleanPreference("throughput_include_planned", false)

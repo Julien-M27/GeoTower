@@ -175,8 +175,8 @@
     <string name="appearance_scroll_blur_desc">Ativar ou desativar o desfoque (consome mais bateria)</string>
     <string name="appearance_app_icon_title">Ícone da aplicação</string>
     <string name="appearance_in_app_logo_title">Logótipo na aplicação</string>
-    <string name="appearance_logo_material_waves_title">Ondas do logótipo Material</string>
-    <string name="appearance_logo_material_waves_desc">Usar a cor do tema Material selecionado para as ondas GeoTower</string>
+    <string name="appearance_logo_material_waves_title">Cor de destaque dos logótipos Material</string>
+    <string name="appearance_logo_material_waves_desc">Usar a cor do tema Material selecionado para o destaque colorido dos logótipos GeoTower, GeoRadio e Fun</string>
     <string name="appearance_menu_size_title">Tamanho do menu principal</string>
     <string name="appearance_menu_size_small">Pequeno</string>
     <string name="appearance_menu_size_normal">Normal</string>
@@ -1080,7 +1080,7 @@
     <string name="appstrings_release_section_statistics_data">Estatísticas e dados</string>
     <string name="appstrings_release_section_image_sharing">Partilha de imagens</string>
     <string name="appstrings_release_section_refresh">Atualização</string>
-    <string name="appstrings_release_section_throughput_calculator">Cálculo de débito</string>
+    <string name="appstrings_release_section_throughput_calculator">Estimativa de débito</string>
     <string name="appstrings_release_section_preference_profiles">Perfis de preferências</string>
     <string name="appstrings_release_section_database">Base de dados</string>
     <string name="appstrings_release_section_live_tracking">Seguimento em direto</string>
@@ -1363,7 +1363,7 @@
     <string name="appstrings_site_photos_settings_title">Configurações de fotos e esquemas</string>
     <string name="appstrings_site_share_option">Botão Compartilhar</string>
     <string name="appstrings_site_support_details_option">Detalhes do suporte</string>
-    <string name="appstrings_site_throughput_calculator_option">Botão Calculadora de débito</string>
+    <string name="appstrings_site_throughput_calculator_option">Botão Estimador de débito</string>
     <string name="appstrings_sites_in_service_label">Em serviço</string>
     <string name="appstrings_sites_label">Locais</string>
     <string name="appstrings_sites_out_of_service_label">Avariado</string>
@@ -1499,8 +1499,22 @@
     <string name="appstrings_throughput5g_upload_label">5G upload</string>
     <string name="appstrings_throughput_attention_title">Pontos de atenção</string>
     <string name="appstrings_throughput_calculation_settings_title">Definições de cálculo</string>
-    <string name="appstrings_throughput_calculator_button">Calculadora de débito</string>
-    <string name="appstrings_throughput_calculator_title">Calculadora de débito</string>
+    <string name="appstrings_throughput_calculator_button">Estimador de débito</string>
+    <string name="appstrings_throughput_calculator_title">Estimador de débito</string>
+    <string name="appstrings_throughput_advanced_button">Avançado</string>
+    <string name="appstrings_throughput_advanced_title">Definições de rádio avançadas</string>
+    <string name="appstrings_throughput_advanced_desc">Ajuste as hipóteses de rádio independentemente para cada frequência. As alterações são guardadas automaticamente e recalculam a estimativa.</string>
+    <string name="appstrings_throughput_advanced_bandwidth">Largura de banda</string>
+    <string name="appstrings_throughput_advanced_duplex">Modo duplex</string>
+    <string name="appstrings_throughput_advanced_dl_modulation">Modulação descendente</string>
+    <string name="appstrings_throughput_advanced_ul_modulation">Modulação ascendente</string>
+    <string name="appstrings_throughput_advanced_dl_mimo">MIMO descendente</string>
+    <string name="appstrings_throughput_advanced_ul_mimo">MIMO ascendente</string>
+    <string name="appstrings_throughput_advanced_tdd_dl_ratio">Parte descendente TDD</string>
+    <string name="appstrings_throughput_advanced_tdd_ul_ratio">Parte ascendente TDD</string>
+    <string name="appstrings_throughput_advanced_modified">personalizada</string>
+    <string name="appstrings_throughput_advanced_reset">Repor todas as frequências</string>
+    <string name="appstrings_throughput_advanced_reset_band">Repor esta frequência</string>
     <string name="appstrings_throughput_choose_map_point">Escolher um ponto no mapa</string>
     <string name="appstrings_throughput_clear_position">Remover a localização do cálculo</string>
     <string name="appstrings_throughput_cone_assumption">Hipótese: altura do painel/suporte, telemóvel a 1,5 m, tilt vertical típico 4°-8° com ponto nominal a 6°.</string>
@@ -1881,7 +1895,7 @@
     <string name="help_topic_title_support">Detalhes do suporte</string>
     <string name="help_topic_title_site">Detalhes do site</string>
     <string name="help_topic_title_elevation">Perfil altimétrico</string>
-    <string name="help_topic_title_throughput">Calculadora de débito</string>
+    <string name="help_topic_title_throughput">Estimador de débito</string>
     <string name="help_topic_title_photos">Fotos da comunidade</string>
     <string name="help_topic_title_share">Partilha</string>
     <string name="help_topic_title_settings">Configurações</string>
@@ -2025,7 +2039,7 @@
     <string name="help_action_desc_photos">Mostra fotos comunitárias e esquemas se disponíveis.</string>
     <string name="help_action_desc_operator_site">Abre a ficha detalhada de uma operadora instalada no suporte.</string>
     <string name="help_action_desc_elevation_profile">Calcula o relevo entre a tua posição e o site.</string>
-    <string name="help_action_desc_throughput">Abre a calculadora de débito baseada em frequências e hipóteses rádio.</string>
+    <string name="help_action_desc_throughput">Abre o estimador de débito baseado em frequências e hipóteses rádio.</string>
     <string name="help_action_desc_settings_gear">Abre a personalização dos blocos da página quando disponível.</string>
     <string name="help_action_desc_recalculate">Repete a análise com a posição e os dados atuais.</string>
     <string name="help_action_desc_calculate_later">Guarda temporariamente o pedido para o executar quando a ligação voltar.</string>
@@ -3214,4 +3228,6 @@
     <string name="appstrings_release_v2043_android_auto">O Android Auto gere melhor os erros do mapa e as permissões de localização</string>
     <string name="appstrings_release_v2057_summary_ping">Novo teste de latência dos servidores GeoTower no diagnóstico</string>
     <string name="appstrings_release_v2057_summary_diagnostics">Diagnóstico mais interativo com resultados mais claros</string>
+    <string name="appstrings_release_v2058_summary_throughput">Calculadora de débito 4G/5G mais completa e personalizável</string>
+    <string name="appstrings_release_v2058_summary_logos">Novas definições avançadas por banda e logótipos GeoRadio/Fun melhorados</string>
 </resources>

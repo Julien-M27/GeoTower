@@ -951,7 +951,7 @@ fun SettingsScreen(
             entry(context.getString(R.string.appearance_scroll_blur_title), "flou blur defilement transparence effet", SECTION_APPEARANCE)
             entry(context.getString(R.string.appearance_app_icon_title), "icone icon launcher logo application accueil", SECTION_APPEARANCE) { showIconSheet = true }
             entry(context.getString(R.string.appearance_in_app_logo_title), "logo dessin drawing application interne", SECTION_APPEARANCE) { showLogoDrawingSheet = true }
-            entry(context.getString(R.string.appearance_logo_material_waves_title), "logo ondes waves material couleur palette theme", SECTION_APPEARANCE)
+            entry(context.getString(R.string.appearance_logo_material_waves_title), "logo accent couleur waves material palette theme geotower georadio fun", SECTION_APPEARANCE)
             entry(context.getString(R.string.appearance_menu_size_title), "taille menu size police texte echelle zoom", SECTION_APPEARANCE)
             if (isWideScreen) {
                 entry(context.getString(R.string.settings_display_style_title), "affichage display plein ecran split divise tablette", SECTION_APPEARANCE)
@@ -1750,7 +1750,6 @@ fun SettingsScreen(
                 onDismiss = { showIconSheet = false },
                 currentIconRes = logoResId,
                 onToggle = { choix -> AppIconManager.setIcon(context, choix) },
-                context = context,
                 sheetState = sheetState,
                 useOneUi = useOneUi,
                 safeClick = safeClick
@@ -4664,7 +4663,6 @@ fun IconSheet(
     onDismiss: () -> Unit,
     currentIconRes: Int,
     onToggle: (Int) -> Unit,
-    context: Context,
     sheetState: SheetState,
     useOneUi: Boolean,
     safeClick: SafeClick
@@ -4687,6 +4685,14 @@ fun IconSheet(
     val scrollState = rememberScrollState()
     val sizing = LocalGeoTowerUiStyle.current.sizing
 
+    fun chooseIcon(index: Int) {
+        safeClick("launcher_icon_$index") {
+            tempIconIndex = index
+            onToggle(index)
+            onDismiss()
+        }
+    }
+
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
         Column(
             modifier = Modifier
@@ -4702,45 +4708,27 @@ fun IconSheet(
 
                 // --- LOGO 1 (Classique) : Index 0 ---
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    // Clic sur l'image : on change juste la variable temporaire (pas de onDismiss/onToggle)
-                    Surface(onClick = { safeClick("launcher_icon_0") { tempIconIndex = 0 } }, shape = RoundedCornerShape(sizing.component(22.dp)), color = Color.Transparent, modifier = Modifier.size(sizing.component(70.dp))) { LauncherIconPreview(R.mipmap.ic_launcher_geotower, Modifier.fillMaxSize()) }
+                    Surface(onClick = { chooseIcon(0) }, shape = RoundedCornerShape(sizing.component(22.dp)), color = Color.Transparent, modifier = Modifier.size(sizing.component(70.dp))) { LauncherIconPreview(R.mipmap.ic_launcher_geotower, Modifier.fillMaxSize()) }
                     Spacer(Modifier.height(sizing.spacing(12.dp)))
                     val isSelected = tempIconIndex == 0
-                    // Clic sur le cercle radio
-                    if(useOneUi) fr.geotower.ui.components.OneUiRadioButton(isSelected) { tempIconIndex = 0 } else RadioButton(selected = isSelected, onClick = { tempIconIndex = 0 })
+                    if(useOneUi) fr.geotower.ui.components.OneUiRadioButton(isSelected) { chooseIcon(0) } else RadioButton(selected = isSelected, onClick = { chooseIcon(0) })
                 }
 
                 // --- LOGO 2 (Radio) : Index 1 ---
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Surface(onClick = { safeClick("launcher_icon_1") { tempIconIndex = 1 } }, shape = RoundedCornerShape(sizing.component(22.dp)), color = Color.Transparent, modifier = Modifier.size(sizing.component(70.dp))) { LauncherIconPreview(R.mipmap.ic_launcher_georadio, Modifier.fillMaxSize()) }
+                    Surface(onClick = { chooseIcon(1) }, shape = RoundedCornerShape(sizing.component(22.dp)), color = Color.Transparent, modifier = Modifier.size(sizing.component(70.dp))) { LauncherIconPreview(R.mipmap.ic_launcher_georadio, Modifier.fillMaxSize()) }
                     Spacer(Modifier.height(sizing.spacing(12.dp)))
                     val isSelected = tempIconIndex == 1
-                    if(useOneUi) fr.geotower.ui.components.OneUiRadioButton(isSelected) { tempIconIndex = 1 } else RadioButton(selected = isSelected, onClick = { tempIconIndex = 1 })
+                    if(useOneUi) fr.geotower.ui.components.OneUiRadioButton(isSelected) { chooseIcon(1) } else RadioButton(selected = isSelected, onClick = { chooseIcon(1) })
                 }
 
                 // --- LOGO 3 (Funny) : Index 2 ---
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Surface(onClick = { safeClick("launcher_icon_2") { tempIconIndex = 2 } }, shape = RoundedCornerShape(sizing.component(22.dp)), color = Color.Transparent, modifier = Modifier.size(sizing.component(70.dp))) { LauncherIconPreview(R.mipmap.ic_launcher_funny, Modifier.fillMaxSize()) }
+                    Surface(onClick = { chooseIcon(2) }, shape = RoundedCornerShape(sizing.component(22.dp)), color = Color.Transparent, modifier = Modifier.size(sizing.component(70.dp))) { LauncherIconPreview(R.mipmap.ic_launcher_funny, Modifier.fillMaxSize()) }
                     Spacer(Modifier.height(sizing.spacing(12.dp)))
                     val isSelected = tempIconIndex == 2
-                    if(useOneUi) fr.geotower.ui.components.OneUiRadioButton(isSelected) { tempIconIndex = 2 } else RadioButton(selected = isSelected, onClick = { tempIconIndex = 2 })
+                    if(useOneUi) fr.geotower.ui.components.OneUiRadioButton(isSelected) { chooseIcon(2) } else RadioButton(selected = isSelected, onClick = { chooseIcon(2) })
                 }
-            }
-
-            Text(stringResource(R.string.appstrings_restart_to_apply), style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.outline, modifier = Modifier.padding(top = sizing.spacing(24.dp), bottom = sizing.spacing(16.dp)))
-
-            // --- NOUVEAU : BOUTON VALIDER ---
-            Button(
-                onClick = {
-                    safeClick {
-                        onToggle(tempIconIndex) // On applique le changement
-                        onDismiss() // On ferme la fenêtre
-                    }
-                },
-                modifier = Modifier.fillMaxWidth().height(sizing.component(50.dp)),
-                shape = RoundedCornerShape(sizing.component(25.dp))
-            ) {
-                Text(stringResource(R.string.appstrings_validate), style = sizing.textStyle(MaterialTheme.typography.labelLarge), fontWeight = FontWeight.Bold)
             }
         }
     }
