@@ -170,6 +170,7 @@ object PreferenceProfileManager {
         AppConfig.PREF_HIDE_UNDERGROUND_SITES,
         AppConfig.PREF_SHOW_ONLY_ZB_SITES,
         AppConfig.PREF_SHOW_PROJECT_SITES,
+        AppConfig.PREF_MOBILE_TECHNOLOGY_ONLY,
         AppLogoDrawingResources.PREF_KEY
     )
 

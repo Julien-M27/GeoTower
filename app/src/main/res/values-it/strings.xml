@@ -685,6 +685,7 @@
     <string name="appstrings_map_active_filters_dialog_title">Filtri attivi</string>
     <string name="appstrings_map_active_filters_dialog_message">I seguenti filtri sono attivi sulla mappa. Vuoi disattivarli?</string>
     <string name="appstrings_map_active_filters_disable">Disattiva filtri</string>
+    <string name="appstrings_map_active_filters_make_permanent">Rendi permanenti</string>
     <string name="appstrings_map_filters_defaults_menu">Filtri</string>
     <string name="appstrings_map_filters_defaults_title">Filtri predefiniti</string>
     <string name="appstrings_map_filters_defaults_desc">Queste impostazioni diventano i filtri predefiniti della mappa. Il banner «Filtri attivi» appare solo quando la mappa se ne discosta.</string>
@@ -1490,6 +1491,12 @@
     <string name="appstrings_technical_data_unavailable">Dati tecnici non disponibili</string>
     <string name="appstrings_technically">Tecnicamente operativo</string>
     <string name="appstrings_technologies_title">Tecnologie</string>
+    <string name="appstrings_map_technology_only_title">Una sola tecnologia</string>
+    <string name="appstrings_map_technology_only_none">Nessuna</string>
+    <string name="appstrings_map_technology_only_2g">Solo 2G</string>
+    <string name="appstrings_map_technology_only_3g">Solo 3G</string>
+    <string name="appstrings_map_technology_only_4g">Solo 4G</string>
+    <string name="appstrings_map_technology_only_5g">Solo 5G</string>
     <string name="appstrings_theme_dark">Scuro</string>
     <string name="appstrings_theme_desc">Scegli lo stile più adatto a te.</string>
     <string name="appstrings_theme_light">Chiaro</string>
@@ -3230,4 +3237,6 @@
     <string name="appstrings_release_v2057_summary_diagnostics">Diagnostica più interattiva con risultati più chiari</string>
     <string name="appstrings_release_v2058_summary_throughput">Calcolatore di velocità 4G/5G più completo e personalizzabile</string>
     <string name="appstrings_release_v2058_summary_logos">Nuove impostazioni avanzate per banda e loghi GeoRadio/Fun migliorati</string>
+    <string name="appstrings_release_v2059_summary_map_filters">Filtri della mappa più precisi con selezione di una sola tecnologia e impostazioni persistenti</string>
+    <string name="appstrings_release_v2059_summary_databases">Controllo degli aggiornamenti più rapido e supporto migliorato per i nuovi export ANFR</string>
 </resources>

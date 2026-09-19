@@ -15,6 +15,9 @@ import fr.geotower.data.db.LocalDbProvenance
 import fr.geotower.data.db.RadioDatabaseValidator
 import fr.geotower.utils.AppConfig
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 
 /**
@@ -51,6 +54,13 @@ object DatabaseBulkUpdate {
         val targetActions: List<TargetAction> = emptyList()
     )
 
+    private data class TargetCheckResult(
+        val targetAction: TargetAction? = null,
+        val isComplete: Boolean = true,
+        val hasMissingDatabase: Boolean = false,
+        val hasDatabaseUpdate: Boolean = false
+    )
+
     /**
      * Ne retourne que les bases qui peuvent etre telechargees ici et dont la version distante est
      * plus recente. Une base deja en cours de telechargement est laissee tranquille.
@@ -65,107 +75,132 @@ object DatabaseBulkUpdate {
                 return@withContext AvailableUpdatesResult(emptyList(), isComplete = false)
             }
 
-            var isComplete = true
-            var hasMissingDatabases = false
-            var hasDatabaseUpdates = false
-            val targetActions = mutableListOf<TargetAction>()
-            buildList {
+            val checks = buildList<suspend () -> TargetCheckResult> {
                 // Les deux bases ANFR se reconstruisent localement quand ce mode est impose : les
                 // telecharger ici ecraserait cette decision de provenance.
                 if (!AppConfig.dbForcedLocal()) {
-                    val mobileLocallyBuilt = LocalDbProvenance.readMobile(context).locallyBuilt
-                    val radioLocallyBuilt = LocalDbProvenance.readRadio(context).locallyBuilt
-                    if (
-                        !hasUnfinishedWork(workManager, LocalDbBuildWorker.UNIQUE_WORK_NAME)
-                    ) {
-                        if (!mobileLocallyBuilt && !hasUnfinishedWork(workManager, DatabaseDownloadWorker.UNIQUE_WORK_NAME)) {
-                            val remote = DatabaseDownloader.getLatestDatabaseUpdateInfo()
-                            val local = GeoTowerDatabaseValidator.getInstalledDatabaseVersion(context)
-                            if (local == null) {
-                                hasMissingDatabases = true
-                            }
-                            if (remote == null) {
-                                isComplete = false
-                            } else if (DatabaseDownloader.isRemoteDatabaseUpdateAvailable(context, remote, local)) {
-                                if (local != null) {
-                                    hasDatabaseUpdates = true
-                                }
-                                add(Target.MOBILE)
-                                targetActions += TargetAction(
-                                    Target.MOBILE,
-                                    if (local == null) Action.DOWNLOAD else Action.UPDATE
-                                )
-                            }
-                        }
-
-                        if (!radioLocallyBuilt && !hasUnfinishedWork(workManager, RadioDatabaseDownloadWorker.UNIQUE_WORK_NAME)) {
-                            val remote = RadioDatabaseDownloader.getLatestDatabaseVersion()
-                            val dbFile = context.getDatabasePath(RadioDatabaseValidator.DB_NAME)
-                            val local = if (RadioDatabaseValidator.validateDatabaseFile(dbFile).isValid) {
-                                RadioDatabaseValidator.getInstalledDatabaseVersion(context)
-                            } else {
-                                null
-                            }
-                            if (local == null) {
-                                hasMissingDatabases = true
-                            }
-                            if (remote == null) {
-                                isComplete = false
-                            } else if (DatabaseVersionPolicy.isRemoteNewer(remote, local)) {
-                                if (local != null) {
-                                    hasDatabaseUpdates = true
-                                }
-                                add(Target.RADIO)
-                                targetActions += TargetAction(
-                                    Target.RADIO,
-                                    if (local == null) Action.DOWNLOAD else Action.UPDATE
-                                )
-                            }
-                        }
-                    }
+                    add { checkMobile(context, workManager) }
+                    add { checkRadio(context, workManager) }
                 }
 
                 // Au niveau d'autonomie maximal, cette base partenaire n'est plus servie du tout.
                 if (
                     !AppConfig.blockCommunityAndUpdates() &&
-                    RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.ENB_DATABASE) &&
-                    !hasUnfinishedWork(workManager, EnbDatabaseDownloadWorker.UNIQUE_WORK_NAME)
+                    RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.ENB_DATABASE)
                 ) {
-                    val remote = EnbDatabaseDownloader.getLatestDatabaseVersion()
-                    val dbFile = context.getDatabasePath(EnbDatabaseValidator.DB_NAME)
-                    val local = if (EnbDatabaseValidator.validateDatabaseFile(dbFile).isValid) {
-                        EnbDatabaseValidator.getInstalledDatabaseVersion(context)
-                    } else {
-                        null
-                    }
-                    if (local == null) {
-                        hasMissingDatabases = true
-                    }
-                    // La version eNB contient un digest : une comparaison exacte est indispensable
-                    // pour detecter le changement d'une source plus ancienne que les autres.
-                    if (remote.isNullOrBlank()) {
-                        isComplete = false
-                    } else if (remote != local) {
-                        if (local != null) {
-                            hasDatabaseUpdates = true
-                        }
-                        add(Target.ENB)
-                        targetActions += TargetAction(
-                            Target.ENB,
-                            if (local == null) Action.DOWNLOAD else Action.UPDATE
-                        )
-                    }
+                    add { checkEnb(context, workManager) }
                 }
-            }.let { targets ->
-                AvailableUpdatesResult(
-                    targets = targets,
-                    isComplete = isComplete,
-                    hasMissingDatabases = hasMissingDatabases,
-                    hasDatabaseUpdates = hasDatabaseUpdates,
-                    targetActions = targetActions
-                )
             }
+
+            val results = runChecksConcurrently(checks)
+            AvailableUpdatesResult(
+                targets = results.mapNotNull { it.targetAction?.target },
+                isComplete = results.all { it.isComplete },
+                hasMissingDatabases = results.any { it.hasMissingDatabase },
+                hasDatabaseUpdates = results.any { it.hasDatabaseUpdate },
+                targetActions = results.mapNotNull { it.targetAction }
+            )
         }
+
+    internal suspend fun <T> runChecksConcurrently(checks: List<suspend () -> T>): List<T> =
+        coroutineScope {
+            checks.map { check -> async(Dispatchers.IO) { check() } }.awaitAll()
+        }
+
+    private suspend fun checkMobile(context: Context, workManager: WorkManager): TargetCheckResult {
+        if (
+            LocalDbProvenance.readMobile(context).locallyBuilt ||
+            hasUnfinishedWork(workManager, LocalDbBuildWorker.UNIQUE_WORK_NAME) ||
+            hasUnfinishedWork(workManager, DatabaseDownloadWorker.UNIQUE_WORK_NAME)
+        ) {
+            return TargetCheckResult()
+        }
+
+        val remote = DatabaseDownloader.getLatestDatabaseUpdateInfo()
+        val local = GeoTowerDatabaseValidator.getInstalledDatabaseVersion(context)
+        val isMissing = local == null
+        if (remote == null) {
+            return TargetCheckResult(isComplete = false, hasMissingDatabase = isMissing)
+        }
+        if (!DatabaseDownloader.isRemoteDatabaseUpdateAvailable(context, remote, local)) {
+            return TargetCheckResult(hasMissingDatabase = isMissing)
+        }
+
+        return TargetCheckResult(
+            targetAction = TargetAction(
+                Target.MOBILE,
+                if (isMissing) Action.DOWNLOAD else Action.UPDATE
+            ),
+            hasMissingDatabase = isMissing,
+            hasDatabaseUpdate = !isMissing
+        )
+    }
+
+    private suspend fun checkRadio(context: Context, workManager: WorkManager): TargetCheckResult {
+        if (
+            LocalDbProvenance.readRadio(context).locallyBuilt ||
+            hasUnfinishedWork(workManager, LocalDbBuildWorker.UNIQUE_WORK_NAME) ||
+            hasUnfinishedWork(workManager, RadioDatabaseDownloadWorker.UNIQUE_WORK_NAME)
+        ) {
+            return TargetCheckResult()
+        }
+
+        val remote = RadioDatabaseDownloader.getLatestDatabaseVersion()
+        val dbFile = context.getDatabasePath(RadioDatabaseValidator.DB_NAME)
+        val local = if (RadioDatabaseValidator.validateDatabaseFile(dbFile).isValid) {
+            RadioDatabaseValidator.getInstalledDatabaseVersion(context)
+        } else {
+            null
+        }
+        val isMissing = local == null
+        if (remote == null) {
+            return TargetCheckResult(isComplete = false, hasMissingDatabase = isMissing)
+        }
+        if (!DatabaseVersionPolicy.isRemoteNewer(remote, local)) {
+            return TargetCheckResult(hasMissingDatabase = isMissing)
+        }
+
+        return TargetCheckResult(
+            targetAction = TargetAction(
+                Target.RADIO,
+                if (isMissing) Action.DOWNLOAD else Action.UPDATE
+            ),
+            hasMissingDatabase = isMissing,
+            hasDatabaseUpdate = !isMissing
+        )
+    }
+
+    private suspend fun checkEnb(context: Context, workManager: WorkManager): TargetCheckResult {
+        if (hasUnfinishedWork(workManager, EnbDatabaseDownloadWorker.UNIQUE_WORK_NAME)) {
+            return TargetCheckResult()
+        }
+
+        val remote = EnbDatabaseDownloader.getLatestDatabaseVersion()
+        val dbFile = context.getDatabasePath(EnbDatabaseValidator.DB_NAME)
+        val local = if (EnbDatabaseValidator.validateDatabaseFile(dbFile).isValid) {
+            EnbDatabaseValidator.getInstalledDatabaseVersion(context)
+        } else {
+            null
+        }
+        val isMissing = local == null
+        // La version eNB contient un digest : une comparaison exacte est indispensable
+        // pour detecter le changement d'une source plus ancienne que les autres.
+        if (remote.isNullOrBlank()) {
+            return TargetCheckResult(isComplete = false, hasMissingDatabase = isMissing)
+        }
+        if (remote == local) {
+            return TargetCheckResult(hasMissingDatabase = isMissing)
+        }
+
+        return TargetCheckResult(
+            targetAction = TargetAction(
+                Target.ENB,
+                if (isMissing) Action.DOWNLOAD else Action.UPDATE
+            ),
+            hasMissingDatabase = isMissing,
+            hasDatabaseUpdate = !isMissing
+        )
+    }
 
     suspend fun findAvailableUpdates(context: Context, workManager: WorkManager): List<Target> =
         checkAvailableUpdates(context, workManager).targets

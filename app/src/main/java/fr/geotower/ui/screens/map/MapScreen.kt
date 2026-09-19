@@ -239,6 +239,7 @@ import fr.geotower.utils.CommuneNameMatching
 import fr.geotower.utils.FrenchAdminAreas
 import fr.geotower.utils.FrequencyFilterSelection
 import fr.geotower.utils.MapFilterDefaults
+import fr.geotower.utils.MobileTechnologyOnly
 import fr.geotower.utils.LocationReadiness
 import fr.geotower.utils.locationReadiness
 import fr.geotower.utils.openAppLocationSettings
@@ -1446,6 +1447,8 @@ private fun buildActiveMapFilterSummary(
     siteDisplayLabel: String,
     radioLabel: String,
     signalQuestCoverageLabel: String,
+    technologyOnlyLabel: String,
+    technologyOnlyValueLabel: (MobileTechnologyOnly) -> String,
     inServiceLabel: String,
     outOfServiceLabel: String,
     projectLabel: String,
@@ -1504,6 +1507,11 @@ private fun buildActiveMapFilterSummary(
                 exceptLabel = exceptLabel,
                 moreLabel = moreLabel
             )
+        }
+
+        if (frequencyFilter.mobileTechnologyOnly != reference.frequency.mobileTechnologyOnly) {
+            activeFilters += "$technologyOnlyLabel: " +
+                technologyOnlyValueLabel(frequencyFilter.mobileTechnologyOnly)
         }
 
         val frequencyBandFilters = mutableListOf<Pair<String, Boolean>>()
@@ -3439,6 +3447,14 @@ fun MapScreen(
 
     val txtOperatorsTitle = stringResource(R.string.appstrings_operators_title)
     val txtTechnologiesTitle = stringResource(R.string.appstrings_technologies_title)
+    val txtTechnologyOnlyTitle = stringResource(R.string.appstrings_map_technology_only_title)
+    val technologyOnlyLabels = mapOf(
+        MobileTechnologyOnly.NONE to stringResource(R.string.appstrings_map_technology_only_none),
+        MobileTechnologyOnly.TWO_G to stringResource(R.string.appstrings_map_technology_only_2g),
+        MobileTechnologyOnly.THREE_G to stringResource(R.string.appstrings_map_technology_only_3g),
+        MobileTechnologyOnly.FOUR_G to stringResource(R.string.appstrings_map_technology_only_4g),
+        MobileTechnologyOnly.FIVE_G to stringResource(R.string.appstrings_map_technology_only_5g)
+    )
     val txtFrequenciesTitle = stringResource(R.string.appstrings_frequencies_title)
     val txtSiteDisplayTitle = stringResource(R.string.appstrings_site_display_title)
     val txtRadioTitle = stringResource(R.string.appstrings_radio_share_radio_title)
@@ -3476,6 +3492,8 @@ fun MapScreen(
         siteDisplayLabel = txtSiteDisplayTitle,
         radioLabel = txtRadioTitle,
         signalQuestCoverageLabel = txtSignalQuestCoverage,
+        technologyOnlyLabel = txtTechnologyOnlyTitle,
+        technologyOnlyValueLabel = { technologyOnly -> technologyOnlyLabels.getValue(technologyOnly) },
         inServiceLabel = txtInService,
         outOfServiceLabel = txtOutOfService,
         projectLabel = txtProjectSites,
@@ -3656,6 +3674,7 @@ fun MapScreen(
     LaunchedEffect(
         antennas, AppConfig.selectedOperatorKeys.value,
         AppConfig.showTechnoFH.value, AppConfig.showTechno2G.value, AppConfig.showTechno3G.value, AppConfig.showTechno4G.value, AppConfig.showTechno5G.value,
+        AppConfig.mobileTechnologyOnly.value,
         AppConfig.f2G_900.value, AppConfig.f2G_1800.value, AppConfig.f3G_900.value, AppConfig.f3G_2100.value,
         AppConfig.f4G_700.value, AppConfig.f4G_800.value, AppConfig.f4G_900.value, AppConfig.f4G_1800.value, AppConfig.f4G_2100.value, AppConfig.f4G_2600.value,
         AppConfig.f5G_700.value, AppConfig.f5G_1400.value, AppConfig.f5G_2100.value, AppConfig.f5G_3500.value, AppConfig.f5G_4200.value, AppConfig.f5G_26000.value,
@@ -4583,6 +4602,7 @@ fun MapScreen(
         AppConfig.showTechno3G.value,
         AppConfig.showTechno4G.value,
         AppConfig.showTechno5G.value,
+        AppConfig.mobileTechnologyOnly.value,
         AppConfig.f2G_900.value,
         AppConfig.f2G_1800.value,
         AppConfig.f3G_900.value,
@@ -4713,6 +4733,7 @@ fun MapScreen(
         AppConfig.showTechno3G.value,
         AppConfig.showTechno4G.value,
         AppConfig.showTechno5G.value,
+        AppConfig.mobileTechnologyOnly.value,
         AppConfig.f2G_900.value,
         AppConfig.f2G_1800.value,
         AppConfig.f3G_900.value,
@@ -7664,6 +7685,10 @@ fun MapScreen(
                     )
                     showActiveFiltersDialog = false
                 },
+                onMakePermanent = {
+                    MapFilterDefaults.persistCurrentAsDefault(prefs)
+                    showActiveFiltersDialog = false
+                },
                 onDismiss = { showActiveFiltersDialog = false }
             )
         }
@@ -8424,6 +8449,7 @@ private fun ActiveMapFiltersBanner(
 private fun ActiveMapFiltersDialog(
     summary: String,
     onDisable: () -> Unit,
+    onMakePermanent: () -> Unit,
     onDismiss: () -> Unit
 ) {
     val sizing = LocalGeoTowerUiSizing.current
@@ -8453,8 +8479,13 @@ private fun ActiveMapFiltersDialog(
             }
         },
         confirmButton = {
-            Button(onClick = onDisable) {
-                Text(stringResource(R.string.appstrings_map_active_filters_disable))
+            Column(horizontalAlignment = Alignment.End) {
+                TextButton(onClick = onMakePermanent) {
+                    Text(stringResource(R.string.appstrings_map_active_filters_make_permanent))
+                }
+                Button(onClick = onDisable) {
+                    Text(stringResource(R.string.appstrings_map_active_filters_disable))
+                }
             }
         },
         dismissButton = {
@@ -8695,6 +8726,10 @@ open class CustomLocationOverlay(
     }
 }
 
+internal const val SITE_HIDE_LONG_PRESS_TIMEOUT_MS = 1_000L
+
+internal fun siteHideLongPressTimeoutMillis(): Long = SITE_HIDE_LONG_PRESS_TIMEOUT_MS
+
 class AntennaMarker(
     private val mapView: org.osmdroid.views.MapView,
     private val siteAntennas: List<LocalisationEntity>,
@@ -8753,7 +8788,7 @@ class AntennaMarker(
                 longPressHandler.removeCallbacks(longPressRunnable)
                 longPressHandler.postDelayed(
                     longPressRunnable,
-                    android.view.ViewConfiguration.getLongPressTimeout().toLong()
+                    siteHideLongPressTimeoutMillis()
                 )
             }
             android.view.MotionEvent.ACTION_MOVE -> {

@@ -49,6 +49,7 @@ object AppConfig {
     const val PREF_HIDE_UNDERGROUND_SITES = "hide_underground_sites"
     const val PREF_SHOW_ONLY_ZB_SITES = "show_only_zb_sites"
     const val PREF_SHOW_PROJECT_SITES = "show_project_sites"
+    const val PREF_MOBILE_TECHNOLOGY_ONLY = "mobile_technology_only"
     const val DEFAULT_SHOW_AZIMUTH_LINES = true
     const val DEFAULT_SHOW_AZIMUTH_CONES = false
     const val PREF_LOW_POWER_LEVEL = "low_power_level"
@@ -236,6 +237,7 @@ object AppConfig {
     var showTechno4G = mutableStateOf(true)
     var showTechno5G = mutableStateOf(true)
     var showTechnoFH = mutableStateOf(true)
+    var mobileTechnologyOnly = mutableStateOf(MobileTechnologyOnly.NONE)
 
     // --- FILTRES : FRÉQUENCES ---
 
@@ -412,6 +414,9 @@ object AppConfig {
         showTechno4G.value = MapDisplayPrefs.showTechno4G.read(prefs)
         showTechno5G.value = MapDisplayPrefs.showTechno5G.read(prefs)
         showTechnoFH.value = MapDisplayPrefs.showTechnoFh.read(prefs)
+        mobileTechnologyOnly.value = MobileTechnologyOnly.fromPreferenceValue(
+            MapDisplayPrefs.mobileTechnologyOnly.read(prefs)
+        )
 
         f2G_900.value = MapDisplayPrefs.f2G900.read(prefs)
         f2G_1800.value = MapDisplayPrefs.f2G1800.read(prefs)

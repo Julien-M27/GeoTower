@@ -24,10 +24,12 @@ data class FrequencyFilterSelection(
     val f5G2100: Boolean,
     val f5G3500: Boolean,
     val f5G4200: Boolean,
-    val f5G26000: Boolean
+    val f5G26000: Boolean,
+    val mobileTechnologyOnly: MobileTechnologyOnly = MobileTechnologyOnly.NONE
 ) {
     val isFullyEnabled: Boolean
-        get() = show2G && show3G && show4G && show5G && showFh &&
+        get() = mobileTechnologyOnly == MobileTechnologyOnly.NONE &&
+            show2G && show3G && show4G && show5G && showFh &&
             allMobileBandsEnabled
 
     private val allMobileBandsEnabled: Boolean
@@ -38,6 +40,8 @@ data class FrequencyFilterSelection(
             f5G700 && f5G1400 && f5G2100 && f5G3500 && f5G4200 && f5G26000
 
     fun matchesAntenna(antenna: LocalisationEntity): Boolean {
+        if (!mobileTechnologyOnly.matches(antenna)) return false
+
         val bandMask = antenna.bandMask
         val hasFh = bandMask has RadioFilterMasks.BAND_FH || !antenna.azimutsFh.isNullOrBlank()
         val hasKnownRadio = bandMask != 0 || hasFh
@@ -173,7 +177,8 @@ data class FrequencyFilterSelection(
                 f5G2100 = AppConfig.f5G_2100.value,
                 f5G3500 = AppConfig.f5G_3500.value,
                 f5G4200 = AppConfig.f5G_4200.value,
-                f5G26000 = AppConfig.f5G_26000.value
+                f5G26000 = AppConfig.f5G_26000.value,
+                mobileTechnologyOnly = AppConfig.mobileTechnologyOnly.value
             )
         }
     }

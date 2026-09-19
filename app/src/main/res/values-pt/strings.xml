@@ -685,6 +685,7 @@
     <string name="appstrings_map_active_filters_dialog_title">Filtros ativos</string>
     <string name="appstrings_map_active_filters_dialog_message">Os seguintes filtros estão ativos no mapa. Pretende desativá-los?</string>
     <string name="appstrings_map_active_filters_disable">Desativar filtros</string>
+    <string name="appstrings_map_active_filters_make_permanent">Tornar permanentes</string>
     <string name="appstrings_map_filters_defaults_menu">Filtros</string>
     <string name="appstrings_map_filters_defaults_title">Filtros predefinidos</string>
     <string name="appstrings_map_filters_defaults_desc">Estas definições tornam-se os filtros predefinidos do mapa. O aviso «Filtros ativos» só aparece quando o mapa difere deles.</string>
@@ -1490,6 +1491,12 @@
     <string name="appstrings_technical_data_unavailable">Dados técnicos indisponíveis</string>
     <string name="appstrings_technically">Tecnicamente operacional</string>
     <string name="appstrings_technologies_title">Tecnologias</string>
+    <string name="appstrings_map_technology_only_title">Apenas uma tecnologia</string>
+    <string name="appstrings_map_technology_only_none">Nenhuma</string>
+    <string name="appstrings_map_technology_only_2g">Apenas 2G</string>
+    <string name="appstrings_map_technology_only_3g">Apenas 3G</string>
+    <string name="appstrings_map_technology_only_4g">Apenas 4G</string>
+    <string name="appstrings_map_technology_only_5g">Apenas 5G</string>
     <string name="appstrings_theme_dark">Escuro</string>
     <string name="appstrings_theme_desc">Escolha o estilo que mais lhe convém.</string>
     <string name="appstrings_theme_light">Claro</string>
@@ -3230,4 +3237,6 @@
     <string name="appstrings_release_v2057_summary_diagnostics">Diagnóstico mais interativo com resultados mais claros</string>
     <string name="appstrings_release_v2058_summary_throughput">Calculadora de débito 4G/5G mais completa e personalizável</string>
     <string name="appstrings_release_v2058_summary_logos">Novas definições avançadas por banda e logótipos GeoRadio/Fun melhorados</string>
+    <string name="appstrings_release_v2059_summary_map_filters">Filtros do mapa mais precisos com seleção de uma só tecnologia e definições persistentes</string>
+    <string name="appstrings_release_v2059_summary_databases">Verificação de atualizações mais rápida e melhor suporte para novos exports ANFR</string>
 </resources>

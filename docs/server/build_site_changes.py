@@ -94,9 +94,11 @@ MOVE_THRESHOLD_M = 5.0
 # sans modification du code.
 
 COLUMN_ALIASES = {
-    "station": ("sta_nm_anfr", "id_anfr", "station_anfr"),
-    "operator": ("adm_lb_nom", "operateur", "operator"),
-    "system": ("emr_lb_systeme", "systeme", "system"),
+    # L'export du 17/09/2026 utilise des libelles francais (`ID`, `Opérateur`,
+    # `Système`) au lieu des noms techniques historiques.
+    "station": ("sta_nm_anfr", "id_anfr", "station_anfr", "id"),
+    "operator": ("adm_lb_nom", "operateur", "operator", "opérateur"),
+    "system": ("emr_lb_systeme", "systeme", "system", "système"),
     "support": ("sup_id", "id_support", "support_id"),
     "coords": ("coordonnees", "coord"),
     "dept": ("sta_nm_dpt", "departement", "dept"),

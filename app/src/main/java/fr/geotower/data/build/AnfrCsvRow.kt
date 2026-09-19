@@ -36,8 +36,24 @@ class AnfrCsvHeader private constructor(
         fun of(names: List<String>): AnfrCsvHeader {
             val map = HashMap<String, Int>(names.size * 2)
             names.forEachIndexed { index, name -> map[name.trim().lowercase()] = index }
+            // L'export Observatoire du 17/09/2026 a remplace plusieurs noms techniques par des
+            // libelles francais. On expose ces variantes sous les noms canoniques deja utilises
+            // par le builder, afin de rester compatible avec les deux generations de CSV.
+            OBSERVATOIRE_ALIASES.forEach { (canonical, aliases) ->
+                if (!map.containsKey(canonical)) {
+                    aliases.firstNotNullOfOrNull { map[it] }?.let { map[canonical] = it }
+                }
+            }
             return AnfrCsvHeader(map, names.size)
         }
+
+        private val OBSERVATOIRE_ALIASES = mapOf(
+            "sta_nm_anfr" to listOf("id", "id_anfr", "station_anfr"),
+            "adm_lb_nom" to listOf("opérateur", "operateur", "operator"),
+            "emr_lb_systeme" to listOf("système", "systeme", "system"),
+            "emr_dt" to listOf("mise en service déclaré", "mise en service declare", "mise_en_service_declare"),
+            "generation" to listOf("technologie", "technology"),
+        )
     }
 }
 

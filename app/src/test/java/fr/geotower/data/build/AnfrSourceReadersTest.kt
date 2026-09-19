@@ -72,6 +72,20 @@ class AnfrSourceReadersTest {
         assertEquals(null, rows[1].get("colonne_absente"))
     }
 
+    @Test
+    fun readsTheCurrentObservatoireHeaderAliases() {
+        val csv = "ID;Opérateur;SUP_ID;Système;Mise en service déclaré;Technologie;DATE_MAJ;Statut\n" +
+            "357482;FREE MOBILE;2703535;UMTS 900;2023-02-16;3G;2026-09-17T15:15:24;En service"
+
+        val row = csvRows { csv.byteInputStream() }.single()
+
+        assertEquals("357482", row.get("sta_nm_anfr"))
+        assertEquals("FREE MOBILE", row.get("adm_lb_nom"))
+        assertEquals("UMTS 900", row.get("emr_lb_systeme"))
+        assertEquals("2023-02-16", row.get("emr_dt"))
+        assertEquals("3G", row.get("generation"))
+    }
+
     private fun AnfrCsvRow.cells(): List<String?> = listOf(get("c1"), get("c2"), get("c3"))
 
     @Test

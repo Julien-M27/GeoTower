@@ -82,6 +82,24 @@ class FrequencyFilterSelectionTest {
     }
 
     @Test
+    fun mobileTechnologyOnlyRestrictsSiteBeforeBandVisibilityIsApplied() {
+        val filter = baseSelection(mobileTechnologyOnly = MobileTechnologyOnly.FOUR_G)
+        val fourGOnly = antennaWithTechnologies(RadioFilterMasks.TECH_4G, RadioFilterMasks.BAND_4G_1800)
+        val fourGAndFiveG = antennaWithTechnologies(
+            RadioFilterMasks.TECH_4G or RadioFilterMasks.TECH_5G,
+            RadioFilterMasks.BAND_4G_1800
+        )
+
+        assertTrue(filter.matchesAntenna(fourGOnly))
+        assertFalse(filter.matchesAntenna(fourGAndFiveG))
+    }
+
+    @Test
+    fun mobileTechnologyOnlyDisablesClusterFallback() {
+        assertFalse(baseSelection(mobileTechnologyOnly = MobileTechnologyOnly.FOUR_G).isFullyEnabled)
+    }
+
+    @Test
     fun includesFhMatchesAntennaFhGate() {
         assertFalse(baseSelection(showFh = true, f5G4200 = false).includesFh())
         assertTrue(fullyEnabled().includesFh())
@@ -185,7 +203,8 @@ class FrequencyFilterSelectionTest {
         f5G2100: Boolean = true,
         f5G3500: Boolean = true,
         f5G4200: Boolean = true,
-        f5G26000: Boolean = true
+        f5G26000: Boolean = true,
+        mobileTechnologyOnly: MobileTechnologyOnly = MobileTechnologyOnly.NONE
     ): FrequencyFilterSelection {
         return FrequencyFilterSelection(
             show2G = show2G,
@@ -208,7 +227,8 @@ class FrequencyFilterSelectionTest {
             f5G2100 = f5G2100,
             f5G3500 = f5G3500,
             f5G4200 = f5G4200,
-            f5G26000 = f5G26000
+            f5G26000 = f5G26000,
+            mobileTechnologyOnly = mobileTechnologyOnly
         )
     }
 
@@ -223,5 +243,9 @@ class FrequencyFilterSelectionTest {
             azimutsFh = null,
             bandMask = bandMask
         )
+    }
+
+    private fun antennaWithTechnologies(techMask: Int, bandMask: Int): LocalisationEntity {
+        return antenna(bandMask).copy(techMask = techMask)
     }
 }

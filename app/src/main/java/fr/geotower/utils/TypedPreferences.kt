@@ -82,6 +82,10 @@ object MapDisplayPrefs {
     val showTechno4G = BooleanPreference("show_techno_4g", true)
     val showTechno5G = BooleanPreference("show_techno_5g", true)
     val showTechnoFh = BooleanPreference("show_techno_fh", true)
+    val mobileTechnologyOnly = StringPreference(
+        AppConfig.PREF_MOBILE_TECHNOLOGY_ONLY,
+        MobileTechnologyOnly.NONE.preferenceValue
+    )
     val f2G900 = BooleanPreference("f2g_900", true)
     val f2G1800 = BooleanPreference("f2g_1800", true)
     val f3G900 = BooleanPreference("f3g_900", true)

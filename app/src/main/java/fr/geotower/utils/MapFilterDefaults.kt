@@ -30,6 +30,7 @@ object MapFilterDefaults {
     private const val KEY_TECHNO_FH = "show_techno_fh"
     private const val KEY_SITES_IN_SERVICE = "show_sites_in_service"
     private const val KEY_SITES_OUT_OF_SERVICE = "show_sites_out_of_service"
+    private const val KEY_MOBILE_TECHNOLOGY_ONLY = AppConfig.PREF_MOBILE_TECHNOLOGY_ONLY
 
     private val KEY_OPERATORS = PREFIX + AppConfig.PREF_SELECTED_OPERATORS
     private val KEY_SQ_COVERAGE_OPERATORS = PREFIX + AppConfig.PREF_SIGNALQUEST_COVERAGE_OPERATOR_KEYS
@@ -119,7 +120,10 @@ object MapFilterDefaults {
                 f5G2100 = ref("f5g_2100"),
                 f5G3500 = ref("f5g_3500"),
                 f5G4200 = ref("f5g_4200"),
-                f5G26000 = ref("f5g_26000")
+                f5G26000 = ref("f5g_26000"),
+                mobileTechnologyOnly = MobileTechnologyOnly.fromPreferenceValue(
+                    prefs.getString(PREFIX + KEY_MOBILE_TECHNOLOGY_ONLY, MobileTechnologyOnly.NONE.preferenceValue)
+                )
             ),
             showSitesInService = ref(KEY_SITES_IN_SERVICE),
             showSitesOutOfService = ref(KEY_SITES_OUT_OF_SERVICE),
@@ -164,9 +168,23 @@ object MapFilterDefaults {
         booleanFilters.forEach { filter ->
             editor.putBoolean(PREFIX + filter.key, filter.state.value)
         }
+        editor.putString(
+            PREFIX + KEY_MOBILE_TECHNOLOGY_ONLY,
+            AppConfig.mobileTechnologyOnly.value.preferenceValue
+        )
         editor.putStringSet(KEY_OPERATORS, AppConfig.selectedOperatorKeys.value)
         editor.putStringSet(KEY_SQ_COVERAGE_OPERATORS, AppConfig.selectedSignalQuestCoverageOperatorKeys.value)
         editor.apply()
+    }
+
+    /**
+     * Rend la sélection actuelle permanente pour le bandeau des filtres actifs.
+     *
+     * Ce nom exprime l'action déclenchée depuis la boîte de dialogue de la carte tout en
+     * conservant [captureFromCurrent] pour les écrans de réglages qui l'utilisent déjà.
+     */
+    fun persistCurrentAsDefault(prefs: SharedPreferences) {
+        captureFromCurrent(prefs)
     }
 
     /**
@@ -180,6 +198,11 @@ object MapFilterDefaults {
             filter.state.value = value
             editor.putBoolean(filter.key, value)
         }
+        AppConfig.mobileTechnologyOnly.value = reference.frequency.mobileTechnologyOnly
+        editor.putString(
+            AppConfig.PREF_MOBILE_TECHNOLOGY_ONLY,
+            reference.frequency.mobileTechnologyOnly.preferenceValue
+        )
         AppConfig.updateShowRadioSitesFromCategoryFilters()
         editor.putBoolean(AppConfig.PREF_SHOW_RADIO_SITES, AppConfig.showRadioSites.value)
         editor.apply()
@@ -202,6 +225,11 @@ object MapFilterDefaults {
             filter.state.value = filter.factory
             editor.putBoolean(filter.key, filter.factory)
         }
+        AppConfig.mobileTechnologyOnly.value = MobileTechnologyOnly.NONE
+        editor.putString(
+            AppConfig.PREF_MOBILE_TECHNOLOGY_ONLY,
+            MobileTechnologyOnly.NONE.preferenceValue
+        )
         // Agrégat radio dérivé (toutes les catégories reviennent à false → aucun site radio).
         AppConfig.updateShowRadioSitesFromCategoryFilters()
         editor.putBoolean(AppConfig.PREF_SHOW_RADIO_SITES, AppConfig.showRadioSites.value)

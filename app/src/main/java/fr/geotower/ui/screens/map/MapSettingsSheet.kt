@@ -53,6 +53,8 @@ import fr.geotower.ui.components.settingsPopupFadingEdge
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.db.RadioDatabaseValidator
 import fr.geotower.utils.AppConfig
+import fr.geotower.utils.MobileTechnologyOnly
+import fr.geotower.utils.MapDisplayPrefs
 import fr.geotower.utils.OperatorColorSpec
 import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.PowerProfile
@@ -153,6 +155,7 @@ fun MapFiltersControls(
     var show4G by AppConfig.showTechno4G
     var show5G by AppConfig.showTechno5G
     var showFH by AppConfig.showTechnoFH
+    var mobileTechnologyOnly by AppConfig.mobileTechnologyOnly
 
     // Variables Fréquences
     // 2G
@@ -288,6 +291,42 @@ fun MapFiltersControls(
                 }
                 SelectableButton("FH", showFH, Modifier.weight(1f)) {
                     showFH = it; prefs.edit().putBoolean("show_techno_fh", it).apply()
+                }
+            }
+
+            Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
+
+            Text(
+                text = stringResource(R.string.appstrings_map_technology_only_title),
+                style = sizing.textStyle(MaterialTheme.typography.titleSmall),
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp)),
+                verticalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))
+            ) {
+                listOf(
+                    MobileTechnologyOnly.NONE to R.string.appstrings_map_technology_only_none,
+                    MobileTechnologyOnly.TWO_G to R.string.appstrings_map_technology_only_2g,
+                    MobileTechnologyOnly.THREE_G to R.string.appstrings_map_technology_only_3g,
+                    MobileTechnologyOnly.FOUR_G to R.string.appstrings_map_technology_only_4g,
+                    MobileTechnologyOnly.FIVE_G to R.string.appstrings_map_technology_only_5g
+                ).forEach { (option, labelRes) ->
+                    SelectableButton(
+                        label = stringResource(labelRes),
+                        isSelected = mobileTechnologyOnly == option,
+                        modifier = Modifier.weight(1f),
+                        minHeight = 48.dp,
+                        maxLines = 2
+                    ) {
+                        mobileTechnologyOnly = option
+                        MapDisplayPrefs.mobileTechnologyOnly.write(
+                            prefs.edit(),
+                            option.preferenceValue
+                        ).apply()
+                    }
                 }
             }
 

@@ -9,12 +9,28 @@ import org.junit.Test
 class MapFilterDefaultsTest {
 
     @Test
+    fun persistCurrentAsDefaultStoresTheCurrentFilterSelection() {
+        val prefs = FakePrefs()
+        val previousShowSitesInService = AppConfig.showSitesInService.value
+        try {
+            AppConfig.showSitesInService.value = false
+
+            MapFilterDefaults.persistCurrentAsDefault(prefs)
+
+            assertFalse(prefs.getBoolean("filter_default_show_sites_in_service", true))
+        } finally {
+            AppConfig.showSitesInService.value = previousShowSitesInService
+        }
+    }
+
+    @Test
     fun referenceOnEmptyPrefsReturnsFactoryDefaults() {
         val ref = MapFilterDefaults.reference(FakePrefs())
 
         // Tant que rien n'est configuré, la référence = l'usine → bandeau inchangé.
         assertEquals(OperatorColors.defaultVisibleKeys, ref.operatorKeys)
         assertTrue(ref.frequency.isFullyEnabled)
+        assertEquals(MobileTechnologyOnly.NONE, ref.frequency.mobileTechnologyOnly)
         assertTrue(ref.showSitesInService)
         assertTrue(ref.showSitesOutOfService)
         assertTrue(ref.showProjectSites)
@@ -37,6 +53,7 @@ class MapFilterDefaultsTest {
             "filter_default_show_project_sites" to false,
             "filter_default_show_techno_2g" to false,
             "filter_default_f5g_3500" to false,
+            "filter_default_mobile_technology_only" to "4g",
             "filter_default_show_radio_tv" to true
         )
 
@@ -47,6 +64,7 @@ class MapFilterDefaultsTest {
         assertFalse(ref.showProjectSites)
         assertFalse(ref.frequency.show2G)
         assertFalse(ref.frequency.f5G3500)
+        assertEquals(MobileTechnologyOnly.FOUR_G, ref.frequency.mobileTechnologyOnly)
         assertTrue(ref.showRadioTv)
         // Une techno / une bande désactivée dans le défaut ⇒ la référence n'est plus "pleine".
         assertFalse(ref.frequency.isFullyEnabled)

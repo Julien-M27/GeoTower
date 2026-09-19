@@ -685,6 +685,7 @@
     <string name="appstrings_map_active_filters_dialog_title">Aktive Filter</string>
     <string name="appstrings_map_active_filters_dialog_message">Die folgenden Filter sind auf der Karte aktiv. Möchten Sie sie deaktivieren?</string>
     <string name="appstrings_map_active_filters_disable">Filter deaktivieren</string>
+    <string name="appstrings_map_active_filters_make_permanent">Als Standard speichern</string>
     <string name="appstrings_map_filters_defaults_menu">Filter</string>
     <string name="appstrings_map_filters_defaults_title">Standardfilter</string>
     <string name="appstrings_map_filters_defaults_desc">Diese Einstellungen werden zu den Standardfiltern der Karte. Das Banner „Aktive Filter“ erscheint nur, wenn die Karte davon abweicht.</string>
@@ -1490,6 +1491,12 @@
     <string name="appstrings_technical_data_unavailable">Technische Daten nicht verfügbar</string>
     <string name="appstrings_technically">Technisch betriebsbereit</string>
     <string name="appstrings_technologies_title">Technologien</string>
+    <string name="appstrings_map_technology_only_title">Nur eine Technologie</string>
+    <string name="appstrings_map_technology_only_none">Keine</string>
+    <string name="appstrings_map_technology_only_2g">Nur 2G</string>
+    <string name="appstrings_map_technology_only_3g">Nur 3G</string>
+    <string name="appstrings_map_technology_only_4g">Nur 4G</string>
+    <string name="appstrings_map_technology_only_5g">Nur 5G</string>
     <string name="appstrings_theme_dark">Dunkel</string>
     <string name="appstrings_theme_desc">Wähle den Stil, der zu dir passt.</string>
     <string name="appstrings_theme_light">Hell</string>
@@ -3230,4 +3237,6 @@
     <string name="appstrings_release_v2057_summary_diagnostics">Interaktivere Diagnose mit übersichtlicheren Ergebnissen</string>
     <string name="appstrings_release_v2058_summary_throughput">Umfassenderer und anpassbarer 4G/5G-Durchsatzrechner</string>
     <string name="appstrings_release_v2058_summary_logos">Neue erweiterte Einstellungen pro Band und verbesserte GeoRadio/Fun-Logos</string>
+    <string name="appstrings_release_v2059_summary_map_filters">Präzisere Kartenfilter mit Auswahl einer einzelnen Technologie und dauerhaften Einstellungen</string>
+    <string name="appstrings_release_v2059_summary_databases">Schnellere Prüfung auf Datenbankupdates und bessere Unterstützung neuer ANFR-Exporte</string>
 </resources>
