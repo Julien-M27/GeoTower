@@ -46,6 +46,7 @@ import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.hidden.HiddenSitesStore
 import fr.geotower.data.models.SiteHsEntity
 import fr.geotower.utils.AppLogger
+import fr.geotower.utils.AppConfig
 import fr.geotower.utils.DeviceProfile
 import fr.geotower.utils.LiveTrackingPrefs
 import fr.geotower.utils.NotificationIconResources
@@ -79,6 +80,7 @@ class LiveTrackingService : Service() {
     private lateinit var repository: AnfrRepository
 
     private var serviceStartTime: Long = 0L
+    private var trackingState = LiveTrackingSessionState.State.ACTIVE
     private var processingJob: Job? = null
     private var lastProcessedLocation: Location? = null
     private var lastProcessedAt: Long = 0L
@@ -120,8 +122,10 @@ class LiveTrackingService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_STOP_SERVICE) {
-            return stopTrackingAndSelf()
+        when (intent?.action) {
+            ACTION_END_SERVICE -> return stopTrackingAndSelf(disableLiveTracking = true)
+            ACTION_PAUSE_SERVICE -> return pauseTracking()
+            ACTION_RESUME_SERVICE -> return resumeTracking()
         }
 
         if (serviceStartTime == 0L) {
@@ -138,11 +142,19 @@ class LiveTrackingService : Service() {
         val operatorChanged = resetIfOperatorChanged(defaultOp)
 
         if (intent?.action == ACTION_REFRESH_NOTIFICATION) {
+            if (trackingState == LiveTrackingSessionState.State.PAUSED) {
+                updatePausedNotification()
+                return START_STICKY
+            }
             refreshFromLastProcessedLocation()
             return START_STICKY
         }
 
         if (intent?.action == ACTION_REFRESH_LOCATION_SETTINGS) {
+            if (trackingState == LiveTrackingSessionState.State.PAUSED) {
+                updatePausedNotification()
+                return START_STICKY
+            }
             startLocationUpdates()
             refreshFromLastProcessedLocation()
             return START_STICKY
@@ -183,6 +195,7 @@ class LiveTrackingService : Service() {
     }
 
     private fun startLocationUpdates() {
+        if (trackingState != LiveTrackingSessionState.State.ACTIVE) return
         if (!hasFineLocationPermission()) {
             stopTrackingAndSelf()
             return
@@ -207,6 +220,62 @@ class LiveTrackingService : Service() {
             AppLogger.w(TAG_LOCATION, "Location updates could not start", e)
             stopTrackingAndSelf()
         }
+    }
+
+    private fun pauseTracking(): Int {
+        val nextState = LiveTrackingSessionState.reduce(
+            state = trackingState,
+            action = LiveTrackingSessionState.Action.PAUSE,
+        )
+        if (nextState == trackingState) return START_STICKY
+
+        trackingState = nextState
+        processingJob?.cancel()
+        liveSitePhotoJob?.cancel()
+        liveSitePhotoLoadingKey = null
+        stopLocationUpdates()
+        updatePausedNotification()
+        return START_STICKY
+    }
+
+    private fun resumeTracking(): Int {
+        val nextState = LiveTrackingSessionState.reduce(
+            state = trackingState,
+            action = LiveTrackingSessionState.Action.RESUME,
+        )
+        if (nextState == trackingState) return START_STICKY
+        if (!LiveTrackingController.hasPreciseLocationPermission(this)) {
+            return stopTrackingAndSelf()
+        }
+
+        trackingState = nextState
+        val operator = currentOperator
+        val notification = if (supportsProgressStyle()) {
+            buildLiveNotification(
+                contentText = getString(R.string.live_tracking_searching),
+                progress = 0,
+                operator = operator,
+                antLoc = null,
+                address = "",
+                sitePhotoBitmap = null,
+                mirrorTrackerIcon = false,
+            )
+        } else {
+            buildNotification(
+                contentText = getString(R.string.live_tracking_searching),
+                userLoc = null,
+                antLoc = null,
+                operator = operator,
+                progress = 0,
+                address = "",
+            )
+        }
+        if (!startAsForeground(notification)) return START_NOT_STICKY
+
+        requestLiveOutageRefreshIfNeeded()
+        startLocationUpdates()
+        refreshFromLastProcessedLocation()
+        return START_STICKY
     }
 
     private fun hasFineLocationPermission(): Boolean {
@@ -238,6 +307,7 @@ class LiveTrackingService : Service() {
     }
 
     private fun processLocationUpdate(location: Location) {
+        if (trackingState != LiveTrackingSessionState.State.ACTIVE) return
         val defaultOp = currentOperator
 
         if (!shouldProcessLocation(location)) return
@@ -551,6 +621,15 @@ class LiveTrackingService : Service() {
         manager.notify(notificationId, notification)
     }
 
+    private fun updatePausedNotification() {
+        updateNotification(
+            text = getString(R.string.appstrings_operation_paused),
+            userLoc = null,
+            antLoc = null,
+            operator = currentOperator,
+        )
+    }
+
     private fun requestLiveSitePhotoBitmapIfNeeded(
         cacheKey: String,
         siteId: String,
@@ -574,6 +653,7 @@ class LiveTrackingService : Service() {
                 putLiveSitePhotoBitmap(cacheKey, bitmap)
 
                 if (
+                    trackingState == LiveTrackingSessionState.State.ACTIVE &&
                     bitmap != null &&
                     lockedAntennaId == antLoc.idAnfr &&
                     currentOperator == trackingOperator
@@ -772,12 +852,8 @@ class LiveTrackingService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        val stopPendingIntent = PendingIntent.getService(
-            this,
-            STOP_ACTION_REQUEST_CODE,
-            Intent(this, LiveTrackingService::class.java).apply { action = ACTION_STOP_SERVICE },
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
+        val toggleTrackingPendingIntent = trackingTogglePendingIntent()
+        val endTrackingPendingIntent = endTrackingPendingIntent()
 
         val progressStyle = Notification.ProgressStyle()
             .setProgress(progress)
@@ -809,8 +885,15 @@ class LiveTrackingService : Service() {
             .addAction(
                 Notification.Action.Builder(
                     IconCompat.createWithResource(this, R.drawable.ic_notification_action_transparent).toIcon(this),
+                    trackingToggleLabel(),
+                    toggleTrackingPendingIntent
+                ).build()
+            )
+            .addAction(
+                Notification.Action.Builder(
+                    IconCompat.createWithResource(this, R.drawable.ic_notification_action_transparent).toIcon(this),
                     getString(R.string.live_tracking_stop_action),
-                    stopPendingIntent
+                    endTrackingPendingIntent
                 ).build()
             )
         NotificationIconResources.applyTo(builder, this)
@@ -869,12 +952,8 @@ class LiveTrackingService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        val stopPendingIntent = PendingIntent.getService(
-            this,
-            STOP_ACTION_REQUEST_CODE,
-            Intent(this, LiveTrackingService::class.java).apply { action = ACTION_STOP_SERVICE },
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
+        val toggleTrackingPendingIntent = trackingTogglePendingIntent()
+        val endTrackingPendingIntent = endTrackingPendingIntent()
 
         val expandedText = liveNotificationContentText(contentText, address)
         val shortCriticalText = extractShortCriticalText(contentText)
@@ -901,7 +980,8 @@ class LiveTrackingService : Service() {
             .setShowWhen(false)
             .setColor(operatorColor(operator))
             .setProgress(100, progress, false)
-            .addAction(0, getString(R.string.live_tracking_stop_action), stopPendingIntent)
+            .addAction(0, trackingToggleLabel(), toggleTrackingPendingIntent)
+            .addAction(0, getString(R.string.live_tracking_stop_action), endTrackingPendingIntent)
             .setStyle(NotificationCompat.BigTextStyle().bigText(expandedText))
         (sitePhotoBitmap ?: operatorLogoBitmap(operator))?.let(builder::setLargeIcon)
         NotificationIconResources.applyTo(builder, this)
@@ -920,6 +1000,33 @@ class LiveTrackingService : Service() {
             )
         }
     }
+
+    private fun trackingTogglePendingIntent(): PendingIntent {
+        val paused = trackingState == LiveTrackingSessionState.State.PAUSED
+        return PendingIntent.getService(
+            this,
+            if (paused) RESUME_ACTION_REQUEST_CODE else PAUSE_ACTION_REQUEST_CODE,
+            Intent(this, LiveTrackingService::class.java).apply {
+                action = if (paused) ACTION_RESUME_SERVICE else ACTION_PAUSE_SERVICE
+            },
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+    }
+
+    private fun endTrackingPendingIntent(): PendingIntent = PendingIntent.getService(
+        this,
+        END_ACTION_REQUEST_CODE,
+        Intent(this, LiveTrackingService::class.java).apply { action = ACTION_END_SERVICE },
+        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+    )
+
+    private fun trackingToggleLabel(): String = getString(
+        if (trackingState == LiveTrackingSessionState.State.PAUSED) {
+            R.string.appstrings_resume
+        } else {
+            R.string.appstrings_pause
+        }
+    )
 
     private fun notificationIntent(antLoc: LocalisationEntity?): Intent {
         return Intent(this, MainActivity::class.java).apply {
@@ -1144,7 +1251,18 @@ class LiveTrackingService : Service() {
         }
     }
 
-    private fun stopTrackingAndSelf(): Int {
+    private fun stopTrackingAndSelf(disableLiveTracking: Boolean = false): Int {
+        trackingState = LiveTrackingSessionState.reduce(
+            state = trackingState,
+            action = LiveTrackingSessionState.Action.END,
+        )
+        if (disableLiveTracking) {
+            AppConfig.enableLiveTracking.value = false
+            getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
+                .edit()
+                .putBoolean(AppConfig.PREF_ENABLE_LIVE_TRACKING, false)
+                .apply()
+        }
         processingJob?.cancel()
         liveSitePhotoJob?.cancel()
         liveSitePhotoLoadingKey = null
@@ -1266,10 +1384,14 @@ class LiveTrackingService : Service() {
         internal var isRunning: Boolean = false
             private set
 
-        private const val ACTION_STOP_SERVICE = "ACTION_STOP_SERVICE"
+        private const val ACTION_END_SERVICE = "ACTION_END_SERVICE"
+        private const val ACTION_PAUSE_SERVICE = "ACTION_PAUSE_SERVICE"
+        private const val ACTION_RESUME_SERVICE = "ACTION_RESUME_SERVICE"
         internal const val ACTION_REFRESH_NOTIFICATION = "ACTION_REFRESH_NOTIFICATION"
         internal const val ACTION_REFRESH_LOCATION_SETTINGS = "ACTION_REFRESH_LOCATION_SETTINGS"
-        private const val STOP_ACTION_REQUEST_CODE = 1
+        private const val PAUSE_ACTION_REQUEST_CODE = 1
+        private const val RESUME_ACTION_REQUEST_CODE = 2
+        private const val END_ACTION_REQUEST_CODE = 3
         private const val MIN_PROCESS_INTERVAL_MS = 30_000L
         private const val MIN_PROCESS_DISTANCE_METERS = 15f
         private const val MOVING_AWAY_DISTANCE_THRESHOLD_METERS = 5f
