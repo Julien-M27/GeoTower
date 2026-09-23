@@ -29,7 +29,9 @@ class GeoTowerCarAppService : CarAppService() {
      */
     private fun loadCarDisplayPreferences() {
         val prefs = getSharedPreferences(PreferenceStores.APP, MODE_PRIVATE)
-        AppConfig.mapProvider.intValue = prefs.getInt("map_provider", 1)
+        val mapProvider = fr.geotower.utils.MapProviderRules.sanitize(prefs.getInt("map_provider", 1))
+        AppConfig.mapProvider.intValue = mapProvider
+        prefs.edit().putInt("map_provider", mapProvider).apply()
         AppConfig.ignStyle.intValue = prefs.getInt("ign_style", 0)
         AppConfig.distanceUnit.intValue = prefs.getInt("distance_unit", 0)
         AppConfig.defaultOperator.value = prefs.getString("default_operator", "Aucun") ?: "Aucun"

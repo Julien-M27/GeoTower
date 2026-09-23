@@ -50,6 +50,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -61,6 +62,7 @@ import androidx.annotation.StringRes
 import fr.geotower.R
 import fr.geotower.data.build.BuildPhase
 import fr.geotower.data.build.BuildImportType
+import fr.geotower.data.build.BuildSourceLink
 import fr.geotower.data.build.labelRes
 import fr.geotower.data.build.LocalBuildCapability
 import fr.geotower.data.db.DbOperationTimings
@@ -88,6 +90,7 @@ fun LocalDbBuildCard(
     refreshState: DatabaseRefreshState? = null,
 ) {
     val context = LocalContext.current
+    val uriHandler = LocalUriHandler.current
     val sizing = LocalGeoTowerUiStyle.current.sizing
     val workManager = remember { WorkManager.getInstance(context) }
     val safeClick = onSafeClick ?: rememberSafeClick()
@@ -124,6 +127,15 @@ fun LocalDbBuildCard(
     val currentFileName = currentBuild?.progress
         ?.getString(LocalDbBuildWorker.KEY_FILE)
         ?.takeIf { it.isNotBlank() }
+    val currentSourceUrl = currentBuild?.progress
+        ?.getString(LocalDbBuildWorker.KEY_SOURCE_URL)
+        ?.takeIf { it.isNotBlank() }
+    val currentSourceLink = currentBuild?.progress
+        ?.getInt(LocalDbBuildWorker.KEY_SOURCE_LINK, -1)
+        ?.let { BuildSourceLink.values().getOrNull(it) }
+    val currentSourceSwitchReason = currentBuild?.progress
+        ?.getString(LocalDbBuildWorker.KEY_SOURCE_SWITCH_REASON)
+        ?.takeIf { it.isNotBlank() }
     val downloadedBytes = currentBuild?.progress
         ?.getLong(LocalDbBuildWorker.KEY_DOWNLOADED_BYTES, 0L)
         ?: 0L
@@ -151,6 +163,7 @@ fun LocalDbBuildCard(
     // fournit l'horodatage (metadata.version) du dernier build local. Re-lue a la fin de chaque build.
     var mobileInfo by remember { mutableStateOf(LocalDbProvenance.Info.NONE) }
     var radioInfo by remember { mutableStateOf(LocalDbProvenance.Info.NONE) }
+    var mobileBuildSource by remember { mutableStateOf(LocalDbProvenance.BuildSourceInfo.NONE) }
     // Actualisation de toute la section « Base de données » : clé partagée par les quatre cartes.
     val sectionRefreshKey = refreshState?.refreshKey ?: 0
     DatabaseRefreshMembership(refreshState, DatabaseRefreshIds.LOCAL_BUILD)
@@ -159,6 +172,7 @@ fun LocalDbBuildCard(
         withContext(Dispatchers.IO) {
             mobileInfo = LocalDbProvenance.readMobile(context)
             radioInfo = LocalDbProvenance.readRadio(context)
+            mobileBuildSource = LocalDbProvenance.readMobileBuildSource(context)
         }
         refreshState?.reportRefreshed(DatabaseRefreshIds.LOCAL_BUILD, sectionRefreshKey)
     }
@@ -264,6 +278,30 @@ fun LocalDbBuildCard(
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis,
+                                            )
+                                        }
+                                        if (currentSourceUrl != null && currentSourceLink != null) {
+                                            TextButton(
+                                                onClick = { uriHandler.openUri(currentSourceUrl) },
+                                                contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
+                                            ) {
+                                                Text(
+                                                    text = stringResource(
+                                                        if (currentSourceLink == BuildSourceLink.FALLBACK) {
+                                                            R.string.appstrings_local_build_fallback_link
+                                                        } else {
+                                                            R.string.appstrings_local_build_standard_link
+                                                        },
+                                                    ),
+                                                    style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                                                )
+                                            }
+                                        }
+                                        currentSourceSwitchReason?.let { reason ->
+                                            Text(
+                                                text = reason,
+                                                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             )
                                         }
                                     }
@@ -410,6 +448,11 @@ fun LocalDbBuildCard(
                         ?.let { LocalDbProvenance.formatBuildTime(it.buildVersionRaw) }
                     val generatedRadio = radioInfo.takeIf { it.locallyBuilt }
                         ?.let { LocalDbProvenance.formatBuildTime(it.buildVersionRaw) }
+                    val completedSource = mobileBuildSource.takeIf {
+                        generatedMobile != null &&
+                            it.buildVersionRaw == mobileInfo.buildVersionRaw &&
+                            !it.url.isNullOrBlank()
+                    }
                     if (generatedMobile != null || generatedRadio != null) {
                         Surface(
                             color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
@@ -433,6 +476,30 @@ fun LocalDbBuildCard(
                                 if (generatedRadio != null) {
                                     Text(
                                         text = stringResource(R.string.appstrings_local_build_generated_radio, generatedRadio),
+                                        style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                completedSource?.url?.let { sourceUrl ->
+                                    TextButton(
+                                        onClick = { uriHandler.openUri(sourceUrl) },
+                                        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
+                                    ) {
+                                        Text(
+                                            text = stringResource(
+                                                if (completedSource.isFallback) {
+                                                    R.string.appstrings_local_build_fallback_link
+                                                } else {
+                                                    R.string.appstrings_local_build_standard_link
+                                                },
+                                            ),
+                                            style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                                        )
+                                    }
+                                }
+                                completedSource?.switchReason?.let { reason ->
+                                    Text(
+                                        text = reason,
                                         style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )

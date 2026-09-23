@@ -54,14 +54,42 @@ object OfficialSources {
         RegexOption.IGNORE_CASE,
     )
 
+    /** Taille minimale attendue pour l'observatoire complet : 100 MiB. */
+    const val MIN_OBSERVATOIRE_CSV_BYTES = 100L * 1024L * 1024L
+
+    enum class ObservatoireCsvLink { STANDARD, FALLBACK }
+
+    data class ObservatoireCsvSource(
+        val url: String,
+        val link: ObservatoireCsvLink,
+    )
+
     /**
      * Extrait du HTML de [OBSERVATOIRE_EXPORT_PAGE_URL] l'URL du CSV statique courant de
      * l'observatoire. Normalise les slashes echappes `\/` du JSON embarque. `null` si absente.
      */
     fun resolveObservatoireCsvUrl(exportPageHtml: String): String? {
-        val match = OBSERVATOIRE_CSV_REGEX.find(exportPageHtml)?.value ?: return null
-        val url = ("https://$match").replace("\\/", "/")
-        return if (isAllowedHost(url)) url else null
+        return resolveObservatoireCsvUrls(exportPageHtml).firstOrNull()
+    }
+
+    /** Extrait le lien standard puis les liens CSV de secours publiés sur la page ANFR. */
+    fun resolveObservatoireCsvUrls(exportPageHtml: String): List<String> =
+        OBSERVATOIRE_CSV_REGEX.findAll(exportPageHtml)
+            .map { match -> ("https://${match.value}").replace("\\/", "/") }
+            .filter(::isAllowedHost)
+            .distinct()
+            .toList()
+
+    /** Choisit le lien de secours uniquement si le fichier standard est réellement trop petit. */
+    fun selectObservatoireCsvSource(
+        standardUrl: String,
+        fallbackUrl: String?,
+        standardBytes: Long,
+    ): ObservatoireCsvSource? = when {
+        standardBytes in 0 until MIN_OBSERVATOIRE_CSV_BYTES && fallbackUrl == null -> null
+        standardBytes in 0 until MIN_OBSERVATOIRE_CSV_BYTES ->
+            ObservatoireCsvSource(fallbackUrl!!, ObservatoireCsvLink.FALLBACK)
+        else -> ObservatoireCsvSource(standardUrl, ObservatoireCsvLink.STANDARD)
     }
 
     /**

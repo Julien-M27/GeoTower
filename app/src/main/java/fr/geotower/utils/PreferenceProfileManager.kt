@@ -234,20 +234,22 @@ object PreferenceProfileManager {
         AppConfig.PREF_MAP_LOCATION_ZOOM to "Carte",
         AppConfig.PREF_MAP_ROTATION_ENABLED to "Carte",
         AppConfig.PREF_MAP_FOLLOW_ORIENTATION to "Carte",
-        "default_operator" to "Préférences",
-        "app_language" to "Préférences",
-        "distance_unit" to "Préférences",
-        "speed_unit" to "Préférences",
+        "default_operator" to "Général",
+        "app_language" to "Général",
+        "distance_unit" to "Général",
+        "speed_unit" to "Général",
         // Mise en page des réglages : même section que le reste de l'apparence.
         "nav_mode" to "Apparence",
         AppConfig.PREF_SETTINGS_SECTIONS_MODE to "Apparence",
         "display_style" to "Apparence",
         // Ce qui tourne hors de l'app, comme dans les réglages.
-        AppNotifications.PREF_ENABLED to "Notifications",
-        "enable_update_notifications" to "Notifications",
-        "enable_live_notifications" to "Notifications",
-        "widget_sync_freq" to "Notifications",
-        "live_tracking_location_update_interval_seconds" to "Notifications",
+        AppNotifications.PREF_ENABLED to "Suivi et arrière-plan",
+        "enable_update_notifications" to "Suivi et arrière-plan",
+        "enable_live_notifications" to "Suivi et arrière-plan",
+        "widget_sync_freq" to "Suivi et arrière-plan",
+        "live_tracking_location_update_interval_seconds" to "Suivi et arrière-plan",
+        AppConfig.PREF_LOW_POWER_LEVEL to "Système, batterie et permissions",
+        AppConfig.PREF_LOW_POWER_FOLLOW_SYSTEM to "Système, batterie et permissions",
         "startup_page" to "Pages",
         "pages_order" to "Pages",
         AppConfig.PREF_HOME_LONG_PRESS_REORDER to "Pages",
@@ -291,6 +293,8 @@ object PreferenceProfileManager {
         "enable_live_notifications" to "Suivi live",
         "widget_sync_freq" to "Fréquence des widgets",
         "live_tracking_location_update_interval_seconds" to "Rafraîchissement live",
+        AppConfig.PREF_LOW_POWER_LEVEL to "Mode économie d'énergie",
+        AppConfig.PREF_LOW_POWER_FOLLOW_SYSTEM to "Suivre l'économie d'énergie Android",
         "startup_page" to "Page de démarrage",
         "pages_order" to "Ordre des pages",
         AppConfig.PREF_HOME_LONG_PRESS_REORDER to "Déplacer par appui long (accueil)",
@@ -593,7 +597,9 @@ object PreferenceProfileManager {
         )
         AppConfig.colorPalette.value = prefs.getString(AppConfig.PREF_COLOR_PALETTE, AppConfig.DEFAULT_COLOR_PALETTE)
             ?: AppConfig.DEFAULT_COLOR_PALETTE
-        AppConfig.mapProvider.intValue = prefs.getInt("map_provider", 1)
+        val mapProvider = MapProviderRules.sanitize(prefs.getInt("map_provider", 1))
+        AppConfig.mapProvider.intValue = mapProvider
+        prefs.edit().putInt("map_provider", mapProvider).apply()
         AppConfig.ignStyle.intValue = prefs.getInt("ign_style", 0)
         AppConfig.navMode.intValue = prefs.getInt(AppConfig.PREF_NAV_MODE, AppConfig.DEFAULT_NAV_MODE)
         AppConfig.settingsSectionsMode.value = prefs.getBoolean(AppConfig.PREF_SETTINGS_SECTIONS_MODE, true)
@@ -726,7 +732,7 @@ object PreferenceProfileManager {
             key.startsWith("throughput_") -> "Débit"
             key.startsWith("show_") || key.startsWith("f2g_") || key.startsWith("f3g_") ||
                 key.startsWith("f4g_") || key.startsWith("f5g_") -> "Carte"
-            else -> "Préférences"
+            else -> "Général"
         }
     }
 

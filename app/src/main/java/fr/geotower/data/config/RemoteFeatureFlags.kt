@@ -344,7 +344,6 @@ object RemoteFeatureFlags {
     object Providers {
         const val MAP_IGN = "map.ign"
         const val MAP_OSM = "map.osm"
-        const val MAP_MAPLIBRE = "map.mapLibre"
         const val MAP_OPEN_TOPO = "map.openTopo"
         const val MAP_OFFLINE = "map.offline"
         const val SEARCH_NOMINATIM = "search.nominatim"
@@ -506,7 +505,6 @@ object RemoteFeatureFlags {
         providers = mapOf(
             Providers.MAP_IGN to true,
             Providers.MAP_OSM to true,
-            Providers.MAP_MAPLIBRE to true,
             Providers.MAP_OPEN_TOPO to true,
             Providers.MAP_OFFLINE to true,
             Providers.SEARCH_NOMINATIM to true,

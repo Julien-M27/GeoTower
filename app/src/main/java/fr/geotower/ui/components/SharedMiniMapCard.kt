@@ -117,11 +117,11 @@ fun SharedMiniMapCard(
     val mapProvider by AppConfig.mapProvider
 
     // ✅ NOUVEAU : État calculé une seule fois
-    var effectiveProvider by remember { mutableIntStateOf(AppConfig.mapProvider.intValue) }
+    var effectiveProvider by remember { mutableIntStateOf(fr.geotower.utils.MapProviderRules.sanitize(AppConfig.mapProvider.intValue)) }
     var mapFiles by remember { mutableStateOf(emptyArray<java.io.File>()) }
 
     LaunchedEffect(AppConfig.mapProvider.intValue) {
-        effectiveProvider = AppConfig.mapProvider.intValue
+        effectiveProvider = fr.geotower.utils.MapProviderRules.sanitize(AppConfig.mapProvider.intValue)
     }
 
     LaunchedEffect(Unit) {
@@ -322,11 +322,6 @@ fun SharedMiniMapCard(
                     // ⚠️ ATTENTION : on utilise "effectiveProvider" ici !
                     val newSource = when (effectiveProvider) {
                         1 -> if (ignStyle == 2) MapUtils.EsriSource.SATELLITE else MapUtils.OSM_Source
-                        2 -> if (ignStyle == 1) {
-                            org.osmdroid.tileprovider.tilesource.XYTileSource("MapLibreDark", 1, 20, 256, ".png", arrayOf("https://basemaps.cartocdn.com/rastertiles/dark_all/"))
-                        } else {
-                            org.osmdroid.tileprovider.tilesource.XYTileSource("MapLibre", 1, 20, 256, ".png", arrayOf("https://basemaps.cartocdn.com/rastertiles/voyager/"))
-                        }
                         3 -> org.osmdroid.tileprovider.tilesource.TileSourceFactory.OpenTopo
                         else -> if (ignStyle == 2) MapUtils.IgnSource.SATELLITE else MapUtils.IgnSource.PLAN_IGN
                     }

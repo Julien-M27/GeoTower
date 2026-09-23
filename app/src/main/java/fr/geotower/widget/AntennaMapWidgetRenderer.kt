@@ -887,15 +887,6 @@ object AntennaMapWidgetRenderer {
                     "https://data.geopf.fr/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetTile&LAYER=$layer&STYLE=normal&FORMAT=$format&TILEMATRIXSET=PM&TILEMATRIX=$z&TILEROW=$y&TILECOL=$x"
                 }
             )
-            2 -> WidgetTileSource(
-                cacheKey = if (ignStyle == 1) "carto_dark" else "carto_voyager",
-                invertColors = false,
-                maxRenderZoom = 20,
-                urlFor = { z, x, y ->
-                    val layer = if (ignStyle == 1) "dark_all" else "voyager"
-                    "https://basemaps.cartocdn.com/rastertiles/$layer/$z/$x/$y.png"
-                }
-            )
             3 -> WidgetTileSource(
                 cacheKey = "opentopo",
                 invertColors = false,

@@ -31,6 +31,12 @@ enum class BuildImportType {
     QUARTERLY,
 }
 
+/** Lien de source actuellement utilise pour un import reseau. */
+enum class BuildSourceLink {
+    STANDARD,
+    FALLBACK,
+}
+
 @StringRes
 fun BuildImportType.labelRes(): Int = when (this) {
     BuildImportType.MONTHLY -> R.string.appstrings_local_build_import_monthly
@@ -45,6 +51,9 @@ data class BuildProgressUpdate(
     val detail: String? = null,
     val importType: BuildImportType? = null,
     val fileName: String? = null,
+    val sourceUrl: String? = null,
+    val sourceLink: BuildSourceLink? = null,
+    val sourceSwitchReason: String? = null,
     val downloadedBytes: Long = 0L,
     val totalBytes: Long = -1L,
 )

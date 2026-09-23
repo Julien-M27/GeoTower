@@ -300,11 +300,11 @@ fun SignalQuestUploadScreen(
     val ignStyle by AppConfig.ignStyle
 
     // ✅ NOUVEAU : Fournisseur effectif calculé une seule fois au chargement
-    var effectiveProvider by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(AppConfig.mapProvider.intValue) }
+    var effectiveProvider by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(fr.geotower.utils.MapProviderRules.sanitize(AppConfig.mapProvider.intValue)) }
     var mapFiles by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(emptyArray<java.io.File>()) }
 
     androidx.compose.runtime.LaunchedEffect(AppConfig.mapProvider.intValue) {
-        effectiveProvider = AppConfig.mapProvider.intValue
+        effectiveProvider = fr.geotower.utils.MapProviderRules.sanitize(AppConfig.mapProvider.intValue)
     }
 
     androidx.compose.runtime.LaunchedEffect(Unit) {
@@ -1135,11 +1135,6 @@ fun SignalQuestUploadScreen(
 
                                         val newSource = when (effectiveProvider) {
                                             1 -> if (ignStyle == 2) MapUtils.EsriSource.SATELLITE else MapUtils.OSM_Source
-                                            2 -> if (ignStyle == 1) {
-                                                org.osmdroid.tileprovider.tilesource.XYTileSource("MapLibreDark", 1, 20, 256, ".png", arrayOf("https://basemaps.cartocdn.com/rastertiles/dark_all/"))
-                                            } else {
-                                                org.osmdroid.tileprovider.tilesource.XYTileSource("MapLibre", 1, 20, 256, ".png", arrayOf("https://basemaps.cartocdn.com/rastertiles/voyager/"))
-                                            }
                                             3 -> org.osmdroid.tileprovider.tilesource.TileSourceFactory.OpenTopo
                                             else -> if (ignStyle == 2) MapUtils.IgnSource.SATELLITE else MapUtils.IgnSource.PLAN_IGN
                                         }

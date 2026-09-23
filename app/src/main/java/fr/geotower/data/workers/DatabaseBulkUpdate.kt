@@ -65,7 +65,11 @@ object DatabaseBulkUpdate {
      * Ne retourne que les bases qui peuvent etre telechargees ici et dont la version distante est
      * plus recente. Une base deja en cours de telechargement est laissee tranquille.
      */
-    suspend fun checkAvailableUpdates(context: Context, workManager: WorkManager): AvailableUpdatesResult =
+    suspend fun checkAvailableUpdates(
+        context: Context,
+        workManager: WorkManager,
+        onProgress: suspend (AvailableUpdatesResult) -> Unit = {}
+    ): AvailableUpdatesResult =
         withContext(Dispatchers.IO) {
             if (
                 !RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.DATABASE_DOWNLOAD) ||
@@ -92,20 +96,42 @@ object DatabaseBulkUpdate {
                 }
             }
 
-            val results = runChecksConcurrently(checks)
-            AvailableUpdatesResult(
-                targets = results.mapNotNull { it.targetAction?.target },
-                isComplete = results.all { it.isComplete },
-                hasMissingDatabases = results.any { it.hasMissingDatabase },
-                hasDatabaseUpdates = results.any { it.hasDatabaseUpdate },
-                targetActions = results.mapNotNull { it.targetAction }
-            )
+            val totalChecks = checks.size
+            val results = runChecksConcurrently(checks) { _, completedResults ->
+                onProgress(completedResults.toAvailableUpdatesResult(totalChecks, isComplete = false))
+            }
+            results.toAvailableUpdatesResult(totalChecks, isComplete = true)
         }
 
-    internal suspend fun <T> runChecksConcurrently(checks: List<suspend () -> T>): List<T> =
+    internal suspend fun <T> runChecksConcurrently(
+        checks: List<suspend () -> T>,
+        onResult: suspend (result: T, completedResults: List<T>) -> Unit = { _, _ -> }
+    ): List<T> =
         coroutineScope {
-            checks.map { check -> async(Dispatchers.IO) { check() } }.awaitAll()
+            val completedResults = mutableListOf<T>()
+            checks.map { check ->
+                async(Dispatchers.IO) {
+                    val result = check()
+                    val snapshot = synchronized(completedResults) {
+                        completedResults += result
+                        completedResults.toList()
+                    }
+                    onResult(result, snapshot)
+                    result
+                }
+            }.awaitAll()
         }
+
+    private fun List<TargetCheckResult>.toAvailableUpdatesResult(
+        totalChecks: Int,
+        isComplete: Boolean
+    ): AvailableUpdatesResult = AvailableUpdatesResult(
+        targets = mapNotNull { it.targetAction?.target },
+        isComplete = isComplete && size == totalChecks && all { it.isComplete },
+        hasMissingDatabases = any { it.hasMissingDatabase },
+        hasDatabaseUpdates = any { it.hasDatabaseUpdate },
+        targetActions = mapNotNull { it.targetAction }
+    )
 
     private suspend fun checkMobile(context: Context, workManager: WorkManager): TargetCheckResult {
         if (

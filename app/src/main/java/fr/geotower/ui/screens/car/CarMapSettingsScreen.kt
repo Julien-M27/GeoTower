@@ -61,13 +61,6 @@ class CarMapSettingsScreen(
         AppConfig.mapProvider.intValue = provider
         prefs.edit().putInt("map_provider", provider).apply()
 
-        // Le fond MapLibre/CARTO ne propose pas de satellite dans l'application téléphone. Le
-        // même repli est appliqué ici pour éviter que le rendu voiture affiche un style incohérent.
-        if (provider == 2 && AppConfig.ignStyle.intValue == 2) {
-            AppConfig.ignStyle.intValue = 0
-            prefs.edit().putInt("ign_style", 0).apply()
-        }
-
         onMapChanged()
         runCatching {
             carContext.getCarService(ScreenManager::class.java).pop()
@@ -78,7 +71,6 @@ class CarMapSettingsScreen(
         return buildList {
             add(MapProviderOption(1, R.string.mapping_provider_osm, R.string.car_map_provider_osm))
             add(MapProviderOption(0, R.string.mapping_provider_ign, R.string.car_map_provider_ign))
-            add(MapProviderOption(2, R.string.mapping_provider_maplibre, R.string.car_map_provider_maplibre))
             add(MapProviderOption(3, R.string.mapping_provider_topo, R.string.car_map_provider_topo))
             if (hasOfflineMaps()) {
                 add(MapProviderOption(4, R.string.appstrings_offline_maps_title, R.string.car_map_provider_offline))

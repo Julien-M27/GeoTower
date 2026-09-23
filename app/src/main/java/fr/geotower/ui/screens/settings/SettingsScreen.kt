@@ -208,14 +208,14 @@ import kotlin.math.roundToInt
 
 // Ordre des sections de réglages : sert d'index à la barre latérale des tablettes, à l'accueil
 // par sections des téléphones, aux ancres de défilement et à l'index de recherche.
-private const val SECTION_APPEARANCE = 0
-private const val SECTION_MAPPING = 1
-private const val SECTION_PREFERENCES = 2
-private const val SECTION_PAGES = 3
-private const val SECTION_BACKGROUND = 4
-private const val SECTION_SYSTEM = 5
-private const val SECTION_DATABASE = 6
-private const val SECTION_COUNT = 7
+private const val SECTION_APPEARANCE = SettingsSectionIds.APPEARANCE
+private const val SECTION_MAPPING = SettingsSectionIds.MAPPING
+private const val SECTION_PREFERENCES = SettingsSectionIds.GENERAL
+private const val SECTION_PAGES = SettingsSectionIds.PAGES
+private const val SECTION_BACKGROUND = SettingsSectionIds.TRACKING
+private const val SECTION_SYSTEM = SettingsSectionIds.SYSTEM
+private const val SECTION_DATABASE = SettingsSectionIds.DATA
+private const val SECTION_COUNT = SettingsSectionIds.COUNT
 
 // Ancres fines de la section « Base de données » : valeurs possibles du paramètre `section` des
 // liens profonds `geotower://settings?section=…` émis par les notifications de téléchargement
@@ -485,9 +485,11 @@ fun SettingsScreen(
     LaunchedEffect(initialSection) {
         if (hasAppliedInitialSection) return@LaunchedEffect
         hasAppliedInitialSection = true
-        if (initialSection == "database" || initialSection == "offline_maps" || initialDatabaseCardAnchor != null) {
-            // Les cartes hors ligne vivent maintenant dans la section Cartographie.
-            val target = if (initialSection == "offline_maps") SECTION_MAPPING else SECTION_DATABASE
+        val deepLinkTarget = SettingsSectionIds.forDeepLink(initialSection)
+        if (deepLinkTarget != null || initialDatabaseCardAnchor != null) {
+            // Les cartes hors ligne vivent dans Cartographie ; les liens historiques de données
+            // restent valables même si le titre visible de la section change.
+            val target = deepLinkTarget ?: SECTION_DATABASE
             activeSectionIndex = target
             if (useSectionsHome) openedSection = target
             shouldBringDatabaseIntoView = initialSection == "database"
@@ -958,7 +960,7 @@ fun SettingsScreen(
             }
 
             // --- Cartographie ---
-            entry(context.getString(R.string.settings_section_mapping), "carte map fond fournisseur ign osm maplibre topo provider tuiles", SECTION_MAPPING)
+            entry(context.getString(R.string.settings_section_mapping), "carte map fond fournisseur ign osm topo provider tuiles", SECTION_MAPPING)
             entry(context.getString(R.string.mapping_style_title), "style carte clair sombre satellite couleur", SECTION_MAPPING)
             entry(context.getString(R.string.appstrings_map_smooth_location_option), "repere position gps fluide glissement lissage", SECTION_MAPPING)
             entry(context.getString(R.string.settings_map_location_zoom_title), "zoom niveau localisation position recentrage bouton gps echelle", SECTION_MAPPING)
@@ -1035,13 +1037,21 @@ fun SettingsScreen(
             entry(context.getString(R.string.appstrings_update_notif_setting_title), "notification mise a jour update base donnees alerte", SECTION_BACKGROUND)
             entry(context.getString(R.string.appstrings_live_notification_title), "notification live suivi temps reel antenne direct", SECTION_BACKGROUND)
             entry(context.getString(R.string.appstrings_live_location_accuracy_title), "precision gps position live exactitude", SECTION_BACKGROUND)
-            entry(context.getString(R.string.appstrings_low_power_title), "faible consommation economie batterie eco energie basse performance low power mode", SECTION_BACKGROUND)
+            entry(
+                context.getString(R.string.appstrings_low_power_title),
+                "faible consommation economie batterie eco energie basse performance low power mode",
+                SettingsSectionIds.forSearchEntry(SettingsSearchEntryId.LOW_POWER)
+            )
             entry(context.getString(R.string.appstrings_widget_refresh_title), "widget frequence rafraichissement synchronisation accueil", SECTION_BACKGROUND)
 
             // --- Système ---
             entry(context.getString(R.string.appstrings_manage_permissions), "permissions autorisations systeme application acces", SECTION_SYSTEM)
             entry(context.getString(R.string.appstrings_bg_location_perm_title), "position arriere plan background localisation permission autorisation", SECTION_SYSTEM)
-            entry(context.getString(R.string.appstrings_diagnostic_api_dialog_title), "serveur server miroir mirror principal secours bascule api hote host reseau geotower cajejuma", SECTION_SYSTEM)
+            entry(
+                context.getString(R.string.appstrings_diagnostic_api_dialog_title),
+                "serveur server miroir mirror principal secours bascule api hote host reseau geotower cajejuma",
+                SettingsSectionIds.forSearchEntry(SettingsSearchEntryId.API_SERVER)
+            )
             entry(context.getString(R.string.appstrings_diagnostic_title), "diagnostic logs debogage info journal probleme", SECTION_SYSTEM) { navController.navigate("diagnostic") }
 
             // --- Base de données ---
@@ -1724,6 +1734,7 @@ fun SettingsScreen(
                                         context,
                                         modifier = sectionAnchorModifiers[SECTION_DATABASE],
                                         onLocalMode = { navController.navigate("local_mode") },
+                                        onOpenDatabaseViewer = { navController.navigate("database_viewer") },
                                         safeClick = safeClick,
                                         databaseCardModifiers = databaseCardAnchorModifiers,
                                         refreshState = databaseRefreshState
@@ -3111,7 +3122,7 @@ fun SectionPreferences(
 
 /**
  * Tout ce qui vit hors de l'application : notifications de mise à jour de la base, notification
- * live et sa précision GPS, mode faible consommation, rafraîchissement du widget.
+ * live et sa précision GPS, rafraîchissement du widget et activité en arrière-plan.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -3322,86 +3333,6 @@ fun SectionNotifications(
     }
     Spacer(Modifier.height(sizing.spacing(12.dp)))
 
-    // --- MODE FAIBLE CONSOMMATION (Normal / Éco / Éco+) ---
-    val lowPowerLevel by AppConfig.lowPowerLevel
-    val lowPowerFollowSystem by AppConfig.lowPowerFollowSystem
-    // Niveau EFFECTIF (manuel, ou relevé par l'économie d'énergie système) → la sélection le reflète, réactif.
-    val effectiveLowPowerLevel = fr.geotower.utils.PowerProfile.level
-    fun applyLowPowerLevel(newLevel: Int) {
-        AppConfig.lowPowerLevel.intValue = newLevel
-        prefs.edit().putInt(AppConfig.PREF_LOW_POWER_LEVEL, newLevel).apply()
-        // Applique à chaud la priorité/intervalle GPS au service live s'il tourne.
-        LiveTrackingController.refreshLocationSettings(context)
-    }
-    Surface(
-        shape = shape,
-        border = border,
-        color = if (useOneUi) bubbleColor else Color.Transparent,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(Modifier.fillMaxWidth().padding(sizing.spacing(16.dp))) {
-            Text(
-                stringResource(R.string.appstrings_low_power_title),
-                style = sizing.textStyle(MaterialTheme.typography.titleMedium),
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                stringResource(R.string.appstrings_low_power_desc),
-                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.height(sizing.spacing(12.dp)))
-            NavigationModeOption(
-                title = stringResource(R.string.appstrings_low_power_level_normal),
-                desc = stringResource(R.string.appstrings_low_power_level_normal_desc),
-                isSelected = effectiveLowPowerLevel == 0,
-                useOneUi = useOneUi,
-                onClick = { applyLowPowerLevel(0) }
-            )
-            Spacer(Modifier.height(sizing.spacing(8.dp)))
-            NavigationModeOption(
-                title = stringResource(R.string.appstrings_low_power_level_eco),
-                desc = stringResource(R.string.appstrings_low_power_level_eco_desc),
-                isSelected = effectiveLowPowerLevel == 1,
-                useOneUi = useOneUi,
-                onClick = { applyLowPowerLevel(1) }
-            )
-            Spacer(Modifier.height(sizing.spacing(8.dp)))
-            NavigationModeOption(
-                title = stringResource(R.string.appstrings_low_power_level_ecoplus),
-                desc = stringResource(R.string.appstrings_low_power_level_ecoplus_desc),
-                isSelected = effectiveLowPowerLevel == 2,
-                useOneUi = useOneUi,
-                onClick = { applyLowPowerLevel(2) }
-            )
-            if (effectiveLowPowerLevel > lowPowerLevel) {
-                Spacer(Modifier.height(sizing.spacing(8.dp)))
-                Text(
-                    stringResource(R.string.appstrings_low_power_forced_by_system),
-                    style = sizing.textStyle(MaterialTheme.typography.bodySmall),
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-        }
-    }
-    Spacer(Modifier.height(sizing.spacing(12.dp)))
-
-    PreferenceSwitchCard(
-        title = stringResource(R.string.appstrings_low_power_follow_system_title),
-        desc = stringResource(R.string.appstrings_low_power_follow_system_desc),
-        checked = lowPowerFollowSystem,
-        onCheckedChange = { isChecked ->
-            AppConfig.lowPowerFollowSystem.value = isChecked
-            prefs.edit().putBoolean(AppConfig.PREF_LOW_POWER_FOLLOW_SYSTEM, isChecked).apply()
-            LiveTrackingController.refreshLocationSettings(context)
-        },
-        shape = shape,
-        border = border,
-        bubbleColor = bubbleColor,
-        useOneUi = useOneUi
-    )
-    Spacer(Modifier.height(sizing.spacing(12.dp)))
-
     // --- CURSEUR PARTAGÉ (Nettoyé des < 30 min) ---
     fr.geotower.ui.components.CustomSliderCard(
         title = stringResource(R.string.appstrings_widget_refresh_title),
@@ -3520,6 +3451,96 @@ private fun WidgetFormatPickerSheet(
             }
         }
     }
+}
+
+@Composable
+private fun LowPowerSettingsCard(
+    shape: Shape,
+    border: BorderStroke?,
+    bubbleColor: Color,
+    useOneUi: Boolean
+) {
+    val context = LocalContext.current
+    val prefs = context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    val lowPowerLevel by AppConfig.lowPowerLevel
+    val lowPowerFollowSystem by AppConfig.lowPowerFollowSystem
+    // Le niveau effectif inclut l'économie d'énergie Android si l'utilisateur a choisi de la suivre.
+    val effectiveLowPowerLevel = PowerProfile.level
+
+    fun applyLowPowerLevel(newLevel: Int) {
+        AppConfig.lowPowerLevel.intValue = newLevel
+        prefs.edit().putInt(AppConfig.PREF_LOW_POWER_LEVEL, newLevel).apply()
+        LiveTrackingController.refreshLocationSettings(context)
+    }
+
+    Surface(
+        shape = shape,
+        border = border,
+        color = if (useOneUi) bubbleColor else Color.Transparent,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(Modifier.fillMaxWidth().padding(sizing.spacing(16.dp))) {
+            Text(
+                stringResource(R.string.appstrings_low_power_title),
+                style = sizing.textStyle(MaterialTheme.typography.titleMedium),
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                stringResource(R.string.appstrings_low_power_desc),
+                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(sizing.spacing(12.dp)))
+            NavigationModeOption(
+                title = stringResource(R.string.appstrings_low_power_level_normal),
+                desc = stringResource(R.string.appstrings_low_power_level_normal_desc),
+                isSelected = effectiveLowPowerLevel == PowerProfile.LEVEL_NORMAL,
+                useOneUi = useOneUi,
+                onClick = { applyLowPowerLevel(PowerProfile.LEVEL_NORMAL) }
+            )
+            Spacer(Modifier.height(sizing.spacing(8.dp)))
+            NavigationModeOption(
+                title = stringResource(R.string.appstrings_low_power_level_eco),
+                desc = stringResource(R.string.appstrings_low_power_level_eco_desc),
+                isSelected = effectiveLowPowerLevel == PowerProfile.LEVEL_ECO,
+                useOneUi = useOneUi,
+                onClick = { applyLowPowerLevel(PowerProfile.LEVEL_ECO) }
+            )
+            Spacer(Modifier.height(sizing.spacing(8.dp)))
+            NavigationModeOption(
+                title = stringResource(R.string.appstrings_low_power_level_ecoplus),
+                desc = stringResource(R.string.appstrings_low_power_level_ecoplus_desc),
+                isSelected = effectiveLowPowerLevel == PowerProfile.LEVEL_ECO_PLUS,
+                useOneUi = useOneUi,
+                onClick = { applyLowPowerLevel(PowerProfile.LEVEL_ECO_PLUS) }
+            )
+            if (effectiveLowPowerLevel > lowPowerLevel) {
+                Spacer(Modifier.height(sizing.spacing(8.dp)))
+                Text(
+                    stringResource(R.string.appstrings_low_power_forced_by_system),
+                    style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+    }
+    Spacer(Modifier.height(sizing.spacing(12.dp)))
+
+    PreferenceSwitchCard(
+        title = stringResource(R.string.appstrings_low_power_follow_system_title),
+        desc = stringResource(R.string.appstrings_low_power_follow_system_desc),
+        checked = lowPowerFollowSystem,
+        onCheckedChange = { isChecked ->
+            AppConfig.lowPowerFollowSystem.value = isChecked
+            prefs.edit().putBoolean(AppConfig.PREF_LOW_POWER_FOLLOW_SYSTEM, isChecked).apply()
+            LiveTrackingController.refreshLocationSettings(context)
+        },
+        shape = shape,
+        border = border,
+        bubbleColor = bubbleColor,
+        useOneUi = useOneUi
+    )
 }
 
 @Composable
@@ -3705,48 +3726,8 @@ fun SectionSysteme(
         }
     }
 
-    // --- SERVEUR GEOTOWER ---
-    // Raccourci vers le même réglage que la carte « Serveur GeoTower » de la page Diagnostic
-    // (elle-même atteignable depuis « À propos ») : état unique dans ApiEndpoints, dialogue commun,
-    // et sonde forcée à la sélection. Les deux entrées ne peuvent donc pas se contredire.
-    val apiServerScope = rememberCoroutineScope()
-    var showApiServerDialog by remember { mutableStateOf(false) }
-    val apiServerMode = ApiEndpoints.mode.value
-    val apiServerActive = ApiEndpoints.activeServer.value
-    Surface(
-        onClick = { safeClick("system_api_server") { showApiServerDialog = true } },
-        shape = shape,
-        border = border,
-        color = cardBg,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(modifier = Modifier.padding(sizing.spacing(16.dp)), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Outlined.VisibilityOff, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(sizing.component(24.dp)))
-            Spacer(Modifier.width(sizing.spacing(16.dp)))
-            Column {
-                Text(stringResource(R.string.appstrings_diagnostic_api_dialog_title), style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.Bold)
-                Text(stringResource(R.string.settings_api_server_desc), style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                // Le mode dit ce qui a été choisi, l'hôte ce qui est réellement utilisé : en mode
-                // automatique, les deux diffèrent dès que la bascule sur le miroir a eu lieu.
-                Text(
-                    text = "${stringResource(apiServerModeLabelRes(apiServerMode))} · ${apiServerActive.host}",
-                    style = sizing.textStyle(MaterialTheme.typography.bodySmall),
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-        }
-    }
-
-    if (showApiServerDialog) {
-        ApiServerModeDialog(
-            currentMode = apiServerMode,
-            onDismiss = { showApiServerDialog = false },
-            onSelect = { selectedMode ->
-                showApiServerDialog = false
-                applyApiServerMode(ctx, apiServerScope, selectedMode)
-            }
-        )
-    }
+    Spacer(Modifier.height(sizing.spacing(12.dp)))
+    LowPowerSettingsCard(shape, border, bubbleColor, useOneUi)
 
     Spacer(Modifier.height(sizing.spacing(12.dp)))
 
@@ -3779,6 +3760,7 @@ fun SectionDatabase(
     context: Context,
     modifier: Modifier = Modifier,
     onLocalMode: () -> Unit = {},
+    onOpenDatabaseViewer: () -> Unit = {},
     safeClick: SafeClick,
     databaseCardModifiers: Map<String, Modifier> = emptyMap(),
     refreshState: DatabaseRefreshState? = null,
@@ -3826,6 +3808,27 @@ fun SectionDatabase(
     var allDatabasesUpToDate by remember { mutableStateOf<Boolean?>(null) }
     var hasMissingDatabases by remember { mutableStateOf(false) }
     var hasDatabaseUpdates by remember { mutableStateOf(false) }
+    var bulkUpdateCheckRequest by remember { mutableIntStateOf(0) }
+    var hadRunningBulkUpdate by remember { mutableStateOf(isBulkUpdateRunning) }
+
+    suspend fun applyBulkCheckResult(result: DatabaseBulkUpdate.AvailableUpdatesResult) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main.immediate) {
+            allDatabasesUpToDate = result.isComplete && result.targets.isEmpty()
+            hasMissingDatabases = result.hasMissingDatabases
+            hasDatabaseUpdates = result.hasDatabaseUpdates
+            queuedBulkUpdateTargets = result.targetActions
+        }
+    }
+
+    suspend fun checkBulkUpdates() {
+        isCheckingBulkUpdates = true
+        allDatabasesUpToDate = null
+        val result = DatabaseBulkUpdate.checkAvailableUpdates(context, workManager) { partialResult ->
+            applyBulkCheckResult(partialResult)
+        }
+        applyBulkCheckResult(result)
+        isCheckingBulkUpdates = false
+    }
 
     fun workTagFor(target: DatabaseBulkUpdate.Target): String = when (target) {
         DatabaseBulkUpdate.Target.MOBILE -> DatabaseDownloadWorker.WORK_TAG
@@ -3886,7 +3889,7 @@ fun SectionDatabase(
     // Vérification initiale à l'ouverture de la page, puis à chaque actualisation de la section.
     // Un résultat incomplet (réseau indisponible ou manifeste invalide) ne doit pas être présenté
     // comme « tout est à jour » : le bouton reste alors disponible pour permettre un nouvel essai.
-    LaunchedEffect(sectionRefreshKey, featureFlags, showMobileCard, showRadioCard, showEnbCard, isBulkUpdateRunning) {
+    LaunchedEffect(sectionRefreshKey, featureFlags, showMobileCard, showRadioCard, showEnbCard, bulkUpdateCheckRequest) {
         if (!showMobileCard && !showRadioCard && !showEnbCard) {
             allDatabasesUpToDate = null
             return@LaunchedEffect
@@ -3896,17 +3899,18 @@ fun SectionDatabase(
             return@LaunchedEffect
         }
 
-        isCheckingBulkUpdates = true
-        allDatabasesUpToDate = null
-        val result = DatabaseBulkUpdate.checkAvailableUpdates(context, workManager)
-        allDatabasesUpToDate = result.isComplete && result.targets.isEmpty()
-        hasMissingDatabases = result.hasMissingDatabases
-        hasDatabaseUpdates = result.hasDatabaseUpdates
-        queuedBulkUpdateTargets = result.targetActions
-        if (allDatabasesUpToDate == true) {
-            queuedBulkUpdateTargets = emptyList()
+        checkBulkUpdates()
+    }
+
+    // Une file créée pendant la vérification ne l'interrompt pas. Quand elle se termine, on
+    // relance une vérification pour refléter les versions effectivement installées.
+    LaunchedEffect(isBulkUpdateRunning) {
+        if (isBulkUpdateRunning) {
+            hadRunningBulkUpdate = true
+        } else if (hadRunningBulkUpdate) {
+            hadRunningBulkUpdate = false
+            bulkUpdateCheckRequest++
         }
-        isCheckingBulkUpdates = false
     }
 
     // 🚀 LA CARTE DE LA BASE DE DONNÉES (Existante)
@@ -3931,6 +3935,61 @@ fun SectionDatabase(
         } else {
             SectionTitle(stringResource(R.string.settings_section_database))
         }
+
+        PreferenceActionCard(
+            title = stringResource(R.string.database_viewer_title),
+            desc = stringResource(R.string.database_viewer_desc),
+            onClick = onOpenDatabaseViewer,
+            shape = shape,
+            border = border,
+            bubbleColor = bubbleColor,
+            useOneUi = useOneUi,
+            safeClick = safeClick,
+            icon = Icons.Outlined.Storage,
+        )
+
+        Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+
+        // Le serveur sélectionné détermine la provenance des données téléchargées et peut
+        // basculer entre le serveur principal et son miroir : il appartient donc à cette section,
+        // pas aux réglages Android.
+        val apiServerMode = ApiEndpoints.mode.value
+        val apiServerActive = ApiEndpoints.activeServer.value
+        var showApiServerDialog by remember { mutableStateOf(false) }
+        Surface(
+            onClick = { safeClick("data_api_server") { showApiServerDialog = true } },
+            shape = shape,
+            border = border,
+            color = if (useOneUi) bubbleColor else Color.Transparent,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(modifier = Modifier.padding(sizing.spacing(16.dp)), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Outlined.VisibilityOff, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(sizing.component(24.dp)))
+                Spacer(Modifier.width(sizing.spacing(16.dp)))
+                Column {
+                    Text(stringResource(R.string.appstrings_diagnostic_api_dialog_title), style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.settings_api_server_desc), style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        text = "${stringResource(apiServerModeLabelRes(apiServerMode))} · ${apiServerActive.host}",
+                        style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+        }
+
+        if (showApiServerDialog) {
+            ApiServerModeDialog(
+                currentMode = apiServerMode,
+                onDismiss = { showApiServerDialog = false },
+                onSelect = { selectedMode ->
+                    showApiServerDialog = false
+                    applyApiServerMode(context, scope, selectedMode)
+                }
+            )
+        }
+
+        Spacer(Modifier.height(sizing.spacing(12.dp)))
 
         // Provenance des données : un SEUL écran décide d'où viennent la base ET les sites en panne
         // (le niveau de traitement local). Il ouvre la section parce qu'il commande tout ce qui
@@ -3975,23 +4034,19 @@ fun SectionDatabase(
                     Button(
                         onClick = {
                             safeClick("database_update_all") {
-                                isCheckingBulkUpdates = true
-                                queuedBulkUpdateTargets = emptyList()
-                                scope.launch {
-                                    val result = DatabaseBulkUpdate.checkAvailableUpdates(context, workManager)
-                                    val targets = result.targets
-                                    if (targets.isNotEmpty()) {
-                                        DatabaseBulkUpdate.enqueueDetailed(workManager, result.targetActions)
+                                val detectedTargets = queuedBulkUpdateTargets
+                                if (detectedTargets.isNotEmpty()) {
+                                    DatabaseBulkUpdate.enqueueDetailed(workManager, detectedTargets)
+                                } else {
+                                    queuedBulkUpdateTargets = emptyList()
+                                    scope.launch {
+                                        checkBulkUpdates()
                                     }
-                                    queuedBulkUpdateTargets = result.targetActions
-                                    allDatabasesUpToDate = result.isComplete && targets.isEmpty()
-                                    hasMissingDatabases = result.hasMissingDatabases
-                                    hasDatabaseUpdates = result.hasDatabaseUpdates
-                                    isCheckingBulkUpdates = false
                                 }
                             }
                         },
-                        enabled = !isCheckingBulkUpdates && !isBulkUpdateRunning && allDatabasesUpToDate != true,
+                        enabled = !isBulkUpdateRunning && allDatabasesUpToDate != true &&
+                            (!isCheckingBulkUpdates || queuedBulkUpdateTargets.isNotEmpty()),
                         modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = sizing.component(50.dp)),
                         shape = RoundedCornerShape(sizing.component(12.dp)),
                         colors = ButtonDefaults.buttonColors(
@@ -4008,12 +4063,13 @@ fun SectionDatabase(
                         Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
                         Text(
                             text = when {
-                                isCheckingBulkUpdates -> stringResource(R.string.database_update_all_checking)
                                 isBulkUpdateRunning -> stringResource(R.string.database_update_all_running)
                                 allDatabasesUpToDate == true -> stringResource(R.string.database_update_all_none)
                                 hasMissingDatabases && hasDatabaseUpdates ->
                                     stringResource(R.string.database_download_and_update_all_action)
                                 hasMissingDatabases -> stringResource(R.string.database_download_all_action)
+                                isCheckingBulkUpdates && queuedBulkUpdateTargets.isEmpty() ->
+                                    stringResource(R.string.database_update_all_checking)
                                 else -> stringResource(R.string.database_update_all_action)
                             },
                             fontWeight = FontWeight.Bold

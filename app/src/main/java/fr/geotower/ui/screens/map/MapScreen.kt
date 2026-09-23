@@ -247,6 +247,7 @@ import fr.geotower.utils.openLocationSourceSettings
 import fr.geotower.utils.rememberLocationReadinessState
 import fr.geotower.utils.MapDisplayPrefs
 import fr.geotower.utils.MapUtils
+import fr.geotower.utils.MapProviderRules
 import fr.geotower.ui.screens.emitters.OperatorGrid
 import fr.geotower.utils.OperatorColorSpec
 import fr.geotower.utils.OperatorColors
@@ -1833,7 +1834,7 @@ fun MapScreen(
         return when (providerId) {
             0 -> featureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.MAP_IGN)
             1 -> featureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.MAP_OSM)
-            2 -> featureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.MAP_MAPLIBRE)
+            2 -> false
             3 -> featureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.MAP_OPEN_TOPO)
             4 -> featureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.MAP_OFFLINE)
             else -> true
@@ -1841,7 +1842,7 @@ fun MapScreen(
     }
 
     fun fallbackMapProvider(): Int {
-        return listOf(1, 0, 2, 3, 4).firstOrNull(::isMapProviderEnabled) ?: 1
+        return listOf(1, 0, 3, 4).firstOrNull(::isMapProviderEnabled) ?: 1
     }
 
     val canUseMapSearch =
@@ -1862,7 +1863,7 @@ fun MapScreen(
     val canUseCompassPage = AppConfig.hasCompass.value &&
         featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.COMPASS)
     val canUseMapLocation = featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.MAP_LOCATION)
-    val canUseLayerSelector = listOf(0, 1, 2, 3, 4).any(::isMapProviderEnabled)
+    val canUseLayerSelector = listOf(0, 1, 3, 4).any(::isMapProviderEnabled)
 
     LaunchedEffect(Unit) {
         AppConfig.loadMapDisplayPreferences(prefs)
@@ -2906,7 +2907,7 @@ fun MapScreen(
 
     // Synchronisation si l'utilisateur change la carte dans les paramètres
     LaunchedEffect(AppConfig.mapProvider.intValue, featureFlags) {
-        val requestedProvider = AppConfig.mapProvider.intValue
+        val requestedProvider = MapProviderRules.sanitize(AppConfig.mapProvider.intValue)
         val nextProvider = if (isMapProviderEnabled(requestedProvider)) {
             requestedProvider
         } else {
@@ -3441,7 +3442,6 @@ fun MapScreen(
     val txtMapLight = stringResource(R.string.appstrings_map_light)
     val txtMapDark = stringResource(R.string.appstrings_map_dark)
     val txtMapSatellite = stringResource(R.string.appstrings_map_satellite)
-    val txtMapMapLibre = stringResource(R.string.appstrings_map_map_libre)
     val txtMapTopo = stringResource(R.string.appstrings_map_topo)
     val txtMapOfflineLayer = stringResource(R.string.appstrings_map_offline_layer)
 
@@ -5373,11 +5373,6 @@ fun MapScreen(
                     // ⚠️ ATTENTION : on utilise bien "effectiveProvider" ici !
                     val newSource = when (effectiveProvider) {
                         1 -> if (ignStyle == 2) MapUtils.EsriSource.SATELLITE else MapUtils.OSM_Source
-                        2 -> if (ignStyle == 1) {
-                            org.osmdroid.tileprovider.tilesource.XYTileSource("MapLibreDark", 1, 20, 256, ".png", arrayOf("https://basemaps.cartocdn.com/rastertiles/dark_all/"))
-                        } else {
-                            org.osmdroid.tileprovider.tilesource.XYTileSource("MapLibre", 1, 20, 256, ".png", arrayOf("https://basemaps.cartocdn.com/rastertiles/voyager/"))
-                        }
                         3 -> org.osmdroid.tileprovider.tilesource.TileSourceFactory.OpenTopo
                         else -> if (ignStyle == 2) MapUtils.IgnSource.SATELLITE else MapUtils.IgnSource.PLAN_IGN
                     }
@@ -7608,12 +7603,6 @@ fun MapScreen(
                                 }
                             }
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp))) {
-                                if (isMapProviderEnabled(2)) {
-                                    MapLayerButton(txtMapMapLibre, mapProvider == 2, Modifier.weight(1f)) {
-                                        AppConfig.mapProvider.value = 2; prefs.edit().putInt("map_provider", 2).apply()
-                                        if (ignStyle == 2) { AppConfig.ignStyle.value = 0; prefs.edit().putInt("ign_style", 0).apply() }
-                                    }
-                                }
                                 if (isMapProviderEnabled(3)) {
                                     MapLayerButton(txtMapTopo, mapProvider == 3, Modifier.weight(1f)) {
                                         AppConfig.mapProvider.value = 3; prefs.edit().putInt("map_provider", 3).apply()
@@ -7650,7 +7639,7 @@ fun MapScreen(
 
                     // ✅ 3. L'ANIMATION DES STYLES (Cachée si on est hors ligne !)
                     AnimatedVisibility(
-                        visible = isOnline && (mapProvider == 0 || mapProvider == 1 || mapProvider == 2),
+                        visible = isOnline && (mapProvider == 0 || mapProvider == 1),
                         enter = fadeIn() + slideInHorizontally(initialOffsetX = { it }) + expandVertically(expandFrom = Alignment.Top),
                         exit = fadeOut() + slideOutHorizontally(targetOffsetX = { it }) + shrinkVertically(shrinkTowards = Alignment.Top)
                     ) {

@@ -419,11 +419,54 @@ fun HomeScreen(navController: NavController) {
                         // Base générée sur l'appareil : la nouvelle version se propose en
                         // régénération, la même donnée ANFR étant à portée de build local.
                         val rebuildOffer = hasRemoteUpdate && LocalDbRebuildOffer.forMobile(context)
+                        // La base mobile est déjà connue : ne la masque pas derrière les
+                        // vérifications radio/eNB restantes. Le bandeau peut donc proposer
+                        // immédiatement l'action, sans lancer le téléchargement tout seul.
+                        val mobileUpdateActions = if (hasRemoteUpdate) {
+                            listOf(
+                                DatabaseBulkUpdate.TargetAction(
+                                    DatabaseBulkUpdate.Target.MOBILE,
+                                    DatabaseBulkUpdate.Action.UPDATE
+                                )
+                            )
+                        } else {
+                            emptyList()
+                        }
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                            isRebuildOffer = rebuildOffer
+                            availableDatabaseUpdates = mobileUpdateActions
+                            isUpdateAvailable = mobileUpdateActions.isNotEmpty()
+                            fr.geotower.utils.AppConfig.isDbUpdateAvailable.value =
+                                mobileUpdateActions.isNotEmpty()
+                        }
                         // La vérification groupée ajoute les bases radio et eNB/gNB. La base mobile
                         // reste calculée ci-dessus afin de conserver le cas particulier de la
                         // régénération locale, que la file de téléchargements ignore volontairement.
                         val additionalUpdates = DatabaseBulkUpdate
-                            .checkAvailableUpdates(context, workManager)
+                            .checkAvailableUpdates(context, workManager) { partialResult ->
+                                val partialAdditionalUpdates = partialResult.targetActions.filter {
+                                    it.action == DatabaseBulkUpdate.Action.UPDATE &&
+                                        it.target != DatabaseBulkUpdate.Target.MOBILE
+                                }
+                                val partialUpdateActions = buildList {
+                                    if (hasRemoteUpdate) {
+                                        add(
+                                            DatabaseBulkUpdate.TargetAction(
+                                                DatabaseBulkUpdate.Target.MOBILE,
+                                                DatabaseBulkUpdate.Action.UPDATE
+                                            )
+                                        )
+                                    }
+                                    addAll(partialAdditionalUpdates)
+                                }.distinctBy { it.target }
+                                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                    isRebuildOffer = rebuildOffer
+                                    availableDatabaseUpdates = partialUpdateActions
+                                    isUpdateAvailable = partialUpdateActions.isNotEmpty()
+                                    fr.geotower.utils.AppConfig.isDbUpdateAvailable.value =
+                                        partialUpdateActions.isNotEmpty()
+                                }
+                            }
                             .targetActions
                             .filter {
                                 it.action == DatabaseBulkUpdate.Action.UPDATE &&
@@ -990,20 +1033,22 @@ private fun HomeNotificationsButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    IconButton(
-        onClick = onClick,
-        modifier = modifier
-    ) {
-        BadgedBox(
-            badge = {
-                if (unreadCount > 0) {
-                    Badge {
-                        // Au-delà de 99 la pastille déborderait du bouton.
-                        Text(if (unreadCount > 99) "99+" else unreadCount.toString())
-                    }
+    BadgedBox(
+        modifier = modifier,
+        badge = {
+            if (unreadCount > 0) {
+                Badge {
+                    // Au-delà de 99 la pastille déborderait du bouton.
+                    Text(
+                        text = notificationBadgeText(unreadCount),
+                        maxLines = 1,
+                        softWrap = false
+                    )
                 }
             }
-        ) {
+        }
+    ) {
+        IconButton(onClick = onClick) {
             Icon(
                 Icons.Default.Notifications,
                 contentDescription = stringResource(R.string.notification_history_title),
@@ -1012,6 +1057,9 @@ private fun HomeNotificationsButton(
         }
     }
 }
+
+internal fun notificationBadgeText(unreadCount: Int): String =
+    if (unreadCount > 99) "99+" else unreadCount.toString()
 
 @Composable
 private fun HomeAnnouncementBanner(

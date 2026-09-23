@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.widget.ImageView
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -133,6 +134,9 @@ private enum class OnboardingStep {
     Preferences,
 }
 
+internal fun previousOnboardingStep(currentStep: Int): Int? =
+    currentStep.takeIf { it > 0 }?.minus(1)
+
 /**
  * Liste des étapes réellement affichées, figée au premier affichage.
  *
@@ -207,6 +211,11 @@ fun FirstStartScreen(
         } else {
             onFinished()
         }
+    }
+
+    val previousStep = previousOnboardingStep(currentStep)
+    BackHandler(enabled = previousStep != null) {
+        previousStep?.let(::goToStep)
     }
 
     var showLocationPermissionDialog by remember { mutableStateOf(false) }
@@ -1431,7 +1440,10 @@ fun StepDatabaseDesign(useOneUi: Boolean, cardShape: Shape, cardBorder: BorderSt
         .collectAsState(initial = emptyList())
     val isBulkUpdateRunning = bulkWorkInfos.any { workInfo -> !workInfo.state.isFinished }
     var isCheckingBulkUpdates by remember { mutableStateOf(false) }
-    val disableIndividualDownloads = isCheckingBulkUpdates || isBulkUpdateRunning
+    // Les cartes individuelles vérifient chacune leur propre version distante. Elles doivent
+    // rester actionnables pendant que la vérification groupée termine, sinon une base déjà
+    // identifiée par sa carte resterait inutilement bloquée.
+    val disableIndividualDownloads = isBulkUpdateRunning
     // Génération locale : réservée aux appareils éligibles (RAM/stockage). Dès le 1er lancement, un
     // message « non disponible sur cet appareil » n'apporterait rien : on masque la carte.
     val buildEligibility = remember { LocalBuildCapability.evaluate(context) }

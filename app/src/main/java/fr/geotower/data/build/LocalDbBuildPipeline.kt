@@ -103,6 +103,9 @@ class LocalDbBuildPipeline(
             processed: Long = 0L,
             importType: BuildImportType? = null,
             fileName: String? = null,
+            sourceUrl: String? = null,
+            sourceLink: BuildSourceLink? = null,
+            sourceSwitchReason: String? = null,
             downloadedBytes: Long = 0L,
             totalBytes: Long = -1L,
         ) {
@@ -119,6 +122,9 @@ class LocalDbBuildPipeline(
                     detail = detail,
                     importType = importType,
                     fileName = fileName,
+                    sourceUrl = sourceUrl,
+                    sourceLink = sourceLink,
+                    sourceSwitchReason = sourceSwitchReason,
                     downloadedBytes = downloadedBytes,
                     totalBytes = totalBytes,
                 )
@@ -186,6 +192,8 @@ class LocalDbBuildPipeline(
                                 detail = "$mb Mo (essai $attempt)",
                                 importType = BuildImportType.MONTHLY,
                                 fileName = monthlyFileVersion,
+                                sourceUrl = monthly.dataUrl,
+                                sourceLink = BuildSourceLink.STANDARD,
                                 downloadedBytes = copied,
                                 totalBytes = total,
                             )
@@ -222,6 +230,8 @@ class LocalDbBuildPipeline(
                                 importType = BuildImportType.MONTHLY,
                                 fileName = refUrl.substringAfterLast('/').substringBefore('?')
                                     .ifBlank { refZip.name },
+                                sourceUrl = refUrl,
+                                sourceLink = BuildSourceLink.STANDARD,
                                 downloadedBytes = copied,
                                 totalBytes = total,
                             )
@@ -261,41 +271,90 @@ class LocalDbBuildPipeline(
             if (packs.mobile) {
                 emit(BuildPhase.READING_STATIONS, 36, null)
                 val exportHtml = downloader.fetchText(OfficialSources.OBSERVATOIRE_EXPORT_PAGE_URL, MAX_JSON_BYTES)
-                val observatoireUrl = OfficialSources.resolveObservatoireCsvUrl(exportHtml)
+                val observatoireUrls = OfficialSources.resolveObservatoireCsvUrls(exportHtml)
+                val observatoireUrl = observatoireUrls.firstOrNull()
                     ?: return@withContext Result(false, "URL de l'observatoire ANFR introuvable (page d'export)")
+                val fallbackObservatoireUrl = observatoireUrls.getOrNull(1)
 
                 // Observatoire telecharge dans un FICHIER (retry + completude) plutot que streame :
                 // un flux HTTP peut casser (PROTOCOL_ERROR) en plein build ; un fichier est retryable.
-                var obsError: String? = "Observatoire non telecharge"
-                var obsAttempt = 0
-                var obsPct = -1
-                while (obsAttempt < MAX_ZIP_ATTEMPTS) {
-                    obsAttempt++
-                    try {
-                        downloader.downloadToFile(observatoireUrl, observatoireCsv, MAX_OBS_BYTES, onProgress = { copied, total ->
-                            val mb = copied / (1024 * 1024)
-                            val pct = if (total > 0) (36 + copied * 8 / total).toInt().coerceIn(36, 44) else 40
-                            if (pct != obsPct) {
-                                obsPct = pct
-                                emit(
-                                    phase = BuildPhase.READING_STATIONS,
-                                    percent = pct,
-                                    detail = "$mb Mo (essai $obsAttempt)",
-                                    importType = BuildImportType.WEEKLY,
-                                    fileName = observatoireUrl.substringAfterLast('/').substringBefore('?')
-                                        .ifBlank { observatoireCsv.name },
-                                    downloadedBytes = copied,
-                                    totalBytes = total,
-                                )
-                            }
-                        }, beforeRead = onPause)
-                        obsError = if (observatoireCsv.length() > 1000L) null else "Observatoire vide"
-                        if (obsError == null) break
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        obsError = "Telechargement de l'observatoire : ${e.message ?: e.javaClass.simpleName}"
+                fun downloadObservatoire(
+                    url: String,
+                    sourceLink: BuildSourceLink,
+                    switchReason: String? = null,
+                ): String? {
+                    var obsError: String? = "Observatoire non telecharge"
+                    var obsAttempt = 0
+                    var obsPct = -1
+                    while (obsAttempt < MAX_ZIP_ATTEMPTS) {
+                        obsAttempt++
+                        try {
+                            downloader.downloadToFile(url, observatoireCsv, MAX_OBS_BYTES, onProgress = { copied, total ->
+                                val mb = copied / (1024 * 1024)
+                                val pct = if (total > 0) (36 + copied * 8 / total).toInt().coerceIn(36, 44) else 40
+                                if (pct != obsPct) {
+                                    obsPct = pct
+                                    emit(
+                                        phase = BuildPhase.READING_STATIONS,
+                                        percent = pct,
+                                        detail = "$mb Mo (essai $obsAttempt)",
+                                        importType = BuildImportType.WEEKLY,
+                                        fileName = url.substringAfterLast('/').substringBefore('?')
+                                            .ifBlank { observatoireCsv.name },
+                                        sourceUrl = url,
+                                        sourceLink = sourceLink,
+                                        sourceSwitchReason = switchReason,
+                                        downloadedBytes = copied,
+                                        totalBytes = total,
+                                    )
+                                }
+                            }, beforeRead = onPause)
+                            obsError = if (observatoireCsv.length() > 1000L) null else "Observatoire vide"
+                            if (obsError == null) break
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            obsError = "Telechargement de l'observatoire : ${e.message ?: e.javaClass.simpleName}"
+                        }
                     }
+                    return obsError
+                }
+
+                var obsError = downloadObservatoire(observatoireUrl, BuildSourceLink.STANDARD)
+                val selectedObservatoire = OfficialSources.selectObservatoireCsvSource(
+                    standardUrl = observatoireUrl,
+                    fallbackUrl = fallbackObservatoireUrl,
+                    standardBytes = observatoireCsv.length(),
+                ) ?: return@withContext Result(
+                    false,
+                    context.getString(
+                        R.string.appstrings_local_build_fallback_unavailable,
+                        observatoireCsv.length() / (1024L * 1024L),
+                    ),
+                )
+                if (selectedObservatoire.link == OfficialSources.ObservatoireCsvLink.FALLBACK) {
+                    val standardSizeMb = observatoireCsv.length() / (1024L * 1024L)
+                    val switchReason = context.getString(
+                        R.string.appstrings_local_build_switch_to_fallback,
+                        standardSizeMb,
+                    )
+                    observatoireCsv.delete()
+                    emit(
+                        phase = BuildPhase.READING_STATIONS,
+                        percent = 36,
+                        detail = switchReason,
+                        importType = BuildImportType.WEEKLY,
+                        fileName = selectedObservatoire.url.substringAfterLast('/').substringBefore('?')
+                            .ifBlank { observatoireCsv.name },
+                        sourceUrl = selectedObservatoire.url,
+                        sourceLink = BuildSourceLink.FALLBACK,
+                        sourceSwitchReason = switchReason,
+                    )
+                    obsError = downloadObservatoire(
+                        selectedObservatoire.url,
+                        BuildSourceLink.FALLBACK,
+                        switchReason,
+                    )
                 }
                 if (obsError != null) return@withContext Result(false, obsError)
                 metrics.noteFile("observatoire.csv", observatoireCsv.length())
@@ -326,6 +385,8 @@ class LocalDbBuildPipeline(
                                         importType = BuildImportType.QUARTERLY,
                                         fileName = url.substringAfterLast('/').substringBefore('?')
                                             .ifBlank { dest.name },
+                                        sourceUrl = url,
+                                        sourceLink = BuildSourceLink.STANDARD,
                                         downloadedBytes = copied,
                                         totalBytes = total,
                                     )

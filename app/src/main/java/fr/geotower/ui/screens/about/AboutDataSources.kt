@@ -172,11 +172,6 @@ fun aboutSourceGroups(): List<AboutSourceGroup> {
                 description = stringResource(R.string.appstrings_src_tiles_desc),
                 links = listOf(
                     AboutSourceLink(
-                        label = "CARTO",
-                        host = "basemaps.cartocdn.com",
-                        url = "https://carto.com/attributions"
-                    ),
-                    AboutSourceLink(
                         label = "OpenTopoMap",
                         host = "tile.opentopomap.org",
                         url = "https://opentopomap.org/about"

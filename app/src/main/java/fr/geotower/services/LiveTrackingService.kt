@@ -81,6 +81,7 @@ class LiveTrackingService : Service() {
 
     private var serviceStartTime: Long = 0L
     private var trackingState = LiveTrackingSessionState.State.ACTIVE
+    private var lastNotificationState: LiveTrackingNotificationState? = null
     private var processingJob: Job? = null
     private var lastProcessedLocation: Location? = null
     private var lastProcessedAt: Long = 0L
@@ -143,7 +144,7 @@ class LiveTrackingService : Service() {
 
         if (intent?.action == ACTION_REFRESH_NOTIFICATION) {
             if (trackingState == LiveTrackingSessionState.State.PAUSED) {
-                updatePausedNotification()
+                refreshFrozenNotification()
                 return START_STICKY
             }
             refreshFromLastProcessedLocation()
@@ -152,7 +153,7 @@ class LiveTrackingService : Service() {
 
         if (intent?.action == ACTION_REFRESH_LOCATION_SETTINGS) {
             if (trackingState == LiveTrackingSessionState.State.PAUSED) {
-                updatePausedNotification()
+                refreshFrozenNotification()
                 return START_STICKY
             }
             startLocationUpdates()
@@ -164,26 +165,12 @@ class LiveTrackingService : Service() {
             return START_STICKY
         }
 
-        val initialNotification = if (supportsProgressStyle()) {
-            buildLiveNotification(
-                contentText = getString(R.string.live_tracking_searching),
-                progress = 0,
-                operator = defaultOp,
-                antLoc = null,
-                address = "",
-                sitePhotoBitmap = null,
-                mirrorTrackerIcon = false
-            )
-        } else {
-            buildNotification(
-                contentText = getString(R.string.live_tracking_searching),
-                userLoc = null,
-                antLoc = null,
-                operator = defaultOp,
-                progress = 0,
-                address = ""
-            )
-        }
+        val initialState = LiveTrackingNotificationState(
+            contentText = getString(R.string.live_tracking_searching),
+            operator = defaultOp,
+        )
+        lastNotificationState = initialState
+        val initialNotification = buildNotificationForState(initialState)
 
         if (!startAsForeground(initialNotification)) {
             return START_NOT_STICKY
@@ -234,7 +221,7 @@ class LiveTrackingService : Service() {
         liveSitePhotoJob?.cancel()
         liveSitePhotoLoadingKey = null
         stopLocationUpdates()
-        updatePausedNotification()
+        refreshFrozenNotification()
         return START_STICKY
     }
 
@@ -250,26 +237,15 @@ class LiveTrackingService : Service() {
 
         trackingState = nextState
         val operator = currentOperator
-        val notification = if (supportsProgressStyle()) {
-            buildLiveNotification(
-                contentText = getString(R.string.live_tracking_searching),
-                progress = 0,
-                operator = operator,
-                antLoc = null,
-                address = "",
-                sitePhotoBitmap = null,
-                mirrorTrackerIcon = false,
-            )
-        } else {
-            buildNotification(
-                contentText = getString(R.string.live_tracking_searching),
-                userLoc = null,
-                antLoc = null,
-                operator = operator,
-                progress = 0,
-                address = "",
-            )
-        }
+        val fallbackState = LiveTrackingNotificationState(
+            contentText = getString(R.string.live_tracking_searching),
+            operator = operator,
+        )
+        val notificationState = LiveTrackingNotificationState.forPause(
+            last = lastNotificationState,
+            fallback = fallbackState,
+        )
+        val notification = buildNotificationForState(notificationState)
         if (!startAsForeground(notification)) return START_NOT_STICKY
 
         requestLiveOutageRefreshIfNeeded()
@@ -597,37 +573,68 @@ class LiveTrackingService : Service() {
         sitePhotoBitmap: Bitmap? = null,
         mirrorTrackerIcon: Boolean = false
     ) {
+        val state = LiveTrackingNotificationState(
+            contentText = text,
+            userLoc = userLoc,
+            antLoc = antLoc,
+            operator = operator,
+            progress = progress,
+            address = address,
+            sitePhotoBitmap = sitePhotoBitmap,
+            mirrorTrackerIcon = mirrorTrackerIcon,
+        )
+        if (trackingState == LiveTrackingSessionState.State.ACTIVE) {
+            lastNotificationState = state
+        }
+
         // Notifications refusées : rien à afficher, mais le suivi continue (position, site verrouillé,
         // distance) — l'utilisateur retrouve tout dans l'app. On sort avant de construire la
         // notification, inutile de payer le rendu (bitmaps du site) pour un notify() sans effet.
+        postNotification(state)
+    }
+
+    private fun postNotification(state: LiveTrackingNotificationState) {
         if (!LiveTrackingController.hasPostNotificationsPermission(this)) return
 
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val notification = if (supportsProgressStyle()) {
-            buildLiveNotification(text, progress, operator, antLoc, address, sitePhotoBitmap, mirrorTrackerIcon)
-        } else {
-            buildNotification(
-                contentText = text,
-                userLoc = userLoc,
-                antLoc = antLoc,
-                operator = operator,
-                progress = progress,
-                address = address,
-                sitePhotoBitmap = sitePhotoBitmap,
-                mirrorTrackerIcon = mirrorTrackerIcon
-            )
-        }
-
-        manager.notify(notificationId, notification)
+        manager.notify(notificationId, buildNotificationForState(state))
     }
 
-    private fun updatePausedNotification() {
-        updateNotification(
-            text = getString(R.string.appstrings_operation_paused),
-            userLoc = null,
-            antLoc = null,
+    private fun refreshFrozenNotification() {
+        val fallbackState = LiveTrackingNotificationState(
+            contentText = getString(R.string.live_tracking_searching),
             operator = currentOperator,
         )
+        val frozenState = LiveTrackingNotificationState.forPause(
+            last = lastNotificationState,
+            fallback = fallbackState,
+        )
+        startAsForeground(buildNotificationForState(frozenState))
+    }
+
+    private fun buildNotificationForState(state: LiveTrackingNotificationState): Notification {
+        return if (supportsProgressStyle()) {
+            buildLiveNotification(
+                contentText = state.contentText,
+                progress = state.progress,
+                operator = state.operator,
+                antLoc = state.antLoc,
+                address = state.address,
+                sitePhotoBitmap = state.sitePhotoBitmap,
+                mirrorTrackerIcon = state.mirrorTrackerIcon,
+            )
+        } else {
+            buildNotification(
+                contentText = state.contentText,
+                userLoc = state.userLoc,
+                antLoc = state.antLoc,
+                operator = state.operator,
+                progress = state.progress,
+                address = state.address,
+                sitePhotoBitmap = state.sitePhotoBitmap,
+                mirrorTrackerIcon = state.mirrorTrackerIcon,
+            )
+        }
     }
 
     private fun requestLiveSitePhotoBitmapIfNeeded(

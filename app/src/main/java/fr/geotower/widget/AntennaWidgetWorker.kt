@@ -262,7 +262,7 @@ class AntennaWidgetWorker(
                     val imagePaths = AntennaMapWidgetRenderer.renderAndSaveVariants(
                         context = context,
                         data = mapData,
-                        mapProvider = prefs.getInt("map_provider", 1),
+                        mapProvider = fr.geotower.utils.MapProviderRules.sanitize(prefs.getInt("map_provider", 1)),
                         ignStyle = prefs.getInt("ign_style", 0),
                         options = WidgetMapRenderOptions(
                             defaultOperator = prefs.getString("default_operator", "Aucun") ?: "Aucun",

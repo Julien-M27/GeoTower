@@ -62,8 +62,7 @@ object LiveDatabaseStatus {
      * fichier, ce qui touche le disque (à appeler hors du thread principal).
      */
     fun isInUse(context: Context): Boolean {
-        if (AppConfig.blockCommunityAndUpdates()) return false
-        if (!RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.LIVE_API_FR)) return false
+        if (!canQueryLiveDatabaseMetadata()) return false
 
         val knownState = AppConfig.localDatabaseState.value
         if (knownState != null) {
@@ -76,14 +75,17 @@ object LiveDatabaseStatus {
     }
 
     /**
-     * Métadonnées de la base en ligne, ou `null` si elle n'est pas utilisée / le serveur n'a pas
-     * répondu. Un échec n'est jamais mis en cache : la page se rattrape à la visite suivante.
+     * Métadonnées de la base en ligne, ou `null` si l'API live n'est pas disponible / le serveur
+     * n'a pas répondu. Un échec n'est jamais mis en cache : la page se rattrape à la visite suivante.
      *
      * [forceRefresh] court-circuite le cache, pour les actualisations demandées par l'utilisateur :
      * un bouton qui rendrait la même réponse pendant dix minutes mentirait sur ce qu'il fait.
      */
-    suspend fun dataset(context: Context, forceRefresh: Boolean = false): LiveDatabaseDataset? {
-        if (!isInUse(context)) return null
+    suspend fun dataset(forceRefresh: Boolean = false): LiveDatabaseDataset? {
+        // Les métadonnées doivent rester consultables même lorsqu'une base locale valide fournit
+        // les données à l'application : l'écran « À propos » compare volontairement les deux
+        // sources. Les garde-fous du mode autonomie et du kill-switch restent applicables.
+        if (!canQueryLiveDatabaseMetadata()) return null
 
         val cachedDataset = cached
         if (!forceRefresh && cachedDataset != null && System.currentTimeMillis() - cachedAtMillis < CACHE_TTL_MS) {
@@ -118,4 +120,15 @@ object LiveDatabaseStatus {
             null
         }
     }
+
+    private fun canQueryLiveDatabaseMetadata(): Boolean =
+        canQueryLiveDatabaseMetadata(
+            liveApiEnabled = RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.LIVE_API_FR),
+            communityAndUpdatesBlocked = AppConfig.blockCommunityAndUpdates()
+        )
 }
+
+internal fun canQueryLiveDatabaseMetadata(
+    liveApiEnabled: Boolean,
+    communityAndUpdatesBlocked: Boolean
+): Boolean = liveApiEnabled && !communityAndUpdatesBlocked

@@ -63,6 +63,8 @@ import fr.geotower.ui.screens.onboarding.FirstStartScreen
 import fr.geotower.ui.screens.home.HomeScreen
 import fr.geotower.ui.screens.help.HelpScreen
 import fr.geotower.ui.screens.settings.SettingsScreen
+import fr.geotower.ui.screens.settings.DatabaseViewerScreen
+import fr.geotower.ui.screens.settings.DatabaseViewerInfoScreen
 import fr.geotower.ui.screens.settings.HiddenSitesScreen
 import fr.geotower.ui.screens.settings.PhotosFavoritesScreen
 import fr.geotower.ui.screens.settings.NotificationHistoryScreen
@@ -557,7 +559,9 @@ class MainActivity : ComponentActivity() {
             appPrefs.getString(AppConfig.PREF_UI_MODE, AppUiMode.Auto.storageKey)
         )
         AppConfig.colorPalette.value = appPrefs.getString(AppConfig.PREF_COLOR_PALETTE, AppConfig.DEFAULT_COLOR_PALETTE) ?: AppConfig.DEFAULT_COLOR_PALETTE
-        AppConfig.mapProvider.intValue = appPrefs.getInt("map_provider", 1)
+        val mapProvider = fr.geotower.utils.MapProviderRules.sanitize(appPrefs.getInt("map_provider", 1))
+        AppConfig.mapProvider.intValue = mapProvider
+        appPrefs.edit().putInt("map_provider", mapProvider).apply()
         AppConfig.ignStyle.intValue = appPrefs.getInt("ign_style", 0)
         AppConfig.navMode.intValue = appPrefs.getInt(AppConfig.PREF_NAV_MODE, AppConfig.DEFAULT_NAV_MODE)
         AppConfig.settingsSectionsMode.value = appPrefs.getBoolean(AppConfig.PREF_SETTINGS_SECTIONS_MODE, true)
@@ -965,6 +969,19 @@ class MainActivity : ComponentActivity() {
                                     } else {
                                         DisabledFeatureRoute(navController, txtUnavailable)
                                     }
+                                }
+                            }
+
+                            // Explorateur read-only des trois bases SQLite locales.
+                            composable("database_viewer") {
+                                Box(modifier = Modifier.padding(innerPadding)) {
+                                    DatabaseViewerScreen(navController)
+                                }
+                            }
+
+                            composable("database_viewer_info") {
+                                Box(modifier = Modifier.padding(innerPadding)) {
+                                    DatabaseViewerInfoScreen(navController)
                                 }
                             }
 

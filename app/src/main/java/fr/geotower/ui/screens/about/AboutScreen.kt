@@ -1030,9 +1030,9 @@ fun SectionVersions(
     var hsLocalGeneratedAt by remember { mutableLongStateOf(0L) }
     var hsServerGeneratedAt by remember { mutableLongStateOf(0L) }
     var hsRefreshTick by remember { mutableIntStateOf(0) }
-    // Base EN LIGNE : utilisée à la place d'une base installée, elle a son propre jeu de données.
-    // `liveDbInUse` commande l'affichage de la carte, `liveDbDataset` son contenu (null tant que le
-    // serveur n'a pas répondu, d'où le drapeau d'échec pour distinguer « en cours » de « raté »).
+    // Base EN LIGNE : ses métadonnées sont affichées même lorsqu'une base locale fournit les
+    // données à l'application. `liveDbInUse` décrit la source active, tandis que `liveDbDataset`
+    // contient les informations comparables publiées par le serveur.
     var liveDbInUse by remember { mutableStateOf(false) }
     var liveDbDataset by remember { mutableStateOf<LiveDatabaseDataset?>(null) }
     var liveDbUnreachable by remember { mutableStateOf(false) }
@@ -1144,17 +1144,14 @@ fun SectionVersions(
                 timeAtLabel = txtVersionTimeAt
             )
 
-            // 5. Base EN LIGNE : sans base installée valide, la carte, la recherche et les fiches
-            // interrogent le serveur. Les versions ci-dessus ne disent alors rien des données
-            // réellement lues — on va donc demander au serveur ce qu'il sert.
+            // 5. Base EN LIGNE : on récupère toujours ses métadonnées afin de les afficher, même
+            // si une base locale valide est actuellement utilisée par la carte et la recherche.
             liveDbInUse = LiveDatabaseStatus.isInUse(context)
-            if (liveDbInUse) {
-                // Une clé non nulle ne peut venir que du bouton : c'est là, et seulement là, qu'il
-                // faut passer outre le cache de dix minutes.
-                val dataset = LiveDatabaseStatus.dataset(context, forceRefresh = versionsRefreshKey > 0)
-                liveDbDataset = dataset
-                liveDbUnreachable = dataset == null
-            }
+            // Une clé non nulle ne peut venir que du bouton : c'est là, et seulement là, qu'il faut
+            // passer outre le cache de dix minutes.
+            val dataset = LiveDatabaseStatus.dataset(forceRefresh = versionsRefreshKey > 0)
+            liveDbDataset = dataset
+            liveDbUnreachable = dataset == null
         }
         refreshState.reportRefreshed(VERSIONS_REFRESH_ID, versionsRefreshKey)
     }
@@ -1250,19 +1247,17 @@ fun SectionVersions(
         }
     }
 
-    // Les versions ci-dessus sont celles des fichiers posés sur l'appareil. Quand il n'y en a pas,
-    // ce sont les données du serveur qui s'affichent partout : elles ont droit à leur propre carte,
-    // pour qu'on ne prenne jamais l'une pour l'autre.
-    if (liveDbInUse) {
-        Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
-        LiveDatabaseVersionsCard(
-            cardShape = cardShape,
-            cardColor = cardColor,
-            dataset = liveDbDataset,
-            unreachable = liveDbUnreachable,
-            timeAtLabel = txtVersionTimeAt
-        )
-    }
+    // Les versions ci-dessus sont celles des fichiers posés sur l'appareil. Les métadonnées de la
+    // base en ligne ont toujours leur propre carte, avec la source active explicitement indiquée.
+    Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+    LiveDatabaseVersionsCard(
+        cardShape = cardShape,
+        cardColor = cardColor,
+        dataset = liveDbDataset,
+        isInUse = liveDbInUse,
+        unreachable = liveDbUnreachable,
+        timeAtLabel = txtVersionTimeAt
+    )
 
     Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
 
@@ -1312,6 +1307,7 @@ private fun LiveDatabaseVersionsCard(
     cardShape: Shape,
     cardColor: Color,
     dataset: LiveDatabaseDataset?,
+    isInUse: Boolean,
     unreachable: Boolean,
     timeAtLabel: String
 ) {
@@ -1339,7 +1335,10 @@ private fun LiveDatabaseVersionsCard(
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        stringResource(R.string.appstrings_version_live_db_desc),
+                        stringResource(
+                            if (isInUse) R.string.appstrings_version_live_db_active_desc
+                            else R.string.appstrings_version_live_db_local_desc
+                        ),
                         style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

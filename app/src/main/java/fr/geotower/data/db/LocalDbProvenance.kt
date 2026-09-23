@@ -37,8 +37,29 @@ object LocalDbProvenance {
         }
     }
 
+    /** Source CSV du dernier build mobile local, rattachee a sa version pour eviter un recap obsolete. */
+    data class BuildSourceInfo(
+        val buildVersionRaw: String?,
+        val url: String?,
+        val isFallback: Boolean,
+        val switchReason: String?,
+    ) {
+        companion object {
+            val NONE = BuildSourceInfo(
+                buildVersionRaw = null,
+                url = null,
+                isFallback = false,
+                switchReason = null,
+            )
+        }
+    }
+
     private const val PROVENANCE_LOCAL_BUILD = "local_build"
     private const val RADIO_LOCAL_VERSION_KEY = "db_radio_local_build_version"
+    private const val MOBILE_BUILD_SOURCE_VERSION_KEY = "db_mobile_build_source_version"
+    private const val MOBILE_BUILD_SOURCE_URL_KEY = "db_mobile_build_source_url"
+    private const val MOBILE_BUILD_SOURCE_FALLBACK_KEY = "db_mobile_build_source_fallback"
+    private const val MOBILE_BUILD_SOURCE_REASON_KEY = "db_mobile_build_source_reason"
 
     /** Provenance de la base **mobile** installee (via `source_versions.provenance`). */
     fun readMobile(context: Context): Info {
@@ -83,6 +104,36 @@ object LocalDbProvenance {
     /** Efface explicitement le marqueur apres l'installation d'une base radio distante. */
     fun clearRadioLocalBuildMarker(context: Context) {
         prefs(context).edit().remove(RADIO_LOCAL_VERSION_KEY).apply()
+    }
+
+    /** Memorise le CSV utilise par un build mobile local reussi. */
+    fun recordMobileBuildSource(
+        context: Context,
+        buildVersionRaw: String,
+        url: String,
+        isFallback: Boolean,
+        switchReason: String?,
+    ) {
+        prefs(context).edit()
+            .putString(MOBILE_BUILD_SOURCE_VERSION_KEY, buildVersionRaw)
+            .putString(MOBILE_BUILD_SOURCE_URL_KEY, url)
+            .putBoolean(MOBILE_BUILD_SOURCE_FALLBACK_KEY, isFallback)
+            .putString(MOBILE_BUILD_SOURCE_REASON_KEY, switchReason?.takeIf { it.isNotBlank() })
+            .apply()
+    }
+
+    /** Source memorisee, exploitable seulement si sa version correspond a la base mobile installee. */
+    fun readMobileBuildSource(context: Context): BuildSourceInfo {
+        val stored = prefs(context)
+        val version = stored.getString(MOBILE_BUILD_SOURCE_VERSION_KEY, null)
+        val url = stored.getString(MOBILE_BUILD_SOURCE_URL_KEY, null)
+        if (version.isNullOrBlank() || url.isNullOrBlank()) return BuildSourceInfo.NONE
+        return BuildSourceInfo(
+            buildVersionRaw = version,
+            url = url,
+            isFallback = stored.getBoolean(MOBILE_BUILD_SOURCE_FALLBACK_KEY, false),
+            switchReason = stored.getString(MOBILE_BUILD_SOURCE_REASON_KEY, null)?.takeIf { it.isNotBlank() },
+        )
     }
 
     /** `yyyyMMdd_HHmm` -> `dd/MM/yyyy - HH:mm` (renvoie l'entree brute si non parsable, ou null). */

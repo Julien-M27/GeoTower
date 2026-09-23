@@ -65,9 +65,11 @@ import androidx.compose.material.icons.filled.Outbox
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -130,7 +132,6 @@ import androidx.compose.foundation.Image
 import java.text.Normalizer
 import java.text.NumberFormat
 import java.util.Locale
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
@@ -146,7 +147,8 @@ data class CommunityPhoto(
     val sourceId: String? = null,
     val stableId: String = url,
     val operatorKey: String? = null,
-    val operatorLabel: String? = null
+    val operatorLabel: String? = null,
+    val duplicateOperatorLabels: List<String> = emptyList()
 )
 
 private val favoritePhotoColor = Color(0xFFE53935)
@@ -361,23 +363,29 @@ private fun communityPhotoSourceLabel(sourceId: String): String? {
     }
 }
 
-private fun CommunityPhoto.operatorDisplayLabel(): String? {
-    return operatorLabel
-        ?.takeIf { it.isNotBlank() }
-        ?: operatorKey?.let { key -> OperatorColors.specForKey(key)?.label ?: key }
+internal fun CommunityPhoto.operatorDisplayLabel(): String? {
+    return operatorDisplayLabelForDuplicate()
 }
 
-private fun CommunityPhoto.displaySourceLabel(photoSourceOrder: List<String>): String {
+private fun CommunityPhoto.displaySourceLabel(
+    photoSourceOrder: List<String>,
+    duplicateOperatorsTemplate: String? = null
+): String {
     val resolvedSourceId = resolvedSourceId()
     val sourceLabel = resolvedSourceId
         ?.let(::communityPhotoSourceLabel)
         ?: communityName.takeIf { it.isNotBlank() }
         ?: communityPhotoSourcesLabel(listOf(this), photoSourceOrder)
 
-    return if (resolvedSourceId == CommunityDataPreferences.SOURCE_SIGNALQUEST) {
+    val baseLabel = if (resolvedSourceId == CommunityDataPreferences.SOURCE_SIGNALQUEST) {
         operatorDisplayLabel()?.let { label -> "$sourceLabel - $label" } ?: sourceLabel
     } else {
         sourceLabel
+    }
+    return if (duplicateOperatorsTemplate != null && duplicateOperatorLabels.isNotEmpty()) {
+        duplicateOperatorsTemplate.format(baseLabel, duplicateOperatorLabels.joinToString(", "))
+    } else {
+        baseLabel
     }
 }
 
@@ -941,6 +949,7 @@ private fun extensionForImage(mimeType: String, url: String): String {
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun CommunityPhotosSectionShared(
     photos: List<CommunityPhoto>,
@@ -1119,6 +1128,36 @@ fun CommunityPhotosSectionShared(
         )
     }
 
+    val hideDuplicatePhotos = CommunityDataPreferences.hideDuplicatePhotos(prefs)
+    val cachedPhotoHashes = remember(filteredPhotos, hideDuplicatePhotos) {
+        if (hideDuplicatePhotos) {
+            readCachedCommunityPhotoHashes(prefs, filteredPhotos)
+        } else {
+            emptyMap()
+        }
+    }
+    var analyzedPhotos by remember(filteredPhotos, hideDuplicatePhotos, cachedPhotoHashes) {
+        mutableStateOf<List<CommunityPhoto>?>(
+            when {
+                !hideDuplicatePhotos -> filteredPhotos
+                cachedPhotoHashes.size == filteredPhotos.distinctBy { it.url }.size -> {
+                    deduplicateCommunityPhotos(filteredPhotos, cachedPhotoHashes)
+                }
+                else -> null
+            }
+        )
+    }
+    LaunchedEffect(filteredPhotos, hideDuplicatePhotos) {
+        analyzedPhotos = if (!hideDuplicatePhotos) {
+            filteredPhotos
+        } else {
+            val hashes = loadCommunityPhotoHashes(context, filteredPhotos, prefs)
+            deduplicateCommunityPhotos(filteredPhotos, hashes)
+        }
+    }
+    val isAnalyzingPhotos = hideDuplicatePhotos && analyzedPhotos == null
+    val displayPhotos = analyzedPhotos.orEmpty()
+
     // --- SÉCURITÉ : On vérifie bien la liste FILTRÉE ---
     // --- NOUVEAU : On vérifie si l'opérateur est supporté par SignalQuest ---
     // Fiche pylône : `operatorName` est nul et ce sont les opérateurs du support (`operatorNames`)
@@ -1178,7 +1217,7 @@ fun CommunityPhotosSectionShared(
     var showPlaceholderFullScreen by remember { mutableStateOf(false) }
 
     // 🚨 NOUVEAU : On gère le titre dynamiquement
-    val showSchemaTitle = filteredPhotos.isEmpty() && placeholderRes != null
+    val showSchemaTitle = !isAnalyzingPhotos && displayPhotos.isEmpty() && placeholderRes != null
 
     val sectionTitle = if (showSchemaTitle) {
         stringResource(R.string.appstrings_support_diagram)
@@ -1187,7 +1226,7 @@ fun CommunityPhotosSectionShared(
     }
 
     // 🚨 NOUVEAU : Si on n'a ni photos, ni schéma, ET qu'on ne peut pas uploader, on masque TOUT !
-    if (filteredPhotos.isEmpty() && placeholderRes == null && (!canUpload || onAddPhotoClick == null)) {
+    if (!isAnalyzingPhotos && displayPhotos.isEmpty() && placeholderRes == null && (!canUpload || onAddPhotoClick == null)) {
         return // On ne dessine absolument rien, le bloc disparaît !
     }
 
@@ -1278,19 +1317,39 @@ fun CommunityPhotosSectionShared(
                 }
             } else {
                 // 🌐 LOGIQUE EN LIGNE
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp)), modifier = Modifier.fillMaxWidth()) {
+                if (isAnalyzingPhotos) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(sizing.component(120.dp)),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        LoadingIndicator(
+                            modifier = Modifier.size(sizing.component(32.dp)),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(sizing.spacing(10.dp)))
+                        Text(
+                            text = stringResource(R.string.appstrings_community_photos_duplicate_checking),
+                            style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                } else LazyRow(horizontalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp)), modifier = Modifier.fillMaxWidth()) {
 
                     // 🚨 VÉRIFICATION : EST-CE QUE L'OPÉRATEUR EST FREE ?
                     if (operatorName != null && operatorName.contains("FREE", ignoreCase = true)) {
 
-                        if (filteredPhotos.isNotEmpty()) {
-                            itemsIndexed(filteredPhotos, key = { _, photo -> photo.url }) { index, photo ->
+                        if (displayPhotos.isNotEmpty()) {
+                            itemsIndexed(displayPhotos, key = { _, photo -> photo.url }) { index, photo ->
                                 Box(
                                     modifier = Modifier
                                         .size(sizing.component(120.dp))
                                         .clip(thumbnailShape)
                                         .clickable {
-                                            selectedPhotosSnapshot = filteredPhotos
+                                            selectedPhotosSnapshot = displayPhotos
                                             selectedPhotoIndex = index
                                         }
                                 ) {
@@ -1305,7 +1364,7 @@ fun CommunityPhotosSectionShared(
                             }
                         }
 
-                        if (filteredPhotos.isNotEmpty() && placeholderRes != null) {
+                        if (displayPhotos.isNotEmpty() && placeholderRes != null) {
                             item {
                                 Box(
                                     modifier = Modifier.height(sizing.component(120.dp)),
@@ -1375,14 +1434,14 @@ fun CommunityPhotosSectionShared(
                     } else {
 
                         // 2. POUR LES AUTRES OPÉRATEURS : ON AFFICHE D'ABORD LES VRAIES PHOTOS
-                        if (filteredPhotos.isNotEmpty()) {
-                            itemsIndexed(filteredPhotos, key = { _, photo -> photo.url }) { index, photo ->
+                        if (displayPhotos.isNotEmpty()) {
+                            itemsIndexed(displayPhotos, key = { _, photo -> photo.url }) { index, photo ->
                                 Box(
                                     modifier = Modifier
                                         .size(sizing.component(120.dp))
                                         .clip(thumbnailShape)
                                         .clickable {
-                                            selectedPhotosSnapshot = filteredPhotos
+                                            selectedPhotosSnapshot = displayPhotos
                                             selectedPhotoIndex = index
                                         }
                                 ) {
@@ -1399,7 +1458,7 @@ fun CommunityPhotosSectionShared(
 
                         // 🚨 AJOUT : LA BARRE DE SÉPARATION VERTICALE
                         // Elle s'affiche uniquement si on a des vraies photos ET un schéma à montrer
-                        if (filteredPhotos.isNotEmpty() && placeholderRes != null) {
+                        if (displayPhotos.isNotEmpty() && placeholderRes != null) {
                             item {
                                 Box(
                                     modifier = Modifier.height(sizing.component(120.dp)), // Même hauteur que le carrousel
@@ -1546,7 +1605,7 @@ fun CommunityPhotosSectionShared(
     }
 
     if (selectedPhotoIndex != null) {
-        val viewerPhotos = selectedPhotosSnapshot.ifEmpty { filteredPhotos }
+        val viewerPhotos = selectedPhotosSnapshot.ifEmpty { displayPhotos }
         if (viewerPhotos.isEmpty()) {
             LaunchedEffect(Unit) {
                 selectedPhotoIndex = null
@@ -1558,12 +1617,7 @@ fun CommunityPhotosSectionShared(
         val pagerState = rememberPagerState(initialPage = initialPhotoIndex, pageCount = { viewerPhotos.size })
         val currentPhoto = viewerPhotos[pagerState.currentPage]
         val currentPhotoSourceId = currentPhoto.resolvedSourceId()
-        val currentPhotoSourceLabel = currentPhoto.displaySourceLabel(photoSourceOrder)
-        val fullScreenTitle = pluralStringResource(
-            R.plurals.community_photos_title,
-            viewerPhotos.size,
-            currentPhotoSourceLabel.replace(" ", "\u00A0")
-        )
+        val fullScreenTitle = stringResource(R.string.appstrings_community_photos_viewer_title)
         val canFavoriteCurrentPhoto = canSelectFavoritePhoto && currentPhotoSourceId != null
         val isCurrentPhotoFavorite = canSelectFavoritePhoto && isFavoritePhoto(currentPhoto)
 
@@ -1582,7 +1636,6 @@ fun CommunityPhotosSectionShared(
             properties = DialogProperties(usePlatformDefaultWidth = false)
         ) {
             val bgAlpha = (1f - (abs(dismissOffset.value) / 800f)).coerceIn(0f, 1f)
-            val currentPhotoSourceSize = photoSourceSizes[pagerState.currentPage]
             // L'habillage se cale sur le visionneur, pas sur les bords calculés de la photo : sinon il flotte
             // au milieu du fond dès que l'image ne remplit pas l'écran.
             val chromeSidePadding = sizing.spacing(16.dp)
@@ -1827,7 +1880,7 @@ fun CommunityPhotosSectionShared(
 
                     // --- AUTEUR ET DATE ---
                     val hasCurrentPhotoCaption = !currentPhoto.author.isNullOrBlank() || !currentPhoto.date.isNullOrBlank()
-                    val hasCurrentPhotoInfo = showPhotoExif && currentPhoto.hasExifInfo() && currentPhotoSourceSize != null
+                    val hasCurrentPhotoInfo = true
                     Column(
                         modifier = Modifier.align(Alignment.BottomStart).padding(bottom = photoBottomPadding, start = chromeSidePadding),
                         horizontalAlignment = Alignment.Start
@@ -1975,6 +2028,7 @@ fun CommunityPhotosSectionShared(
     exifDialogPhoto?.let { photo ->
         PhotoExifDialog(
             photo = photo,
+            showExif = showPhotoExif,
             onDismiss = { exifDialogPhoto = null }
         )
     }
@@ -2075,11 +2129,14 @@ private fun PhotoInfoButton(
 @Composable
 internal fun PhotoExifDialog(
     photo: CommunityPhoto,
+    showExif: Boolean = true,
     onDismiss: () -> Unit
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
-    val items = exifDisplayItems(photo.exifMetadata)
-    val coordinate = remember(photo.exifMetadata) { exifCoordinate(photo.exifMetadata) }
+    val items = if (showExif) exifDisplayItems(photo.exifMetadata) else emptyList()
+    val coordinate = remember(photo.exifMetadata, showExif) {
+        if (showExif) exifCoordinate(photo.exifMetadata) else null
+    }
     val dialogShape = RoundedCornerShape(sizing.component(18.dp))
     val mapShape = RoundedCornerShape(sizing.component(12.dp))
 
@@ -2101,7 +2158,7 @@ internal fun PhotoExifDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = stringResource(R.string.appstrings_photo_exif_metadata_title),
+                        text = stringResource(R.string.appstrings_community_photo_info_title),
                         style = sizing.textStyle(MaterialTheme.typography.titleMedium),
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -2116,6 +2173,47 @@ internal fun PhotoExifDialog(
                         .fillMaxWidth()
                         .verticalScroll(rememberScrollState())
                 ) {
+                    Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
+                    Text(
+                        text = stringResource(R.string.appstrings_about_sources),
+                        style = sizing.textStyle(MaterialTheme.typography.labelLarge),
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = photo.communityName,
+                        style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    photo.operatorDisplayLabelForDuplicate()?.let { operator ->
+                        Spacer(modifier = Modifier.height(sizing.spacing(10.dp)))
+                        Text(
+                            text = stringResource(R.string.appstrings_signalquest_coverage_detail_operator),
+                            style = sizing.textStyle(MaterialTheme.typography.labelLarge),
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = operator,
+                            style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    if (photo.duplicateOperatorLabels.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(sizing.spacing(10.dp)))
+                        Text(
+                            text = stringResource(R.string.appstrings_community_photo_hidden_operators),
+                            style = sizing.textStyle(MaterialTheme.typography.labelLarge),
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = photo.duplicateOperatorLabels.joinToString(", "),
+                            style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
                     coordinate?.let { point ->
                         Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
                         Text(

@@ -23,10 +23,13 @@ import androidx.work.workDataOf
 import fr.geotower.MainActivity
 import fr.geotower.R
 import fr.geotower.data.build.BuildPhase
+import fr.geotower.data.build.BuildImportType
+import fr.geotower.data.build.BuildSourceLink
 import fr.geotower.data.build.BuildProgressUpdate
 import fr.geotower.data.build.LocalDbBuildPipeline
 import fr.geotower.data.build.labelRes
 import fr.geotower.data.db.DbOperationTimings
+import fr.geotower.data.db.LocalDbProvenance
 import fr.geotower.utils.AppLogger
 import fr.geotower.data.notifications.NotificationHistoryStore
 import fr.geotower.utils.AppNotifications
@@ -55,8 +58,17 @@ class LocalDbBuildWorker(
         val detail: String,
         val importOrdinal: Int,
         val fileName: String,
+        val sourceUrl: String,
+        val sourceLinkOrdinal: Int,
+        val sourceSwitchReason: String,
         val downloadedBytes: Long,
         val totalBytes: Long,
+    )
+
+    private data class ObservatoireSourceSnapshot(
+        val url: String,
+        val sourceLinkOrdinal: Int,
+        val switchReason: String,
     )
 
     private val notificationManager =
@@ -92,10 +104,14 @@ class LocalDbBuildWorker(
                 detail = "",
                 importOrdinal = -1,
                 fileName = "",
+                sourceUrl = "",
+                sourceLinkOrdinal = -1,
+                sourceSwitchReason = "",
                 downloadedBytes = 0L,
                 totalBytes = -1L,
             ),
         )
+        val observatoireSourceSnapshot = AtomicReference<ObservatoireSourceSnapshot?>(null)
 
         // Pousse la progression vers la carte (setProgress est suspend -> coroutine dediee).
         val ticker = launch {
@@ -109,6 +125,9 @@ class LocalDbBuildWorker(
                             KEY_DETAIL to snapshot.detail,
                             KEY_IMPORT to snapshot.importOrdinal,
                             KEY_FILE to snapshot.fileName,
+                            KEY_SOURCE_URL to snapshot.sourceUrl,
+                            KEY_SOURCE_LINK to snapshot.sourceLinkOrdinal,
+                            KEY_SOURCE_SWITCH_REASON to snapshot.sourceSwitchReason,
                             KEY_DOWNLOADED_BYTES to snapshot.downloadedBytes,
                             KEY_TOTAL_BYTES to snapshot.totalBytes,
                             KEY_PAUSED to OperationPauseStore.isPaused(context, OperationPauseStore.LOCAL_DB_BUILD),
@@ -151,6 +170,17 @@ class LocalDbBuildWorker(
                 packs = packs,
                 force = force,
                 onProgress = { update: BuildProgressUpdate ->
+                    if (update.importType == BuildImportType.WEEKLY &&
+                        update.sourceUrl != null && update.sourceLink != null
+                    ) {
+                        observatoireSourceSnapshot.set(
+                            ObservatoireSourceSnapshot(
+                                url = update.sourceUrl,
+                                sourceLinkOrdinal = update.sourceLink.ordinal,
+                                switchReason = update.sourceSwitchReason.orEmpty(),
+                            ),
+                        )
+                    }
                     val previous = progressSnapshot.get()
                     val snapshot = ProgressSnapshot(
                         percent = maxOf(previous.percent, update.percent.coerceIn(0, 100)),
@@ -158,6 +188,9 @@ class LocalDbBuildWorker(
                         detail = update.detail.orEmpty(),
                         importOrdinal = update.importType?.ordinal ?: -1,
                         fileName = update.fileName.orEmpty(),
+                        sourceUrl = update.sourceUrl.orEmpty(),
+                        sourceLinkOrdinal = update.sourceLink?.ordinal ?: -1,
+                        sourceSwitchReason = update.sourceSwitchReason.orEmpty(),
                         downloadedBytes = update.downloadedBytes,
                         totalBytes = update.totalBytes,
                     )
@@ -182,6 +215,19 @@ class LocalDbBuildWorker(
                 DbOperationTimings.finish(context, DbOperationTimings.LOCAL_BUILD)
                 setProgress(workDataOf(KEY_PROGRESS to 100, KEY_PHASE to BuildPhase.DONE.ordinal))
                 showResult(success = true, reason = null)
+                val source = observatoireSourceSnapshot.get()
+                if (source != null) {
+                    val mobileInfo = LocalDbProvenance.readMobile(context)
+                    mobileInfo.buildVersionRaw?.takeIf { mobileInfo.locallyBuilt }?.let { version ->
+                        LocalDbProvenance.recordMobileBuildSource(
+                            context = context,
+                            buildVersionRaw = version,
+                            url = source.url,
+                            isFallback = source.sourceLinkOrdinal == BuildSourceLink.FALLBACK.ordinal,
+                            switchReason = source.switchReason,
+                        )
+                    }
+                }
                 Result.success()
             } else {
                 OperationPauseStore.clear(context, OperationPauseStore.LOCAL_DB_BUILD)
@@ -371,6 +417,9 @@ class LocalDbBuildWorker(
         const val KEY_DETAIL = "detail"
         const val KEY_IMPORT = "import"
         const val KEY_FILE = "file"
+        const val KEY_SOURCE_URL = "source_url"
+        const val KEY_SOURCE_LINK = "source_link"
+        const val KEY_SOURCE_SWITCH_REASON = "source_switch_reason"
         const val KEY_DOWNLOADED_BYTES = "downloaded_bytes"
         const val KEY_TOTAL_BYTES = "total_bytes"
         const val KEY_PAUSED = "paused"

@@ -1,0 +1,10 @@
+<resources>
+    <string name="database_viewer_info_columns_title">Columnas de %1$s</string>
+    <string name="database_viewer_info_columns_help">Cada columna muestra su significado en lenguaje claro, el tipo SQLite, su posición en la clave primaria cuando corresponda y si puede estar vacía.</string>
+    <string name="database_viewer_info_no_tables">No se encontraron tablas legibles en esta base de datos.</string>
+    <string name="database_viewer_column_sqlite_type">Tipo SQLite: %1$s</string>
+    <string name="database_viewer_column_primary_key_order">Clave primaria · posición %1$d</string>
+    <string name="database_viewer_column_required">Obligatorio</string>
+    <string name="database_viewer_column_nullable">Puede estar vacío</string>
+    <string name="database_viewer_column_unknown_meaning">No hay un significado documentado para %1$s en este esquema. Se muestran igualmente su nombre técnico y su tipo SQLite.</string>
+</resources>

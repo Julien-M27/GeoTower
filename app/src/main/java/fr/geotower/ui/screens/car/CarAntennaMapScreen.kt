@@ -3,12 +3,10 @@ package fr.geotower.ui.screens.car
 import android.text.Spannable
 import android.text.SpannableString
 import androidx.car.app.CarContext
-import androidx.car.app.AppManager
 import androidx.car.app.Screen
 import androidx.car.app.ScreenManager
 import androidx.car.app.constraints.ConstraintManager
 import androidx.car.app.model.Action
-import androidx.car.app.model.ActionStrip
 import androidx.car.app.model.CarLocation
 import androidx.car.app.model.CarIcon
 import androidx.car.app.model.Distance
@@ -17,15 +15,11 @@ import androidx.car.app.model.ItemList
 import androidx.car.app.model.ListTemplate
 import androidx.car.app.model.Metadata
 import androidx.car.app.model.MessageTemplate
-import androidx.car.app.model.Pane
-import androidx.car.app.model.PaneTemplate
 import androidx.car.app.model.Place
 import androidx.car.app.model.PlaceListMapTemplate
 import androidx.car.app.model.PlaceMarker
 import androidx.car.app.model.Row
 import androidx.car.app.model.Template
-import androidx.car.app.navigation.model.MapController
-import androidx.car.app.navigation.model.MapWithContentTemplate
 import androidx.core.graphics.drawable.IconCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
@@ -43,7 +37,7 @@ import kotlinx.coroutines.launch
 
 private const val DEFAULT_MAP_PLACE_LIMIT = 6
 
-/** Carte Android Auto : surface GeoTower sur les hôtes récents, repli hôte sur les anciens. */
+/** Carte Android Auto rendue par l'hôte, sans surface applicative. */
 class CarAntennaMapScreen(
     carContext: CarContext,
     private val repository: AnfrRepository
@@ -51,35 +45,23 @@ class CarAntennaMapScreen(
 
     private val screenScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val sitesLoader = CarNearbySitesLoader(carContext, repository)
-    private val mapSurfaceCallback = CarAntennaMapSurfaceCallback(carContext)
     private var state: CarSitesLoadResult = CarSitesLoadResult.Loading
-    private var mapSurfaceRegistered = false
-    private var siteListExpanded = true
     private var templateRequestCount = 0L
     private var lifecycleEventCount = 0L
 
     init {
-        carLog("Carte: création de CarAntennaMapScreen (${mapDiagnosticState()})")
+        carLog("Carte: création de CarAntennaMapScreen, renderer=HOST_PLACE_LIST_V1 (${mapDiagnosticState()})")
         lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStart(owner: LifecycleOwner) {
                 carLog("Carte: onStart #${++lifecycleEventCount} (${mapDiagnosticState()})")
-                registerMapSurfaceIfSupported()
                 if (state == CarSitesLoadResult.MissingLocationPermission && hasCarLocationPermission(carContext)) {
                     carLog("Carte: permission retrouvée pendant onStart, rechargement des sites")
                     loadSites()
                 }
             }
 
-            override fun onStop(owner: LifecycleOwner) {
-                carLog("Carte: onStop #${++lifecycleEventCount} (${mapDiagnosticState()})")
-                unregisterMapSurface()
-                mapSurfaceCallback.detachSurface()
-            }
-
             override fun onDestroy(owner: LifecycleOwner) {
                 carLog("Carte: onDestroy #${++lifecycleEventCount} (${mapDiagnosticState()})")
-                unregisterMapSurface()
-                mapSurfaceCallback.close()
                 screenScope.cancel()
             }
         })
@@ -162,101 +144,11 @@ class CarAntennaMapScreen(
     }
 
     private fun loadedTemplate(sites: List<CarSiteListItem>): Template {
-        val customSurfaceAvailable = registerMapSurfaceIfSupported()
-        carLog(
-            "Carte: sélection du template, surface personnalisée=$customSurfaceAvailable, " +
-                "sites=${sites.size}, ${mapDiagnosticState()}"
-        )
-        if (customSurfaceAvailable) {
-            val customTemplate = runCatching { customMapTemplate(sites) }
-                .onFailure {
-                    AppFileLog.e(CAR_LOG_TAG, "Echec de construction de la carte applicative", it)
-                    unregisterMapSurface()
-                    mapSurfaceCallback.detachSurface()
-                }
-                .getOrNull()
-            if (customTemplate != null) return customTemplate
-            carLog("Carte: construction personnalisée nulle, bascule vers le template hôte")
-        }
-
-        carLog("Carte: utilisation de PlaceListMapTemplate (carte fournie par l'hôte)")
+        carLog("Carte: renderer=HOST_PLACE_LIST_V1, sites=${sites.size}, carte fournie par l'hôte")
         return placeListMapTemplate(sites)
     }
 
-    /** Carte applicative : logos dans les lignes, dessin des antennes directement sur la surface. */
-    private fun customMapTemplate(sites: List<CarSiteListItem>): Template {
-        val screenManager = carContext.getCarService(ScreenManager::class.java)
-        val hostLimit = runCatching {
-            carContext.getCarService(ConstraintManager::class.java)
-                .getContentLimit(ConstraintManager.CONTENT_LIMIT_TYPE_LIST)
-        }.getOrElse { DEFAULT_MAP_PLACE_LIMIT }.coerceAtLeast(1)
-        val shownSites = sites.take(hostLimit)
-        carLog(
-            "Carte applicative: sites=${sites.size}, lignes=${shownSites.size}, limiteHôte=$hostLimit, " +
-                "listeDépliée=$siteListExpanded, provider=${AppConfig.mapProvider.intValue}, " +
-                "ignStyle=${AppConfig.ignStyle.intValue}, azimuts=${AppConfig.showAzimuths.value}, " +
-                "cônes=${AppConfig.showAzimuthsCone.value}, FH=${AppConfig.showTechnoFH.value}"
-        )
-        mapSurfaceCallback.updateSites(sites)
-
-        val items = ItemList.Builder()
-        shownSites.forEach { site ->
-            items.addItem(
-                Row.Builder()
-                    .setImage(carOperatorGridIcon(carContext, site.operators), Row.IMAGE_TYPE_LARGE)
-                    .setTitle(site.title)
-                    .addText(formatCarDistance(site.distanceMeters))
-                    .addText(carSiteDescriptionLine(site))
-                    .setOnClickListener {
-                        screenManager.push(CarSiteDetailScreen(carContext, site))
-                    }
-                    .build()
-            )
-        }
-
-        val contentTemplate: Template = if (siteListExpanded) {
-            ListTemplate.Builder()
-                .setTitle(carContext.getString(R.string.car_map_title))
-                .setHeaderAction(carHeaderAction())
-                .setSingleList(items.build())
-                .build()
-        } else {
-            // MapWithContentTemplate impose toujours un content template. AndroidX Car App
-            // n'autorise un Pane sans ligne que lorsqu'il est explicitement en chargement :
-            // Pane.Builder().build() lève sinon une IllegalStateException dans Pane.Builder.
-            // Cette variante conserve le volet replié très compact, sans faux message visible,
-            // et laisse l'icône de l'ActionStrip comme seul contrôle de réouverture.
-            PaneTemplate.Builder(Pane.Builder().setLoading(true).build())
-                .setTitle(carContext.getString(R.string.car_map_title))
-                .setHeaderAction(carHeaderAction())
-                .build()
-        }
-
-        return MapWithContentTemplate.Builder()
-            .setContentTemplate(contentTemplate)
-            .setMapController(
-                MapController.Builder()
-                    .setMapActionStrip(
-                        ActionStrip.Builder()
-                            .addAction(Action.PAN)
-                            .addAction(mapZoomAction(R.drawable.ic_car_map_zoom_in) { mapSurfaceCallback.zoomIn() })
-                            .addAction(mapZoomAction(R.drawable.ic_car_map_zoom_out) { mapSurfaceCallback.zoomOut() })
-                            .addAction(mapZoomAction(R.drawable.ic_car_map_recenter) { mapSurfaceCallback.recenter() })
-                            .build()
-                    )
-                    .setPanModeListener { mapSurfaceCallback.setPanMode(it) }
-                    .build()
-            )
-            .setActionStrip(
-                ActionStrip.Builder()
-                    .addAction(toggleSiteListAction())
-                    .addAction(mapSettingsAction())
-                    .build()
-            )
-            .build()
-    }
-
-    /** Repli hôte : la carte reste utilisable même si MapWithContentTemplate n'est pas disponible. */
+    /** L'hôte Android Auto dessine le fond et les marqueurs de ce template POI. */
     private fun placeListMapTemplate(sites: List<CarSiteListItem>): Template {
         val screenManager = carContext.getCarService(ScreenManager::class.java)
         val hostLimit = runCatching {
@@ -271,9 +163,8 @@ class CarAntennaMapScreen(
 
         val items = ItemList.Builder()
         shownSites.forEachIndexed { index, site ->
-            // PlaceListMapTemplate réutilise le PlaceMarker comme repère de la carte ET de la
-            // liste. L'API interdit donc d'ajouter une image d'opérateurs à cette même Row. Le
-            // chemin MapWithContentTemplate ci-dessus est utilisé sur les hôtes compatibles.
+            // Le marqueur appartient au Place : l'hôte le rend sur la carte et dans la liste.
+            // Une image d'opérateurs séparée n'est pas autorisée sur cette Row.
             val place = Place.Builder(CarLocation.create(site.latitude, site.longitude))
                 .setMarker(antennaPlaceMarker(site, index))
                 .build()
@@ -296,7 +187,6 @@ class CarAntennaMapScreen(
                 // jamais activer cette option si l'autorisation a été retirée entre deux rendus.
                 .setCurrentLocationEnabled(hasCarLocationPermission(carContext))
                 .setItemList(items.build())
-                .setActionStrip(ActionStrip.Builder().addAction(mapSettingsAction()).build())
                 .build()
         }.onFailure {
             AppFileLog.e(CAR_LOG_TAG, "Echec de construction du template carte", it)
@@ -305,86 +195,6 @@ class CarAntennaMapScreen(
             // toute la session : la liste reste une représentation sûre des mêmes sites.
             fallbackListTemplate(shownSites)
         }
-    }
-
-    private fun mapSettingsAction(): Action {
-        val screenManager = carContext.getCarService(ScreenManager::class.java)
-        return Action.Builder()
-            .setTitle(carContext.getString(R.string.car_map_settings_action))
-            .setOnClickListener {
-                carLog("Carte: ouverture des réglages, surfaceEnregistrée=$mapSurfaceRegistered")
-                screenManager.push(
-                    CarMapSettingsScreen(carContext) {
-                        carLog("Carte: retour des réglages, rafraîchissement demandé")
-                        mapSurfaceCallback.refresh()
-                    }
-                )
-            }
-            .build()
-    }
-
-    private fun toggleSiteListAction(): Action {
-        return Action.Builder()
-            // Sans titre, Android Auto rend l'action comme un contrôle circulaire d'icône, ce qui
-            // évite le large bouton « Masquer/Afficher la liste » visible dans la vidéo.
-            .setIcon(CarIcon.Builder(IconCompat.createWithResource(carContext, R.drawable.ic_car_map_list)).build())
-            .setOnClickListener {
-                carLog("Carte: clic liste, avant=$siteListExpanded, surfaceEnregistrée=$mapSurfaceRegistered")
-                siteListExpanded = !siteListExpanded
-                carLog("Carte: clic liste, après=$siteListExpanded, invalidation du template")
-                invalidate()
-            }
-            .build()
-    }
-
-    private fun mapZoomAction(iconRes: Int, action: () -> Unit): Action {
-        return Action.Builder()
-            .setIcon(CarIcon.Builder(IconCompat.createWithResource(carContext, iconRes)).build())
-            .setOnClickListener(action)
-            .build()
-    }
-
-    private fun registerMapSurfaceIfSupported(): Boolean {
-        val apiLevel = runCatching { carContext.getCarAppApiLevel() }
-            .onFailure { AppFileLog.e(CAR_LOG_TAG, "Carte: lecture de l'API Car App impossible", it) }
-            .getOrNull()
-        carLog("Carte: tentative d'enregistrement de surface, api=$apiLevel, ${mapDiagnosticState()}")
-        if (apiLevel == null || apiLevel < 7) {
-            carLog("Carte: fallback hôte, raison=API Car App < 7 ou inconnue")
-            return false
-        }
-        if (mapSurfaceRegistered) {
-            carLog("Carte: surface déjà enregistrée")
-            return true
-        }
-
-        return runCatching {
-            carContext.getCarService(AppManager::class.java)
-                .setSurfaceCallback(mapSurfaceCallback)
-            mapSurfaceRegistered = true
-            carLog("Carte: setSurfaceCallback réussi, surface personnalisée activée")
-            true
-        }.onFailure {
-            AppFileLog.e(CAR_LOG_TAG, "La surface de carte n'est pas disponible sur cet hôte", it)
-            carLog(
-                "Carte: fallback hôte, setSurfaceCallback en échec=" +
-                    "${it.javaClass.simpleName}: ${it.message ?: "-"}"
-            )
-        }.getOrDefault(false)
-    }
-
-    private fun unregisterMapSurface() {
-        if (!mapSurfaceRegistered) {
-            carLog("Carte: aucune surface à désenregistrer")
-            return
-        }
-        carLog("Carte: désenregistrement de la surface")
-        runCatching {
-            carContext.getCarService(AppManager::class.java).setSurfaceCallback(null)
-        }.onFailure {
-            AppFileLog.e(CAR_LOG_TAG, "Impossible de libérer la surface de carte", it)
-        }
-        mapSurfaceRegistered = false
     }
 
     private fun mapDiagnosticState(): String {
@@ -397,11 +207,8 @@ class CarAntennaMapScreen(
             }
         }.getOrElse { "erreur:${it.javaClass.simpleName}" }
 
-        return "api=$apiLevel, surface=$mapSurfaceRegistered, " +
-            "ACCESS_SURFACE=${permission("androidx.car.app.ACCESS_SURFACE")}, " +
-            "MAP_TEMPLATES=${permission("androidx.car.app.MAP_TEMPLATES")}, " +
-            "INTERNET=${permission("android.permission.INTERNET")}, " +
-            "localisation=${hasCarLocationPermission(carContext)}, liste=$siteListExpanded"
+        return "api=$apiLevel, MAP_TEMPLATES=${permission("androidx.car.app.MAP_TEMPLATES")}, " +
+            "localisation=${hasCarLocationPermission(carContext)}"
     }
 
     private fun fallbackListTemplate(sites: List<CarSiteListItem>): Template {

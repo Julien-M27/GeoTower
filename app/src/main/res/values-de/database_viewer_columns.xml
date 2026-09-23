@@ -1,0 +1,10 @@
+<resources>
+    <string name="database_viewer_info_columns_title">Spalten in %1$s</string>
+    <string name="database_viewer_info_columns_help">Jede Spalte wird mit einer verständlichen Bedeutung, ihrem SQLite-Typ, ihrer Position im Primärschlüssel (falls vorhanden) und ihrer Zulässigkeit leerer Werte erklärt.</string>
+    <string name="database_viewer_info_no_tables">In dieser Datenbank wurden keine lesbaren Tabellen gefunden.</string>
+    <string name="database_viewer_column_sqlite_type">SQLite-Typ: %1$s</string>
+    <string name="database_viewer_column_primary_key_order">Primärschlüssel · Position %1$d</string>
+    <string name="database_viewer_column_required">Erforderlich</string>
+    <string name="database_viewer_column_nullable">Darf leer sein</string>
+    <string name="database_viewer_column_unknown_meaning">Für %1$s ist in diesem Schema keine Bedeutung dokumentiert. Technischer Name und SQLite-Typ werden weiterhin angezeigt.</string>
+</resources>

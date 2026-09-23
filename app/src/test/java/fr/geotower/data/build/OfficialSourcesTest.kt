@@ -121,6 +121,59 @@ class OfficialSourcesTest {
     }
 
     @Test
+    fun resolvesStandardAndFallbackObservatoireCsvUrlsFromExportHtml() {
+        val html = """
+            &quot;file_csv&quot;,&quot;value&quot;:&quot;https:\/\/data.anfr.fr\/sites\/default\/files\/dataset\/20260910170329_observatoireod_20260910.csv&quot;
+            Export de secours : https:\/\/data.anfr.fr\/sites\/default\/files\/dataset\/20260903170329_observatoireod_20260903.csv
+        """.trimIndent()
+
+        assertEquals(
+            listOf(
+                "https://data.anfr.fr/sites/default/files/dataset/20260910170329_observatoireod_20260910.csv",
+                "https://data.anfr.fr/sites/default/files/dataset/20260903170329_observatoireod_20260903.csv",
+            ),
+            OfficialSources.resolveObservatoireCsvUrls(html),
+        )
+    }
+
+    @Test
+    fun selectsFallbackWhenStandardObservatoireCsvIsSmallerThan100MiB() {
+        val selection = OfficialSources.selectObservatoireCsvSource(
+            standardUrl = "https://data.anfr.fr/standard.csv",
+            fallbackUrl = "https://data.anfr.fr/fallback.csv",
+            standardBytes = OfficialSources.MIN_OBSERVATOIRE_CSV_BYTES - 1,
+        )
+
+        val selected = selection!!
+        assertEquals(OfficialSources.ObservatoireCsvLink.FALLBACK, selected.link)
+        assertEquals("https://data.anfr.fr/fallback.csv", selected.url)
+    }
+
+    @Test
+    fun keepsStandardWhenObservatoireCsvIsAtLeast100MiB() {
+        val selection = OfficialSources.selectObservatoireCsvSource(
+            standardUrl = "https://data.anfr.fr/standard.csv",
+            fallbackUrl = "https://data.anfr.fr/fallback.csv",
+            standardBytes = OfficialSources.MIN_OBSERVATOIRE_CSV_BYTES,
+        )
+
+        val selected = selection!!
+        assertEquals(OfficialSources.ObservatoireCsvLink.STANDARD, selected.link)
+        assertEquals("https://data.anfr.fr/standard.csv", selected.url)
+    }
+
+    @Test
+    fun refusesUndersizedStandardWhenNoFallbackLinkExists() {
+        assertNull(
+            OfficialSources.selectObservatoireCsvSource(
+                standardUrl = "https://data.anfr.fr/standard.csv",
+                fallbackUrl = null,
+                standardBytes = OfficialSources.MIN_OBSERVATOIRE_CSV_BYTES - 1,
+            ),
+        )
+    }
+
+    @Test
     fun extractsQuarterFromArcepFileNames() {
         assertEquals("2026-T2", OfficialSources.extractQuarter("sites_2026_T2.csv"))
         assertEquals("2025-T3", OfficialSources.extractQuarter("T3_2025_sites.csv"))

@@ -26,23 +26,19 @@ fun MappingOptionsBlock(
     shape: Shape, border: BorderStroke?, bubbleColor: Color, useOneUi: Boolean, safeClick: SafeClick
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
-    // 1. Les 4 fournisseurs répartis sur 2 lignes pour ne pas écraser l'interface
+    // 1. Les trois fournisseurs répartis sur deux lignes pour ne pas écraser l'interface
     Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp)), verticalAlignment = Alignment.CenterVertically) {
             SettingsOptionCard(stringResource(R.string.mapping_provider_osm), Icons.Default.Public, mapProvider == 1, { safeClick("mapping_provider_osm") { onMapProviderChange(1) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
             SettingsOptionCard(stringResource(R.string.mapping_provider_ign), Icons.Default.Layers, mapProvider == 0, { safeClick("mapping_provider_ign") { onMapProviderChange(0) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
         }
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp)), verticalAlignment = Alignment.CenterVertically) {
-            // MapLibre n'a pas de vue satellite : on repasse en Clair (0) automatiquement
-            SettingsOptionCard(stringResource(R.string.mapping_provider_maplibre), Icons.Default.Explore, mapProvider == 2, { safeClick("mapping_provider_maplibre") { onMapProviderChange(2); if (ignStyle == 2) onIgnStyleChange(0) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
-            SettingsOptionCard(stringResource(R.string.mapping_provider_topo), Icons.Default.Terrain, mapProvider == 3, { safeClick("mapping_provider_topo") { onMapProviderChange(3) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
-        }
+        SettingsOptionCard(stringResource(R.string.mapping_provider_topo), Icons.Default.Terrain, mapProvider == 3, { safeClick("mapping_provider_topo") { onMapProviderChange(3) } }, Modifier.fillMaxWidth(), shape, border, bubbleColor, useOneUi)
     }
 
     // 2. Sous-options (Clair / Sombre / Sat)
     // S'affiche pour l'IGN (0) ET pour OSM (1)
     AnimatedVisibility(
-        visible = mapProvider == 0 || mapProvider == 1 || mapProvider == 2, // <-- MODIFIÉ ICI
+        visible = mapProvider == 0 || mapProvider == 1,
         enter = fadeIn() + slideInHorizontally(initialOffsetX = { it }) + expandVertically(expandFrom = Alignment.Top),
         exit = fadeOut() + slideOutHorizontally(targetOffsetX = { it }) + shrinkVertically(shrinkTowards = Alignment.Top)
     ) {
