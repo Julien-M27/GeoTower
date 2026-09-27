@@ -1329,6 +1329,7 @@
     <string name="appstrings_share_throughput_title">Débito teórico</string>
     <string name="appstrings_show_azimuths_cone_label">Mostrar azimutes (représentação em cone)</string>
     <string name="appstrings_show_azimuths_label">Mostrar azimutes (direção da antena)</string>
+    <string name="appstrings_keep_azimuths_visible_when_zoomed_out">Manter as linhas de azimute visíveis ao diminuir o zoom</string>
     <!-- CellularFR masqué — voir CellularFrApi.ENABLED -->
     <!-- <string name="appstrings_show_cellular_fr_photos_label">Mostrar fotos do CellularFR</string> -->
     <string name="appstrings_show_exif_label">Mostrar EXIF</string>
@@ -3251,6 +3252,8 @@
     <string name="appstrings_release_v2060_summary_live_photos">Seguimento live mais fiável e melhor gestão das fotos da comunidade</string>
     <string name="appstrings_release_v2061_summary_cluster_strength">Ajuste a intensidade do agrupamento de antenas no mapa</string>
     <string name="appstrings_release_v2061_summary_marker_readability">Marcadores mais legíveis com diferentes níveis de zoom, filtros e mapas</string>
+    <string name="appstrings_release_v2062_summary_cluster_strength">Ajuste a intensidade do agrupamento de antenas no mapa</string>
+    <string name="appstrings_release_v2062_summary_marker_readability">Marcadores mais legíveis com diferentes níveis de zoom, filtros e mapas</string>
     <string name="database_viewer_title">Visualizador de bases de dados</string>
     <string name="database_viewer_desc">Consulte todas as tabelas e linhas das bases de dados locais. Apenas leitura.</string>
     <string name="database_viewer_mobile">Base de dados móvel</string>

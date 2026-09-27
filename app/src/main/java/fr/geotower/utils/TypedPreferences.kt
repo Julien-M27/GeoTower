@@ -76,6 +76,10 @@ object MapDisplayPrefs {
     val showRadioSites = BooleanPreference(AppConfig.PREF_SHOW_RADIO_SITES, false)
     val showAzimuthLines = BooleanPreference(AppConfig.PREF_SHOW_AZIMUTH_LINES, AppConfig.DEFAULT_SHOW_AZIMUTH_LINES)
     val showAzimuthCones = BooleanPreference(AppConfig.PREF_SHOW_AZIMUTH_CONES, AppConfig.DEFAULT_SHOW_AZIMUTH_CONES)
+    val keepAzimuthsWhenZoomedOut = BooleanPreference(
+        AppConfig.PREF_KEEP_AZIMUTHS_WHEN_ZOOMED_OUT,
+        AppConfig.DEFAULT_KEEP_AZIMUTHS_WHEN_ZOOMED_OUT
+    )
     val showSitesInService = BooleanPreference("show_sites_in_service", true)
     val showSitesOutOfService = BooleanPreference("show_sites_out_of_service", true)
     val hideUndergroundSites = BooleanPreference(AppConfig.PREF_HIDE_UNDERGROUND_SITES, false)

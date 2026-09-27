@@ -2883,6 +2883,7 @@ fun MapScreen(
     val latestSatelliteMarkerContrast = androidx.compose.runtime.rememberUpdatedState(satelliteMarkerContrast)
 
     val clusterStrength = AppConfig.mapClusterStrength.intValue
+    val keepAzimuthsWhenZoomedOut = AppConfig.keepAzimuthsWhenZoomedOut.value
     val markersOverlay = remember {
         object : org.osmdroid.bonuspack.clustering.RadiusMarkerClusterer(context) {
             override fun buildClusterMarker(cluster: org.osmdroid.bonuspack.clustering.StaticCluster, mapView: MapView): Marker {
@@ -4673,6 +4674,26 @@ fun MapScreen(
         delay(MAP_MARKER_REDRAW_DEBOUNCE_MS)
         mapViewRef?.let { map ->
             updateMarkers(map, filteredAntennas, sitesHs)
+        }
+    }
+
+    var previousAzimuthDetailMode by remember { mutableStateOf<Pair<Boolean, Boolean>?>(null) }
+    LaunchedEffect(mapViewRef, AppConfig.showAzimuths.value, keepAzimuthsWhenZoomedOut) {
+        val map = mapViewRef ?: return@LaunchedEffect
+        val currentMode = AppConfig.showAzimuths.value to keepAzimuthsWhenZoomedOut
+        val previousMode = previousAzimuthDetailMode
+        previousAzimuthDetailMode = currentMode
+        if (previousMode == null || previousMode == currentMode) return@LaunchedEffect
+
+        map.invalidate()
+        val previouslyLoadedWithAzimuthDetails = previousMode.first && previousMode.second
+        val shouldLoadWithAzimuthDetails = currentMode.first && currentMode.second
+        if (
+            map.zoomLevelDouble < 13.0 &&
+            previouslyLoadedWithAzimuthDetails != shouldLoadWithAzimuthDetails
+        ) {
+            delay(PowerProfile.mapReloadDebounceMs)
+            mapViewRef?.loadVisibleAntennas(viewModel)
         }
     }
 
@@ -7745,6 +7766,11 @@ fun MapScreen(
                     AppConfig.showAzimuths.value = it
                     prefs.edit().putBoolean(AppConfig.PREF_SHOW_AZIMUTH_LINES, it).apply()
                 },
+                keepAzimuthsWhenZoomedOut = AppConfig.keepAzimuthsWhenZoomedOut.value,
+                onKeepAzimuthsWhenZoomedOutChange = {
+                    AppConfig.keepAzimuthsWhenZoomedOut.value = it
+                    prefs.edit().putBoolean(AppConfig.PREF_KEEP_AZIMUTHS_WHEN_ZOOMED_OUT, it).apply()
+                },
                 showAzimuthsCone = AppConfig.showAzimuthsCone.value,
                 onAzimuthsConeChange = {
                     AppConfig.showAzimuthsCone.value = it
@@ -8869,10 +8895,39 @@ class AntennaMarker(
         val dotColors: List<Int>,
         val lineOutlinePaint: android.graphics.Paint? = null, // liseré de contraste (satellite)
         val coneEdgeOutlinePaint: android.graphics.Paint? = null
+    ) {
+        val firstConeEdgeCos = Math.cos(Math.toRadians(azimuth.toDouble() - 125.0)).toFloat()
+        val firstConeEdgeSin = Math.sin(Math.toRadians(azimuth.toDouble() - 125.0)).toFloat()
+        val secondConeEdgeCos = Math.cos(Math.toRadians(azimuth.toDouble() - 55.0)).toFloat()
+        val secondConeEdgeSin = Math.sin(Math.toRadians(azimuth.toDouble() - 55.0)).toFloat()
+    }
+
+    private class AzimuthPathBatch(
+        val entries: List<GroupedAzimuthData>,
+        val paint: android.graphics.Paint,
+        val outlinePaint: android.graphics.Paint?
+    )
+
+    private data class AzimuthDotEntry(
+        val azimuth: GroupedAzimuthData,
+        val colorIndex: Int
+    )
+
+    private class AzimuthDotPathBatch(
+        val color: Int,
+        val entries: List<AzimuthDotEntry>
     )
 
     private val precalculatedMobileAzimuths = mutableListOf<GroupedAzimuthData>()
     private val precalculatedFhAzimuths = mutableListOf<GroupedAzimuthData>()
+    private var mobileLinePathBatches = emptyList<AzimuthPathBatch>()
+    private var mobileConeEdgePathBatches = emptyList<AzimuthPathBatch>()
+    private var mobileDotPathBatches = emptyList<AzimuthDotPathBatch>()
+    private var fhLinePathBatches = emptyList<AzimuthPathBatch>()
+    private var fhDotPathBatches = emptyList<AzimuthDotPathBatch>()
+    private val azimuthPath = android.graphics.Path()
+    private val coneBounds = android.graphics.RectF()
+    private val azimuthBounds = android.graphics.RectF()
 
     // Cache pour les pinceaux (pour éviter d'en recréer 60 fois par seconde)
     private val dotPaints = mutableMapOf<Int, android.graphics.Paint>()
@@ -9051,6 +9106,49 @@ class AntennaMarker(
                 GroupedAzimuthData(az, cos, sin, dashedPaint, null, null, sortedColors, dashedOutlinePaint)
             )
         }
+
+        mobileLinePathBatches = createAzimuthPathBatches(
+            precalculatedMobileAzimuths,
+            paintSelector = { it.linePaint },
+            outlineSelector = { it.lineOutlinePaint }
+        )
+        mobileConeEdgePathBatches = createAzimuthPathBatches(
+            precalculatedMobileAzimuths,
+            paintSelector = { it.coneEdgePaint },
+            outlineSelector = { it.coneEdgeOutlinePaint }
+        )
+        mobileDotPathBatches = createAzimuthDotPathBatches(precalculatedMobileAzimuths)
+        fhLinePathBatches = createAzimuthPathBatches(
+            precalculatedFhAzimuths,
+            paintSelector = { it.linePaint },
+            outlineSelector = { it.lineOutlinePaint }
+        )
+        fhDotPathBatches = createAzimuthDotPathBatches(precalculatedFhAzimuths)
+    }
+
+    private fun createAzimuthPathBatches(
+        azimuths: List<GroupedAzimuthData>,
+        paintSelector: (GroupedAzimuthData) -> android.graphics.Paint?,
+        outlineSelector: (GroupedAzimuthData) -> android.graphics.Paint?
+    ): List<AzimuthPathBatch> {
+        return azimuths.mapNotNull { data ->
+            paintSelector(data)?.let { it.color to data }
+        }.groupBy({ it.first }, { it.second }).values.map { entries ->
+            AzimuthPathBatch(
+                entries = entries,
+                paint = paintSelector(entries.first())!!,
+                outlinePaint = outlineSelector(entries.first())
+            )
+        }
+    }
+
+    private fun createAzimuthDotPathBatches(
+        azimuths: List<GroupedAzimuthData>
+    ): List<AzimuthDotPathBatch> {
+        return azimuths.flatMap { data ->
+            data.dotColors.indices.map { colorIndex -> AzimuthDotEntry(data, colorIndex) }
+        }.groupBy { entry -> entry.azimuth.dotColors[entry.colorIndex] }
+            .map { (color, entries) -> AzimuthDotPathBatch(color, entries) }
     }
 
     private fun getOpColorInt(name: String?): Int {
@@ -9060,12 +9158,13 @@ class AntennaMarker(
     override fun draw(canvas: android.graphics.Canvas, projection: org.osmdroid.views.Projection) {
         val zoom = mapView.zoomLevelDouble
 
-        // 🚨 NOUVEAU : On lit les préférences en direct
-        val showLines = fr.geotower.utils.AppConfig.showAzimuths.value
-        val showCones = PowerProfile.drawAzimuthCones
-
-        // On ne rentre dans le bloc que si au moins l'un des deux est activé
-        if (zoom >= 14.0 && (showLines || showCones)) {
+        val keepAzimuthsWhenZoomedOut = AppConfig.keepAzimuthsWhenZoomedOut.value
+        val showLines = AppConfig.showAzimuths.value && (zoom >= 14.0 || keepAzimuthsWhenZoomedOut)
+        val showCones = PowerProfile.drawAzimuthCones && zoom >= 14.0
+        val showFh = AppConfig.showTechnoFH.value && showLines
+        if ((showLines && (precalculatedMobileAzimuths.isNotEmpty() || showFh && precalculatedFhAzimuths.isNotEmpty())) ||
+            (showCones && precalculatedMobileAzimuths.isNotEmpty())
+        ) {
             projection.toPixels(mPosition, ptCenter)
 
             val baseBeamLengthDp = when {
@@ -9092,119 +9191,164 @@ class AntennaMarker(
             val gapMobile = pointRadius * 2.0f
             val gapFh = fhRadius * 2.0f
 
-            // 🚨 NOUVEAU : Rectangle de délimitation (Bounding Box) pour tracer les cônes
-            val rectF = android.graphics.RectF(
-                ptCenter.x - totalRadiusPx,
-                ptCenter.y - totalRadiusPx,
-                ptCenter.x + totalRadiusPx,
-                ptCenter.y + totalRadiusPx
-            )
-
-            // --- DESSIN DES MOBILES ---
-            precalculatedMobileAzimuths.forEach { data ->
-
-                // 1. DESSIN DU CÔNE (Toujours en premier pour qu'il soit "au fond")
-                if (showCones && data.conePaint != null) {
-                    // L'angle 0 d'Android est à l'Est (3h), l'azimut 0 est au Nord (12h) -> On enlève 90°.
-                    // Pour un cône de 70°, on doit reculer de 35° pour que le centre du cône pointe sur l'azimut exact.
-                    val startAngle = data.azimuth - 90f - 35f
-                    canvas.drawArc(rectF, startAngle, 70f, true, data.conePaint)
-                    data.coneEdgeOutlinePaint?.let { outlinePaint ->
-                        drawConeEdgeLines(canvas, data.azimuth, circleOffsetPx, totalRadiusPx, outlinePaint)
-                    }
-                    data.coneEdgePaint?.let { edgePaint ->
-                        drawConeEdgeLines(canvas, data.azimuth, circleOffsetPx, totalRadiusPx, edgePaint)
-                    }
+            var maxDotExtensionPx = 0f
+            if (showLines) {
+                precalculatedMobileAzimuths.forEach { data ->
+                    maxDotExtensionPx = maxOf(
+                        maxDotExtensionPx,
+                        (data.dotColors.size - 1).coerceAtLeast(0) * gapMobile + pointRadius
+                    )
                 }
-
-                // 2. DESSIN DE LA LIGNE ET DES PASTILLES D'OPÉRATEURS
-                if (showLines) {
-                    val startX = ptCenter.x + circleOffsetPx * data.cos
-                    val startY = ptCenter.y + circleOffsetPx * data.sin
-                    val endX = ptCenter.x + totalRadiusPx * data.cos
-                    val endY = ptCenter.y + totalRadiusPx * data.sin
-
-                    data.lineOutlinePaint?.let { canvas.drawLine(startX, startY, endX, endY, it) }
-                    canvas.drawLine(startX, startY, endX, endY, data.linePaint)
-
-                    // Les pastilles se touchent (écart = un diamètre) : on pose TOUS les liserés
-                    // d'abord, sinon celui d'une pastille rognerait la couleur de la précédente.
-                    if (satelliteContrast) {
-                        data.dotColors.forEachIndexed { index, colorInt ->
-                            val offsetMag = index * gapMobile
-                            canvas.drawCircle(
-                                endX + (data.cos * offsetMag),
-                                endY + (data.sin * offsetMag),
-                                pointRadius + outlineWidthPx,
-                                getDotOutlinePaint(colorInt)
-                            )
-                        }
-                    }
-
-                    data.dotColors.forEachIndexed { index, colorInt ->
-                        val offsetMag = index * gapMobile
-                        val dotX = endX + (data.cos * offsetMag)
-                        val dotY = endY + (data.sin * offsetMag)
-
-                        canvas.drawCircle(dotX, dotY, pointRadius, getDotPaint(colorInt))
+                if (showFh) {
+                    precalculatedFhAzimuths.forEach { data ->
+                        maxDotExtensionPx = maxOf(
+                            maxDotExtensionPx,
+                            (data.dotColors.size - 1).coerceAtLeast(0) * gapFh + fhRadius
+                        )
                     }
                 }
             }
+            val outlineExtensionPx = if (satelliteContrast && showLines) {
+                maxOf(outlineWidthPx, thinOutlineWidthPx)
+            } else {
+                0f
+            }
+            val coneEdgeExtensionPx = if (showCones) {
+                1.1f * density * symbolScale + if (satelliteContrast) thinOutlineWidthPx else 0f
+            } else {
+                0f
+            }
+            val cullRadiusPx = totalRadiusPx + maxDotExtensionPx + maxOf(outlineExtensionPx, coneEdgeExtensionPx)
+            azimuthBounds.set(
+                ptCenter.x - cullRadiusPx,
+                ptCenter.y - cullRadiusPx,
+                ptCenter.x + cullRadiusPx,
+                ptCenter.y + cullRadiusPx
+            )
 
-            // --- DESSIN DES FAISCEAUX HERTZIENS (FH) ---
-            if (fr.geotower.utils.AppConfig.showTechnoFH.value && showLines) {
-                precalculatedFhAzimuths.forEach { data ->
-                    val startX = ptCenter.x + circleOffsetPx * data.cos
-                    val startY = ptCenter.y + circleOffsetPx * data.sin
-                    val endX = ptCenter.x + totalRadiusPx * data.cos
-                    val endY = ptCenter.y + totalRadiusPx * data.sin
+            // Le projecteur peut encore contenir des sites du viewport précédent pendant un zoom.
+            // On évite alors de recalculer leurs tracés si toute leur zone est hors écran.
+            if (canvas.quickReject(azimuthBounds)) {
+                super.draw(canvas, projection)
+                return
+            }
 
-                    data.lineOutlinePaint?.let { canvas.drawLine(startX, startY, endX, endY, it) }
-                    canvas.drawLine(startX, startY, endX, endY, data.linePaint)
-
-                    if (satelliteContrast) {
-                        data.dotColors.forEachIndexed { index, colorInt ->
-                            val offsetMag = index * gapFh
-                            canvas.drawCircle(
-                                endX + (data.cos * offsetMag),
-                                endY + (data.sin * offsetMag),
-                                fhRadius + thinOutlineWidthPx,
-                                getDotOutlinePaint(colorInt)
-                            )
-                        }
-                    }
-
-                    data.dotColors.forEachIndexed { index, colorInt ->
-                        val offsetMag = index * gapFh
-                        val dotX = endX + (data.cos * offsetMag)
-                        val dotY = endY + (data.sin * offsetMag)
-
-                        canvas.drawCircle(dotX, dotY, fhRadius, getDotPaint(colorInt))
+            if (showCones) {
+                coneBounds.set(
+                    ptCenter.x - totalRadiusPx,
+                    ptCenter.y - totalRadiusPx,
+                    ptCenter.x + totalRadiusPx,
+                    ptCenter.y + totalRadiusPx
+                )
+                precalculatedMobileAzimuths.forEach { data ->
+                    data.conePaint?.let { paint ->
+                        canvas.drawArc(coneBounds, data.azimuth - 125f, 70f, true, paint)
                     }
                 }
+                drawConeEdgePathBatches(canvas, circleOffsetPx, totalRadiusPx)
+            }
+
+            if (showLines) {
+                drawAzimuthLinePathBatches(canvas, mobileLinePathBatches, circleOffsetPx, totalRadiusPx)
+                drawAzimuthDotPathBatches(
+                    canvas,
+                    mobileDotPathBatches,
+                    totalRadiusPx,
+                    gapMobile,
+                    pointRadius,
+                    outlineWidthPx
+                )
+            }
+
+            if (showFh) {
+                drawAzimuthLinePathBatches(canvas, fhLinePathBatches, circleOffsetPx, totalRadiusPx)
+                drawAzimuthDotPathBatches(
+                    canvas,
+                    fhDotPathBatches,
+                    totalRadiusPx,
+                    gapFh,
+                    fhRadius,
+                    thinOutlineWidthPx
+                )
             }
         }
         super.draw(canvas, projection)
     }
 
-    private fun drawConeEdgeLines(
+    private fun drawAzimuthLinePathBatches(
         canvas: android.graphics.Canvas,
-        azimuth: Float,
+        batches: List<AzimuthPathBatch>,
         startRadiusPx: Float,
-        endRadiusPx: Float,
-        paint: android.graphics.Paint
+        endRadiusPx: Float
     ) {
-        listOf(azimuth - 35f, azimuth + 35f).forEach { edgeAzimuth ->
-            val edgeRad = Math.toRadians(edgeAzimuth - 90.0)
-            val edgeCos = Math.cos(edgeRad).toFloat()
-            val edgeSin = Math.sin(edgeRad).toFloat()
-            canvas.drawLine(
-                ptCenter.x + startRadiusPx * edgeCos,
-                ptCenter.y + startRadiusPx * edgeSin,
-                ptCenter.x + endRadiusPx * edgeCos,
-                ptCenter.y + endRadiusPx * edgeSin,
-                paint
-            )
+        batches.forEach { batch ->
+            azimuthPath.reset()
+            batch.entries.forEach { data ->
+                val startX = ptCenter.x + startRadiusPx * data.cos
+                val startY = ptCenter.y + startRadiusPx * data.sin
+                val endX = ptCenter.x + endRadiusPx * data.cos
+                val endY = ptCenter.y + endRadiusPx * data.sin
+                azimuthPath.moveTo(startX, startY)
+                azimuthPath.lineTo(endX, endY)
+            }
+            batch.outlinePaint?.let { canvas.drawPath(azimuthPath, it) }
+            canvas.drawPath(azimuthPath, batch.paint)
+        }
+    }
+
+    private fun drawConeEdgePathBatches(
+        canvas: android.graphics.Canvas,
+        startRadiusPx: Float,
+        endRadiusPx: Float
+    ) {
+        mobileConeEdgePathBatches.forEach { batch ->
+            azimuthPath.reset()
+            batch.entries.forEach { data ->
+                val firstStartX = ptCenter.x + startRadiusPx * data.firstConeEdgeCos
+                val firstStartY = ptCenter.y + startRadiusPx * data.firstConeEdgeSin
+                val firstEndX = ptCenter.x + endRadiusPx * data.firstConeEdgeCos
+                val firstEndY = ptCenter.y + endRadiusPx * data.firstConeEdgeSin
+                val secondStartX = ptCenter.x + startRadiusPx * data.secondConeEdgeCos
+                val secondStartY = ptCenter.y + startRadiusPx * data.secondConeEdgeSin
+                val secondEndX = ptCenter.x + endRadiusPx * data.secondConeEdgeCos
+                val secondEndY = ptCenter.y + endRadiusPx * data.secondConeEdgeSin
+                azimuthPath.moveTo(firstStartX, firstStartY)
+                azimuthPath.lineTo(firstEndX, firstEndY)
+                azimuthPath.moveTo(secondStartX, secondStartY)
+                azimuthPath.lineTo(secondEndX, secondEndY)
+            }
+            batch.outlinePaint?.let { canvas.drawPath(azimuthPath, it) }
+            canvas.drawPath(azimuthPath, batch.paint)
+        }
+    }
+
+    private fun drawAzimuthDotPathBatches(
+        canvas: android.graphics.Canvas,
+        batches: List<AzimuthDotPathBatch>,
+        endRadiusPx: Float,
+        gapPx: Float,
+        dotRadiusPx: Float,
+        outlineWidthPx: Float
+    ) {
+        batches.forEach { batch ->
+            azimuthPath.reset()
+            batch.entries.forEach { entry ->
+                val data = entry.azimuth
+                val offsetPx = entry.colorIndex * gapPx
+                val x = ptCenter.x + (endRadiusPx + offsetPx) * data.cos
+                val y = ptCenter.y + (endRadiusPx + offsetPx) * data.sin
+                azimuthPath.addCircle(x, y, dotRadiusPx, android.graphics.Path.Direction.CW)
+            }
+            if (satelliteContrast) {
+                val outlinePaint = getDotOutlinePaint(batch.color).apply {
+                    // Le trait centré élargit le disque vers l'extérieur ; le disque coloré
+                    // recouvre ensuite sa moitié intérieure. Cela évite un second tracé mémorisé.
+                    style = android.graphics.Paint.Style.STROKE
+                    strokeWidth = 2f * outlineWidthPx
+                }
+                canvas.drawPath(azimuthPath, outlinePaint)
+            }
+            canvas.drawPath(azimuthPath, getDotPaint(batch.color))
         }
     }
 }
@@ -9257,12 +9401,15 @@ class RadioMarker(
     }
     private val dotOutlinePaint = if (satelliteContrast) {
         android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-            style = android.graphics.Paint.Style.FILL
+            style = android.graphics.Paint.Style.STROKE
             color = MapUtils.contrastOutlineColor(this@RadioMarker.color)
         }
     } else {
         null
     }
+    private val azimuthLinePath = android.graphics.Path()
+    private val azimuthDotPath = android.graphics.Path()
+    private val azimuthBounds = android.graphics.RectF()
 
     override fun hitTest(event: android.view.MotionEvent, mapView: org.osmdroid.views.MapView): Boolean {
         if (!showCircle) return false
@@ -9280,7 +9427,7 @@ class RadioMarker(
         val zoom = mapView.zoomLevelDouble
         if (
             !radioMarker.isCluster &&
-            zoom >= 14.0 &&
+            (zoom >= 14.0 || AppConfig.keepAzimuthsWhenZoomedOut.value) &&
             AppConfig.showAzimuths.value &&
             azimuthLines.isNotEmpty()
         ) {
@@ -9296,17 +9443,34 @@ class RadioMarker(
             val circleOffsetPx = 17f * density
             val totalRadiusPx = circleOffsetPx + beamLengthPx
             val dotRadius = 2.8f * density
+            val cullRadiusPx = totalRadiusPx + dotRadius + if (satelliteContrast) outlineWidthPx else 0f
+            azimuthBounds.set(
+                ptCenter.x - cullRadiusPx,
+                ptCenter.y - cullRadiusPx,
+                ptCenter.x + cullRadiusPx,
+                ptCenter.y + cullRadiusPx
+            )
+            if (!canvas.quickReject(azimuthBounds)) {
+                azimuthLinePath.reset()
+                azimuthDotPath.reset()
+                azimuthLines.forEach { data ->
+                    val startX = ptCenter.x + circleOffsetPx * data.cos
+                    val startY = ptCenter.y + circleOffsetPx * data.sin
+                    val endX = ptCenter.x + totalRadiusPx * data.cos
+                    val endY = ptCenter.y + totalRadiusPx * data.sin
 
-            azimuthLines.forEach { data ->
-                val startX = ptCenter.x + circleOffsetPx * data.cos
-                val startY = ptCenter.y + circleOffsetPx * data.sin
-                val endX = ptCenter.x + totalRadiusPx * data.cos
-                val endY = ptCenter.y + totalRadiusPx * data.sin
+                    azimuthLinePath.moveTo(startX, startY)
+                    azimuthLinePath.lineTo(endX, endY)
+                    azimuthDotPath.addCircle(endX, endY, dotRadius, android.graphics.Path.Direction.CW)
+                }
 
-                lineOutlinePaint?.let { canvas.drawLine(startX, startY, endX, endY, it) }
-                canvas.drawLine(startX, startY, endX, endY, linePaint)
-                dotOutlinePaint?.let { canvas.drawCircle(endX, endY, dotRadius + outlineWidthPx, it) }
-                canvas.drawCircle(endX, endY, dotRadius, dotPaint)
+                lineOutlinePaint?.let { canvas.drawPath(azimuthLinePath, it) }
+                canvas.drawPath(azimuthLinePath, linePaint)
+                dotOutlinePaint?.let {
+                    it.strokeWidth = 2f * outlineWidthPx
+                    canvas.drawPath(azimuthDotPath, it)
+                }
+                canvas.drawPath(azimuthDotPath, dotPaint)
             }
         }
         super.draw(canvas, projection)

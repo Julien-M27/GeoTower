@@ -654,6 +654,7 @@ fun SettingsScreen(
     var showMapLocationMarker by AppConfig.showMapLocationMarker
     var showMapAzimuths by AppConfig.showAzimuths
     var showMapAzimuthsCone by AppConfig.showAzimuthsCone
+    var keepMapAzimuthsWhenZoomedOut by AppConfig.keepAzimuthsWhenZoomedOut
     var showMapZoom by remember { mutableStateOf(prefs.getBoolean("show_map_zoom", true)) }
     var showMapToolbox by remember { mutableStateOf(prefs.getBoolean("show_map_toolbox", true)) }
     var showMapCompass by remember { mutableStateOf(prefs.getBoolean("show_map_compass", true)) }
@@ -2052,6 +2053,11 @@ fun SettingsScreen(
                 showAzimuths = showMapAzimuths,
                 onAzimuthsChange = {
                     showMapAzimuths = it; prefs.edit().putBoolean(AppConfig.PREF_SHOW_AZIMUTH_LINES, it).apply()
+                },
+                keepAzimuthsWhenZoomedOut = keepMapAzimuthsWhenZoomedOut,
+                onKeepAzimuthsWhenZoomedOutChange = {
+                    keepMapAzimuthsWhenZoomedOut = it
+                    prefs.edit().putBoolean(AppConfig.PREF_KEEP_AZIMUTHS_WHEN_ZOOMED_OUT, it).apply()
                 },
                 showAzimuthsCone = showMapAzimuthsCone,
                 onAzimuthsConeChange = {

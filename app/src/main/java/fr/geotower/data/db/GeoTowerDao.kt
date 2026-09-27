@@ -156,8 +156,15 @@ interface GeoTowerDao {
         LEFT JOIN ref_statut st ON t.statut_id = st.id
         WHERE l.latitude BETWEEN :minLat AND :maxLat
         AND l.longitude BETWEEN :minLon AND :maxLon
+        LIMIT :limit
     """)
-    suspend fun getLocalisationsInBox(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double): List<LocalisationEntity>
+    suspend fun getLocalisationsInBox(
+        minLat: Double,
+        maxLat: Double,
+        minLon: Double,
+        maxLon: Double,
+        limit: Int = Int.MAX_VALUE
+    ): List<LocalisationEntity>
 
     /**
      * Emprise d'un département, pour cadrer la carte sur une recherche « 35 » / « Ille-et-Vilaine ».
@@ -377,6 +384,7 @@ interface GeoTowerDao {
             OR (:detailBackedBandMask != 0 AND (l.tech_mask & 8) != 0)
             OR (:includeFh = 1 AND ((l.band_mask & 16384) != 0 OR COALESCE(l.azimuts_fh, '') != ''))
         )
+        LIMIT :limit
     """)
     suspend fun getLocalisationsInBoxForRadioFilter(
         minLat: Double,
@@ -385,7 +393,8 @@ interface GeoTowerDao {
         maxLon: Double,
         selectedBandMask: Int,
         detailBackedBandMask: Int,
-        includeFh: Boolean
+        includeFh: Boolean,
+        limit: Int
     ): List<LocalisationEntity>
 
     @Query("""

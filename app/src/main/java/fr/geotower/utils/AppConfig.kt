@@ -40,6 +40,8 @@ object AppConfig {
     const val DEFAULT_MAP_FOLLOW_ORIENTATION = false
     const val PREF_SHOW_AZIMUTH_LINES = "show_azimuths"
     const val PREF_SHOW_AZIMUTH_CONES = "show_azimuths_cone"
+    const val PREF_KEEP_AZIMUTHS_WHEN_ZOOMED_OUT = "keep_azimuths_when_zoomed_out"
+    const val DEFAULT_KEEP_AZIMUTHS_WHEN_ZOOMED_OUT = false
     const val PREF_SHOW_RADIO_SITES = "show_radio_sites"
     const val PREF_SHOW_RADIO_TV = "show_radio_tv"
     const val PREF_SHOW_RADIO_BROADCAST = "show_radio_broadcast"
@@ -215,6 +217,7 @@ object AppConfig {
     var showAzimuths = mutableStateOf(DEFAULT_SHOW_AZIMUTH_LINES)
 
     var showAzimuthsCone = mutableStateOf(DEFAULT_SHOW_AZIMUTH_CONES)
+    var keepAzimuthsWhenZoomedOut = mutableStateOf(DEFAULT_KEEP_AZIMUTHS_WHEN_ZOOMED_OUT)
 
     // --- FILTRES : AFFICHAGE DES SITES ---
     var showSitesInService = mutableStateOf(true)
@@ -386,6 +389,7 @@ object AppConfig {
 
         showAzimuths.value = MapDisplayPrefs.showAzimuthLines.read(prefs)
         showAzimuthsCone.value = MapDisplayPrefs.showAzimuthCones.read(prefs)
+        keepAzimuthsWhenZoomedOut.value = MapDisplayPrefs.keepAzimuthsWhenZoomedOut.read(prefs)
         showMapLocationMarker.value = MapDisplayPrefs.showLocationMarker.read(prefs)
         smoothMapLocation.value = MapDisplayPrefs.smoothLocation.read(prefs)
         mapRotationEnabled.value = MapDisplayPrefs.mapRotationEnabled.read(prefs)

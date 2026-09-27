@@ -39,6 +39,7 @@ import fr.geotower.utils.DepartmentCodes
 import fr.geotower.utils.FrequencyFilterSelection
 import fr.geotower.utils.FrenchAdminAreas
 import fr.geotower.utils.OperatorColors
+import fr.geotower.utils.PowerProfile
 
 /** Contour d'une zone administrative, associé au code qui l'a demandé pour éviter tout décalage. */
 data class AdminAreaOutline(
@@ -272,10 +273,21 @@ class MapViewModel(
                 val showSitesInService = AppConfig.showSitesInService.value
                 val showSitesOutOfService = AppConfig.showSitesOutOfService.value
                 val showProjectSites = AppConfig.showProjectSites.value
+                val keepDetailedAzimuths = AppConfig.showAzimuths.value &&
+                    AppConfig.keepAzimuthsWhenZoomedOut.value
+                val radioMarkerQueryZoom = if (keepDetailedAzimuths) maxOf(zoom, 13.0) else zoom
+                // La carte n'affiche déjà qu'un nombre borné de pylônes. À faible zoom, ne
+                // matérialiser que quelques lignes ANFR par pylône affichable évite de convertir
+                // toute la France en objets Kotlin avant d'appliquer ce plafond.
+                val detailedMapRowLimit = if (keepDetailedAzimuths && zoom < 13.0) {
+                    PowerProfile.mapMarkerCap * 4
+                } else {
+                    Int.MAX_VALUE
+                }
 
                 if (!showSitesInService && !showSitesOutOfService && !showProjectSites) {
                     _antennas.value = emptyList()
-                    _radioMarkers.value = loadRadioMarkers(zoom, latNorth, lonEast, latSouth, lonWest)
+                    _radioMarkers.value = loadRadioMarkers(radioMarkerQueryZoom, latNorth, lonEast, latSouth, lonWest)
                     return@launch
                 }
 
@@ -298,7 +310,7 @@ class MapViewModel(
                 // Les clusters sont pré-agrégés et ne peuvent pas soustraire les masquages locaux
                 // opérateur par opérateur. Dès qu'il existe une préférence de masquage, on charge
                 // les lignes détaillées afin que la carte reste cohérente avec tous les autres écrans.
-                if (zoom < 13.0 && cityPolygons == null && !hasSiteDisplayFilter && !hasFrequencyFilter &&
+                if (zoom < 13.0 && !keepDetailedAzimuths && cityPolygons == null && !hasSiteDisplayFilter && !hasFrequencyFilter &&
                     !AppConfig.timeSliderActive.value && !repository.hasHiddenSites()
                 ) {
                     val aggregationZoom = MapClusterStrengthProfile.aggregationZoom(
@@ -371,7 +383,8 @@ class MapViewModel(
                             lonEast = lonEast,
                             latSouth = latSouth,
                             lonWest = lonWest,
-                            frequencyFilter = frequencyFilter
+                            frequencyFilter = frequencyFilter,
+                            maxResults = detailedMapRowLimit
                         )
                     } else {
                         repository.getAntennasInBox(
@@ -379,7 +392,8 @@ class MapViewModel(
                             lonEast,
                             latSouth,
                             lonWest,
-                            detailBackedBandMask = detailBackedBandMask
+                            detailBackedBandMask = detailBackedBandMask,
+                            maxResults = detailedMapRowLimit
                         )
                     }
 
@@ -392,7 +406,7 @@ class MapViewModel(
                         _antennas.value = areaAntennas
                     }
                 }
-                _radioMarkers.value = loadRadioMarkers(zoom, latNorth, lonEast, latSouth, lonWest)
+                _radioMarkers.value = loadRadioMarkers(radioMarkerQueryZoom, latNorth, lonEast, latSouth, lonWest)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

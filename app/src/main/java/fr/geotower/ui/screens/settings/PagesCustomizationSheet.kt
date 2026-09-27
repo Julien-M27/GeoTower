@@ -1668,6 +1668,7 @@ fun MapSettingsSheet(
     showLocation: Boolean, onLocationChange: (Boolean) -> Unit,
     showLocationMarker: Boolean, onLocationMarkerChange: (Boolean) -> Unit,
     showAzimuths: Boolean, onAzimuthsChange: (Boolean) -> Unit,
+    keepAzimuthsWhenZoomedOut: Boolean, onKeepAzimuthsWhenZoomedOutChange: (Boolean) -> Unit,
     showAzimuthsCone: Boolean, onAzimuthsConeChange: (Boolean) -> Unit,
     showZoom: Boolean, onZoomChange: (Boolean) -> Unit,
     showToolbox: Boolean, onToolboxChange: (Boolean) -> Unit,
@@ -1748,6 +1749,7 @@ fun MapSettingsSheet(
             if (showAzimuthSettings) {
                 Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))) {
                     SimpleSwitchCard(stringResource(R.string.appstrings_map_azimuth_lines_option), showMapLocation = showAzimuths, onLocationChange = onAzimuthsChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
+                    SimpleSwitchCard(stringResource(R.string.appstrings_keep_azimuths_visible_when_zoomed_out), showMapLocation = keepAzimuthsWhenZoomedOut, onLocationChange = onKeepAzimuthsWhenZoomedOutChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
                     // Mode faible conso : les cônes sont forcés OFF → on montre le toggle éteint et grisé.
                     SimpleSwitchCard(stringResource(R.string.appstrings_map_azimuth_cones_option), showMapLocation = showAzimuthsCone && !fr.geotower.utils.PowerProfile.isEco, onLocationChange = onAzimuthsConeChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi, enabled = !fr.geotower.utils.PowerProfile.isEco)
                 }
@@ -1886,6 +1888,7 @@ fun MapSettingsSheet(
             TextButton(onClick = {
                 if (showAzimuthSettings) {
                     onAzimuthsChange(AppConfig.DEFAULT_SHOW_AZIMUTH_LINES)
+                    onKeepAzimuthsWhenZoomedOutChange(AppConfig.DEFAULT_KEEP_AZIMUTHS_WHEN_ZOOMED_OUT)
                     onAzimuthsConeChange(AppConfig.DEFAULT_SHOW_AZIMUTH_CONES)
                 } else if (showCompassSettings) {
                     onCompassChange(true)
@@ -1895,6 +1898,7 @@ fun MapSettingsSheet(
                     onLocationChange(true)
                     onLocationMarkerChange(true)
                     onAzimuthsChange(AppConfig.DEFAULT_SHOW_AZIMUTH_LINES)
+                    onKeepAzimuthsWhenZoomedOutChange(AppConfig.DEFAULT_KEEP_AZIMUTHS_WHEN_ZOOMED_OUT)
                     onAzimuthsConeChange(AppConfig.DEFAULT_SHOW_AZIMUTH_CONES)
                     onZoomChange(true)
                     onToolboxChange(true)

@@ -131,6 +131,7 @@ fun MapFiltersControls(
 
     // Variables Azimuts
     var showAzimuths by AppConfig.showAzimuths
+    var keepAzimuthsWhenZoomedOut by AppConfig.keepAzimuthsWhenZoomedOut
     var showMapLocationMarker by AppConfig.showMapLocationMarker
     var smoothMapLocation by AppConfig.smoothMapLocation
     var mapLocationZoom by AppConfig.mapLocationZoom
@@ -328,6 +329,20 @@ fun MapFiltersControls(
                         ).apply()
                     }
                 }
+            }
+
+            Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+            SelectableButton(
+                label = stringResource(R.string.appstrings_keep_azimuths_visible_when_zoomed_out),
+                isSelected = keepAzimuthsWhenZoomedOut,
+                modifier = Modifier.fillMaxWidth(),
+                minHeight = 64.dp,
+                maxLines = 2
+            ) {
+                keepAzimuthsWhenZoomedOut = it
+                prefs.edit()
+                    .putBoolean(AppConfig.PREF_KEEP_AZIMUTHS_WHEN_ZOOMED_OUT, it)
+                    .apply()
             }
 
             Spacer(modifier = Modifier.height(sizing.spacing(32.dp)))

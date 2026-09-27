@@ -66,7 +66,7 @@ object OperatorColors {
         OperatorColorSpec(MAORE_MOBILE_KEY, "Maore Mobile", "#2FBF5B", 0xFF2FBF5B, listOf("MAORE MOBILE", "MAORÉ MOBILE", "MAORE"), OperatorRegion.OVERSEAS),
         OperatorColorSpec(SPM_TELECOM_KEY, "SPM Telecom", "#875CEE", 0xFF875CEE, listOf("SPM TELECOM", "SPM TÉLÉCOM", "SPM"), OperatorRegion.OVERSEAS),
         OperatorColorSpec(GLOBALTEL_KEY, "Globaltel", "#59C28F", 0xFF59C28F, listOf("GLOBALTEL"), OperatorRegion.OVERSEAS),
-        OperatorColorSpec(OPT_NC_KEY, "OPT Nouvelle-Caledonie", "#005BAC", 0xFF005BAC, listOf("OPT NOUVELLE-CALEDONIE", "OPT NOUVELLE-CALÉDONIE", "OPT NOUVELLE CALEDONIE", "OPT NOUVELLE CALÉDONIE", "OPT NC"), OperatorRegion.OVERSEAS),
+        OperatorColorSpec(OPT_NC_KEY, "OPT Nouvelle-Caledonie", "#005BAC", 0xFF005BAC, listOf("OPT NOUVELLE-CALEDONIE", "OPT NOUVELLE-CALÉDONIE", "OPT NOUVELLE CALEDONIE", "OPT NOUVELLE CALÉDONIE", "OPT NC", "GOUV NELLE CALEDONIE (OPT)", "GOUV NELLE CALÉDONIE (OPT)"), OperatorRegion.OVERSEAS),
         OperatorColorSpec(ONATI_KEY, "ONATi (Vini)", "#00A3E0", 0xFF00A3E0, listOf("ONATI", "ONATI VINI", "VINI"), OperatorRegion.OVERSEAS),
         OperatorColorSpec(PMT_VODAFONE_KEY, "PMT/Vodafone", "#E60000", 0xFFE60000, listOf("PMT/VODAFONE", "PMT", "VODAFONE"), OperatorRegion.OVERSEAS),
         OperatorColorSpec(VITI_KEY, "Ora (Vini)", "#005B2F", 0xFF005B2F, listOf("ORA", "ORA VINI", "VITI", "VITI SAS"), OperatorRegion.OVERSEAS),
