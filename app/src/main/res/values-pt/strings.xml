@@ -3249,6 +3249,8 @@
     <string name="appstrings_release_v2060_summary_database_viewer">Novo visualizador de bases com pesquisa e explicações das colunas</string>
     <string name="appstrings_release_v2060_summary_local_build">Criação local de bases e verificações de atualizações mais fiáveis</string>
     <string name="appstrings_release_v2060_summary_live_photos">Seguimento live mais fiável e melhor gestão das fotos da comunidade</string>
+    <string name="appstrings_release_v2061_summary_cluster_strength">Ajuste a intensidade do agrupamento de antenas no mapa</string>
+    <string name="appstrings_release_v2061_summary_marker_readability">Marcadores mais legíveis com diferentes níveis de zoom, filtros e mapas</string>
     <string name="database_viewer_title">Visualizador de bases de dados</string>
     <string name="database_viewer_desc">Consulte todas as tabelas e linhas das bases de dados locais. Apenas leitura.</string>
     <string name="database_viewer_mobile">Base de dados móvel</string>
@@ -3283,4 +3285,8 @@
     <string name="appstrings_local_build_fallback_link">Ligação alternativa</string>
     <string name="appstrings_local_build_switch_to_fallback">O CSV padrão tem apenas %1$d MiB, por isso é utilizada a ligação alternativa.</string>
     <string name="appstrings_local_build_fallback_unavailable">O CSV padrão tem apenas %1$d MiB e não existe uma ligação alternativa disponível.</string>
+    <string name="map_clustering_strength_title">Intensidade do agrupamento de antenas</string>
+    <string name="map_clustering_strength_desc">Valores mais baixos agrupam menos antenas e mostram marcadores mais pequenos e simples.</string>
+    <string name="map_clustering_strength_low">Baixa</string>
+    <string name="map_clustering_strength_high">Alta</string>
 </resources>

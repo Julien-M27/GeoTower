@@ -155,6 +155,7 @@ object PreferenceProfileManager {
         // Ne commence pas par « show_ » : sans cette entrée explicite, les profils l'ignoreraient.
         AppConfig.PREF_SMOOTH_MAP_LOCATION,
         AppConfig.PREF_MAP_LOCATION_ZOOM,
+        AppConfig.PREF_MAP_CLUSTER_STRENGTH,
         AppConfig.PREF_MAP_ROTATION_ENABLED,
         AppConfig.PREF_MAP_FOLLOW_ORIENTATION,
         AppConfig.PREF_SHOW_AZIMUTH_LINES,
@@ -232,6 +233,7 @@ object PreferenceProfileManager {
         // Rangé avec « Point GPS », qui tombe dans « Carte » par son préfixe show_.
         AppConfig.PREF_SMOOTH_MAP_LOCATION to "Carte",
         AppConfig.PREF_MAP_LOCATION_ZOOM to "Carte",
+        AppConfig.PREF_MAP_CLUSTER_STRENGTH to "Carte",
         AppConfig.PREF_MAP_ROTATION_ENABLED to "Carte",
         AppConfig.PREF_MAP_FOLLOW_ORIENTATION to "Carte",
         "default_operator" to "Général",
@@ -277,6 +279,7 @@ object PreferenceProfileManager {
         "ign_style" to "Style IGN",
         AppConfig.PREF_SMOOTH_MAP_LOCATION to "Déplacement fluide du repère",
         AppConfig.PREF_MAP_LOCATION_ZOOM to "Zoom du bouton de localisation",
+        AppConfig.PREF_MAP_CLUSTER_STRENGTH to "Regroupement des antennes",
         AppConfig.PREF_MAP_ROTATION_ENABLED to "Rotation de la carte à deux doigts",
         AppConfig.PREF_MAP_FOLLOW_ORIENTATION to "Carte orientée selon la boussole",
         AppConfig.PREF_SHOW_SIGNALQUEST_COVERAGE_POINTS to "Points de couverture SignalQuest",

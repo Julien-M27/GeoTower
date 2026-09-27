@@ -130,8 +130,13 @@ object MapUtils {
         showAzimuths: Boolean,
         defaultOp: String,
         inactiveOperatorKeys: Set<String> = emptySet(),
-        satelliteContrast: Boolean = false
+        satelliteContrast: Boolean = false,
+        clusterStrength: Int = 100
     ): BitmapDrawable {
+        val normalizedStrength = MapClusterStrengthProfile.normalize(clusterStrength)
+        val drawTowerPictogram = MapClusterStrengthProfile.showTowerPictogram(normalizedStrength)
+        val drawIconAzimuths = showAzimuths && drawTowerPictogram
+
         // --- Ordre de priorité des opérateurs (selon l'opérateur par défaut) ---
         val def = defaultOp.uppercase()
         val baseOrder = OperatorColors.orderedKeys
@@ -144,8 +149,9 @@ object MapUtils {
             .distinct()
             .sortedBy { op -> priorityList.indexOf(op) }
 
-        // Carte angle -> opérateurs (uniquement si les azimuts sont affichés).
-        val azimutMap: Map<Int, List<String>> = if (showAzimuths) {
+        // En mode simplifié, les azimuts sont déjà dessinés par AntennaMarker sur la carte.
+        // Éviter ici leur parsing et leur dessin bitmap réduit le travail par icône.
+        val azimutMap: Map<Int, List<String>> = if (drawIconAzimuths) {
             val map = mutableMapOf<Int, MutableList<String>>()
             siteAntennas.forEach { antenna ->
                 val operatorKeys = OperatorColors.keysFor(antenna.operateur)
@@ -169,23 +175,25 @@ object MapUtils {
         // Deux sites avec les mêmes opérateurs (et mêmes azimuts si affichés) partagent
         // la même icône : le taux de réussite du cache grimpe fortement.
         val inactiveSignature = inactiveOperatorKeys.sorted().joinToString(",")
-        val azimuthSignature = if (showAzimuths) {
+        val azimuthSignature = if (drawIconAzimuths) {
             azimutMap.entries.sortedBy { it.key }.joinToString("|") { (angle, ops) ->
                 "$angle>" + ops.sortedBy { priorityList.indexOf(it) }.joinToString("+")
             }
         } else {
             ""
         }
+        val metrics = context.resources.displayMetrics
+        val density = metrics.density
+        val targetSize = (105 * density * MapClusterStrengthProfile.iconScale(normalizedStrength))
+            .toInt()
+            .coerceAtLeast(1)
+        val coreRadiusUnits = MapClusterStrengthProfile.antennaCoreRadiusUnits(normalizedStrength)
+        val coreRadiusSignature = java.lang.Float.floatToIntBits(coreRadiusUnits)
         val cacheKey =
-            "m3|$showAzimuths|$def|${operatorsOnSite.joinToString(",")}|$inactiveSignature|$azimuthSignature|$satelliteContrast"
+            "m5|$drawIconAzimuths|$drawTowerPictogram|$targetSize|$coreRadiusSignature|$def|${operatorsOnSite.joinToString(",")}|$inactiveSignature|$azimuthSignature|$satelliteContrast"
 
         markerIconCache.get(cacheKey)?.let { return it }
 
-        val metrics = context.resources.displayMetrics
-        val density = metrics.density
-
-        // ✅ CORRECTION : Taille cible proportionnelle en DP (~85dp)
-        val targetSize = (105 * density).toInt()
         val bitmap = Bitmap.createBitmap(targetSize, targetSize, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
 
@@ -196,7 +204,10 @@ object MapUtils {
 
         val size = 230 // On laisse cette valeur à 230 pour ton repère mathématique !
         val center = size / 2f
-        val pieRadius = 45f
+        val pieRadius = coreRadiusUnits
+        val artworkScale = pieRadius / 45f
+        val pieOutlineUnits = PIE_OUTLINE_UNITS * artworkScale
+        val azimuthOutlineUnits = AZIMUTH_OUTLINE_UNITS * artworkScale
 
         val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
             isAntiAlias = true
@@ -211,10 +222,48 @@ object MapUtils {
             }
         }
 
-        if (showAzimuths && azimutMap.isNotEmpty()) {
-            val innerRadius = pieRadius + 4f
-            val outerRadius = pieRadius + 60f
-            val strokeWidth = 6f
+        if (!drawTowerPictogram) {
+            val centerRadius = pieRadius
+            val centerRect = android.graphics.RectF(
+                center - centerRadius,
+                center - centerRadius,
+                center + centerRadius,
+                center + centerRadius
+            )
+            paint.style = Paint.Style.FILL
+
+            if (operatorsOnSite.isEmpty()) {
+                val coreColor = android.graphics.Color.GRAY
+                if (satelliteContrast) {
+                    paint.color = contrastOutlineColor(coreColor)
+                    canvas.drawCircle(center, center, centerRadius + pieOutlineUnits, paint)
+                }
+                paint.color = coreColor
+                canvas.drawCircle(center, center, centerRadius, paint)
+            } else {
+                if (satelliteContrast) {
+                    val outlineRect = android.graphics.RectF(
+                        center - centerRadius - pieOutlineUnits,
+                        center - centerRadius - pieOutlineUnits,
+                        center + centerRadius + pieOutlineUnits,
+                        center + centerRadius + pieOutlineUnits
+                    )
+                    drawOperatorSlices(canvas, outlineRect, operatorsOnSite, paint) { op ->
+                        contrastOutlineColor(colorForOperator(op))
+                    }
+                }
+                drawOperatorSlices(canvas, centerRect, operatorsOnSite, paint, ::colorForOperator)
+            }
+
+            val simpleDrawable = BitmapDrawable(context.resources, bitmap)
+            markerIconCache.put(cacheKey, simpleDrawable)
+            return simpleDrawable
+        }
+
+        if (drawIconAzimuths && azimutMap.isNotEmpty()) {
+            val innerRadius = pieRadius + 4f * artworkScale
+            val outerRadius = pieRadius + 60f * artworkScale
+            val strokeWidth = 6f * artworkScale
 
             azimutMap.forEach { (angle, ops) ->
                 val sortedOpsForAz = ops.sortedBy { priorityList.indexOf(it) }
@@ -231,7 +280,7 @@ object MapUtils {
                 // sinon celui d'un segment mangerait la couleur de son voisin. Le débord côté
                 // centre est ensuite recouvert par le camembert, dessiné juste après.
                 if (satelliteContrast) {
-                    paint.strokeWidth = strokeWidth + 2f * AZIMUTH_OUTLINE_UNITS
+                    paint.strokeWidth = strokeWidth + 2f * azimuthOutlineUnits
                     sortedOpsForAz.forEachIndexed { index, op ->
                         paint.color = contrastOutlineColor(colorForOperator(op))
                         val startY = center - innerRadius - (index * segmentLength)
@@ -258,7 +307,7 @@ object MapUtils {
         if (operatorsOnSite.isEmpty()) {
             if (satelliteContrast) {
                 paint.color = contrastOutlineColor(android.graphics.Color.GRAY)
-                canvas.drawCircle(center, center, pieRadius + PIE_OUTLINE_UNITS, paint)
+                canvas.drawCircle(center, center, pieRadius + pieOutlineUnits, paint)
             }
             paint.color = android.graphics.Color.GRAY
             canvas.drawCircle(center, center, pieRadius, paint)
@@ -267,10 +316,10 @@ object MapUtils {
                 // Le liseré est le même camembert, à peine plus grand et peint dessous : la bande
                 // de couleur garde toute son épaisseur, le trait ne fait que déborder au-dehors.
                 val outlineRect = android.graphics.RectF(
-                    center - pieRadius - PIE_OUTLINE_UNITS,
-                    center - pieRadius - PIE_OUTLINE_UNITS,
-                    center + pieRadius + PIE_OUTLINE_UNITS,
-                    center + pieRadius + PIE_OUTLINE_UNITS
+                    center - pieRadius - pieOutlineUnits,
+                    center - pieRadius - pieOutlineUnits,
+                    center + pieRadius + pieOutlineUnits,
+                    center + pieRadius + pieOutlineUnits
                 )
                 drawOperatorSlices(canvas, outlineRect, operatorsOnSite, paint) { op ->
                     contrastOutlineColor(colorForOperator(op))
@@ -285,7 +334,7 @@ object MapUtils {
         paint.color = android.graphics.Color.parseColor("#EBEBEB")
         canvas.drawCircle(center, center, pieRadius * 0.80f, paint)
 
-        val iconScale = 100f
+        val iconScale = 100f * artworkScale
         val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
             isAntiAlias = true
             style = Paint.Style.STROKE; strokeWidth = iconScale * 0.035f; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND; color = android.graphics.Color.parseColor("#34404A")
@@ -506,18 +555,20 @@ object MapUtils {
         operators: List<String>,
         count: Int,
         defaultOp: String,
-        satelliteContrast: Boolean = false
+        satelliteContrast: Boolean = false,
+        clusterStrength: Int = 100
     ): BitmapDrawable {
         // ✅ CORRECTION : On intègre l'opérateur par défaut dans le cache pour forcer le redessin si on change d'avis !
-        val cacheKey = "${operators.sorted().joinToString("_")}_${count}_${defaultOp}_$satelliteContrast"
-
-        clusterIconCache.get(cacheKey)?.let { return it }
+        val normalizedStrength = MapClusterStrengthProfile.normalize(clusterStrength)
 
         val metrics = context.resources.displayMetrics
         val density = metrics.density
+        val size = (45 * density * MapClusterStrengthProfile.iconScale(normalizedStrength))
+            .toInt()
+            .coerceAtLeast(1)
+        val cacheKey = "${operators.sorted().joinToString("_")}_${count}_${defaultOp}_${satelliteContrast}_$size"
 
-        // ✅ CORRECTION : La taille s'adapte maintenant à la densité de l'écran (environ 38dp)
-        val size = (45 * density).toInt()
+        clusterIconCache.get(cacheKey)?.let { return it }
         val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
 

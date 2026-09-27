@@ -233,6 +233,7 @@ import fr.geotower.ui.navigation.ROOT_FALLBACK_ROUTE
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppConfig
+import fr.geotower.utils.MapClusterStrengthProfile
 import fr.geotower.utils.PowerProfile
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.CommuneNameMatching
@@ -2841,63 +2842,6 @@ fun MapScreen(
         }
     }
 
-    val markersOverlay = remember {
-        object : org.osmdroid.bonuspack.clustering.RadiusMarkerClusterer(context) {
-            override fun buildClusterMarker(cluster: org.osmdroid.bonuspack.clustering.StaticCluster, mapView: MapView): Marker {
-                // 🚨 MODIFICATION : On écrase la zone de clic pour la forcer à être ronde !
-                val m = object : Marker(mapView) {
-                    override fun hitTest(event: android.view.MotionEvent, mapView: MapView): Boolean {
-                        val pj = mapView.projection
-                        val screenCoords = android.graphics.Point()
-                        pj.toPixels(position, screenCoords)
-
-                        val dx = event.x - screenCoords.x
-                        val dy = event.y - screenCoords.y
-
-                        // Rayon de clic mathématique de 22dp (parfait pour le doigt)
-                        val clickRadius = 22f * mapView.context.resources.displayMetrics.density
-                        return (dx * dx + dy * dy) <= (clickRadius * clickRadius)
-                    }
-                }
-
-                m.position = GeoPoint(cluster.position.latitude, cluster.position.longitude)
-                m.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-
-                val allOperators = mutableListOf<String>()
-                for (i in 0 until cluster.size) {
-                    val item = cluster.getItem(i)
-                    @Suppress("UNCHECKED_CAST")
-                    (item.relatedObject as? List<String>)?.let { allOperators.addAll(it) }
-                }
-
-                m.icon = MapUtils.createClusterIcon(context, allOperators.distinct(), cluster.size, AppConfig.defaultOperator.value)
-
-                m.setOnMarkerClickListener { clickedMarker, map ->
-                    // 1. On fige les coordonnées exactes AVANT toute autre action
-                    val targetPoint = org.osmdroid.util.GeoPoint(
-                        clickedMarker.position.latitude,
-                        clickedMarker.position.longitude
-                    )
-                    // 2. On calcule le zoom souhaité (+1.5 est un bon compromis, modifiable !)
-                    val targetZoom = map.zoomLevelDouble + 1.5
-
-                    map.post {
-                        // 3. ON TUE TOUTE ANIMATION EN COURS
-                        map.controller.stopAnimation(false)
-
-                        // 4. On utilise les setters purs (0% d'animation garantie)
-                        map.controller.setZoom(targetZoom)
-                        map.controller.setCenter(targetPoint)
-                    }
-                    true
-                }
-                return m
-            }
-        }.apply {
-            setRadius(250)
-        }
-    }
-
     var searchJob by remember { mutableStateOf<Job?>(null) }
     val mapProvider by AppConfig.mapProvider
 
@@ -2936,6 +2880,97 @@ fun MapScreen(
     val shouldInvertColors = ((mapProvider == 0 || mapProvider == 1) && ignStyle == 1)
     // Sur orthophoto seulement, les marqueurs sont cernés d'un liseré de contraste (cf. MapUtils).
     val satelliteMarkerContrast = MapUtils.isSatelliteBasemap(effectiveProvider, ignStyle)
+    val latestSatelliteMarkerContrast = androidx.compose.runtime.rememberUpdatedState(satelliteMarkerContrast)
+
+    val clusterStrength = AppConfig.mapClusterStrength.intValue
+    val markersOverlay = remember {
+        object : org.osmdroid.bonuspack.clustering.RadiusMarkerClusterer(context) {
+            override fun buildClusterMarker(cluster: org.osmdroid.bonuspack.clustering.StaticCluster, mapView: MapView): Marker {
+                // 🚨 MODIFICATION : On écrase la zone de clic pour la forcer à être ronde !
+                val m = object : Marker(mapView) {
+                    override fun hitTest(event: android.view.MotionEvent, mapView: MapView): Boolean {
+                        val pj = mapView.projection
+                        val screenCoords = android.graphics.Point()
+                        pj.toPixels(position, screenCoords)
+
+                        val dx = event.x - screenCoords.x
+                        val dy = event.y - screenCoords.y
+
+                        // Rayon de clic mathématique de 22dp (parfait pour le doigt)
+                        val clickRadius = 22f * mapView.context.resources.displayMetrics.density
+                        return (dx * dx + dy * dy) <= (clickRadius * clickRadius)
+                    }
+                }
+
+                m.position = GeoPoint(cluster.position.latitude, cluster.position.longitude)
+                m.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+
+                val allOperators = mutableListOf<String>()
+                for (i in 0 until cluster.size) {
+                    val item = cluster.getItem(i)
+                    @Suppress("UNCHECKED_CAST")
+                    (item.relatedObject as? List<String>)?.let { allOperators.addAll(it) }
+                }
+
+                m.icon = MapUtils.createClusterIcon(
+                    context,
+                    allOperators.distinct(),
+                    cluster.size,
+                    AppConfig.defaultOperator.value,
+                    latestSatelliteMarkerContrast.value,
+                    clusterStrength = AppConfig.mapClusterStrength.intValue
+                )
+
+                m.setOnMarkerClickListener { clickedMarker, map ->
+                    // 1. On fige les coordonnées exactes AVANT toute autre action
+                    val targetPoint = org.osmdroid.util.GeoPoint(
+                        clickedMarker.position.latitude,
+                        clickedMarker.position.longitude
+                    )
+                    // 2. On calcule le zoom souhaité (+1.5 est un bon compromis, modifiable !)
+                    val targetZoom = map.zoomLevelDouble + 1.5
+
+                    map.post {
+                        // 3. ON TUE TOUTE ANIMATION EN COURS
+                        map.controller.stopAnimation(false)
+
+                        // 4. On utilise les setters purs (0% d'animation garantie)
+                        map.controller.setZoom(targetZoom)
+                        map.controller.setCenter(targetPoint)
+                    }
+                    true
+                }
+                return m
+            }
+        }.apply {
+            val normalizedStrength = MapClusterStrengthProfile.normalize(clusterStrength)
+            setRadius(if (normalizedStrength == 100) 250 else Math.round(250f * normalizedStrength / 100f))
+        }
+    }
+
+    var hasAppliedClusterStrength by remember { mutableStateOf(false) }
+    LaunchedEffect(clusterStrength, mapViewRef) {
+        val map = mapViewRef ?: return@LaunchedEffect
+        val isInitialApplication = !hasAppliedClusterStrength
+        hasAppliedClusterStrength = true
+        val targetRadius = if (isInitialApplication && clusterStrength == AppConfig.DEFAULT_MAP_CLUSTER_STRENGTH) {
+            250
+        } else {
+            MapClusterStrengthProfile.nearbyRadiusPx(
+                zoom = map.zoomLevelDouble,
+                strength = clusterStrength
+            )
+        }
+        markersOverlay.setRadius(targetRadius)
+        markersOverlay.invalidate()
+        map.invalidate()
+
+        if (isInitialApplication) return@LaunchedEffect
+
+        delay(PowerProfile.mapReloadDebounceMs)
+        if (AppConfig.mapClusterStrength.intValue != clusterStrength) return@LaunchedEffect
+        map.loadVisibleAntennas(viewModel)
+    }
 
     var azimuth by remember { mutableFloatStateOf(0f) }
     val continuousAzimuth = remember { floatArrayOf(0f) }
@@ -4370,6 +4405,7 @@ fun MapScreen(
                         filteredSiteAntennas,
                         safePrimaryColor,
                         satelliteMarkerContrast,
+                        clusterStrength = clusterStrength,
                         onLongClick = {
                             if (plannerPlan == null && !isMeasuringMode) {
                                 hideSiteChoices = HiddenSitesStore.recordsFor(filteredSiteAntennas)
@@ -4391,11 +4427,12 @@ fun MapScreen(
                             filteredSiteAntennas,
                             false,
                             AppConfig.defaultOperator.value,
-                            satelliteContrast = satelliteMarkerContrast
+                            satelliteContrast = satelliteMarkerContrast,
+                            clusterStrength = clusterStrength
                         )
 
                         if (isHs) {
-                            icon = createHsMarkerIcon(context, baseIcon)
+                            icon = createHsMarkerIcon(context, baseIcon, clusterStrength)
                         } else {
                             icon = baseIcon
                         }
@@ -4429,7 +4466,16 @@ fun MapScreen(
                 val clusterMarkers = clusterAntennas.map { fakeAntenna ->
                     val count = fakeAntenna.idAnfr.removePrefix("CLUSTER_").toIntOrNull() ?: 1
                     ensureMapNotDisposed()
-                    org.osmdroid.views.overlay.Marker(map).apply {
+                    object : org.osmdroid.views.overlay.Marker(map) {
+                        override fun hitTest(event: android.view.MotionEvent, mapView: MapView): Boolean {
+                            val screenCoords = android.graphics.Point()
+                            mapView.projection.toPixels(position, screenCoords)
+                            val dx = event.x - screenCoords.x
+                            val dy = event.y - screenCoords.y
+                            val clickRadius = 22f * mapView.context.resources.displayMetrics.density
+                            return (dx * dx + dy * dy) <= (clickRadius * clickRadius)
+                        }
+                    }.apply {
                         position = GeoPoint(fakeAntenna.latitude, fakeAntenna.longitude)
                         setAnchor(org.osmdroid.views.overlay.Marker.ANCHOR_CENTER, org.osmdroid.views.overlay.Marker.ANCHOR_CENTER)
                         val activeOps = visibleOperatorKeysForAntenna(
@@ -4445,7 +4491,8 @@ fun MapScreen(
                             activeOps,
                             count,
                             AppConfig.defaultOperator.value,
-                            satelliteMarkerContrast
+                            satelliteMarkerContrast,
+                            clusterStrength = clusterStrength
                         )
                         setOnMarkerClickListener { clickedMarker, m ->
                             val targetPoint = org.osmdroid.util.GeoPoint(clickedMarker.position.latitude, clickedMarker.position.longitude)
@@ -4503,6 +4550,7 @@ fun MapScreen(
                         filteredSiteAntennas,
                         safePrimaryColor,
                         satelliteMarkerContrast,
+                        clusterStrength = clusterStrength,
                         onLongClick = {
                             if (plannerPlan == null && !isMeasuringMode) {
                                 hideSiteChoices = HiddenSitesStore.recordsFor(filteredSiteAntennas)
@@ -4525,13 +4573,14 @@ fun MapScreen(
                             filteredSiteAntennas,
                             false,
                             AppConfig.defaultOperator.value,
-                            satelliteContrast = satelliteMarkerContrast
+                            satelliteContrast = satelliteMarkerContrast,
+                            clusterStrength = clusterStrength
                         )
 
                         // 2. LOGIQUE DE FUSION : On vérifie TOUTES les antennes du pylône partagé !
                         if (isHs) {
 
-                            val cachedHsIcon = createHsMarkerIcon(context, baseIcon)
+                            val cachedHsIcon = createHsMarkerIcon(context, baseIcon, clusterStrength)
 
                             // A. Création d'une "toile" vide de la taille de l'icône de base
                             icon = cachedHsIcon
@@ -4588,6 +4637,7 @@ fun MapScreen(
         isMeasuringMode,
         safePrimaryColor,
         satelliteMarkerContrast, // bascule plan <-> satellite : les icônes changent de liseré
+        clusterStrength,
         AppConfig.showAzimuths.value,
         AppConfig.showAzimuthsCone.value,
         PowerProfile.level, // mode faible conso : reconstruit + invalide (cônes/plafond/repère)
@@ -5249,13 +5299,10 @@ fun MapScreen(
 
                                 val z = snapshot.zoom
 
-                                // ---> AIMANT PLUS FORT POUR LES ZONES DENSES <---
-                                val targetRadius = when {
-                                    z < 14.0 -> 220 // Attraction très forte pour Paris quand on vient de passer en mode "Vraies antennes"
-                                    z < 15.5 -> 150 // Attraction moyenne
-                                    z < 17.0 -> 90  // Attraction faible
-                                    else -> 60      // Pratiquement aucune attraction (on voit tous les pylônes distincts)
-                                }
+                                val targetRadius = MapClusterStrengthProfile.nearbyRadiusPx(
+                                    zoom = z,
+                                    strength = AppConfig.mapClusterStrength.intValue
+                                )
                                 if (targetRadius != lastRadius) {
                                     lastRadius = targetRadius
                                     markersOverlay.setRadius(targetRadius)
@@ -8724,10 +8771,12 @@ class AntennaMarker(
     private val siteAntennas: List<LocalisationEntity>,
     private val primaryColor: Int,
     private val satelliteContrast: Boolean = false,
+    private val clusterStrength: Int = AppConfig.DEFAULT_MAP_CLUSTER_STRENGTH,
     private val onLongClick: (() -> Unit)? = null
 ) : org.osmdroid.views.overlay.Marker(mapView) {
 
     private val density = mapView.context.resources.displayMetrics.density
+    private val symbolScale = MapClusterStrengthProfile.iconScale(clusterStrength)
     private val ptCenter = android.graphics.Point()
     private val longPressHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private val touchSlop = android.view.ViewConfiguration.get(mapView.context).scaledTouchSlop
@@ -8742,8 +8791,8 @@ class AntennaMarker(
     }
 
     // Débord du liseré de contraste, de part et d'autre du trait ou de la pastille (satellite only).
-    private val outlineWidthPx = 1.2f * density
-    private val thinOutlineWidthPx = 0.9f * density // pastilles FH et bords de cône : liseré plus fin
+    private val outlineWidthPx = 1.2f * density * symbolScale
+    private val thinOutlineWidthPx = 0.9f * density * symbolScale // pastilles FH et bords de cône : liseré plus fin
 
     // 🚨 NOUVEAU : On redéfinit la HitBox pour qu'elle ignore les faisceaux et soit 100% ronde
     override fun hitTest(event: android.view.MotionEvent, mapView: org.osmdroid.views.MapView): Boolean {
@@ -8908,7 +8957,7 @@ class AntennaMarker(
             val linePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
                 style = android.graphics.Paint.Style.STROKE
                 color = mainColor
-                strokeWidth = 3.5f * density
+                strokeWidth = 3.5f * density * symbolScale
                 strokeCap = android.graphics.Paint.Cap.ROUND
             }
 
@@ -8918,7 +8967,7 @@ class AntennaMarker(
                 android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
                     style = android.graphics.Paint.Style.STROKE
                     color = MapUtils.contrastOutlineColor(mainColor)
-                    strokeWidth = 3.5f * density + 2f * outlineWidthPx
+                    strokeWidth = 3.5f * density * symbolScale + 2f * outlineWidthPx
                     strokeCap = android.graphics.Paint.Cap.ROUND
                 }
             } else {
@@ -8934,7 +8983,7 @@ class AntennaMarker(
             val coneEdgePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
                 style = android.graphics.Paint.Style.STROKE
                 color = androidx.core.graphics.ColorUtils.setAlphaComponent(mainColor, 170)
-                strokeWidth = 2.2f * density
+                strokeWidth = 2.2f * density * symbolScale
                 strokeCap = android.graphics.Paint.Cap.ROUND
             }
 
@@ -8944,7 +8993,7 @@ class AntennaMarker(
                 android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
                     style = android.graphics.Paint.Style.STROKE
                     color = MapUtils.contrastOutlineColor(mainColor)
-                    strokeWidth = 2.2f * density + 2f * thinOutlineWidthPx
+                    strokeWidth = 2.2f * density * symbolScale + 2f * thinOutlineWidthPx
                     strokeCap = android.graphics.Paint.Cap.ROUND
                 }
             } else {
@@ -8972,9 +9021,12 @@ class AntennaMarker(
             val dashedPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
                 style = android.graphics.Paint.Style.STROKE
                 color = android.graphics.Color.argb(200, android.graphics.Color.red(mainColor), android.graphics.Color.green(mainColor), android.graphics.Color.blue(mainColor))
-                strokeWidth = 3f * density
+                strokeWidth = 3f * density * symbolScale
                 strokeCap = android.graphics.Paint.Cap.ROUND
-                pathEffect = android.graphics.DashPathEffect(floatArrayOf(5f * density, 5f * density), 0f)
+                pathEffect = android.graphics.DashPathEffect(
+                    floatArrayOf(5f * density * symbolScale, 5f * density * symbolScale),
+                    0f
+                )
             }
 
             // Le liseré reprend le MÊME pointillé, sinon il apparaîtrait comme un trait plein
@@ -8983,9 +9035,12 @@ class AntennaMarker(
                 android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
                     style = android.graphics.Paint.Style.STROKE
                     color = MapUtils.contrastOutlineColor(mainColor)
-                    strokeWidth = 3f * density + 2f * outlineWidthPx
+                    strokeWidth = 3f * density * symbolScale + 2f * outlineWidthPx
                     strokeCap = android.graphics.Paint.Cap.ROUND
-                    pathEffect = android.graphics.DashPathEffect(floatArrayOf(5f * density, 5f * density), 0f)
+                    pathEffect = android.graphics.DashPathEffect(
+                        floatArrayOf(5f * density * symbolScale, 5f * density * symbolScale),
+                        0f
+                    )
                 }
             } else {
                 null
@@ -9013,19 +9068,26 @@ class AntennaMarker(
         if (zoom >= 14.0 && (showLines || showCones)) {
             projection.toPixels(mPosition, ptCenter)
 
-            val beamLengthPx = when {
-                zoom >= 18.0 -> 60f * density
-                zoom >= 17.0 -> 50f * density
-                zoom >= 16.0 -> 40f * density
-                zoom >= 15.0 -> 30f * density
-                else -> 25f * density
+            val baseBeamLengthDp = when {
+                zoom >= 18.0 -> 60f
+                zoom >= 17.0 -> 50f
+                zoom >= 16.0 -> 40f
+                zoom >= 15.0 -> 30f
+                else -> 25f
             }
+            val scaledBeamLengthPx = baseBeamLengthDp * density * symbolScale
 
-            val pointRadius = 3.5f * density
+            val pointRadius = 3.5f * density * symbolScale
             val fhRadius = pointRadius * 0.7f
 
-            val circleOffsetPx = 17f * density
-            val totalRadiusPx = circleOffsetPx + beamLengthPx
+            val centerRadiusPx = MapClusterStrengthProfile.antennaCoreRadiusUnits(clusterStrength) *
+                (105f * density * symbolScale / 230f)
+            val scaledPreferredOffsetPx = 17f * density * symbolScale
+            val circleOffsetPx = minOf(
+                scaledPreferredOffsetPx,
+                centerRadiusPx - 1.5f * density * symbolScale
+            ).coerceAtLeast(0f)
+            val totalRadiusPx = circleOffsetPx + scaledBeamLengthPx
 
             val gapMobile = pointRadius * 2.0f
             val gapFh = fhRadius * 2.0f
@@ -9784,12 +9846,16 @@ private fun isPointInPolygon(lat: Double, lon: Double, polygon: List<GeoPoint>):
 
 // ✅ NOUVEAU : Fonction pour vérifier si internet est disponible
 // 🚨 DESSINE LE POINT D'EXCLAMATION DE PANNE AVEC UN CACHE
-fun createHsBadge(context: Context): android.graphics.drawable.BitmapDrawable {
+fun createHsBadge(
+    context: Context,
+    clusterStrength: Int = AppConfig.DEFAULT_MAP_CLUSTER_STRENGTH
+): android.graphics.drawable.BitmapDrawable {
     val density = context.resources.displayMetrics.density
+    val badgeScale = MapClusterStrengthProfile.iconScale(clusterStrength) *
+        (MapClusterStrengthProfile.antennaCoreRadiusUnits(clusterStrength) / 45f)
 
-    // ✅ ON AGRANDIT ENCORE : 32 au lieu de 26 pour être sûr de tout masquer !
-    // (Vous pouvez ajuster ce chiffre librement : 30, 32, 34...)
-    val size = (32 * density).roundToInt().coerceAtLeast(1)
+    // Le badge suit la taille du cœur coloré : il ne déborde pas sur un point basse consommation.
+    val size = (32 * density * badgeScale).roundToInt().coerceAtLeast(1)
     hsBadgeDrawableCache.get(size)?.let { return it }
     val bitmap = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888)
     val canvas = android.graphics.Canvas(bitmap)
@@ -9804,8 +9870,7 @@ fun createHsBadge(context: Context): android.graphics.drawable.BitmapDrawable {
     // 2. LE TEXTE (Le point d'exclamation)
     val textPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
         color = android.graphics.Color.parseColor("#E53935") // Rouge vif
-        // ✅ On grossit aussi le point d'exclamation (de 20 à 24) pour qu'il reste proportionnel
-        textSize = 24f * density
+        textSize = size * (24f / 32f)
         textAlign = android.graphics.Paint.Align.CENTER
         typeface = android.graphics.Typeface.DEFAULT_BOLD
     }
@@ -9817,11 +9882,15 @@ fun createHsBadge(context: Context): android.graphics.drawable.BitmapDrawable {
     }
 }
 
-private fun createHsMarkerIcon(context: Context, baseIcon: BitmapDrawable): BitmapDrawable {
-    val cacheKey = "${System.identityHashCode(baseIcon)}_${baseIcon.intrinsicWidth}x${baseIcon.intrinsicHeight}"
+private fun createHsMarkerIcon(
+    context: Context,
+    baseIcon: BitmapDrawable,
+    clusterStrength: Int
+): BitmapDrawable {
+    val badgeIcon = createHsBadge(context, clusterStrength)
+    val cacheKey = "${System.identityHashCode(baseIcon)}_${baseIcon.intrinsicWidth}x${baseIcon.intrinsicHeight}_${badgeIcon.intrinsicWidth}"
     hsMarkerIconCache.get(cacheKey)?.let { return it }
 
-    val badgeIcon = createHsBadge(context)
     val combinedBitmap = android.graphics.Bitmap.createBitmap(
         baseIcon.intrinsicWidth,
         baseIcon.intrinsicHeight,

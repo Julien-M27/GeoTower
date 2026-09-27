@@ -29,6 +29,8 @@ object AppConfig {
     const val DEFAULT_MAP_LOCATION_ZOOM = 16
     const val MIN_MAP_LOCATION_ZOOM = 10
     const val MAX_MAP_LOCATION_ZOOM = 19
+    const val PREF_MAP_CLUSTER_STRENGTH = "map_cluster_strength"
+    const val DEFAULT_MAP_CLUSTER_STRENGTH = 100
     // Rotation de la carte. « enabled » = le pincement à deux doigts peut faire pivoter la carte
     // (sinon elle reste bloquée plein nord, comportement historique). « follow orientation » = la
     // carte s'aligne toute seule sur la boussole, comme en navigation.
@@ -192,6 +194,7 @@ object AppConfig {
     var mapRotationEnabled = mutableStateOf(DEFAULT_MAP_ROTATION_ENABLED)
     var mapFollowOrientation = mutableStateOf(DEFAULT_MAP_FOLLOW_ORIENTATION)
     var mapLocationZoom = mutableIntStateOf(DEFAULT_MAP_LOCATION_ZOOM)
+    var mapClusterStrength = mutableIntStateOf(DEFAULT_MAP_CLUSTER_STRENGTH)
     var showRadioSites = mutableStateOf(false)
     var showRadioTv = mutableStateOf(false)
     var showRadioBroadcast = mutableStateOf(false)
@@ -389,6 +392,8 @@ object AppConfig {
         mapFollowOrientation.value = MapDisplayPrefs.mapFollowOrientation.read(prefs)
         mapLocationZoom.intValue = MapDisplayPrefs.locationZoom.read(prefs)
             .coerceIn(MIN_MAP_LOCATION_ZOOM, MAX_MAP_LOCATION_ZOOM)
+        mapClusterStrength.intValue = MapDisplayPrefs.mapClusterStrength.read(prefs)
+            .coerceIn(0, 100)
         val legacyShowRadioSites = MapDisplayPrefs.showRadioSites.read(prefs)
         showRadioTv.value = prefs.getBoolean(PREF_SHOW_RADIO_TV, legacyShowRadioSites)
         showRadioBroadcast.value = prefs.getBoolean(PREF_SHOW_RADIO_BROADCAST, legacyShowRadioSites)

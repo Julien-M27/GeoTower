@@ -90,6 +90,7 @@ import androidx.compose.ui.unit.dp
 import fr.geotower.ui.theme.LocalGeoTowerUiSizing
 import androidx.compose.ui.zIndex
 import fr.geotower.R
+import fr.geotower.data.community.CommunityDataPreferences
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.PageCustomizationPrefs
 import android.content.Context
@@ -1015,7 +1016,6 @@ fun HomeSettingsSheet(
     val safeClick = rememberSafeClick()
     val featureFlags by RemoteFeatureFlags.config
     val sizing = LocalGeoTowerUiStyle.current.sizing
-
     // ---> 2. SÉCURITÉ ET RÉACTIVITÉ : Assure que le logo est dans la liste <---
     val safeOrder = remember(pagesOrder, featureFlags) {
         val withLogo = if (!pagesOrder.contains("logo")) pagesOrder + listOf("logo") else pagesOrder
@@ -1800,6 +1800,20 @@ fun MapSettingsSheet(
                     SimpleSwitchCard(stringResource(R.string.appstrings_show_speedometer), showMapLocation = showSpeedometer, onLocationChange = onSpeedometerChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
                     SimpleSwitchCard(stringResource(R.string.appstrings_map_scale_option), showMapLocation = showScale, onLocationChange = onScaleChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
                     SimpleSwitchCard(stringResource(R.string.appstrings_map_attribution_option), showMapLocation = showAttribution, onLocationChange = onAttributionChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
+                }
+
+                Spacer(modifier = Modifier.height(sizing.spacing(20.dp)))
+                Surface(
+                    shape = shape,
+                    border = border,
+                    color = if (useOneUi) bubbleColor else Color.Transparent,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    fr.geotower.ui.components.MapClusterStrengthSlider(
+                        useOneUi = useOneUi,
+                        showDescription = true,
+                        modifier = Modifier.padding(sizing.spacing(16.dp))
+                    )
                 }
 
                 // --- OUTIL DE MESURE : comportement à la suppression d'un trait ---
@@ -4205,6 +4219,9 @@ fun SitePhotosSettingsSheet(
     val scrollState = rememberScrollState()
     val featureFlags by RemoteFeatureFlags.config
     val sizing = LocalGeoTowerUiStyle.current.sizing
+    var hideDuplicatePhotos by remember {
+        mutableStateOf(CommunityDataPreferences.hideDuplicatePhotos(prefs))
+    }
 
     fun saveBool(key: String, state: androidx.compose.runtime.MutableState<Boolean>, value: Boolean) {
         state.value = value
@@ -4282,6 +4299,33 @@ fun SitePhotosSettingsSheet(
                                     checkedColor = switchColor
                                 )
                             }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = sizing.spacing(4.dp)),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.appstrings_community_data_hide_duplicate_photos),
+                                    modifier = Modifier.weight(1f),
+                                    style = sizing.textStyle(MaterialTheme.typography.bodyMedium)
+                                )
+                                fr.geotower.ui.components.GeoTowerSwitch(
+                                    checked = hideDuplicatePhotos,
+                                    onCheckedChange = {
+                                        hideDuplicatePhotos = it
+                                        CommunityDataPreferences.setHideDuplicatePhotos(prefs, it)
+                                    },
+                                    modifier = Modifier.scale(if (useOneUi) 0.85f else 0.8f),
+                                    useOneUi = useOneUi,
+                                    checkedColor = switchColor
+                                )
+                            }
+                            Text(
+                                text = stringResource(R.string.appstrings_community_data_hide_duplicate_photos_note),
+                                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = sizing.spacing(2.dp))
+                            )
                         }
                     }
                 }
@@ -4326,6 +4370,8 @@ fun SitePhotosSettingsSheet(
                     onPhotosVisibilityChange(true)
                     saveBool("site_show_schemes", AppConfig.siteShowSchemes, true)
                     saveBool("site_show_photo_exif", AppConfig.siteShowPhotoExif, true)
+                    hideDuplicatePhotos = true
+                    CommunityDataPreferences.setHideDuplicatePhotos(prefs, true)
                 },
                 modifier = Modifier.align(Alignment.CenterHorizontally)
             ) {

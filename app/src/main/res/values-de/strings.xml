@@ -3249,6 +3249,8 @@
     <string name="appstrings_release_v2060_summary_database_viewer">Neue Datenbankansicht mit Suche und Spaltenerklärungen</string>
     <string name="appstrings_release_v2060_summary_local_build">Zuverlässigere lokale Datenbankerstellung und Update-Prüfungen</string>
     <string name="appstrings_release_v2060_summary_live_photos">Zuverlässigeres Live-Tracking und bessere Verwaltung von Community-Fotos</string>
+    <string name="appstrings_release_v2061_summary_cluster_strength">Gruppierungsstärke der Antennen auf der Karte anpassen</string>
+    <string name="appstrings_release_v2061_summary_marker_readability">Besser lesbare Marker bei verschiedenen Zoomstufen, Filtern und Kartenstilen</string>
     <string name="database_viewer_title">Datenbank-Viewer</string>
     <string name="database_viewer_desc">Alle Tabellen und Zeilen in den lokalen Datenbanken durchsuchen. Schreibgeschützt.</string>
     <string name="database_viewer_mobile">Mobilfunkdatenbank</string>
@@ -3283,4 +3285,8 @@
     <string name="appstrings_local_build_fallback_link">Ausweichlink</string>
     <string name="appstrings_local_build_switch_to_fallback">Die Standard-CSV ist nur %1$d MiB groß; daher wird der Ausweichlink verwendet.</string>
     <string name="appstrings_local_build_fallback_unavailable">Die Standard-CSV ist nur %1$d MiB groß und es ist kein Ausweichlink verfügbar.</string>
+    <string name="map_clustering_strength_title">Stärke der Antennengruppierung</string>
+    <string name="map_clustering_strength_desc">Niedrigere Werte gruppieren weniger Antennen und zeigen kleinere, einfachere Markierungen.</string>
+    <string name="map_clustering_strength_low">Niedrig</string>
+    <string name="map_clustering_strength_high">Hoch</string>
 </resources>

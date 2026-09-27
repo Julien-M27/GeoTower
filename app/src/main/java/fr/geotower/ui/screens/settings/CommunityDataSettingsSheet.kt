@@ -120,9 +120,6 @@ fun CommunityDataSettingsSheet(
             }
         }
     }
-    var hideDuplicatePhotos by remember(featureFlags) {
-        mutableStateOf(CommunityDataPreferences.hideDuplicatePhotos(prefs))
-    }
     val sourceOrderStates = remember(featureFlags) {
         mutableStateMapOf<String, List<String>>().apply {
             CommunityDataPreferences.operators.forEach { operator ->
@@ -184,7 +181,6 @@ fun CommunityDataSettingsSheet(
     fun resetVisiblePreferences() {
         if (featureId == null) {
             CommunityDataPreferences.reset(prefs)
-            hideDuplicatePhotos = true
             enabledStates.clear()
             photosEnabledStates.clear()
             sourceOrderStates.clear()
@@ -208,10 +204,6 @@ fun CommunityDataSettingsSheet(
             return
         }
 
-        if (featureId == CommunityDataPreferences.FEATURE_PHOTOS) {
-            hideDuplicatePhotos = true
-            CommunityDataPreferences.setHideDuplicatePhotos(prefs, true)
-        }
         CommunityDataPreferences.operators.forEach { operator ->
             if (featureId == CommunityDataPreferences.FEATURE_PHOTOS) {
                 photosEnabledStates[operator.key] = true
@@ -272,34 +264,6 @@ fun CommunityDataSettingsSheet(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = sizing.spacing(16.dp))
             )
-
-            if (featureId == null || featureId == CommunityDataPreferences.FEATURE_PHOTOS) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(4.dp)),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = stringResource(R.string.appstrings_community_data_hide_duplicate_photos),
-                        modifier = Modifier.weight(1f),
-                        style = sizing.textStyle(MaterialTheme.typography.bodyMedium)
-                    )
-                    GeoTowerSwitch(
-                        checked = hideDuplicatePhotos,
-                        onCheckedChange = {
-                            hideDuplicatePhotos = it
-                            CommunityDataPreferences.setHideDuplicatePhotos(prefs, it)
-                        },
-                        modifier = Modifier.scale(if (useOneUi) 0.85f else 0.8f),
-                        useOneUi = useOneUi
-                    )
-                }
-                Text(
-                    text = stringResource(R.string.appstrings_community_data_hide_duplicate_photos_note),
-                    style = sizing.textStyle(MaterialTheme.typography.bodySmall),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = sizing.spacing(12.dp))
-                )
-            }
 
             communityOperators.forEach { operator ->
                 val visibleFeatures = operator.features.filter { feature -> featureId == null || feature.id == featureId }

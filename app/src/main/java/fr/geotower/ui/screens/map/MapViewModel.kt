@@ -33,6 +33,7 @@ import kotlinx.coroutines.launch
 import org.osmdroid.util.GeoPoint
 import fr.geotower.data.models.SiteHsEntity
 import fr.geotower.utils.AppConfig
+import fr.geotower.utils.MapClusterStrengthProfile
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.DepartmentCodes
 import fr.geotower.utils.FrequencyFilterSelection
@@ -300,7 +301,17 @@ class MapViewModel(
                 if (zoom < 13.0 && cityPolygons == null && !hasSiteDisplayFilter && !hasFrequencyFilter &&
                     !AppConfig.timeSliderActive.value && !repository.hasHiddenSites()
                 ) {
-                    val clusters = repository.getClusteredAntennas(zoom, latNorth, lonEast, latSouth, lonWest)
+                    val aggregationZoom = MapClusterStrengthProfile.aggregationZoom(
+                        mapZoom = zoom,
+                        strength = AppConfig.mapClusterStrength.intValue
+                    )
+                    val clusters = repository.getClusteredAntennas(
+                        aggregationZoom,
+                        latNorth,
+                        lonEast,
+                        latSouth,
+                        lonWest
+                    )
                     val clusterIsZb = if (AppConfig.showOnlyZbSites.value) 1 else 0
 
                     // On transforme ces DbCluster en fausses LocalisationEntity

@@ -3306,4 +3306,10 @@
     <string name="appstrings_release_v2060_summary_database_viewer">New database viewer with search and column explanations</string>
     <string name="appstrings_release_v2060_summary_local_build">More reliable local database builds and update checks</string>
     <string name="appstrings_release_v2060_summary_live_photos">More reliable live tracking and improved community photo handling</string>
+    <string name="appstrings_release_v2061_summary_cluster_strength">Adjust antenna clustering strength on the map</string>
+    <string name="appstrings_release_v2061_summary_marker_readability">More readable markers across zoom levels, filters and map styles</string>
+    <string name="map_clustering_strength_title">Antenna clustering strength</string>
+    <string name="map_clustering_strength_desc">Lower values group fewer antennas and show smaller, simpler markers.</string>
+    <string name="map_clustering_strength_low">Low</string>
+    <string name="map_clustering_strength_high">High</string>
 </resources>

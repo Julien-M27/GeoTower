@@ -429,6 +429,19 @@ fun MapFiltersControls(
                 )
             }
 
+            Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+            Surface(
+                shape = RoundedCornerShape(sizing.component(12.dp)),
+                color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                fr.geotower.ui.components.MapClusterStrengthSlider(
+                    useOneUi = LocalGeoTowerUiStyle.current.useOneUi,
+                    showDescription = false,
+                    modifier = Modifier.padding(sizing.spacing(16.dp))
+                )
+            }
+
             if (featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SIGNALQUEST_COVERAGE)) {
                 Spacer(modifier = Modifier.height(sizing.spacing(32.dp)))
 

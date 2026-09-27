@@ -50,7 +50,7 @@ class CarAntennaMapScreen(
     private var lifecycleEventCount = 0L
 
     init {
-        carLog("Carte: création de CarAntennaMapScreen, renderer=HOST_PLACE_LIST_V1 (${mapDiagnosticState()})")
+        carLog("Carte: création de CarAntennaMapScreen, renderer=HOST_PLACE_LIST_V2_AZIMUTH_IMAGE (${mapDiagnosticState()})")
         lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStart(owner: LifecycleOwner) {
                 carLog("Carte: onStart #${++lifecycleEventCount} (${mapDiagnosticState()})")
@@ -144,7 +144,7 @@ class CarAntennaMapScreen(
     }
 
     private fun loadedTemplate(sites: List<CarSiteListItem>): Template {
-        carLog("Carte: renderer=HOST_PLACE_LIST_V1, sites=${sites.size}, carte fournie par l'hôte")
+        carLog("Carte: renderer=HOST_PLACE_LIST_V2_AZIMUTH_IMAGE, sites=${sites.size}, carte fournie par l'hôte")
         return placeListMapTemplate(sites)
     }
 
@@ -265,11 +265,11 @@ class CarAntennaMapScreen(
             val markerIcon = CarIcon.Builder(
                 IconCompat.createWithBitmap(markerDrawable.bitmap)
             ).build()
-            // TYPE_IMAGE est rendu par l'hôte dans un cartouche blanc avec pointe (visible sur
-            // Android Auto). Le bitmap est déjà transparent autour du dessin : TYPE_ICON permet
-            // à l'hôte de conserver l'antenne directement comme contenu du marqueur.
+            // TYPE_ICON est teinté par l'hôte et réduit à 64 dp : les secteurs colorés
+            // deviennent illisibles. TYPE_IMAGE conserve les couleurs du bitmap et autorise
+            // une zone de 72 dp, même si l'hôte peut encore encadrer le repère.
             PlaceMarker.Builder()
-                .setIcon(markerIcon, PlaceMarker.TYPE_ICON)
+                .setIcon(markerIcon, PlaceMarker.TYPE_IMAGE)
                 .build()
         }.onFailure {
             AppFileLog.e(CAR_LOG_TAG, "Impossible de dessiner le marqueur antenne ${site.idAnfr}", it)
