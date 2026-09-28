@@ -3254,6 +3254,7 @@
     <string name="appstrings_release_v2061_summary_marker_readability">Marker più leggibili con diversi livelli di zoom, filtri e stili di mappa</string>
     <string name="appstrings_release_v2062_summary_cluster_strength">Regola l’intensità del raggruppamento delle antenne sulla mappa</string>
     <string name="appstrings_release_v2062_summary_marker_readability">Marker più leggibili con diversi livelli di zoom, filtri e stili di mappa</string>
+    <string name="appstrings_release_v2063_summary_map_loading">Ripristina il caricamento completo delle antenne sulla mappa</string>
     <string name="database_viewer_title">Visualizzatore database</string>
     <string name="database_viewer_desc">Consulta tutte le tabelle e le righe dei database locali. Sola lettura.</string>
     <string name="database_viewer_mobile">Database mobile</string>

@@ -3254,6 +3254,7 @@
     <string name="appstrings_release_v2061_summary_marker_readability">More readable markers across zoom levels, filters and map styles</string>
     <string name="appstrings_release_v2062_summary_cluster_strength">Adjust antenna clustering strength on the map</string>
     <string name="appstrings_release_v2062_summary_marker_readability">More readable markers across zoom levels, filters and map styles</string>
+    <string name="appstrings_release_v2063_summary_map_loading">Restores complete antenna loading on the map</string>
     <string name="database_viewer_title">Database viewer</string>
     <string name="database_viewer_desc">Browse every table and row in the local databases. Read-only.</string>
     <string name="database_viewer_mobile">Mobile database</string>

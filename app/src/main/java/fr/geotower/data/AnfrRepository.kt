@@ -913,25 +913,13 @@ class AnfrRepository(
         lonEast: Double,
         latSouth: Double,
         lonWest: Double,
-        detailBackedBandMask: Int = DETAIL_BACKED_5G_BANDS,
-        maxResults: Int = Int.MAX_VALUE
+        detailBackedBandMask: Int = DETAIL_BACKED_5G_BANDS
     ): List<LocalisationEntity> {
-        val resultLimit = maxResults.coerceAtLeast(0)
-        if (resultLimit == 0) return emptyList()
-
         if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_BBOX)) {
             return hideHiddenSites(getLiveSitesInBox(latNorth, lonEast, latSouth, lonWest))
-                .take(resultLimit)
         }
 
         val bounds = mapQueryBounds(latNorth, lonEast, latSouth, lonWest)
-        val rangeLimit = if (resultLimit == Int.MAX_VALUE) {
-            Int.MAX_VALUE
-        } else {
-            kotlin.math.ceil(resultLimit.toDouble() / bounds.longitudeRanges.size.coerceAtLeast(1))
-                .toInt()
-                .coerceAtLeast(1)
-        }
         val localisations = queryLocalDatabase(emptyList()) {
             bounds.longitudeRanges
                 .flatMap { range ->
@@ -939,12 +927,10 @@ class AnfrRepository(
                         minLat = bounds.minLat,
                         maxLat = bounds.maxLat,
                         minLon = range.min,
-                        maxLon = range.max,
-                        limit = rangeLimit
+                        maxLon = range.max
                     )
                 }
                 .distinctBy { it.idAnfr }
-                .take(resultLimit)
         }
         return hideHiddenSites(enrichRadioBandMasksFromDetails(localisations, detailBackedBandMask))
     }
@@ -1099,11 +1085,8 @@ class AnfrRepository(
         lonEast: Double,
         latSouth: Double,
         lonWest: Double,
-        frequencyFilter: FrequencyFilterSelection,
-        maxResults: Int = Int.MAX_VALUE
+        frequencyFilter: FrequencyFilterSelection
     ): List<LocalisationEntity> {
-        val resultLimit = maxResults.coerceAtLeast(0)
-        if (resultLimit == 0) return emptyList()
         val detailBackedBandMask = frequencyFilter.detailBackedBandMaskForEnrichment()
         if (frequencyFilter.isFullyEnabled) {
             return getAntennasInBox(
@@ -1111,14 +1094,12 @@ class AnfrRepository(
                 lonEast = lonEast,
                 latSouth = latSouth,
                 lonWest = lonWest,
-                detailBackedBandMask = detailBackedBandMask,
-                maxResults = resultLimit
+                detailBackedBandMask = detailBackedBandMask
             )
         }
 
         if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_BBOX)) {
             val liveSites = getLiveSitesInBox(latNorth, lonEast, latSouth, lonWest)
-                .take(resultLimit)
             return if (detailBackedBandMask != 0 && liveSites.size <= LIVE_DETAIL_LOOKUP_LIMIT) {
                 hideHiddenSites(enrichRadioBandMasksFromDetails(liveSites, detailBackedBandMask))
             } else {
@@ -1133,13 +1114,6 @@ class AnfrRepository(
         }
 
         val bounds = mapQueryBounds(latNorth, lonEast, latSouth, lonWest)
-        val rangeLimit = if (resultLimit == Int.MAX_VALUE) {
-            Int.MAX_VALUE
-        } else {
-            kotlin.math.ceil(resultLimit.toDouble() / bounds.longitudeRanges.size.coerceAtLeast(1))
-                .toInt()
-                .coerceAtLeast(1)
-        }
         val localisations = queryLocalDatabase(emptyList()) {
             bounds.longitudeRanges
                 .flatMap { range ->
@@ -1150,12 +1124,10 @@ class AnfrRepository(
                         maxLon = range.max,
                         selectedBandMask = selectedBandMask,
                         detailBackedBandMask = detailBackedBandMask,
-                        includeFh = includeFh,
-                        limit = rangeLimit
+                        includeFh = includeFh
                     )
                 }
                 .distinctBy { it.idAnfr }
-                .take(resultLimit)
         }
         return hideHiddenSites(enrichRadioBandMasksFromDetails(localisations, detailBackedBandMask))
     }

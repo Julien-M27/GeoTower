@@ -276,14 +276,6 @@ class MapViewModel(
                 val keepDetailedAzimuths = AppConfig.showAzimuths.value &&
                     AppConfig.keepAzimuthsWhenZoomedOut.value
                 val radioMarkerQueryZoom = if (keepDetailedAzimuths) maxOf(zoom, 13.0) else zoom
-                // La carte n'affiche déjà qu'un nombre borné de pylônes. À faible zoom, ne
-                // matérialiser que quelques lignes ANFR par pylône affichable évite de convertir
-                // toute la France en objets Kotlin avant d'appliquer ce plafond.
-                val detailedMapRowLimit = if (keepDetailedAzimuths && zoom < 13.0) {
-                    PowerProfile.mapMarkerCap * 4
-                } else {
-                    Int.MAX_VALUE
-                }
 
                 if (!showSitesInService && !showSitesOutOfService && !showProjectSites) {
                     _antennas.value = emptyList()
@@ -383,8 +375,7 @@ class MapViewModel(
                             lonEast = lonEast,
                             latSouth = latSouth,
                             lonWest = lonWest,
-                            frequencyFilter = frequencyFilter,
-                            maxResults = detailedMapRowLimit
+                            frequencyFilter = frequencyFilter
                         )
                     } else {
                         repository.getAntennasInBox(
@@ -392,8 +383,7 @@ class MapViewModel(
                             lonEast,
                             latSouth,
                             lonWest,
-                            detailBackedBandMask = detailBackedBandMask,
-                            maxResults = detailedMapRowLimit
+                            detailBackedBandMask = detailBackedBandMask
                         )
                     }
 
