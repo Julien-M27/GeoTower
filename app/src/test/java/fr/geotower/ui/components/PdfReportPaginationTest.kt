@@ -1,5 +1,6 @@
 package fr.geotower.ui.components
 
+import fr.geotower.utils.FreqBand
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -10,6 +11,27 @@ import org.junit.Test
  * ne doit ni perdre ni dupliquer une ligne, et les sections doivent rester dans l'ordre.
  */
 class PdfReportPaginationTest {
+
+    @Test
+    fun pdfAntennaSummaryRetainsEveryMatchingSectorMarker() {
+        val band = FreqBand(
+            rawFreq = "LTE 800",
+            status = "En service",
+            date = "",
+            physDetails = listOf(
+                "Panneau : 120° (20m) [AER_ID: AE1]",
+                "Panneau : 120° (30m) [AER_ID: AE2]",
+                "Panneau : 240° (30m) [AER_ID: AE3]",
+            ),
+            gen = 4,
+            value = 800,
+            activeAzimuths = setOf(120),
+        )
+
+        val row = buildPdfAntennaSummaryRows(listOf(band)).single()
+
+        assertEquals(listOf(120, 120), row.sectorMarkerAzimuths)
+    }
 
     private fun assertCoversEverything(
         emitterCount: Int,

@@ -1,10 +1,26 @@
 package fr.geotower.data
 
 import fr.geotower.data.models.RadioFilterMasks
+import fr.geotower.data.models.LiveSiteDetailDto
+import fr.geotower.data.models.toTechniqueEntity
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AnfrRepositoryFrequencyDetailsTest {
+    @Test
+    fun liveTechniqueCarriesOptionalFrequencyAzimuthMapping() {
+        val withMapping = LiveSiteDetailDto(
+            idAnfr = "1",
+            detailsAzimutsFrequences = "{\"LTE 800\":[0,120]}"
+        ).toTechniqueEntity()
+        assertEquals("{\"LTE 800\":[0,120]}", withMapping?.detailsAzimutsFrequences)
+
+        val oldResponse = LiveSiteDetailDto(idAnfr = "2").toTechniqueEntity()
+        assertNull(oldResponse?.detailsAzimutsFrequences)
+    }
+
     @Test
     fun frequencyDetailsMaskKeepsExistingLteBands() {
         val details = "LTE 1800 (4G) : 1835-1850 MHz | En service | 2026-05-07 | Panneau : 120 deg (24m)"

@@ -10,8 +10,24 @@ data class FreqBand(
     val physDetails: List<String>,
     val gen: Int,
     val value: Int,
-    val spectrumLines: List<String> = emptyList()
+    val spectrumLines: List<String> = emptyList(),
+    val activeAzimuths: Set<Int>? = null
 )
+
+fun FreqBand.isActiveOnAzimuth(azimuth: Int): Boolean {
+    val normalized = FrequencyAzimuths.normalizeAzimuth(azimuth) ?: return false
+    return activeAzimuths?.contains(normalized) ?: true
+}
+
+private val physicalAzimuthRegex = Regex("""(-?\d+)\s*(?:°|deg(?:rees?)?)""", RegexOption.IGNORE_CASE)
+private val displayGenerationSuffixRegex = Regex("\\s*\\([2345]G\\)$")
+
+private fun frequencySystemAzimuthKey(value: String): String =
+    FrequencyAzimuths.normalizeSystem(value).replace(displayGenerationSuffixRegex, "").trim()
+
+fun extractPhysicalAzimuth(physicalDetails: String): Int? =
+    physicalAzimuthRegex.find(physicalDetails)?.groupValues?.getOrNull(1)?.toIntOrNull()
+        ?.let(FrequencyAzimuths::normalizeAzimuth)
 
 private data class FrequencyAccumulator(
     val band: FreqBand,
@@ -27,7 +43,8 @@ private data class SpectrumLine(
 fun parseAndSortFrequencies(
     freqStr: String?,
     txtUnknown: String,
-    txtAzimuthNotSpecified: String
+    txtAzimuthNotSpecified: String,
+    frequencyAzimuthsBySystem: Map<String, Set<Int>> = emptyMap()
 ): List<FreqBand> {
     if (freqStr.isNullOrBlank()) return emptyList()
 
@@ -56,7 +73,16 @@ fun parseAndSortFrequencies(
 
         val accumulator = tempMap.getOrPut(groupingKey) {
             val freqValue = frequencySortValue(systemName, rawFrequencies, isFh)
-            val band = FreqBand(rawFrequencies, status, dateStr, emptyList(), generation, freqValue)
+            val band = FreqBand(
+                rawFrequencies, status, dateStr, emptyList(), generation, freqValue,
+                activeAzimuths = frequencyAzimuthsBySystem.entries
+                    .asSequence()
+                    .filter { frequencySystemAzimuthKey(it.key) == frequencySystemAzimuthKey(systemName) }
+                    .flatMap { it.value.asSequence() }
+                    .mapNotNull(FrequencyAzimuths::normalizeAzimuth)
+                    .toSet()
+                    .takeIf { it.isNotEmpty() },
+            )
             FrequencyAccumulator(band)
         }
 

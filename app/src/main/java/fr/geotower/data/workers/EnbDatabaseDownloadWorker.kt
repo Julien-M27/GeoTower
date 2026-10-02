@@ -73,7 +73,13 @@ class EnbDatabaseDownloadWorker(
                 DbOperationTimings.finish(context, DbOperationTimings.ENB_DOWNLOAD)
                 setProgress(workDataOf(KEY_PROGRESS to 100, KEY_PAUSED to false))
                 showSuccessNotification()
-                Result.success()
+                Result.success(
+                    workDataOf(
+                        DownloadNotificationCenter.KEY_SUCCESSFUL_DATABASE_DOWNLOAD to true,
+                        DownloadNotificationCenter.KEY_DATABASE_DISPLAY_NAME to
+                            context.getString(R.string.notification_history_type_db_enb)
+                    )
+                )
             } else {
                 OperationPauseStore.clear(context, OperationPauseStore.ENB_DB_DOWNLOAD)
                 DbOperationTimings.clearStart(context, DbOperationTimings.ENB_DOWNLOAD)
@@ -269,7 +275,13 @@ class EnbDatabaseDownloadWorker(
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
             data = android.net.Uri.parse("geotower://settings?section=db_enb")
-            if (showSuccessPopup) putExtra("SHOW_DB_SUCCESS_POPUP", true)
+            if (showSuccessPopup) {
+                putExtra("SHOW_DB_SUCCESS_POPUP", true)
+                putExtra(
+                    DownloadNotificationCenter.EXTRA_DATABASE_DISPLAY_NAME,
+                    context.getString(R.string.notification_history_type_db_enb)
+                )
+            }
         }
         return PendingIntent.getActivity(
             context,
@@ -301,6 +313,7 @@ class EnbDatabaseDownloadWorker(
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
             .setInputData(workDataOf(KEY_CONTINUE_AFTER_FAILURE to continueAfterFailure))
             .addTag(WORK_TAG)
+            .addTag(DownloadNotificationCenter.DATABASE_DOWNLOADS_WORK_TAG)
             .apply { bulkActionTag?.let(::addTag) }
             .build()
 

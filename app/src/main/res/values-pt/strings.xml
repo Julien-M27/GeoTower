@@ -256,6 +256,7 @@
     <string name="database_delete_warning_desc">Tem a certeza de que pretende eliminar a base de dados?</string>
     <string name="database_download_success_title">Transferência concluída</string>
     <string name="database_download_success_desc">A base de dados foi transferida com sucesso!</string>
+    <string name="database_download_success_desc_named">Transferência concluída: %1$s.</string>
     <string name="notification_database_channel_name">Bases de dados</string>
     <string name="notification_database_download_title">Atualização da base: %1$s</string>
     <string name="notification_database_first_download_title">A transferir a base: %1$s</string>
@@ -3255,6 +3256,8 @@
     <string name="appstrings_release_v2062_summary_cluster_strength">Ajuste a intensidade do agrupamento de antenas no mapa</string>
     <string name="appstrings_release_v2062_summary_marker_readability">Marcadores mais legíveis com diferentes níveis de zoom, filtros e mapas</string>
     <string name="appstrings_release_v2063_summary_map_loading">Restaura o carregamento completo das antenas no mapa</string>
+    <string name="appstrings_release_v2064_summary_frequency_azimuths">Mostra os azimutes ativos de cada setor de frequência</string>
+    <string name="appstrings_release_v2064_summary_database_notifications">Notificações de download das bases de dados mais claras</string>
     <string name="database_viewer_title">Visualizador de bases de dados</string>
     <string name="database_viewer_desc">Consulte todas as tabelas e linhas das bases de dados locais. Apenas leitura.</string>
     <string name="database_viewer_mobile">Base de dados móvel</string>

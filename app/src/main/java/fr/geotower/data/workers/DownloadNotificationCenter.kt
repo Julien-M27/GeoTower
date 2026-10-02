@@ -5,6 +5,11 @@ import android.content.Context
 import android.os.Build
 
 object DownloadNotificationCenter {
+    const val DATABASE_DOWNLOADS_WORK_TAG = "database_download_all"
+    const val KEY_SUCCESSFUL_DATABASE_DOWNLOAD = "successful_database_download"
+    const val KEY_DATABASE_DISPLAY_NAME = "database_display_name"
+    const val EXTRA_DATABASE_DISPLAY_NAME = "DB_SUCCESS_POPUP_NAME"
+
     const val DB_UPDATE_AVAILABLE_NOTIFICATION_ID = 2001
     const val APP_UPDATE_AVAILABLE_NOTIFICATION_ID = 2002
     const val RADIO_DB_UPDATE_AVAILABLE_NOTIFICATION_ID = 2003

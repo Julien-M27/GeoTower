@@ -256,6 +256,7 @@
     <string name="database_delete_warning_desc">Vuoi davvero eliminare il database?</string>
     <string name="database_download_success_title">Download completato</string>
     <string name="database_download_success_desc">Il database è stato scaricato correttamente!</string>
+    <string name="database_download_success_desc_named">Download completato: %1$s.</string>
     <string name="notification_database_channel_name">Database</string>
     <string name="notification_database_download_title">Aggiornamento database: %1$s</string>
     <string name="notification_database_first_download_title">Download del database: %1$s</string>
@@ -3255,6 +3256,8 @@
     <string name="appstrings_release_v2062_summary_cluster_strength">Regola l’intensità del raggruppamento delle antenne sulla mappa</string>
     <string name="appstrings_release_v2062_summary_marker_readability">Marker più leggibili con diversi livelli di zoom, filtri e stili di mappa</string>
     <string name="appstrings_release_v2063_summary_map_loading">Ripristina il caricamento completo delle antenne sulla mappa</string>
+    <string name="appstrings_release_v2064_summary_frequency_azimuths">Visualizza gli azimut attivi per ogni settore di frequenza</string>
+    <string name="appstrings_release_v2064_summary_database_notifications">Notifiche di download dei database più chiare</string>
     <string name="database_viewer_title">Visualizzatore database</string>
     <string name="database_viewer_desc">Consulta tutte le tabelle e le righe dei database locali. Sola lettura.</string>
     <string name="database_viewer_mobile">Database mobile</string>

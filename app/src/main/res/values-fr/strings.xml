@@ -284,6 +284,7 @@
     <string name="database_delete_warning_desc">Êtes-vous sûr de vouloir supprimer la base de données ?</string>
     <string name="database_download_success_title">Téléchargement terminé</string>
     <string name="database_download_success_desc">La base de données a été téléchargée avec succès !</string>
+    <string name="database_download_success_desc_named">Téléchargement réussi : %1$s.</string>
     <string name="notification_database_channel_name">Bases de données</string>
     <string name="notification_database_download_title">Mise à jour de la base : %1$s</string>
     <string name="notification_database_first_download_title">Téléchargement de la base : %1$s</string>
@@ -3291,6 +3292,8 @@
     <string name="appstrings_release_v2062_summary_cluster_strength">Réglez l’intensité du regroupement des antennes sur la carte</string>
     <string name="appstrings_release_v2062_summary_marker_readability">Marqueurs plus lisibles selon le zoom, les filtres et le fond de carte</string>
     <string name="appstrings_release_v2063_summary_map_loading">Rétablit le chargement complet des antennes sur la carte</string>
+    <string name="appstrings_release_v2064_summary_frequency_azimuths">Affichage des azimuts actifs par secteur de fréquence</string>
+    <string name="appstrings_release_v2064_summary_database_notifications">Notifications de téléchargement des bases plus claires</string>
     <string name="map_clustering_strength_title">Intensité du regroupement des antennes</string>
     <string name="map_clustering_strength_desc">Une valeur basse regroupe moins d’antennes et affiche des marqueurs plus petits et simplifiés.</string>
     <string name="map_clustering_strength_low">Faible</string>

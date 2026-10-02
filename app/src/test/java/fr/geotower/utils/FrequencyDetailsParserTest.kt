@@ -29,6 +29,35 @@ class FrequencyDetailsParserTest {
     }
 
     @Test
+    fun assignsNormalizedFrequencyAzimuthsBySystemAndRetainsMissingMappingFallback() {
+        val bands = parseAndSortFrequencies(
+            "LTE 800 (4G) : 791-801 MHz | En service\n5G NR 3500 : 3490-3540 MHz | En service",
+            txtUnknown,
+            txtAzimuthNotSpecified,
+            mapOf(" lte 800 " to setOf(0, 120)),
+        )
+
+        val lte = bands.first { it.gen == 4 }
+        val fiveG = bands.first { it.gen == 5 }
+        assertEquals(setOf(0, 120), lte.activeAzimuths)
+        assertTrue(lte.isActiveOnAzimuth(360))
+        assertFalse(lte.isActiveOnAzimuth(240))
+        assertEquals(null, fiveG.activeAzimuths)
+        assertTrue(fiveG.isActiveOnAzimuth(240))
+    }
+
+    @Test
+    fun extractsPhysicalAzimuthAndKeepsSameAngleAntennaRowsIndependent() {
+        val rows = listOf(
+            "Panneau : 120° (20m) [AER_ID: AE1]",
+            "Panneau : 120° (30m) [AER_ID: AE2]",
+        )
+        assertEquals(listOf(120, 120), rows.map(::extractPhysicalAzimuth))
+        val band = FreqBand("LTE 800", "En service", "", rows, 4, 800, activeAzimuths = setOf(120))
+        assertTrue(rows.all { band.isActiveOnAzimuth(extractPhysicalAzimuth(it)!!) })
+    }
+
+    @Test
     fun doesNotTurnTheAzimuthPlaceholderIntoAnAntennaDetail() {
         // GOTCHA : les builders ecrivent le marqueur SANS accent ; seule la forme accentuee etait
         // filtree, si bien que « Azimut non specifie » s'affichait comme un panneau de la fiche.

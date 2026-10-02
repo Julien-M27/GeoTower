@@ -48,6 +48,7 @@ data class LiveSiteDetailDto(
     @SerializedName("date_service") val dateService: String? = null,
     @SerializedName("date_modif") val dateModif: String? = null,
     @SerializedName("details_frequences") val detailsFrequences: String? = null,
+    @SerializedName("details_azimuts_frequences") val detailsAzimutsFrequences: String? = null,
     @SerializedName("adresse") val adresse: String? = null,
     @SerializedName("operator_name") val operatorName: String? = null,
     @SerializedName("code_insee") val codeInsee: String? = null,
@@ -108,7 +109,8 @@ fun LiveSiteDetailDto.toTechniqueEntity(): TechniqueEntity? {
         dateService = dateService,
         dateModif = dateModif,
         encodedDetailsFrequences = detailsFrequences,
-        adresse = adresse
+        adresse = adresse,
+        detailsAzimutsFrequences = detailsAzimutsFrequences
     )
 }
 

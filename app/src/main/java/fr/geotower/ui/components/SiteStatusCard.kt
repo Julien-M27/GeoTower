@@ -37,6 +37,7 @@ import fr.geotower.data.models.SiteHsEntity
 import fr.geotower.data.outages.OutageStatusCodes
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppConfig
+import fr.geotower.utils.FrequencyStatusPalette
 import fr.geotower.utils.LocalizedDateLabels
 
 /** Couleur d'un « ? » quand l'état précis de la génération n'est pas publié. */
@@ -260,7 +261,7 @@ fun SiteStatusCard(
     // Couleurs
     val colorOk = Color(0xFF4CAF50) // Vert
     val colorKo = Color(0xFFE53935) // Rouge
-    val colorProject = Color(0xFFFFA000) // Jaune/Orange (Projet)
+    val colorProject = FrequencyStatusPalette.Approved // Jaune/Orange (Projet)
     val colorNeutral = Color.Gray.copy(alpha = 0.5f) // Gris
     var showLegendDialog by remember { mutableStateOf(false) }
     val hasKnownServiceState = techStatus.values.any { it.isVoixOk != null || it.isInternetOk != null }
@@ -504,7 +505,7 @@ private fun StatusLegendDialog(onDismiss: () -> Unit) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
     val colorOk = Color(0xFF4CAF50)
     val colorKo = Color(0xFFE53935)
-    val colorProject = Color(0xFFFFA000)
+    val colorProject = FrequencyStatusPalette.Approved
     val colorNeutral = Color.Gray.copy(alpha = 0.45f)
 
     AlertDialog(
@@ -885,7 +886,7 @@ private fun ServiceRow(
     val sizing = LocalGeoTowerUiSizing.current
     val colorOk = Color(0xFF4CAF50)
     val colorKo = Color(0xFFE53935)
-    val colorProject = Color(0xFFFFA000)
+    val colorProject = FrequencyStatusPalette.Approved
     val colorNeutral = Color.Gray.copy(alpha = 0.3f)
 
     Row(

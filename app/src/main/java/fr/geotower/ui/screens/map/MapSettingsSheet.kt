@@ -58,6 +58,7 @@ import fr.geotower.utils.MapDisplayPrefs
 import fr.geotower.utils.OperatorColorSpec
 import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.PowerProfile
+import fr.geotower.utils.FrequencyStatusPalette
 import android.content.SharedPreferences
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.runtime.MutableState
@@ -68,7 +69,7 @@ import kotlinx.coroutines.withContext
 private val OperatorFilterButtonHeight = 76.dp
 
 /** Jaune/orange « projet », identique au statut affiché sur la fiche site (SiteStatusCard). */
-internal val ProjectFilterColor = Color(0xFFFFA000)
+internal val ProjectFilterColor = FrequencyStatusPalette.Approved
 private const val PREF_OPERATOR_FILTER_METRO_EXPANDED = "map_operator_filter_metro_expanded"
 private const val PREF_OPERATOR_FILTER_OVERSEAS_EXPANDED = "map_operator_filter_overseas_expanded"
 

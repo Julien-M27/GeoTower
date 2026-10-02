@@ -90,7 +90,6 @@ import fr.geotower.data.build.LocalBuildCapability
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.db.GeoTowerDatabaseValidator
 import fr.geotower.data.workers.DatabaseBulkUpdate
-import fr.geotower.data.workers.DatabaseDownloadWorker
 import fr.geotower.data.workers.LocalDbBuildWorker
 import fr.geotower.ui.components.SafeClick
 import fr.geotower.ui.components.geoTowerFadingEdge
@@ -269,32 +268,19 @@ fun FirstStartScreen(
 
     // ✅ NOUVEAU : Variables pour gérer le pop-up de succès de fin de téléchargement
     var showSuccessDialog by remember { mutableStateOf(false) }
-    var wasSyncing by remember { mutableStateOf(false) }
+    var wasBuilding by remember { mutableStateOf(false) }
 
     val workManager = remember { androidx.work.WorkManager.getInstance(context) }
-    val workInfos by workManager.getWorkInfosByTagFlow(DatabaseDownloadWorker.WORK_TAG).collectAsState(initial = emptyList())
-    val currentWork = workInfos.firstOrNull { workInfo ->
-        workInfo.state == androidx.work.WorkInfo.State.RUNNING ||
-            workInfo.state == androidx.work.WorkInfo.State.ENQUEUED ||
-            workInfo.state == androidx.work.WorkInfo.State.BLOCKED
-    }
-    val isDownloading = currentWork != null
     // La base peut aussi arriver par génération locale (étape 6) : on surveille les deux chemins,
     // sinon le pop-up de succès ne s'afficherait jamais pour un utilisateur qui génère au lieu de
     // télécharger.
     val buildInfos by workManager.getWorkInfosForUniqueWorkFlow(LocalDbBuildWorker.UNIQUE_WORK_NAME).collectAsState(initial = emptyList())
     val currentBuild = buildInfos.firstOrNull()
     val isBuilding = currentBuild?.state == androidx.work.WorkInfo.State.RUNNING || currentBuild?.state == androidx.work.WorkInfo.State.ENQUEUED
-    val bulkWorkInfos by workManager
-        .getWorkInfosForUniqueWorkFlow(DatabaseBulkUpdate.UNIQUE_WORK_NAME)
-        .collectAsState(initial = emptyList())
-    val isBulkUpdating = bulkWorkInfos.any { workInfo -> !workInfo.state.isFinished }
-    val isSyncing = isDownloading || isBuilding || isBulkUpdating
-
-    // ✅ NOUVEAU : On détecte le passage exact de "En téléchargement" à "Terminé"
-    LaunchedEffect(isSyncing) {
-        if (wasSyncing && !isSyncing) {
-            // Le téléchargement vient de s'arrêter. Vérifions le vrai schema local.
+    // La génération locale conserve son dialogue propre; les téléchargements utilisent la file
+    // globale avec le nom de chaque base réellement réussie.
+    LaunchedEffect(isBuilding) {
+        if (wasBuilding && !isBuilding) {
             val dbState = withContext(Dispatchers.IO) {
                 GeoTowerDatabaseValidator.getInstalledDatabaseStatus(context).state
             }
@@ -303,7 +289,7 @@ fun FirstStartScreen(
                 showSuccessDialog = true
             }
         }
-        wasSyncing = isSyncing
+        wasBuilding = isBuilding
     }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var appLanguage by remember { mutableStateOf(prefs.getString("app_language", AppLocale.LANGUAGE_SYSTEM) ?: AppLocale.LANGUAGE_SYSTEM) }
@@ -566,8 +552,51 @@ fun FirstStartScreen(
         )
     }
 
-    // --- POP-UP DE SUCCÈS FIN DE TÉLÉCHARGEMENT ---
-    if (showSuccessDialog) {
+    // Les téléchargements aboutis sont montrés un par un, même si plusieurs bases ont fini
+    // pendant une mise à jour groupée.
+    val pendingDbSuccessPopup = fr.geotower.AppGlobalState.pendingDbSuccessPopups.firstOrNull()
+    if (pendingDbSuccessPopup != null) {
+        fun dismissDownloadedDatabasePopup() {
+            fr.geotower.AppGlobalState.dismissDbSuccessPopup(pendingDbSuccessPopup.workId)
+            fr.geotower.AppGlobalState.showDbSuccessPopup.value = false
+            fr.geotower.AppGlobalState.dbSuccessPopupName.value = null
+            if (
+                pendingDbSuccessPopup.databaseName == context.getString(R.string.notification_history_type_db_mobile) &&
+                steps.getOrNull(currentStep) == OnboardingStep.Database
+            ) {
+                goToNextStep()
+            }
+        }
+
+        AlertDialog(
+            onDismissRequest = ::dismissDownloadedDatabasePopup,
+            title = {
+                Text(
+                    text = stringResource(R.string.database_download_success_title),
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            },
+            text = {
+                Text(
+                    stringResource(
+                        R.string.database_download_success_desc_named,
+                        pendingDbSuccessPopup.databaseName
+                    )
+                )
+            },
+            shape = cardShape,
+            containerColor = MaterialTheme.colorScheme.surface,
+            confirmButton = {
+                Button(onClick = ::dismissDownloadedDatabasePopup) {
+                    Text(stringResource(R.string.common_continue), fontWeight = FontWeight.Bold)
+                }
+            }
+        )
+    }
+
+    // --- POP-UP DE SUCCÈS DE GÉNÉRATION LOCALE ---
+    if (showSuccessDialog && pendingDbSuccessPopup == null) {
         AlertDialog(
             onDismissRequest = {
                 showSuccessDialog = false

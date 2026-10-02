@@ -93,7 +93,12 @@ import fr.geotower.utils.AnfrDisplayText
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.FrequencyStatusType
+import fr.geotower.utils.FrequencyAzimuths
+import fr.geotower.utils.FrequencyStatusPalette
 import fr.geotower.utils.FreqBand
+import fr.geotower.utils.extractPhysicalAzimuth
+import fr.geotower.utils.isActiveOnAzimuth
+import fr.geotower.utils.sectorMarkerColor
 import fr.geotower.utils.SharePrefs
 import fr.geotower.utils.addMicrowaveFallbackBands
 import fr.geotower.utils.classifyFrequencyStatus
@@ -2111,7 +2116,12 @@ private fun shareSiteFrequencyBands(
     txtAzimuthNotSpecified: String
 ): List<FreqBand> {
     val rawFreqs = technique?.detailsFrequences ?: info.frequences
-    return parseAndSortFrequencies(rawFreqs, txtUnknown, txtAzimuthNotSpecified)
+    return parseAndSortFrequencies(
+        rawFreqs,
+        txtUnknown,
+        txtAzimuthNotSpecified,
+        FrequencyAzimuths.decode(technique?.detailsAzimutsFrequences),
+    )
         .filter { pdfShouldDisplayFrequencyBand(it) }
 }
 
@@ -2172,11 +2182,12 @@ private fun ShareSiteFrequencyDetailCard(
                     modifier = Modifier.padding(vertical = 12.dp),
                     color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
                 )
-                val (statusColor, statusText) = when {
-                    band.status.contains("En service", true) -> Pair(Color(0xFF4CAF50), txtInService)
-                    band.status.contains("Techniquement", true) -> Pair(Color(0xFF4CAF50), txtTechnically)
-                    band.status.contains("Approuvé", true) -> Pair(Color(0xFF2196F3), txtProjectApproved)
-                    else -> Pair(Color.Gray, txtUnknownStatus)
+                val statusType = classifyFrequencyStatus(band.status)
+                val (statusColor, statusText) = when (statusType) {
+                    FrequencyStatusType.InService -> Pair(FrequencyStatusPalette.InService, txtInService)
+                    FrequencyStatusType.TechnicallyOperational -> Pair(FrequencyStatusPalette.TechnicallyOperational, txtTechnically)
+                    FrequencyStatusType.Approved -> Pair(FrequencyStatusPalette.color(statusType), txtProjectApproved)
+                    FrequencyStatusType.Unknown -> Pair(FrequencyStatusPalette.Unknown, txtUnknownStatus)
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -2265,6 +2276,12 @@ private fun ShareSiteFrequencyDetailCard(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.padding(top = 4.dp)
                             ) {
+                                band.sectorMarkerColor(
+                                    extractPhysicalAzimuth(physDetail),
+                                )?.let { markerColor ->
+                                    Box(Modifier.size(8.dp).clip(CircleShape).background(markerColor))
+                                    Spacer(modifier = Modifier.width(5.dp))
+                                }
                                 Icon(
                                     Icons.Default.Explore,
                                     null,
@@ -2726,12 +2743,7 @@ private fun GeoTowerPdfFrequenciesCard(
                             FrequencyStatusType.Approved -> txtProjectApproved
                             FrequencyStatusType.Unknown -> txtUnknownStatus
                         }
-                        val statusColor = when (statusType) {
-                            FrequencyStatusType.InService -> Color(0xFF4CAF50)
-                            FrequencyStatusType.TechnicallyOperational -> Color(0xFF0EA2D7)
-                            FrequencyStatusType.Approved -> Color(0xFF2196F3)
-                            FrequencyStatusType.Unknown -> MaterialTheme.colorScheme.onSurfaceVariant
-                        }
+                        val statusColor = FrequencyStatusPalette.color(statusType)
                         val dateFormatted = formatDateToFrench(band.date)
                         val dateDisplay = if (dateFormatted.isNotBlank() && dateFormatted != "-") {
                             dateFormatted
@@ -2857,7 +2869,30 @@ private fun GeoTowerPdfAntennaRow(row: PdfAntennaSummaryRow) {
         GeoTowerPdfBodyCell(row.azimuth, Modifier.weight(0.7f), fontWeight = FontWeight.SemiBold)
         GeoTowerPdfBodyCell(row.height, Modifier.weight(0.65f))
         GeoTowerPdfBodyCell(row.panelSize, Modifier.weight(0.6f))
-        GeoTowerPdfBodyCell(row.bands, Modifier.weight(1.1f), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+        Column(
+            modifier = Modifier.weight(1.1f).padding(vertical = 2.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                text = row.bands,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold,
+                fontSize = 8.sp,
+                lineHeight = 9.sp,
+                textAlign = TextAlign.Center,
+            )
+            if (row.sectorMarkerAzimuths.isNotEmpty()) {
+                Spacer(Modifier.height(3.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                    repeat(row.sectorMarkerAzimuths.size) {
+                        Box(
+                            Modifier.size(6.dp).clip(CircleShape)
+                                .background(FrequencyStatusPalette.color(row.statusType))
+                        )
+                    }
+                }
+            }
+        }
         GeoTowerPdfBodyCell(row.frequencies, Modifier.weight(1.45f))
     }
     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
@@ -3305,7 +3340,7 @@ private fun GeoTowerPdfStatusCard(
 
     val colorOk = Color(0xFF4CAF50)
     val colorKo = Color(0xFFE53935)
-    val colorProject = Color(0xFFFFA000)
+    val colorProject = FrequencyStatusPalette.Approved
     val colorNeutral = Color.Gray.copy(alpha = 0.55f)
     // Les cases « ? » comptent comme la fiche site : une panne déclarée sans détail par génération
     // reste une panne, sinon l'en-tête du rapport dirait « fonctionnel ».
@@ -3588,7 +3623,12 @@ private fun buildPdfReportTables(
 ): PdfReportTables {
     val rawFreqs = technique?.detailsFrequences ?: info.frequences
     val bands = addMicrowaveFallbackBands(
-        bands = parseAndSortFrequencies(rawFreqs, txtUnknown, txtAzimuthNotSpecified),
+        bands = parseAndSortFrequencies(
+            rawFreqs,
+            txtUnknown,
+            txtAzimuthNotSpecified,
+            FrequencyAzimuths.decode(technique?.detailsAzimutsFrequences),
+        ),
         info = info,
         technique = technique,
         rawFreqs = rawFreqs,
@@ -3690,13 +3730,15 @@ internal fun planPdfReportTableSlices(
     return slices.ifEmpty { listOf(PdfReportTableSlice()) }
 }
 
-private data class PdfAntennaSummaryRow(
+internal data class PdfAntennaSummaryRow(
     val azimuth: String,
     val height: String,
     /** Taille des panneaux (tag `[DIM: ...]`) de la bande, déjà formatée dans l'unité utilisateur. */
     val panelSize: String,
     val bands: String,
-    val frequencies: String
+    val frequencies: String,
+    val sectorMarkerAzimuths: List<Int>,
+    val statusType: FrequencyStatusType
 )
 
 private data class PdfAntennaPosition(
@@ -3728,7 +3770,7 @@ private val pdfBracketTagRegex = Regex("""\[[^\]]+]""")
 private val pdfParenthesizedValueRegex = Regex("""\(([^)]*)\)""")
 private val pdfNumericValueRegex = Regex("""-?\d+(?:[,.]\d+)?""")
 
-private fun buildPdfAntennaSummaryRows(bands: List<FreqBand>): List<PdfAntennaSummaryRow> {
+internal fun buildPdfAntennaSummaryRows(bands: List<FreqBand>): List<PdfAntennaSummaryRow> {
     return bands.map { band ->
         val details = band.physDetails.takeIf { it.isNotEmpty() } ?: listOf("-")
         val positions = details.map { pdfExtractShareAntennaPosition(it) }
@@ -3756,7 +3798,12 @@ private fun buildPdfAntennaSummaryRows(bands: List<FreqBand>): List<PdfAntennaSu
             height = heights,
             panelSize = panelSizes,
             bands = pdfFrequencyBandLabel(band).replace("\n", " "),
-            frequencies = pdfCompactFrequencyText(band)
+            frequencies = pdfCompactFrequencyText(band),
+            // Keep one marker per antenna row, including same-angle panels at different heights/IDs.
+            sectorMarkerAzimuths = details.mapNotNull { detail ->
+                extractPhysicalAzimuth(detail)?.takeIf(band::isActiveOnAzimuth)
+            },
+            statusType = classifyFrequencyStatus(band.status)
         )
     }
 }

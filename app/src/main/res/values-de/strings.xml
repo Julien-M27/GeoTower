@@ -256,6 +256,7 @@
     <string name="database_delete_warning_desc">Möchtest du die Datenbank wirklich löschen?</string>
     <string name="database_download_success_title">Download abgeschlossen</string>
     <string name="database_download_success_desc">Die Datenbank wurde erfolgreich heruntergeladen!</string>
+    <string name="database_download_success_desc_named">Erfolgreich heruntergeladen: %1$s.</string>
     <string name="notification_database_channel_name">Datenbanken</string>
     <string name="notification_database_download_title">Datenbankaktualisierung: %1$s</string>
     <string name="notification_database_first_download_title">Datenbank wird heruntergeladen: %1$s</string>
@@ -3255,6 +3256,8 @@
     <string name="appstrings_release_v2062_summary_cluster_strength">Gruppierungsstärke der Antennen auf der Karte anpassen</string>
     <string name="appstrings_release_v2062_summary_marker_readability">Besser lesbare Marker bei verschiedenen Zoomstufen, Filtern und Kartenstilen</string>
     <string name="appstrings_release_v2063_summary_map_loading">Vollständiges Laden der Antennen auf der Karte wiederhergestellt</string>
+    <string name="appstrings_release_v2064_summary_frequency_azimuths">Aktive Azimute für jeden Frequenzsektor anzeigen</string>
+    <string name="appstrings_release_v2064_summary_database_notifications">Klarere Benachrichtigungen zu Datenbankdownloads</string>
     <string name="database_viewer_title">Datenbank-Viewer</string>
     <string name="database_viewer_desc">Alle Tabellen und Zeilen in den lokalen Datenbanken durchsuchen. Schreibgeschützt.</string>
     <string name="database_viewer_mobile">Mobilfunkdatenbank</string>

@@ -2684,7 +2684,7 @@ fun MapScreen(
                         tripId = plan.id,
                         stepIndex = arrival,
                         stepLabel = plan.steps.getOrNull(arrival)?.label?.takeIf { it.isNotBlank() }
-                            ?: context.getString(R.string.trips_step_fallback_pattern, arrival + 1)
+                            ?: resources.getString(R.string.trips_step_fallback_pattern, arrival + 1)
                     )
                 }
             }
@@ -3541,8 +3541,8 @@ fun MapScreen(
         radioFhLabel = txtRadioFh,
         radioOtherLabel = txtRadioOther,
         noneLabel = txtNoActiveFilterValue,
-        exceptLabel = { value -> context.getString(R.string.appstrings_map_active_filters_except, value) },
-        moreLabel = { count -> context.getString(R.string.appstrings_map_active_filters_more, count) }
+        exceptLabel = { value -> resources.getString(R.string.appstrings_map_active_filters_except, value) },
+        moreLabel = { count -> resources.getString(R.string.appstrings_map_active_filters_more, count) }
     )
 
     val txtWarningTitle = stringResource(R.string.appstrings_warning_title)
@@ -4936,7 +4936,7 @@ fun MapScreen(
                         measureRouteWarningShown = true
                         Toast.makeText(
                             context,
-                            context.getString(R.string.appstrings_measure_route_unavailable),
+                            resources.getString(R.string.appstrings_measure_route_unavailable),
                             Toast.LENGTH_SHORT
                         ).show()
                     }
@@ -8928,6 +8928,7 @@ class AntennaMarker(
     private val azimuthPath = android.graphics.Path()
     private val coneBounds = android.graphics.RectF()
     private val azimuthBounds = android.graphics.RectF()
+    private val canvasClipBounds = android.graphics.Rect()
 
     // Cache pour les pinceaux (pour éviter d'en recréer 60 fois par seconde)
     private val dotPaints = mutableMapOf<Int, android.graphics.Paint>()
@@ -9228,7 +9229,7 @@ class AntennaMarker(
 
             // Le projecteur peut encore contenir des sites du viewport précédent pendant un zoom.
             // On évite alors de recalculer leurs tracés si toute leur zone est hors écran.
-            if (canvas.quickReject(azimuthBounds)) {
+            if (canvas.isOutsideClip(azimuthBounds, canvasClipBounds)) {
                 super.draw(canvas, projection)
                 return
             }
@@ -9410,6 +9411,7 @@ class RadioMarker(
     private val azimuthLinePath = android.graphics.Path()
     private val azimuthDotPath = android.graphics.Path()
     private val azimuthBounds = android.graphics.RectF()
+    private val canvasClipBounds = android.graphics.Rect()
 
     override fun hitTest(event: android.view.MotionEvent, mapView: org.osmdroid.views.MapView): Boolean {
         if (!showCircle) return false
@@ -9450,7 +9452,7 @@ class RadioMarker(
                 ptCenter.x + cullRadiusPx,
                 ptCenter.y + cullRadiusPx
             )
-            if (!canvas.quickReject(azimuthBounds)) {
+            if (!canvas.isOutsideClip(azimuthBounds, canvasClipBounds)) {
                 azimuthLinePath.reset()
                 azimuthDotPath.reset()
                 azimuthLines.forEach { data ->
@@ -9475,6 +9477,20 @@ class RadioMarker(
         }
         super.draw(canvas, projection)
     }
+}
+
+/** Équivalent compatible avec minSdk 24 de Canvas.quickReject(RectF), ajouté en API 30. */
+private fun android.graphics.Canvas.isOutsideClip(
+    bounds: android.graphics.RectF,
+    clipBounds: android.graphics.Rect
+): Boolean {
+    if (!getClipBounds(clipBounds)) return true
+    return !bounds.intersects(
+        clipBounds.left.toFloat(),
+        clipBounds.top.toFloat(),
+        clipBounds.right.toFloat(),
+        clipBounds.bottom.toFloat()
+    )
 }
 
 /**

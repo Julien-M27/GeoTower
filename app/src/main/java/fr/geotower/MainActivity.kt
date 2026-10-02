@@ -31,7 +31,6 @@ import fr.geotower.data.upload.SignalQuestUploadQueue
 import fr.geotower.data.upload.SignalQuestUploadQueueException
 import fr.geotower.data.upload.SignalQuestUploadTarget
 import fr.geotower.data.upload.SignalQuestUploadTargets
-import fr.geotower.data.workers.DatabaseDownloadWorker
 import fr.geotower.data.workers.SignalQuestUploadScheduler
 import fr.geotower.data.workers.UpdateCheckScheduler
 import fr.geotower.widget.AntennaWidgetWorker
@@ -109,6 +108,23 @@ import org.mapsforge.map.android.graphics.AndroidGraphicFactory
 // ✅ ÉTAPE 1 : État global pour afficher le popup de la BDD depuis n'importe où
 object AppGlobalState {
     val showDbSuccessPopup = androidx.compose.runtime.mutableStateOf(false)
+    val dbSuccessPopupName = androidx.compose.runtime.mutableStateOf<String?>(null)
+    val pendingDbSuccessPopups = androidx.compose.runtime.mutableStateListOf<DbSuccessPopup>()
+    private val queuedDbSuccessPopupWorkIds = mutableSetOf<String>()
+
+    data class DbSuccessPopup(val workId: String, val databaseName: String)
+
+    fun enqueueDbSuccessPopup(workId: String, databaseName: String) {
+        if (queuedDbSuccessPopupWorkIds.add(workId)) {
+            pendingDbSuccessPopups.add(DbSuccessPopup(workId, databaseName))
+        }
+    }
+
+    fun dismissDbSuccessPopup(workId: String) {
+        val index = pendingDbSuccessPopups.indexOfFirst { it.workId == workId }
+        if (index >= 0) pendingDbSuccessPopups.removeAt(index)
+    }
+
     val showUploadResultPopup = androidx.compose.runtime.mutableStateOf(false)
     val uploadResultPopupMessage = androidx.compose.runtime.mutableStateOf<String?>(null)
     val uploadResultPopupSuccessCount = androidx.compose.runtime.mutableIntStateOf(0)
@@ -369,6 +385,8 @@ class MainActivity : ComponentActivity() {
 
     private fun handleGlobalPopupIntent(intent: Intent?) {
         if (intent?.getBooleanExtra("SHOW_DB_SUCCESS_POPUP", false) == true) {
+            AppGlobalState.dbSuccessPopupName.value =
+                intent.getStringExtra(fr.geotower.data.workers.DownloadNotificationCenter.EXTRA_DATABASE_DISPLAY_NAME)
             AppGlobalState.showDbSuccessPopup.value = true
         }
 
@@ -591,15 +609,29 @@ class MainActivity : ComponentActivity() {
             val txtUnavailable = stringResource(R.string.appstrings_unavailable)
             val featureFlags by RemoteFeatureFlags.config
 
-            // ✅ NOUVEAU : On écoute la fin du téléchargement globalement
+            // Écoute la réussite des téléchargements mobile, radio et eNB/gNB.
             val workManager = remember { androidx.work.WorkManager.getInstance(context) }
-            val workInfos by workManager.getWorkInfosByTagFlow(DatabaseDownloadWorker.WORK_TAG).collectAsState(initial = emptyList())
-            val currentWork = workInfos.firstOrNull()
+            val databaseDownloadWorkInfos by workManager
+                .getWorkInfosByTagFlow(fr.geotower.data.workers.DownloadNotificationCenter.DATABASE_DOWNLOADS_WORK_TAG)
+                .collectAsState(initial = emptyList())
 
-            LaunchedEffect(currentWork?.state) {
-                if (currentWork?.state == androidx.work.WorkInfo.State.SUCCEEDED) {
-                    AppGlobalState.showDbSuccessPopup.value = true // Affiche le Pop-up !
-                    workManager.pruneWork() // 🧹 Nettoie l'historique du Worker pour que le pop-up ne revienne pas au prochain lancement de l'appli
+            LaunchedEffect(databaseDownloadWorkInfos) {
+                val completedDownloads = databaseDownloadWorkInfos.filter { workInfo ->
+                    workInfo.state == androidx.work.WorkInfo.State.SUCCEEDED &&
+                        workInfo.outputData.getBoolean(
+                            fr.geotower.data.workers.DownloadNotificationCenter.KEY_SUCCESSFUL_DATABASE_DOWNLOAD,
+                            false
+                        )
+                }
+                completedDownloads.forEach { workInfo ->
+                    val databaseName = workInfo.outputData.getString(
+                        fr.geotower.data.workers.DownloadNotificationCenter.KEY_DATABASE_DISPLAY_NAME
+                    ) ?: return@forEach
+                    AppGlobalState.enqueueDbSuccessPopup(workInfo.id.toString(), databaseName)
+                }
+                if (completedDownloads.isNotEmpty()) {
+                    // Le flux partagé a d'abord copié tous les succès dans la file.
+                    workManager.pruneWork()
                 }
             }
             val isDark = when (themeMode) {
@@ -1606,11 +1638,20 @@ class MainActivity : ComponentActivity() {
                         val navBackStackEntry by navController.currentBackStackEntryAsState()
                         val currentRoute = navBackStackEntry?.destination?.route
 
-                        // ✅ ÉTAPE 3 : Le pop-up s'affiche PARTOUT, SAUF sur le splash et le tuto !
-                        if (AppGlobalState.showDbSuccessPopup.value && currentRoute != "splash" && currentRoute != "first_start") {
+                        // L'onboarding affiche lui-même la file afin de conserver son avancement.
+                        val pendingDbSuccessPopup = AppGlobalState.pendingDbSuccessPopups.firstOrNull()
+                        val dbSuccessPopupName = pendingDbSuccessPopup?.databaseName
+                            ?: AppGlobalState.dbSuccessPopupName.value
+                        val shouldShowDbSuccessPopup = pendingDbSuccessPopup != null ||
+                            AppGlobalState.showDbSuccessPopup.value
+                        if (shouldShowDbSuccessPopup && currentRoute != "splash" && currentRoute != "first_start") {
                             AlertDialog(
                                 onDismissRequest = {
+                                    pendingDbSuccessPopup?.let {
+                                        AppGlobalState.dismissDbSuccessPopup(it.workId)
+                                    }
                                     AppGlobalState.showDbSuccessPopup.value = false
+                                    AppGlobalState.dbSuccessPopupName.value = null
                                 },
                                 title = {
                                     Text(
@@ -1618,11 +1659,22 @@ class MainActivity : ComponentActivity() {
                                         fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
                                     )
                                 },
-                                text = { Text(stringResource(R.string.database_download_success_desc)) },
+                                text = {
+                                    Text(
+                                        text = if (dbSuccessPopupName != null) {
+                                            stringResource(R.string.database_download_success_desc_named, dbSuccessPopupName)
+                                        } else {
+                                            stringResource(R.string.database_download_success_desc)
+                                        }
+                                    )
+                                },
                                 confirmButton = {
                                     Button(onClick = {
-                                        // On ferme simplement le pop-up en douceur !
+                                        pendingDbSuccessPopup?.let {
+                                            AppGlobalState.dismissDbSuccessPopup(it.workId)
+                                        }
                                         AppGlobalState.showDbSuccessPopup.value = false
+                                        AppGlobalState.dbSuccessPopupName.value = null
                                     }) {
                                         Text(stringResource(R.string.common_finish))
                                     }

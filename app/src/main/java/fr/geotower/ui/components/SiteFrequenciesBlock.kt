@@ -35,6 +35,8 @@ import fr.geotower.data.models.TechniqueEntity
 import fr.geotower.utils.AnfrDisplayText
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.FrequencyFilterSelection
+import fr.geotower.utils.FrequencyAzimuths
+import fr.geotower.utils.FrequencyStatusPalette
 import fr.geotower.utils.FrequencyStatusType
 import fr.geotower.utils.FreqBand
 import fr.geotower.utils.addMicrowaveFallbackBands
@@ -42,6 +44,8 @@ import fr.geotower.utils.classifyFrequencyStatus
 import fr.geotower.utils.formatSpectrumDisplayDetails
 import fr.geotower.utils.formatDateToFrench
 import fr.geotower.utils.isAnnouncedOnly
+import fr.geotower.utils.extractPhysicalAzimuth
+import fr.geotower.utils.sectorMarkerColor
 import fr.geotower.utils.parseAndSortFrequencies
 import fr.geotower.utils.radioBandCode
 import fr.geotower.utils.radioTechnologyFrequencyLabel
@@ -97,6 +101,7 @@ fun SiteFrequenciesBlock(
         technique?.dateService,
         technique?.dateImplantation,
         technique?.dateModif,
+        technique?.detailsAzimutsFrequences,
         AppConfig.siteShowTechno2G.value, AppConfig.siteF2G_900.value, AppConfig.siteF2G_1800.value,
         AppConfig.siteShowTechno3G.value, AppConfig.siteF3G_900.value, AppConfig.siteF3G_2100.value,
         AppConfig.siteShowTechno4G.value, AppConfig.siteF4G_700.value, AppConfig.siteF4G_800.value, AppConfig.siteF4G_900.value, AppConfig.siteF4G_1800.value, AppConfig.siteF4G_2100.value, AppConfig.siteF4G_2600.value,
@@ -104,7 +109,10 @@ fun SiteFrequenciesBlock(
         AppConfig.siteShowTechnoFH.value
     ) {
         addMicrowaveFallbackBands(
-            bands = parseAndSortFrequencies(rawFreqs, txtUnknown, txtAzimuthNotSpecified),
+            bands = parseAndSortFrequencies(
+                rawFreqs, txtUnknown, txtAzimuthNotSpecified,
+                FrequencyAzimuths.decode(technique?.detailsAzimutsFrequences),
+            ),
             info = info,
             technique = technique,
             rawFreqs = rawFreqs,
@@ -188,10 +196,10 @@ fun SiteFrequenciesBlock(
                             )
                         }
                         val (statusColor, statusText) = when (classifyFrequencyStatus(band.status)) {
-                            FrequencyStatusType.InService -> Pair(Color(0xFF4CAF50), txtInService)
-                            FrequencyStatusType.TechnicallyOperational -> Pair(Color(0xFF4CAF50), txtTechnically)
-                            FrequencyStatusType.Approved -> Pair(MaterialTheme.colorScheme.primary, txtProjectApproved)
-                            FrequencyStatusType.Unknown -> Pair(Color.Gray, txtUnknownStatus)
+                            FrequencyStatusType.InService -> Pair(FrequencyStatusPalette.InService, txtInService)
+                            FrequencyStatusType.TechnicallyOperational -> Pair(FrequencyStatusPalette.TechnicallyOperational, txtTechnically)
+                            FrequencyStatusType.Approved -> Pair(FrequencyStatusPalette.color(FrequencyStatusType.Approved), txtProjectApproved)
+                            FrequencyStatusType.Unknown -> Pair(FrequencyStatusPalette.Unknown, txtUnknownStatus)
                         }
 
                     val dateFormatted = formatDateToFrench(band.date)
@@ -355,6 +363,16 @@ fun SiteFrequenciesBlock(
                                             verticalAlignment = Alignment.Top,
                                             modifier = Modifier.padding(top = sizing.spacing(4.dp))
                                         ) {
+                                            band.sectorMarkerColor(
+                                                extractPhysicalAzimuth(physDetail),
+                                            )?.let { markerColor ->
+                                                Box(
+                                                    Modifier.padding(top = sizing.spacing(4.dp), end = sizing.spacing(5.dp))
+                                                        .size(sizing.component(8.dp))
+                                                        .clip(CircleShape)
+                                                        .background(markerColor)
+                                                )
+                                            }
                                             Icon(
                                                 Icons.Default.Explore,
                                                 contentDescription = null,
@@ -649,10 +667,7 @@ fun FrequenciesGridView(
 
                 val statusType = classifyFrequencyStatus(band.status)
                 val statusColor = when (statusType) {
-                    FrequencyStatusType.InService -> Color(0xFF4CAF50)
-                    FrequencyStatusType.TechnicallyOperational -> MaterialTheme.colorScheme.primary
-                    FrequencyStatusType.Approved -> MaterialTheme.colorScheme.primary
-                    FrequencyStatusType.Unknown -> MaterialTheme.colorScheme.onSurfaceVariant
+                    else -> FrequencyStatusPalette.color(statusType)
                 }
                 val statusText = when (statusType) {
                     FrequencyStatusType.InService -> txtInService
@@ -729,6 +744,7 @@ fun FrequenciesGridView(
         val gen: Int,
         val value: Int,
         val panelId: String?,
+        val markerColor: Color?,
         val isMuted: Boolean
     )
     val groupedAntennas = mutableMapOf<String, MutableMap<String, MutableList<AntennaRow>>>()
@@ -768,7 +784,7 @@ fun FrequenciesGridView(
         if (band.physDetails.isEmpty()) {
             groupedAntennas.getOrPut("-") { mutableMapOf() }
                 .getOrPut("-") { mutableListOf() }
-                .add(AntennaRow(technoName, bandEquivalent, displayFreqs, band.gen, band.value, null, isMutedByMapFilter))
+                .add(AntennaRow(technoName, bandEquivalent, displayFreqs, band.gen, band.value, null, null, isMutedByMapFilter))
         } else {
             band.physDetails.forEach { phys ->
                 // Séparation robuste: "Panneau : 60° (28.9m)" -> On récupère "60" et "28.9m"
@@ -784,7 +800,12 @@ fun FrequenciesGridView(
 
                 groupedAntennas.getOrPut(azimut) { mutableMapOf() }
                     .getOrPut(hauteur) { mutableListOf() }
-                    .add(AntennaRow(technoName, bandEquivalent, displayFreqs, band.gen, band.value, extractFrequencyPanelId(phys), isMutedByMapFilter))
+                    .add(AntennaRow(
+                        technoName, bandEquivalent, displayFreqs, band.gen, band.value,
+                        extractFrequencyPanelId(phys),
+                        band.sectorMarkerColor(extractPhysicalAzimuth(phys)),
+                        isMutedByMapFilter,
+                    ))
             }
         }
     }
@@ -976,6 +997,14 @@ fun FrequenciesGridView(
                                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                             textAlign = TextAlign.Center,
                                                             lineHeight = 12.sp
+                                                        )
+                                                    }
+                                                    rowItem.markerColor?.let { markerColor ->
+                                                        Spacer(modifier = Modifier.height(sizing.spacing(4.dp)))
+                                                        Box(
+                                                            Modifier.size(sizing.component(8.dp))
+                                                                .clip(CircleShape)
+                                                                .background(markerColor)
                                                         )
                                                     }
                                                 }
