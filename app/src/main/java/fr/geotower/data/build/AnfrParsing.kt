@@ -1,5 +1,7 @@
 package fr.geotower.data.build
 
+import fr.geotower.utils.FrequencyAzimuths
+
 /**
  * Fonctions de parsing / normalisation portees a l'identique depuis le builder
  * serveur `docs/server/build_fr_anfr_db.py` (clean_text, normalize_id_anfr,
@@ -12,6 +14,9 @@ package fr.geotower.data.build
 object AnfrParsing {
 
     private val COORD_REGEX = Regex("""[-+]?(?:\d+(?:[.,]\d*)?|[.,]\d+)""")
+
+    /** Parses the weekly `list_azimut` field using the shared ANFR contract. */
+    fun parseAzimuthList(value: String?): List<Int> = FrequencyAzimuths.parseList(value)
 
     /** Python `clean_text` : trim, chaine vide si null. */
     fun cleanText(value: String?): String = value?.trim() ?: ""

@@ -801,7 +801,8 @@ interface GeoTowerDao {
             t.date_service,
             t.date_modif,
             t.details_frequences AS details_frequences,
-            t.adresse
+            t.adresse,
+            t.details_azimuts_frequences AS details_azimuts_frequences
         FROM technique t
         INNER JOIN localisation l ON t.id_anfr = l.id_anfr
         LEFT JOIN ref_statut st ON t.statut_id = st.id
@@ -858,7 +859,8 @@ interface GeoTowerDao {
             t.date_service,
             t.date_modif,
             t.details_frequences AS details_frequences,
-            t.adresse
+            t.adresse,
+            t.details_azimuts_frequences AS details_azimuts_frequences
         FROM technique t
         INNER JOIN localisation l ON t.id_anfr = l.id_anfr
         LEFT JOIN ref_statut st ON t.statut_id = st.id
@@ -882,7 +884,8 @@ interface GeoTowerDao {
             t.date_service,
             t.date_modif,
             NULL AS details_frequences,
-            t.adresse
+            t.adresse,
+            NULL AS details_azimuts_frequences
         FROM technique t
         INNER JOIN localisation l ON t.id_anfr = l.id_anfr
         LEFT JOIN ref_statut st ON t.statut_id = st.id
@@ -1530,7 +1533,8 @@ interface GeoTowerDao {
             t.date_service,
             t.date_modif,
             t.details_frequences AS details_frequences,
-            t.adresse
+            t.adresse,
+            t.details_azimuts_frequences AS details_azimuts_frequences
         FROM technique t
         INNER JOIN localisation l ON t.id_anfr = l.id_anfr
         LEFT JOIN ref_statut st ON t.statut_id = st.id

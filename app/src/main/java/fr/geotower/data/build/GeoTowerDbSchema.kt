@@ -12,7 +12,7 @@ package fr.geotower.data.build
  * builder serveur ET l'identity_hash du schema Room.
  */
 object GeoTowerDbSchema {
-    const val SCHEMA_VERSION = 7
+    const val SCHEMA_VERSION = 8
     const val COUNTRY_CODE = "FR"
     const val COUNTRY_NAME = "France"
     const val SOURCE = "ANFR"
@@ -22,12 +22,12 @@ object GeoTowerDbSchema {
      * de build_fr_anfr_db.py et avec le schema des entites Room. S'il change, Room refuse
      * d'ouvrir la base.
      */
-    const val ROOM_IDENTITY_HASH = "f92129b45cc37b357c5ecb8e0ba597f0"
+    const val ROOM_IDENTITY_HASH = "10080ab6df5dd01987800ed39f1c3b46"
 
     /** DDL des tables, dans l'ordre du builder serveur. */
     val CREATE_TABLE_STATEMENTS: List<String> = listOf(
         "CREATE TABLE IF NOT EXISTS `localisation` (`id_anfr` TEXT NOT NULL, `operateur_id` INTEGER, `latitude` REAL NOT NULL, `longitude` REAL NOT NULL, `azimuts` TEXT, `code_insee` TEXT, `azimuts_fh` TEXT, `tech_mask` INTEGER NOT NULL, `band_mask` INTEGER NOT NULL, `arcep_nidt` TEXT, `is_zb` INTEGER NOT NULL, PRIMARY KEY(`id_anfr`))",
-        "CREATE TABLE IF NOT EXISTS `technique` (`id_anfr` TEXT NOT NULL, `adm_id` INTEGER, `statut_id` INTEGER, `date_implantation` TEXT, `date_service` TEXT, `date_modif` TEXT, `details_frequences` TEXT, `adresse` TEXT, `has_active` INTEGER NOT NULL, PRIMARY KEY(`id_anfr`))",
+        "CREATE TABLE IF NOT EXISTS `technique` (`id_anfr` TEXT NOT NULL, `adm_id` INTEGER, `statut_id` INTEGER, `date_implantation` TEXT, `date_service` TEXT, `date_modif` TEXT, `details_frequences` TEXT, `adresse` TEXT, `has_active` INTEGER NOT NULL, `details_azimuts_frequences` TEXT, PRIMARY KEY(`id_anfr`))",
         "CREATE TABLE IF NOT EXISTS `support` (`id_anfr` TEXT NOT NULL, `id_support` TEXT NOT NULL, `nat_id` INTEGER, `tpo_id` INTEGER, `hauteur` REAL, PRIMARY KEY(`id_anfr`, `id_support`))",
         "CREATE TABLE IF NOT EXISTS `antenne` (`aer_id` TEXT NOT NULL, `id_anfr` TEXT NOT NULL, `id_support` TEXT, `tae_id` INTEGER, `azimut` INTEGER, `hauteur_bas` REAL, `is_fh` INTEGER NOT NULL, PRIMARY KEY(`aer_id`))",
         "CREATE TABLE IF NOT EXISTS `ref_operateur` (`id` INTEGER NOT NULL, `libelle` TEXT NOT NULL, PRIMARY KEY(`id`))",

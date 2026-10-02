@@ -146,7 +146,8 @@ data class TechniqueDbEntity(
     @ColumnInfo(name = "date_modif") val dateModif: String?,
     @ColumnInfo(name = "details_frequences") val detailsFrequences: String?,
     @ColumnInfo(name = "adresse") val adresse: String?,
-    @ColumnInfo(name = "has_active") val hasActive: Int
+    @ColumnInfo(name = "has_active") val hasActive: Int,
+    @ColumnInfo(name = "details_azimuts_frequences") val detailsAzimutsFrequences: String? = null
 )
 
 @Entity(tableName = "support", primaryKeys = ["id_anfr", "id_support"])
@@ -322,7 +323,8 @@ data class TechniqueEntity(
     @ColumnInfo(name = "date_service") val dateService: String?,
     @ColumnInfo(name = "date_modif") val dateModif: String?,
     @ColumnInfo(name = "details_frequences") val encodedDetailsFrequences: String?,
-    @ColumnInfo(name = "adresse") val adresse: String?
+    @ColumnInfo(name = "adresse") val adresse: String?,
+    @ColumnInfo(name = "details_azimuts_frequences") val detailsAzimutsFrequences: String? = null
 ) {
     val detailsFrequences: String?
         get() = FrequencyDetailsCodec.decode(encodedDetailsFrequences)

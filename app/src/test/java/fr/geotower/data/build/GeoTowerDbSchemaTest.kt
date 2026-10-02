@@ -77,13 +77,13 @@ class GeoTowerDbSchemaTest {
 
     @Test
     fun roomStampsAreConsistent() {
-        assertEquals(7, GeoTowerDbSchema.SCHEMA_VERSION)
+        assertEquals(8, GeoTowerDbSchema.SCHEMA_VERSION)
         assertEquals("FR", GeoTowerDbSchema.COUNTRY_CODE)
         assertEquals("ANFR", GeoTowerDbSchema.SOURCE)
         assertEquals(32, GeoTowerDbSchema.ROOM_IDENTITY_HASH.length)
-        assertEquals("f92129b45cc37b357c5ecb8e0ba597f0", GeoTowerDbSchema.ROOM_IDENTITY_HASH)
+        assertEquals("10080ab6df5dd01987800ed39f1c3b46", GeoTowerDbSchema.ROOM_IDENTITY_HASH)
         assertTrue(GeoTowerDbSchema.INSERT_ROOM_IDENTITY.contains(GeoTowerDbSchema.ROOM_IDENTITY_HASH))
-        assertEquals("PRAGMA user_version = 7", GeoTowerDbSchema.SET_USER_VERSION)
+        assertEquals("PRAGMA user_version = 8", GeoTowerDbSchema.SET_USER_VERSION)
     }
 
     @Test

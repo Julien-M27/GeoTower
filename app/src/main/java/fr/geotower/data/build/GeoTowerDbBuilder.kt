@@ -1,6 +1,7 @@
 package fr.geotower.data.build
 
 import fr.geotower.data.models.RadioFilterMasks
+import fr.geotower.utils.FrequencyAzimuths
 
 /**
  * Construit `geotower_fr.db` a partir des sources ANFR ([AnfrSources]), en ecrivant via
@@ -352,6 +353,7 @@ object GeoTowerDbBuilder {
 
         // 1/ CSV hebdomadaire : construit l'accumulateur station (RAM) + statuts par systeme (disque).
         val sysInserter = BatchInserter(db, "INSERT OR REPLACE INTO stg_sysstatus VALUES (?, ?, ?, ?, ?)")
+        val sysAzimuthInserter = BatchInserter(db, "INSERT OR IGNORE INTO stg_sysazimut VALUES (?, ?, ?)")
         var weeklyRows = 0L
         for (row in sources.weekly) {
             val currentRow = ++weeklyRows
@@ -383,16 +385,21 @@ object GeoTowerDbBuilder {
                 val statutId = statutIds.getId(row.get("statut"))
                 sysInserter.add(
                     listOf(
-                        idAnfr, sysName.uppercase(), sysName, statutIds.getLabel(statutId),
+                        idAnfr, FrequencyAzimuths.normalizeSystem(sysName), sysName, statutIds.getLabel(statutId),
                         AnfrParsing.cleanText(row.get("emr_dt")).ifEmpty { null },
                     ),
                 )
+                AnfrParsing.parseAzimuthList(row.get("list_azimut")).forEach { azimuth ->
+                    sysAzimuthInserter.add(listOf(idAnfr, FrequencyAzimuths.normalizeSystem(sysName), azimuth))
+                }
             }
             if (currentRow % EMIT_EVERY == 0L) {
                 report(BuildPhase.READING_STATIONS, currentRow, SOURCE_OBSERVATOIRE, sourceCounts.weekly)
             }
         }
         sysInserter.flush()
+        sysAzimuthInserter.flush()
+        stageFrequencyAzimuths(db)
         report(BuildPhase.READING_STATIONS, weeklyRows, SOURCE_OBSERVATOIRE, sourceCounts.weekly)
         onWeeklyConsumed()
 
@@ -670,7 +677,7 @@ object GeoTowerDbBuilder {
 
         // Ces tables de staging ne servent plus a l'emission finale (SUP_EMETTEUR ~120 Mo) :
         // on libere avant d'ecrire les tables definitives.
-        listOf("stg_emetteur", "stg_emr_freqs", "stg_sysstatus", "stg_fh_aer", "stg_details_extra").forEach {
+        listOf("stg_emetteur", "stg_emr_freqs", "stg_sysstatus", "stg_sysazimut", "stg_fh_aer", "stg_details_extra").forEach {
             db.execSql("DROP TABLE IF EXISTS ${db.staging(it)}")
         }
 
@@ -684,9 +691,11 @@ object GeoTowerDbBuilder {
         )
         db.execSql(
             "INSERT INTO technique SELECT sf.id_anfr, sf.adm_id, sf.statut_id, sf.date_imp, sf.date_ser, sf.date_mod, " +
-                "d.details, sf.adresse, sf.has_active " +
-                "FROM stg_station_final sf LEFT JOIN stg_details d ON sf.id_anfr = d.id_anfr",
+                "d.details, sf.adresse, sf.has_active, za.details " +
+                "FROM stg_station_final sf LEFT JOIN stg_details d ON sf.id_anfr = d.id_anfr " +
+                "LEFT JOIN stg_azimut_json za ON sf.id_anfr = za.id_anfr",
         )
+        db.execSql("DROP TABLE IF EXISTS ${db.staging("stg_azimut_json")}")
         db.execSql("INSERT INTO support SELECT id_anfr, sup_id, nat_id, tpo_id, hauteur FROM stg_support")
         db.execSql("INSERT INTO antenne SELECT aer_id, id_anfr, sup_id, tae_id, azimut, hauteur_bas, is_fh FROM stg_antenne")
 
@@ -1031,9 +1040,51 @@ object GeoTowerDbBuilder {
         // `systeme` garde le libelle d'ORIGINE a cote de la cle majuscule : c'est lui qui est ecrit
         // dans les details quand le ZIP mensuel ne connait pas encore ce systeme (cf. applyAnnouncedDetails).
         "CREATE TABLE ${prefix}stg_sysstatus (id_anfr TEXT, systeme_upper TEXT, systeme TEXT, statut TEXT, emr_dt TEXT, PRIMARY KEY(id_anfr, systeme_upper))",
+        "CREATE TABLE ${prefix}stg_sysazimut (id_anfr TEXT, systeme_upper TEXT, azimut INTEGER, PRIMARY KEY(id_anfr, systeme_upper, azimut))",
+        "CREATE TABLE ${prefix}stg_azimut_json (id_anfr TEXT PRIMARY KEY, details TEXT)",
         "CREATE TABLE ${prefix}stg_details_extra (id_anfr TEXT PRIMARY KEY, details TEXT)",
         "CREATE TABLE ${prefix}stg_station_final (id_anfr TEXT PRIMARY KEY, operateur_id INTEGER, operator_label TEXT, latitude REAL, longitude REAL, statut_id INTEGER, statut_label TEXT, adm_id INTEGER, date_imp TEXT, date_ser TEXT, date_mod TEXT, adresse TEXT, code_insee TEXT, tech_mask INTEGER, band_mask INTEGER, has_active INTEGER, azimuts TEXT, azimuts_fh TEXT)",
         "CREATE TABLE ${prefix}stg_arcep (id_anfr TEXT, operator_upper TEXT, nidt TEXT, is_zb INTEGER, PRIMARY KEY(id_anfr, operator_upper))",
         "CREATE TABLE ${prefix}stg_details (id_anfr TEXT PRIMARY KEY, details TEXT)",
     )
+
+    /** Builds deterministic per-station JSON while retaining at most one station mapping in RAM. */
+    private fun stageFrequencyAzimuths(db: SqlDatabase) {
+        val inserter = BatchInserter(db, "INSERT OR REPLACE INTO stg_azimut_json VALUES (?, ?)")
+        val mapping = linkedMapOf<String, MutableSet<Int>>()
+        var currentId: String? = null
+        var currentSystem: String? = null
+        val currentAzimuths = mutableSetOf<Int>()
+
+        fun flushSystem() {
+            val system = currentSystem ?: return
+            if (currentAzimuths.isNotEmpty()) mapping.getOrPut(system) { mutableSetOf() }.addAll(currentAzimuths)
+            currentAzimuths.clear()
+        }
+
+        fun flushStation() {
+            flushSystem()
+            val id = currentId ?: return
+            FrequencyAzimuths.encode(mapping)?.let { inserter.add(listOf(id, it)) }
+            mapping.clear()
+        }
+
+        db.query("SELECT id_anfr, systeme_upper, azimut FROM stg_sysazimut ORDER BY id_anfr, systeme_upper, azimut") { row ->
+            val id = row.getString("id_anfr") ?: return@query
+            val system = row.getString("systeme_upper") ?: return@query
+            val azimuth = row.getInt("azimut")
+            if (id != currentId) {
+                flushStation()
+                currentId = id
+                currentSystem = null
+            }
+            if (system != currentSystem) {
+                flushSystem()
+                currentSystem = system
+            }
+            currentAzimuths.add(azimuth)
+        }
+        flushStation()
+        inserter.flush()
+    }
 }

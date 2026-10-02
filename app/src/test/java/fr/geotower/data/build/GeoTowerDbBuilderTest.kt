@@ -19,7 +19,12 @@ class GeoTowerDbBuilderTest {
             row(
                 "sta_nm_anfr" to "1", "coordonnees" to "48.85 2.35", "adm_lb_nom" to "Orange",
                 "statut" to "En service", "generation" to "4G", "emr_lb_systeme" to "LTE 800",
-                "emr_dt" to "2026-01-01", "date_maj" to "2026-06-01",
+                "emr_dt" to "2026-01-01", "date_maj" to "2026-06-01", "list_azimut" to "120|0",
+            ),
+            row(
+                "sta_nm_anfr" to "1", "coordonnees" to "48.85 2.35", "adm_lb_nom" to "Orange",
+                "statut" to "En service", "generation" to "4G", "emr_lb_systeme" to "LTE 800",
+                "emr_dt" to "2026-01-01", "list_azimut" to "240|120",
             ),
             row(
                 "sta_nm_anfr" to "2", "coordonnees" to "43.60 1.44", "adm_lb_nom" to "SFR",
@@ -92,15 +97,15 @@ class GeoTowerDbBuilderTest {
 
         DriverManager.getConnection("jdbc:sqlite:${file.absolutePath}").use { conn ->
             // Estampilles Room.
-            assertEquals(7, conn.int("PRAGMA user_version"))
+            assertEquals(8, conn.int("PRAGMA user_version"))
             assertEquals(
-                "f92129b45cc37b357c5ecb8e0ba597f0",
+                GeoTowerDbSchema.ROOM_IDENTITY_HASH,
                 conn.one("SELECT identity_hash FROM room_master_table WHERE id = 42")!!["identity_hash"],
             )
 
             // Metadata (attendue par le validateur).
             val meta = conn.one("SELECT * FROM metadata")!!
-            assertEquals(7, (meta["schema_version"] as Number).toInt())
+            assertEquals(8, (meta["schema_version"] as Number).toInt())
             assertEquals("FR", meta["country_code"])
             assertEquals("20260601_1200", meta["version"])
             assertEquals("2026-06-01", meta["date_maj_anfr"])
@@ -127,6 +132,13 @@ class GeoTowerDbBuilderTest {
 
             // Technique station 1 : actif, adresse composee, details_frequences decodables.
             val techA = conn.one("SELECT * FROM technique WHERE id_anfr = '0000000001'")!!
+            assertEquals("{\"LTE 800\":[0,120,240]}", techA["details_azimuts_frequences"])
+            assertEquals(listOf("TEXT"), conn.column(
+                "SELECT type FROM pragma_table_info('technique') WHERE name = 'details_azimuts_frequences'",
+            ))
+            assertEquals(listOf("0"), conn.column(
+                "SELECT \"notnull\" FROM pragma_table_info('technique') WHERE name = 'details_azimuts_frequences'",
+            ))
             assertEquals(1, (techA["has_active"] as Number).toInt())
             assertEquals("Rue X, 75001 PARIS", techA["adresse"])
             assertEquals(
@@ -136,6 +148,7 @@ class GeoTowerDbBuilderTest {
 
             // Technique station 2 : non actif (En projet), sans dimension declaree -> pas de tag [DIM].
             val techB = conn.one("SELECT * FROM technique WHERE id_anfr = '0000000002'")!!
+            assertEquals(null, techB["details_azimuts_frequences"])
             assertEquals(0, (techB["has_active"] as Number).toInt())
             val detailsB = FrequencyDetailsCodec.decode(techB["details_frequences"] as String?)!!
             assertTrue(detailsB.contains("Panneau 5G : 240° (30m) [AER_ID: AE2]"))
@@ -453,12 +466,12 @@ class GeoTowerDbBuilderTest {
                 row(
                     "sta_nm_anfr" to "20", "coordonnees" to "45.00 1.00", "adm_lb_nom" to "Free Mobile",
                     "statut" to "Projet approuve", "generation" to "5G", "emr_lb_systeme" to "5G NR 3500",
-                    "emr_dt" to "", "date_maj" to "2026-08-06",
+                    "emr_dt" to "", "date_maj" to "2026-08-06", "list_azimut" to "60",
                 ),
                 row(
                     "sta_nm_anfr" to "20", "coordonnees" to "45.00 1.00", "adm_lb_nom" to "Free Mobile",
                     "statut" to "Projet approuve", "generation" to "4G", "emr_lb_systeme" to "LTE 700",
-                    "emr_dt" to "", "date_maj" to "2026-08-06",
+                    "emr_dt" to "", "date_maj" to "2026-08-06", "list_azimut" to "180|360",
                 ),
             ),
             stations = emptyList(),
@@ -474,6 +487,10 @@ class GeoTowerDbBuilderTest {
 
         DriverManager.getConnection("jdbc:sqlite:${file.absolutePath}").use { conn ->
             val tech = conn.one("SELECT * FROM technique WHERE id_anfr = '0000000020'")!!
+            assertEquals(
+                "{\"5G NR 3500\":[60],\"LTE 700\":[0,180]}",
+                tech["details_azimuts_frequences"],
+            )
             assertEquals(
                 "5G NR 3500 :  | Projet approuve |  | Azimut non specifie\n" +
                     "LTE 700 :  | Projet approuve |  | Azimut non specifie",

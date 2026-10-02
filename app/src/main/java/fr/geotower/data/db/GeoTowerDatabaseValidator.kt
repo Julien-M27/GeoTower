@@ -8,7 +8,7 @@ import java.util.Locale
 object GeoTowerDatabaseValidator {
     const val DB_NAME = "geotower_fr.db"
     const val EXPECTED_COUNTRY_CODE = "FR"
-    const val EXPECTED_SCHEMA_VERSION = 7
+    const val EXPECTED_SCHEMA_VERSION = 8
 
     private const val LEGACY_DB_NAME = "geotower.db"
     private const val PREFS_NAME = "GeoTowerPrefs"
@@ -105,6 +105,7 @@ object GeoTowerDatabaseValidator {
             "date_service",
             "date_modif",
             "details_frequences",
+            "details_azimuts_frequences",
             "adresse",
             "has_active"
         ),
@@ -189,7 +190,8 @@ object GeoTowerDatabaseValidator {
             "id_anfr" to SQLiteAffinity.TEXT,
             "adm_id" to SQLiteAffinity.INTEGER,
             "statut_id" to SQLiteAffinity.INTEGER,
-            "has_active" to SQLiteAffinity.INTEGER
+            "has_active" to SQLiteAffinity.INTEGER,
+            "details_azimuts_frequences" to SQLiteAffinity.TEXT
         ),
         "support" to mapOf(
             "id_anfr" to SQLiteAffinity.TEXT,

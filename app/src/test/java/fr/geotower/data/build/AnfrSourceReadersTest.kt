@@ -175,7 +175,7 @@ class AnfrSourceReadersTest {
         )
 
         DriverManager.getConnection("jdbc:sqlite:${dbFile.absolutePath}").use { conn ->
-            assertEquals(7, conn.int("PRAGMA user_version"))
+            assertEquals(8, conn.int("PRAGMA user_version"))
             assertEquals(2L, conn.count("localisation"))
             assertEquals(2L, conn.count("support"))
             assertEquals(2L, conn.count("antenne"))

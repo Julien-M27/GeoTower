@@ -21,6 +21,11 @@ class AnfrParsingTest {
     }
 
     @Test
+    fun parsesWeeklyAzimuthList() {
+        assertEquals(listOf(0, 120, 240), AnfrParsing.parseAzimuthList("0|120|240"))
+    }
+
+    @Test
     fun intOrNoneMatchesPythonSemantics() {
         assertEquals(15, AnfrParsing.intOrNone("15"))
         assertEquals(12, AnfrParsing.intOrNone("12,9"))
