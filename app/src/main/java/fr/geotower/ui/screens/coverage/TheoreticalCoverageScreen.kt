@@ -1,5 +1,6 @@
 package fr.geotower.ui.screens.coverage
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -32,6 +33,7 @@ import fr.geotower.utils.PageScrollPrefs
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material3.Icon
 import fr.geotower.data.models.RadioFilterMasks
 import fr.geotower.ui.components.GeoTowerSwitch
@@ -115,13 +117,28 @@ private data class CoverageAntennaRow(
 fun TheoreticalCoverageScreen(
     navController: NavController,
     repository: AnfrRepository,
-    idAnfr: String
+    idAnfr: String,
+    isSplitScreen: Boolean = false,
+    showBreadcrumb: Boolean = true,
+    onCloseSplitScreen: () -> Unit = {}
 ) {
     SecureScreenEffect(RemoteFeatureFlags.SecureScreens.THEORETICAL_COVERAGE)
     val context = LocalContext.current
     val prefs = context.getSharedPreferences(COVERAGE_DEFAULTS_PREFS, Context.MODE_PRIVATE)
     val scope = rememberCoroutineScope()
     val safeBack = rememberSafeBackNavigation(navController, fallbackRoute = "site_detail/$idAnfr")
+
+    fun handleBackNavigation() {
+        if (isSplitScreen) {
+            onCloseSplitScreen()
+        } else {
+            safeBack.navigateBack()
+        }
+    }
+
+    BackHandler(enabled = isSplitScreen || !safeBack.isLocked) {
+        handleBackNavigation()
+    }
 
     val themeMode by fr.geotower.utils.AppConfig.themeMode
     val isOledMode by fr.geotower.utils.AppConfig.isOledMode
@@ -136,8 +153,8 @@ fun TheoreticalCoverageScreen(
     val blockShape = RoundedCornerShape(if (useOneUi) 24.dp else 12.dp)
     val sizing = LocalGeoTowerUiStyle.current.sizing
 
-    var site by remember { mutableStateOf<LocalisationEntity?>(null) }
-    var antennaRows by remember { mutableStateOf<List<CoverageAntennaRow>>(emptyList()) }
+    var site by remember(idAnfr) { mutableStateOf<LocalisationEntity?>(null) }
+    var antennaRows by remember(idAnfr) { mutableStateOf<List<CoverageAntennaRow>>(emptyList()) }
 
     var quality by remember { mutableIntStateOf(prefs.getInt(COVERAGE_PREF_QUALITY, 1)) }
     var includeObstacles by remember { mutableStateOf(prefs.getBoolean(COVERAGE_PREF_OBSTACLES, true)) }
@@ -146,10 +163,10 @@ fun TheoreticalCoverageScreen(
     var showSettings by remember { mutableStateOf(false) }
     val settingsSheetState = rememberModalBottomSheetState()
 
-    var coverage by remember { mutableStateOf<SiteCoverage?>(null) }
-    var isLoading by remember { mutableStateOf(false) }
-    var progress by remember { mutableStateOf<Pair<Int, Int>?>(null) }
-    var computeJob by remember { mutableStateOf<Job?>(null) }
+    var coverage by remember(idAnfr) { mutableStateOf<SiteCoverage?>(null) }
+    var isLoading by remember(idAnfr) { mutableStateOf(false) }
+    var progress by remember(idAnfr) { mutableStateOf<Pair<Int, Int>?>(null) }
+    var computeJob by remember(idAnfr) { mutableStateOf<Job?>(null) }
 
     val overlay = remember { TheoreticalCoverageOverlay(context) }
     var mapRef by remember { mutableStateOf<MapView?>(null) }
@@ -285,9 +302,9 @@ fun TheoreticalCoverageScreen(
             Column(modifier = Modifier.background(mainBgColor)) {
                 GeoTowerBackTopBar(
                     title = stringResource(R.string.appstrings_coverage_button),
-                    onBack = { safeBack.navigateBack() },
+                    onBack = { handleBackNavigation() },
                     backgroundColor = mainBgColor,
-                    backEnabled = !safeBack.isLocked,
+                    backEnabled = isSplitScreen || !safeBack.isLocked,
                     actions = {
                         fr.geotower.ui.components.PageCustomizationHint(
                             page = fr.geotower.utils.PageScrollPrefs.COVERAGE,
@@ -302,16 +319,33 @@ fun TheoreticalCoverageScreen(
                         }
                     }
                 )
-                GeoTowerNavigationBreadcrumbBar(
-                    navController = navController,
-                    currentItem = GeoTowerBreadcrumbItem(
-                        label = stringResource(R.string.appstrings_coverage_button),
-                        icon = Icons.Default.Map,
-                        key = "theoretical_coverage"
-                    ),
-                    currentRouteKeys = setOf("theoretical_coverage"),
-                    backgroundColor = if (useOneUi) cardBgColor else MaterialTheme.colorScheme.surfaceContainer
-                )
+                if (showBreadcrumb) {
+                    GeoTowerNavigationBreadcrumbBar(
+                        navController = navController,
+                        currentItem = GeoTowerBreadcrumbItem(
+                            label = stringResource(R.string.appstrings_coverage_button),
+                            icon = Icons.Default.Map,
+                            key = "theoretical_coverage"
+                        ),
+                        currentRouteKeys = setOf("theoretical_coverage"),
+                        impliedParentItems = if (isSplitScreen) {
+                            listOf(
+                                GeoTowerBreadcrumbItem(
+                                    label = stringResource(R.string.appstrings_site_detail_title),
+                                    icon = Icons.Default.Tag,
+                                    onClick = onCloseSplitScreen,
+                                    key = "site_detail"
+                                )
+                            )
+                        } else {
+                            emptyList()
+                        },
+                        onBackStackItemClick = {
+                            if (isSplitScreen) onCloseSplitScreen()
+                        },
+                        backgroundColor = if (useOneUi) cardBgColor else MaterialTheme.colorScheme.surfaceContainer
+                    )
+                }
             }
         }
     ) { padding ->

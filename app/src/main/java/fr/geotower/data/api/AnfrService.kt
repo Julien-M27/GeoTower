@@ -46,9 +46,28 @@ data class SitesHsRebuildDto(
 /** Corps d'erreur standard de l'API (`{"detail": "…"}`), lu quand la demande n'aboutit pas. */
 data class ServerDetailDto(val detail: String? = null)
 
+data class EnbVersionOperatorDto(
+    @SerializedName("plmn") val plmn: String? = null,
+    @SerializedName("mnc") val mnc: Int? = null,
+    @SerializedName("mnc_list") val mncList: String? = null,
+    @SerializedName("operator") val operator: String? = null,
+    @SerializedName("source_date") val sourceDate: String? = null,
+    @SerializedName("row_count") val rowCount: Int? = null,
+    @SerializedName("from_cache") val fromCache: Boolean? = null
+)
+
+data class EnbVersionResponseDto(
+    @SerializedName("version") val version: String? = null,
+    @SerializedName("source_date") val sourceDate: String? = null,
+    @SerializedName("operators") val operators: List<EnbVersionOperatorDto>? = null
+)
+
 interface AnfrService {
     @GET("/api/v2/download/manifest")
     suspend fun getDownloadManifest(): okhttp3.ResponseBody
+
+    @GET("/api/v2/download/version_fr_enb")
+    suspend fun getEnbVersion(): Response<EnbVersionResponseDto>
 
     @GET("/api/v2/maps/catalog")
     suspend fun getMapsCatalog(): List<OfflineMapDto>

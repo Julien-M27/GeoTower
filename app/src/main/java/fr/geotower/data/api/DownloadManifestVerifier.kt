@@ -21,6 +21,14 @@ data class DownloadManifest(
     val maps: List<OfflineMapDto>
 )
 
+data class EnbOperatorVersion(
+    val plmn: String,
+    val mnc: Int,
+    val operator: String,
+    val sourceDate: String?,
+    val rowCount: Int = 0
+)
+
 data class DownloadManifestDatabase(
     val filename: String,
     val url: String,
@@ -28,7 +36,9 @@ data class DownloadManifestDatabase(
     val sha256: String,
     val schemaVersion: Int,
     val countryCode: String,
-    val version: String?
+    val version: String?,
+    val sourceDate: String? = null,
+    val operators: List<EnbOperatorVersion> = emptyList()
 )
 
 object DownloadManifestVerifier {
@@ -101,6 +111,24 @@ object DownloadManifestVerifier {
     }
 
     private fun JsonObject.toDatabase(): DownloadManifestDatabase? {
+        val operatorsList = get("operators")
+            ?.takeIf { it.isJsonArray }
+            ?.asJsonArray
+            ?.mapNotNull { el ->
+                val obj = el.asJsonObjectOrNull() ?: return@mapNotNull null
+                val plmn = obj.stringOrBlank("plmn")
+                val operator = obj.stringOrBlank("operator")
+                if (plmn.isBlank() && operator.isBlank()) return@mapNotNull null
+                EnbOperatorVersion(
+                    plmn = plmn,
+                    mnc = obj.intOrNull("mnc") ?: 0,
+                    operator = operator,
+                    sourceDate = obj.stringOrBlank("source_date").takeIf { it.isNotBlank() },
+                    rowCount = obj.intOrNull("row_count") ?: 0
+                )
+            }
+            .orEmpty()
+
         return DownloadManifestDatabase(
             filename = stringOrBlank("filename"),
             url = stringOrBlank("url"),
@@ -108,7 +136,9 @@ object DownloadManifestVerifier {
             sha256 = stringOrBlank("sha256"),
             schemaVersion = intOrNull("schema_version") ?: return null,
             countryCode = stringOrBlank("country_code").uppercase(Locale.ROOT),
-            version = stringOrBlank("version").takeIf { it.isNotBlank() }
+            version = stringOrBlank("version").takeIf { it.isNotBlank() },
+            sourceDate = stringOrBlank("source_date").takeIf { it.isNotBlank() },
+            operators = operatorsList
         )
     }
 

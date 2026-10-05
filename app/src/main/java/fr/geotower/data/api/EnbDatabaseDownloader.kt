@@ -54,16 +54,59 @@ object EnbDatabaseDownloader {
         }
     }
 
-    suspend fun getLatestDatabaseVersion(): String? {
+    suspend fun getLatestDatabaseVersion(forceRefresh: Boolean = false): String? {
         if (!isEnbDatabaseUpdateCheckEnabled()) {
             return null
         }
         return withContext(Dispatchers.IO) {
             try {
-                readVerifiedEnbDatabaseInfo()?.value?.version
+                DownloadManifestRepository.getPreferredEnbDatabase(forceRefresh)?.value?.version
             } catch (e: Exception) {
                 null
             }
+        }
+    }
+
+    suspend fun getRemoteOperatorDates(forceRefresh: Boolean = false): List<fr.geotower.data.db.EnbOperatorDateInfo>? {
+        if (!isEnbDatabaseUpdateCheckEnabled()) {
+            return null
+        }
+        return withContext(Dispatchers.IO) {
+            try {
+                val manifestDb = DownloadManifestRepository.getPreferredEnbDatabase(forceRefresh)?.value
+                val manifestOps = manifestDb?.operators
+                if (!manifestOps.isNullOrEmpty()) {
+                    return@withContext manifestOps.map {
+                        fr.geotower.data.db.EnbOperatorDateInfo(
+                            plmn = it.plmn,
+                            operator = it.operator,
+                            sourceDate = it.sourceDate
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                AppLogger.w(TAG, "Failed to read eNB operators from manifest", e)
+            }
+
+            try {
+                val response = RetrofitClient.apiService.getEnbVersion()
+                if (response.isSuccessful) {
+                    val ops = response.body()?.operators
+                    if (!ops.isNullOrEmpty()) {
+                        return@withContext ops.map {
+                            fr.geotower.data.db.EnbOperatorDateInfo(
+                                plmn = it.plmn.orEmpty(),
+                                operator = it.operator.orEmpty(),
+                                sourceDate = it.sourceDate
+                            )
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                AppLogger.w(TAG, "Failed to fetch eNB version from API", e)
+            }
+
+            null
         }
     }
 
@@ -194,31 +237,7 @@ object EnbDatabaseDownloader {
     }
 
     private fun readVerifiedEnbDatabaseInfo(): ServedFrom<DownloadManifestDatabase>? {
-        // Cran maximal : coupe pour TOUS, eligible ou non — contrairement aux bases mobile et
-        // radio, qui elles retombent sur le serveur quand l'appareil ne sait pas les generer
-        // (cf. [AppConfig.blockServerDatabase]).
-        //
-        // Regle : au cran maximal, un appareil dispose exactement de ce qu'un appareil eligible
-        // saurait construire. Le build local produit mobile + radio/TV + technique non-mobile ;
-        // la base eNB/gNB est un fichier partenaire, non reconstructible depuis les sources ANFR.
-        // La laisser passer ici donnait l'inversion absurde ou le telephone le PLUS capable perdait
-        // une base que le moins capable gardait.
-        if (AppConfig.blockCommunityAndUpdates()) return null
-        val served = readVerifiedDownloadManifest() ?: return null
-        val database = served.value.enbDatabase ?: return null
-        if (
-            !isOfficialEnbDatabaseDownloadUrl(database.url) ||
-            !isValidRemoteEnbDatabaseInfo(
-                filename = database.filename,
-                sizeBytes = database.sizeBytes,
-                sha256 = database.sha256,
-                schemaVersion = database.schemaVersion,
-                countryCode = database.countryCode
-            )
-        ) {
-            return null
-        }
-        return ServedFrom(database, served.host)
+        return DownloadManifestRepository.getPreferredEnbDatabaseSync()
     }
 
     private fun readVerifiedDownloadManifest(): ServedFrom<DownloadManifest>? {

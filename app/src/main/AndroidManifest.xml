@@ -44,6 +44,7 @@
         <package android:name="com.sfrmap.android" />
         <!-- CellularFR masqué — voir CellularFrApi.ENABLED -->
         <package android:name="com.luisbaker.cellularfr" />
+        <package android:name="org.rncteam.rncfreemobile" />
     </queries>
 
     <application

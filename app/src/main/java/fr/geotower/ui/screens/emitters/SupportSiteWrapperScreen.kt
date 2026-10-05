@@ -43,12 +43,14 @@ import fr.geotower.data.AnfrRepository
 import fr.geotower.data.RadioRepository
 import fr.geotower.ui.components.GeoTowerBreadcrumbItem
 import fr.geotower.ui.components.GeoTowerSplitNavigationBreadcrumbBar
+import fr.geotower.ui.screens.coverage.TheoreticalCoverageScreen
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
 
 private enum class SiteDetailSidePane {
     ElevationProfile,
-    ThroughputCalculator
+    ThroughputCalculator,
+    TheoreticalCoverage
 }
 
 /**
@@ -144,6 +146,11 @@ fun SupportSiteWrapperScreen(
                     icon = Icons.Default.Speed,
                     key = "throughput_calculator"
                 )
+                SiteDetailSidePane.TheoreticalCoverage -> GeoTowerBreadcrumbItem(
+                    label = stringResource(R.string.appstrings_coverage_button),
+                    icon = Icons.Default.Map,
+                    key = "theoretical_coverage"
+                )
                 null -> null
             }
             GeoTowerSplitNavigationBreadcrumbBar(
@@ -162,7 +169,8 @@ fun SupportSiteWrapperScreen(
                         applyMapFilters = applyMapFilters,
                         onClose = { selectedSidePane = null },
                         onOpenElevation = { selectedSidePane = SiteDetailSidePane.ElevationProfile },
-                        onOpenThroughput = { selectedSidePane = SiteDetailSidePane.ThroughputCalculator }
+                        onOpenThroughput = { selectedSidePane = SiteDetailSidePane.ThroughputCalculator },
+                        onOpenCoverage = { selectedSidePane = SiteDetailSidePane.TheoreticalCoverage }
                     )
                 } else {
                     SupportDetailScreen(
@@ -217,6 +225,12 @@ fun SupportSiteWrapperScreen(
                         antennaId = siteId,
                         onClose = { selectedSidePane = null }
                     )
+                    SiteDetailSidePane.TheoreticalCoverage -> TheoreticalCoveragePane(
+                        navController = navController,
+                        repository = repository,
+                        antennaId = siteId,
+                        onClose = { selectedSidePane = null }
+                    )
                     null -> SiteDetailPane(
                         navController = navController,
                         repository = repository,
@@ -224,7 +238,8 @@ fun SupportSiteWrapperScreen(
                         applyMapFilters = applyMapFilters,
                         onClose = { closeSitePane() },
                         onOpenElevation = { selectedSidePane = SiteDetailSidePane.ElevationProfile },
-                        onOpenThroughput = { selectedSidePane = SiteDetailSidePane.ThroughputCalculator }
+                        onOpenThroughput = { selectedSidePane = SiteDetailSidePane.ThroughputCalculator },
+                        onOpenCoverage = { selectedSidePane = SiteDetailSidePane.TheoreticalCoverage }
                     )
                 }
             }
@@ -293,6 +308,11 @@ fun NearEmittersSupportWrapperScreen(
                     icon = Icons.Default.Speed,
                     key = "throughput_calculator"
                 )
+                SiteDetailSidePane.TheoreticalCoverage -> GeoTowerBreadcrumbItem(
+                    label = stringResource(R.string.appstrings_coverage_button),
+                    icon = Icons.Default.Map,
+                    key = "theoretical_coverage"
+                )
                 null -> null
             }
             GeoTowerSplitNavigationBreadcrumbBar(
@@ -314,7 +334,8 @@ fun NearEmittersSupportWrapperScreen(
                         antennaId = selectedSiteId!!,
                         onClose = { selectedSidePane = null },
                         onOpenElevation = { selectedSidePane = SiteDetailSidePane.ElevationProfile },
-                        onOpenThroughput = { selectedSidePane = SiteDetailSidePane.ThroughputCalculator }
+                        onOpenThroughput = { selectedSidePane = SiteDetailSidePane.ThroughputCalculator },
+                        onOpenCoverage = { selectedSidePane = SiteDetailSidePane.TheoreticalCoverage }
                     )
                     selectedSiteId != null && selectedSupportId != null -> SupportSiteWrapperScreen(
                         navController = navController,
@@ -387,6 +408,12 @@ fun NearEmittersSupportWrapperScreen(
                         antennaId = siteId,
                         onClose = { selectedSidePane = null }
                     )
+                    selectedSidePane == SiteDetailSidePane.TheoreticalCoverage -> TheoreticalCoveragePane(
+                        navController = navController,
+                        repository = repository,
+                        antennaId = siteId,
+                        onClose = { selectedSidePane = null }
+                    )
                     else -> SiteDetailPane(
                         navController = navController,
                         repository = repository,
@@ -396,7 +423,8 @@ fun NearEmittersSupportWrapperScreen(
                             selectedSidePane = null
                         },
                         onOpenElevation = { selectedSidePane = SiteDetailSidePane.ElevationProfile },
-                        onOpenThroughput = { selectedSidePane = SiteDetailSidePane.ThroughputCalculator }
+                        onOpenThroughput = { selectedSidePane = SiteDetailSidePane.ThroughputCalculator },
+                        onOpenCoverage = { selectedSidePane = SiteDetailSidePane.TheoreticalCoverage }
                     )
                 }
             }
@@ -444,6 +472,11 @@ fun SiteDetailToolWrapperScreen(
                     icon = Icons.Default.Speed,
                     key = "throughput_calculator"
                 )
+                SiteDetailSidePane.TheoreticalCoverage -> GeoTowerBreadcrumbItem(
+                    label = stringResource(R.string.appstrings_coverage_button),
+                    icon = Icons.Default.Map,
+                    key = "theoretical_coverage"
+                )
                 null -> null
             }
             GeoTowerSplitNavigationBreadcrumbBar(
@@ -473,6 +506,10 @@ fun SiteDetailToolWrapperScreen(
                     onOpenThroughputCalculator = {
                         if (splitDisplay) selectedSidePane = SiteDetailSidePane.ThroughputCalculator
                         else navController.navigate("throughput_calculator/$it")
+                    },
+                    onOpenTheoreticalCoverage = {
+                        if (splitDisplay) selectedSidePane = SiteDetailSidePane.TheoreticalCoverage
+                        else navController.navigate("theoretical_coverage/$it")
                     }
                 )
             }
@@ -486,6 +523,12 @@ fun SiteDetailToolWrapperScreen(
                         onClose = { selectedSidePane = null }
                     )
                     SiteDetailSidePane.ThroughputCalculator -> ThroughputCalculatorPane(
+                        navController = navController,
+                        repository = repository,
+                        antennaId = antennaId,
+                        onClose = { selectedSidePane = null }
+                    )
+                    SiteDetailSidePane.TheoreticalCoverage -> TheoreticalCoveragePane(
                         navController = navController,
                         repository = repository,
                         antennaId = antennaId,
@@ -570,7 +613,8 @@ private fun SiteDetailPane(
     applyMapFilters: Boolean = false,
     onClose: () -> Unit,
     onOpenElevation: (String) -> Unit,
-    onOpenThroughput: (String) -> Unit
+    onOpenThroughput: (String) -> Unit,
+    onOpenCoverage: (String) -> Unit
 ) {
     SiteDetailScreen(
         navController = navController,
@@ -581,7 +625,8 @@ private fun SiteDetailPane(
         showBreadcrumb = false,
         onCloseSplitScreen = onClose,
         onOpenElevationProfile = onOpenElevation,
-        onOpenThroughputCalculator = onOpenThroughput
+        onOpenThroughputCalculator = onOpenThroughput,
+        onOpenTheoreticalCoverage = onOpenCoverage
     )
 }
 
@@ -613,6 +658,23 @@ private fun ThroughputCalculatorPane(
         navController = navController,
         repository = repository,
         antennaId = antennaId,
+        isSplitScreen = true,
+        showBreadcrumb = false,
+        onCloseSplitScreen = onClose
+    )
+}
+
+@Composable
+private fun TheoreticalCoveragePane(
+    navController: NavController,
+    repository: AnfrRepository,
+    antennaId: String,
+    onClose: () -> Unit
+) {
+    TheoreticalCoverageScreen(
+        navController = navController,
+        repository = repository,
+        idAnfr = antennaId,
         isSplitScreen = true,
         showBreadcrumb = false,
         onCloseSplitScreen = onClose

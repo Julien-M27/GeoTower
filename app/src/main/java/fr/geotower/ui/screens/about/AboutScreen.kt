@@ -2,7 +2,10 @@
 package fr.geotower.ui.screens.about
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.widget.ImageView
+import androidx.compose.ui.platform.UriHandler
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
@@ -34,6 +37,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.CellTower
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.outlined.Cloud
@@ -922,10 +926,17 @@ fun SectionSources(cardShape: Shape, bubbleColor: Color) {
                 if (group.links.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
                     group.links.forEach { link ->
+                        val url = link.url ?: "https://${link.host}"
                         SourceDataLink(
                             label = link.label,
                             host = link.host,
-                            onClick = link.url?.let { url -> { uriHandler.openUri(url) } }
+                            onClick = {
+                                try {
+                                    uriHandler.openUri(url)
+                                } catch (e: Exception) {
+                                    AppLogger.w(TAG_ABOUT, "Failed to open link: $url", e)
+                                }
+                            }
                         )
                     }
                 }
@@ -941,11 +952,19 @@ fun SectionSources(cardShape: Shape, bubbleColor: Color) {
 
 @Composable
 fun SectionDeveloppement() {
-    SectionTitle(stringResource(R.string.appstrings_about_dev)) // <-- MODIFIÉ
+    val uriHandler = LocalUriHandler.current
+    SectionTitle(stringResource(R.string.appstrings_about_dev))
     ListItem(
-        headlineContent = { Text(stringResource(R.string.appstrings_dev_credit)) }, // <-- MODIFIÉ
+        headlineContent = { Text(stringResource(R.string.appstrings_dev_credit)) },
         leadingContent = { Icon(imageVector = Icons.Default.EditNote, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        modifier = Modifier.clickable {
+            try {
+                uriHandler.openUri(GEOTOWER_GITHUB_URL)
+            } catch (e: Exception) {
+                AppLogger.w(TAG_ABOUT, "Failed to open GitHub repository", e)
+            }
+        }
     )
 }
 
@@ -1036,6 +1055,9 @@ fun SectionVersions(
     var liveDbInUse by remember { mutableStateOf(false) }
     var liveDbDataset by remember { mutableStateOf<LiveDatabaseDataset?>(null) }
     var liveDbUnreachable by remember { mutableStateOf(false) }
+    var enbOperatorDates by remember { mutableStateOf<List<fr.geotower.data.db.EnbOperatorDateInfo>?>(null) }
+    var enbDatesFromLocal by remember { mutableStateOf(false) }
+    var enbDatesUnreachable by remember { mutableStateOf(false) }
     val txtDownloadNewBase = stringResource(R.string.appstrings_about_download_new_database)
     val txtInvalidLocalDatabase = stringResource(R.string.appstrings_invalid_local_database)
     val txtNotInstalled = stringResource(R.string.appstrings_about_database_not_installed)
@@ -1152,6 +1174,32 @@ fun SectionVersions(
             val dataset = LiveDatabaseStatus.dataset(forceRefresh = versionsRefreshKey > 0)
             liveDbDataset = dataset
             liveDbUnreachable = dataset == null
+
+            // 6. Dates des fichiers sources eNB (Orange, SFR, Bouygues Telecom, Free Mobile)
+            try {
+                val localEnbDates = fr.geotower.data.db.EnbDatabaseOperatorCounts.readOperatorDates(context)
+                val hasValidDates = localEnbDates?.any { !it.sourceDate.isNullOrBlank() } == true
+                if (hasValidDates) {
+                    enbOperatorDates = localEnbDates
+                    enbDatesFromLocal = true
+                    enbDatesUnreachable = false
+                } else {
+                    val remoteEnbDates = fr.geotower.data.api.EnbDatabaseDownloader.getRemoteOperatorDates(forceRefresh = versionsRefreshKey > 0)
+                    if (!remoteEnbDates.isNullOrEmpty()) {
+                        enbOperatorDates = remoteEnbDates
+                        enbDatesFromLocal = false
+                        enbDatesUnreachable = false
+                    } else {
+                        enbOperatorDates = localEnbDates
+                        enbDatesFromLocal = !localEnbDates.isNullOrEmpty()
+                        enbDatesUnreachable = localEnbDates.isNullOrEmpty()
+                    }
+                }
+            } catch (e: Exception) {
+                AppLogger.w(TAG_ABOUT, "eNB operator dates could not be read", e)
+                enbOperatorDates = null
+                enbDatesUnreachable = true
+            }
         }
         refreshState.reportRefreshed(VERSIONS_REFRESH_ID, versionsRefreshKey)
     }
@@ -1260,9 +1308,18 @@ fun SectionVersions(
     )
 
     Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+    EnbDatabaseVersionsCard(
+        cardShape = cardShape,
+        cardColor = cardColor,
+        operatorDates = enbOperatorDates,
+        isLocal = enbDatesFromLocal,
+        unreachable = enbDatesUnreachable
+    )
+
+    Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
 
     Surface(
-        onClick = { uriHandler.openUri(GEOTOWER_APP_DOWNLOAD_URL) },
+        onClick = { openPlayStore(context, uriHandler) },
         shape = cardShape,
         color = cardColor,
         modifier = Modifier.fillMaxWidth()
@@ -1313,6 +1370,7 @@ private fun LiveDatabaseVersionsCard(
 ) {
     val context = LocalContext.current
     val sizing = LocalGeoTowerUiStyle.current.sizing
+    val uriHandler = LocalUriHandler.current
 
     Card(
         colors = CardDefaults.cardColors(containerColor = cardColor),
@@ -1413,8 +1471,19 @@ private fun LiveDatabaseVersionsCard(
                     add(stringResource(R.string.appstrings_version_live_db_server_label) to dataset.host)
                 }
 
+                val serverLabel = stringResource(R.string.appstrings_version_live_db_server_label)
                 liveRows.forEachIndexed { index, row ->
-                    VersionLine(row.first, row.second)
+                    val isServerRow = row.first == serverLabel && row.second.isNotBlank() && row.second != "-"
+                    val onClick = if (isServerRow) {
+                        {
+                            try {
+                                uriHandler.openUri("https://${row.second}/")
+                            } catch (e: Exception) {
+                                AppLogger.w(TAG_ABOUT, "Failed to open server host URL", e)
+                            }
+                        }
+                    } else null
+                    VersionLine(row.first, row.second, onClick = onClick)
                     if (index < liveRows.lastIndex) {
                         HorizontalDivider(
                             modifier = Modifier.padding(vertical = sizing.spacing(2.dp)),
@@ -1427,8 +1496,159 @@ private fun LiveDatabaseVersionsCard(
     }
 }
 
-private const val GEOTOWER_APP_DOWNLOAD_URL =
-    "https://kdrive.infomaniak.com/app/share/2149816/6d30423f-ac8b-4509-9857-86684d3a2e03"
+/**
+ * Versions des fichiers sources par opérateur (Orange, SFR, Bouygues Telecom, Free Mobile) utilisés
+ * par la base des identifiants eNB / gNB (fournis par le partenaire eNB-Analytics).
+ */
+@Composable
+private fun EnbDatabaseVersionsCard(
+    cardShape: Shape,
+    cardColor: Color,
+    operatorDates: List<fr.geotower.data.db.EnbOperatorDateInfo>?,
+    isLocal: Boolean,
+    unreachable: Boolean
+) {
+    val context = LocalContext.current
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    val uriHandler = LocalUriHandler.current
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = cardColor),
+        shape = cardShape,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(12.dp))) {
+            Row(verticalAlignment = Alignment.Top) {
+                Icon(
+                    Icons.Default.CellTower,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(sizing.component(24.dp))
+                )
+                Spacer(modifier = Modifier.width(sizing.spacing(12.dp)))
+                Column {
+                    Text(
+                        stringResource(R.string.appstrings_version_enb_card_title),
+                        style = sizing.textStyle(MaterialTheme.typography.titleMedium),
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        stringResource(
+                            if (isLocal) R.string.appstrings_version_enb_installed_desc
+                            else R.string.appstrings_version_enb_server_desc
+                        ),
+                        style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = sizing.spacing(8.dp)),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
+            )
+
+            if (operatorDates == null || (operatorDates.isEmpty() && unreachable)) {
+                Text(
+                    stringResource(
+                        if (unreachable || operatorDates?.isEmpty() == true) R.string.appstrings_version_enb_unavailable
+                        else R.string.database_searching
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = sizing.spacing(4.dp)),
+                    style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+            } else {
+                val canonicalOperators = listOf(
+                    Triple(stringResource(R.string.appstrings_operator_orange), "20801", "Orange"),
+                    Triple(stringResource(R.string.appstrings_operator_sfr), "20810", "SFR"),
+                    Triple(stringResource(R.string.appstrings_operator_bouygues), "20820", "Bouygues"),
+                    Triple(stringResource(R.string.appstrings_operator_free), "20815", "Free")
+                )
+
+                val enbRows = buildList {
+                    for ((label, plmn, name) in canonicalOperators) {
+                        val dateInfo = operatorDates.firstOrNull { it.plmn == plmn }
+                            ?: operatorDates.firstOrNull { it.operator.contains(name, ignoreCase = true) }
+                        val rawDate = dateInfo?.sourceDate.orEmpty()
+                        val formattedDate = if (rawDate.isNotBlank() && rawDate != "-") {
+                            LocalizedDateLabels.formatVersionDate(context, rawDate)
+                        } else {
+                            "-"
+                        }
+                        add(label to formattedDate)
+                    }
+
+                    // Opérateurs additionnels éventuels
+                    val canonicalPlmns = canonicalOperators.map { it.second }.toSet()
+                    val canonicalNames = canonicalOperators.map { it.third.lowercase() }
+                    operatorDates.filter { op ->
+                        op.plmn !in canonicalPlmns && canonicalNames.none { op.operator.lowercase().contains(it) }
+                    }.forEach { op ->
+                        val formattedDate = op.sourceDate?.takeIf { it.isNotBlank() && it != "-" }?.let {
+                            LocalizedDateLabels.formatVersionDate(context, it)
+                        } ?: "-"
+                        add(op.operator to formattedDate)
+                    }
+
+                    // Partenaire source
+                    add(stringResource(R.string.appstrings_version_enb_partner_label) to "eNB-Analytics")
+                }
+
+                val partnerLabel = stringResource(R.string.appstrings_version_enb_partner_label)
+                enbRows.forEachIndexed { index, row ->
+                    val isPartnerRow = row.first == partnerLabel
+                    val onClick = if (isPartnerRow) {
+                        {
+                            try {
+                                uriHandler.openUri(ENB_ANALYTICS_URL)
+                            } catch (e: Exception) {
+                                AppLogger.w(TAG_ABOUT, "Failed to open eNB-Analytics URL", e)
+                            }
+                        }
+                    } else null
+
+                    VersionLine(row.first, row.second, onClick = onClick)
+                    if (index < enbRows.lastIndex) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(vertical = sizing.spacing(2.dp)),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private const val GEOTOWER_PLAY_STORE_WEB_URL =
+    "https://play.google.com/store/apps/details?id=fr.geotower"
+private const val GEOTOWER_PLAY_STORE_MARKET_URI =
+    "market://details?id=fr.geotower"
+private const val GEOTOWER_GITHUB_URL =
+    "https://github.com/Julien-M27/GeoTower"
+private const val ENB_ANALYTICS_URL =
+    "https://enb-analytics.fr/"
+
+private fun openPlayStore(context: Context, uriHandler: UriHandler) {
+    val packageName = context.packageName
+    val marketUri = Uri.parse("market://details?id=$packageName")
+    val intent = Intent(Intent.ACTION_VIEW, marketUri).apply {
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+    try {
+        context.startActivity(intent)
+    } catch (e: Exception) {
+        try {
+            uriHandler.openUri(GEOTOWER_PLAY_STORE_WEB_URL)
+        } catch (e2: Exception) {
+            AppLogger.w(TAG_ABOUT, "Failed to open Play Store URL", e2)
+        }
+    }
+}
 
 private fun readQuarterlyDataVersion(db: SQLiteDatabase): String {
     return try {
@@ -1588,11 +1808,16 @@ private fun formatAboutDatabaseVersion(rawValue: String?, timeAtLabel: String): 
 }
 
 @Composable
-private fun VersionLine(label: String, value: String) {
+private fun VersionLine(
+    label: String,
+    value: String,
+    onClick: (() -> Unit)? = null
+) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(vertical = sizing.spacing(7.dp)),
         verticalAlignment = Alignment.Top
     ) {

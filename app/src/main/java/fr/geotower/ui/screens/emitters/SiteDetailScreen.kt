@@ -50,6 +50,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Navigation
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.FolderOpen
@@ -97,6 +98,7 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalUriHandler
@@ -268,6 +270,8 @@ private const val TAG_SITE_DETAIL = "GeoTower"
 private const val TAG_SPEEDTEST = "GeoTowerUpload"
 private const val SIGNAL_QUEST_PACKAGE_NAME = "com.sfrmap.android"
 private const val SIGNAL_QUEST_PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.sfrmap.android"
+private const val RNC_MOBILE_PACKAGE_NAME = "org.rncteam.rncfreemobile"
+private const val RNC_MOBILE_PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=org.rncteam.rncfreemobile"
 private const val ARCEP_ALERT_URL = "https://jalerte.arcep.fr/"
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -282,6 +286,7 @@ fun SiteDetailScreen(
     onCloseSplitScreen: () -> Unit = {},
     onOpenElevationProfile: ((String) -> Unit)? = null,
     onOpenThroughputCalculator: ((String) -> Unit)? = null,
+    onOpenTheoreticalCoverage: ((String) -> Unit)? = null,
     // Mode « inséré » (accordéon de la fiche support en mode simplifié) : l'écran perd sa barre
     // de titre, son fil d'Ariane, son tiré-pour-rafraîchir et surtout son propre défilement —
     // deux défilements verticaux imbriqués font mesurer le contenu avec une hauteur infinie.
@@ -645,6 +650,11 @@ fun SiteDetailScreen(
             navController.navigate("throughput_calculator/$id")
         }
     }
+    val openTheoreticalCoverage = onOpenTheoreticalCoverage ?: { id: String ->
+        if (canUseTheoreticalCoverage) {
+            navController.navigate("theoretical_coverage/$id")
+        }
+    }
     fun openSiteSpeedtests(site: LocalisationEntity, sitePhysique: PhysiqueEntity?) {
         if (!canUseSiteSpeedtests) return
         val plmn = SignalQuestOperators.speedtestPlmnFor(site.operateur)
@@ -752,7 +762,7 @@ fun SiteDetailScreen(
     val isEnbAppInstalled = remember { isPackageInstalled(context, "fr.enb_analytics.enb4g") }
     val isSignalQuestInstalled = remember { isPackageInstalled(context, SIGNAL_QUEST_PACKAGE_NAME) }
     val isCellularFrInstalled = remember { isPackageInstalled(context, "com.luisbaker.cellularfr") }
-    val isRncMobileInstalled = remember { isPackageInstalled(context, "org.rncteam.rncfreemobile") }
+    val isRncMobileInstalled = remember { isPackageInstalled(context, RNC_MOBILE_PACKAGE_NAME) }
 
     LaunchedEffect(antennaId, refreshPhotosTrigger, refreshTrigger, featureFlags) {
         try {
@@ -1287,7 +1297,16 @@ fun SiteDetailScreen(
                             }
                         },
                         appLauncher = {
-                            AppLauncherButton(isInstalled = isEnbAppInstalled, appName = "eNB-Analytics", txtOpen = txtOpen, txtInstall = txtInstallApp, useOneUi = useOneUi) { haptic.performHapticFeedback(HapticFeedbackType.LongPress); showEnbSheet = false; if (isEnbAppInstalled) launchApp(context, "fr.enb_analytics.enb4g") else uriHandler.openUri("https://play.google.com/store/apps/details?id=fr.enb_analytics.enb4g") }
+                            AppLauncherButton(isInstalled = isEnbAppInstalled, appName = "eNB-Analytics", txtOpen = txtOpen, txtInstall = txtInstallApp, useOneUi = useOneUi) {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress); showEnbSheet = false
+                                if (isEnbAppInstalled) {
+                                    launchApp(context, "fr.enb_analytics.enb4g") {
+                                        uriHandler.openUri("https://play.google.com/store/apps/details?id=fr.enb_analytics.enb4g")
+                                    }
+                                } else {
+                                    uriHandler.openUri("https://play.google.com/store/apps/details?id=fr.enb_analytics.enb4g")
+                                }
+                            }
                         }
                     )
                 }
@@ -1308,7 +1327,14 @@ fun SiteDetailScreen(
                         }
                         Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
                         AppLauncherButton(isInstalled = isCellularFrInstalled, appName = "CellularFR", txtOpen = txtOpen, txtInstall = txtInstallApp, useOneUi = useOneUi) {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress); showCellularFrSheet = false; if (isCellularFrInstalled) launchApp(context, "com.luisbaker.cellularfr") else uriHandler.openUri("https://play.google.com/store/apps/details?id=com.luisbaker.cellularfr")
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress); showCellularFrSheet = false
+                            if (isCellularFrInstalled) {
+                                launchApp(context, "com.luisbaker.cellularfr") {
+                                    uriHandler.openUri("https://play.google.com/store/apps/details?id=com.luisbaker.cellularfr")
+                                }
+                            } else {
+                                uriHandler.openUri("https://play.google.com/store/apps/details?id=com.luisbaker.cellularfr")
+                            }
                         }
                     }
                 }
@@ -1331,50 +1357,85 @@ fun SiteDetailScreen(
                     )
 
                     ModalBottomSheet(onDismissRequest = { showSignalQuestSheet = false }, sheetState = sheetState, containerColor = sheetBgColor) {
-                        Column(modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(48.dp), start = sizing.spacing(24.dp), end = sizing.spacing(24.dp), top = sizing.spacing(8.dp)), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("Signal Quest", style = sizing.textStyle(MaterialTheme.typography.titleLarge), fontWeight = FontWeight.Bold)
-                            Text(stringResource(R.string.appstrings_open_on), style = sizing.textStyle(MaterialTheme.typography.bodyMedium))
-                            Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(sizing.spacing(16.dp))) {
-                                CommunityCard(title = stringResource(R.string.appstrings_website), txtUnavailable = txtUnavailable, opColor = opColor, iconRes = R.drawable.logo_signalquest, isEnabled = info.idAnfr.isNotBlank(), modifier = Modifier.weight(1f)) {
+                        ExternalOpenOnSheetContent(
+                            title = "Signal Quest",
+                            subtitle = stringResource(R.string.appstrings_open_on),
+                            cardRow = {
+                                CommunityCard(
+                                    title = if (isSignalQuestInstalled) stringResource(R.string.appstrings_logo_app) else stringResource(R.string.appstrings_download),
+                                    txtUnavailable = txtUnavailable,
+                                    opColor = opColor,
+                                    iconRes = R.drawable.logo_signalquest,
+                                    badgeVector = if (isSignalQuestInstalled) Icons.AutoMirrored.Filled.Launch else Icons.Default.Download,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    showSignalQuestSheet = false
+                                    if (isSignalQuestInstalled) {
+                                        openSignalQuestApp(context, appDeeplinkUrl) {
+                                            uriHandler.openUri(appDeeplinkUrl)
+                                        }
+                                    } else {
+                                        uriHandler.openUri(SIGNAL_QUEST_PLAY_STORE_URL)
+                                    }
+                                }
+                                CommunityCard(
+                                    title = stringResource(R.string.appstrings_website),
+                                    txtUnavailable = txtUnavailable,
+                                    opColor = opColor,
+                                    iconRes = R.drawable.logo_signalquest,
+                                    badgeVector = Icons.Default.Public,
+                                    isEnabled = info.idAnfr.isNotBlank(),
+                                    modifier = Modifier.weight(1f)
+                                ) {
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                     showSignalQuestSheet = false
                                     openWebsiteUrl(websiteUrl)
                                 }
                             }
-                            Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
-                            AppLauncherButton(isInstalled = isSignalQuestInstalled, appName = "Signal Quest", txtOpen = txtOpen, txtInstall = txtInstallApp, useOneUi = useOneUi) {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                showSignalQuestSheet = false
-                                if (isSignalQuestInstalled) {
-                                    openSignalQuestApp(context, appDeeplinkUrl) {
-                                        uriHandler.openUri(appDeeplinkUrl)
-                                    }
-                                } else {
-                                    uriHandler.openUri(SIGNAL_QUEST_PLAY_STORE_URL)
-                                }
-                            }
-                        }
+                        )
                     }
                 }
             }
 
             if (showRncSheet) {
                 ModalBottomSheet(onDismissRequest = { showRncSheet = false }, sheetState = sheetState, containerColor = sheetBgColor) {
-                    Column(modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(48.dp), start = sizing.spacing(24.dp), end = sizing.spacing(24.dp), top = sizing.spacing(8.dp)), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("RNC Mobile", style = sizing.textStyle(MaterialTheme.typography.titleLarge), fontWeight = FontWeight.Bold)
-                        Text(stringResource(R.string.appstrings_open_on), style = sizing.textStyle(MaterialTheme.typography.bodyMedium))
-                        Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(sizing.spacing(16.dp))) {
-                            CommunityCard(title = stringResource(R.string.appstrings_website), txtUnavailable = txtUnavailable, opColor = opColor, iconRes = R.drawable.logo_rncmobile, modifier = Modifier.weight(1f)) {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress); showRncSheet = false; openWebsiteUrl("https://rncmobile.net/site/${info.latitude},${info.longitude}")
+                    ExternalOpenOnSheetContent(
+                        title = "RNC Mobile",
+                        subtitle = stringResource(R.string.appstrings_open_on),
+                        cardRow = {
+                            CommunityCard(
+                                title = if (isRncMobileInstalled) stringResource(R.string.appstrings_logo_app) else stringResource(R.string.appstrings_download),
+                                txtUnavailable = txtUnavailable,
+                                opColor = opColor,
+                                iconRes = R.drawable.logo_rncmobile,
+                                badgeVector = if (isRncMobileInstalled) Icons.AutoMirrored.Filled.Launch else Icons.Default.Download,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                showRncSheet = false
+                                if (isRncMobileInstalled) {
+                                    launchApp(context, RNC_MOBILE_PACKAGE_NAME) {
+                                        uriHandler.openUri(RNC_MOBILE_PLAY_STORE_URL)
+                                    }
+                                } else {
+                                    uriHandler.openUri(RNC_MOBILE_PLAY_STORE_URL)
+                                }
+                            }
+                            CommunityCard(
+                                title = stringResource(R.string.appstrings_website),
+                                txtUnavailable = txtUnavailable,
+                                opColor = opColor,
+                                iconRes = R.drawable.logo_rncmobile,
+                                badgeVector = Icons.Default.Public,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                showRncSheet = false
+                                openWebsiteUrl("https://rncmobile.net/site/${info.latitude},${info.longitude}")
                             }
                         }
-                        Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
-                        AppLauncherButton(isInstalled = isRncMobileInstalled, appName = "RNC Mobile", txtOpen = txtOpen, txtInstall = txtInstallApp, useOneUi = useOneUi) {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress); showRncSheet = false; if (isRncMobileInstalled) launchApp(context, "org.rncteam.rncfreemobile") else uriHandler.openUri("https://play.google.com/store/apps/details?id=org.rncteam.rncfreemobile")
-                        }
-                    }
+                    )
                 }
             }
 
@@ -1746,12 +1807,7 @@ fun SiteDetailScreen(
                         "theoretical_coverage" -> {
                             if (showTheoreticalCoverage && canUseTheoreticalCoverage) {
                                 Button(
-                                    onClick = {
-                                        safeClick {
-                                            if (isSplitScreen) onCloseSplitScreen()
-                                            navController.navigate("theoretical_coverage/${info.idAnfr}")
-                                        }
-                                    },
+                                    onClick = { safeClick { openTheoreticalCoverage(info.idAnfr) } },
                                     modifier = Modifier.fillMaxWidth().height(sizing.component(56.dp)),
                                     shape = buttonShape,
                                     colors = ButtonDefaults.buttonColors(
@@ -3036,7 +3092,18 @@ private fun AppLauncherButton(isInstalled: Boolean, appName: String, txtOpen: St
 }
 
 private fun isPackageInstalled(context: Context, pkg: String): Boolean = try { context.packageManager.getPackageInfo(pkg, 0); true } catch (e: Exception) { false }
-private fun launchApp(context: Context, pkg: String) { context.packageManager.getLaunchIntentForPackage(pkg)?.let { context.startActivity(it) } }
+private fun launchApp(context: Context, pkg: String, fallback: () -> Unit = {}) {
+    try {
+        val launchIntent = context.packageManager.getLaunchIntentForPackage(pkg)
+        if (launchIntent != null) {
+            context.startActivity(launchIntent)
+        } else {
+            fallback()
+        }
+    } catch (e: Exception) {
+        fallback()
+    }
+}
 
 private fun openUrlInBrowser(context: Context, url: String, fallback: () -> Unit) {
     val browserIntent = android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse(url)).apply {
@@ -3144,7 +3211,16 @@ private fun openSignalQuestApp(context: Context, deeplinkUrl: String, fallback: 
     try {
         context.startActivity(intent)
     } catch (e: Exception) {
-        fallback()
+        val launchIntent = context.packageManager.getLaunchIntentForPackage(SIGNAL_QUEST_PACKAGE_NAME)
+        if (launchIntent != null) {
+            try {
+                context.startActivity(launchIntent)
+            } catch (e2: Exception) {
+                fallback()
+            }
+        } else {
+            fallback()
+        }
     }
 }
 
@@ -3203,29 +3279,116 @@ private fun SiteHeightCard(
 }
 
 @Composable
-private fun CommunityCard(title: String, txtUnavailable: String, opColor: Color, iconRes: Int? = null, modifier: Modifier = Modifier, isEnabled: Boolean = true, onClick: () -> Unit) {
+private fun CommunityCard(
+    title: String,
+    txtUnavailable: String,
+    opColor: Color,
+    iconRes: Int? = null,
+    iconVector: ImageVector? = null,
+    badgeVector: ImageVector? = null,
+    modifier: Modifier = Modifier,
+    isEnabled: Boolean = true,
+    onClick: () -> Unit
+) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
-    OutlinedCard(modifier = modifier.height(sizing.component(120.dp)).clickable(enabled = isEnabled, onClick = onClick), shape = RoundedCornerShape(sizing.component(16.dp)), border = BorderStroke(sizing.component(1.dp), if (isEnabled) SolidColor(opColor) else SolidColor(Color.Gray.copy(0.3f)))) {
-        Column(modifier = Modifier.fillMaxSize().padding(sizing.spacing(12.dp)), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-            if (iconRes != null) {
-                if (iconRes == R.drawable.logo_cellmapper) {
+    OutlinedCard(
+        modifier = modifier
+            .height(sizing.component(120.dp))
+            .clickable(enabled = isEnabled, onClick = onClick),
+        shape = RoundedCornerShape(sizing.component(16.dp)),
+        border = BorderStroke(sizing.component(1.dp), if (isEnabled) SolidColor(opColor) else SolidColor(Color.Gray.copy(0.3f)))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(sizing.spacing(12.dp)),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Box(
+                modifier = Modifier.size(sizing.component(44.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                if (iconRes != null) {
+                    if (iconRes == R.drawable.logo_cellmapper) {
+                        Box(
+                            modifier = Modifier
+                                .size(sizing.component(38.dp))
+                                .clip(RoundedCornerShape(sizing.component(8.dp)))
+                                .background(Color.White)
+                                .padding(sizing.spacing(4.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Image(painter = painterResource(id = iconRes), contentDescription = null, modifier = Modifier.fillMaxSize())
+                        }
+                    } else {
+                        Image(
+                            painter = painterResource(id = iconRes),
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(sizing.component(38.dp))
+                                .clip(RoundedCornerShape(sizing.component(8.dp)))
+                        )
+                    }
+                } else if (iconVector != null) {
                     Box(
                         modifier = Modifier
-                            .size(sizing.component(40.dp))
+                            .size(sizing.component(38.dp))
                             .clip(RoundedCornerShape(sizing.component(8.dp)))
-                            .background(Color.White)
-                            .padding(sizing.spacing(4.dp)),
+                            .background(if (isEnabled) opColor.copy(alpha = 0.12f) else Color.Gray.copy(0.2f)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Image(painter = painterResource(id = iconRes), contentDescription = null, modifier = Modifier.fillMaxSize())
+                        Icon(
+                            imageVector = iconVector,
+                            contentDescription = null,
+                            tint = if (isEnabled) opColor else Color.Gray.copy(0.5f),
+                            modifier = Modifier.size(sizing.component(22.dp))
+                        )
                     }
                 } else {
-                    Image(painter = painterResource(id = iconRes), contentDescription = null, modifier = Modifier.size(sizing.component(40.dp)).clip(RoundedCornerShape(sizing.component(8.dp))))
+                    Box(
+                        modifier = Modifier
+                            .size(sizing.component(38.dp))
+                            .clip(RoundedCornerShape(sizing.component(8.dp)))
+                            .background(if (isEnabled) opColor else Color.Gray.copy(0.5f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            title.takeLast(2),
+                            style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
-            } else {
-                Box(modifier = Modifier.size(sizing.component(40.dp)).clip(RoundedCornerShape(sizing.component(8.dp))).background(if (isEnabled) opColor else Color.Gray.copy(0.5f)), contentAlignment = Alignment.Center) { Text(title.takeLast(2), style = sizing.textStyle(MaterialTheme.typography.bodyMedium), color = Color.White, fontWeight = FontWeight.Bold) }
+                if (badgeVector != null) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .size(sizing.component(18.dp))
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surface)
+                            .padding(sizing.spacing(1.dp))
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primaryContainer),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = badgeVector,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(sizing.component(11.dp))
+                        )
+                    }
+                }
             }
-            Spacer(modifier = Modifier.height(sizing.spacing(12.dp))); Text(if (isEnabled) title else txtUnavailable, textAlign = TextAlign.Center, fontWeight = FontWeight.Bold, fontSize = sizing.text(14.sp))
+            Spacer(modifier = Modifier.height(sizing.spacing(10.dp)))
+            Text(
+                if (isEnabled) title else txtUnavailable,
+                textAlign = TextAlign.Center,
+                fontWeight = FontWeight.Bold,
+                fontSize = sizing.text(14.sp)
+            )
         }
     }
 }

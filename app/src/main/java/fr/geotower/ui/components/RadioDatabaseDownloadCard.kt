@@ -137,16 +137,12 @@ fun RadioDatabaseDownloadCard(
             var nextRowCount: Int? = null
 
             if (dbPath.exists()) {
-                val validation = RadioDatabaseValidator.validateDatabaseFile(dbPath)
-                if (validation.isValid) {
-                    readRadioMetadata(dbPath)?.let { metadata ->
-                        nextLocalVersionRaw = metadata.version
-                        nextLocalVersion = formatRadioVersion(metadata.version) ?: txtUnknown
-                        nextLocalAnfrDate = formatRadioDate(metadata.dateMajAnfr).orEmpty()
-                        nextRowCount = metadata.rowCount
-                    } ?: run {
-                        nextLocalVersion = txtInvalidDb
-                    }
+                val metadata = runCatching { readRadioMetadata(dbPath) }.getOrNull()
+                if (metadata != null) {
+                    nextLocalVersionRaw = metadata.version
+                    nextLocalVersion = formatRadioVersion(metadata.version) ?: txtUnknown
+                    nextLocalAnfrDate = formatRadioDate(metadata.dateMajAnfr).orEmpty()
+                    nextRowCount = metadata.rowCount
                 } else {
                     nextLocalVersion = txtInvalidDb
                 }

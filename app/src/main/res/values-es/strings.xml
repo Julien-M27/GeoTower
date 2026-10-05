@@ -1673,6 +1673,15 @@
     <string name="appstrings_version_live_db_published_label">Puesta en línea</string>
     <string name="appstrings_version_live_db_server_label">Servidor</string>
     <string name="appstrings_version_live_db_unavailable">El servidor no ha facilitado el detalle de los datos online.</string>
+    <string name="appstrings_version_enb_card_title">Archivos fuente eNB / gNB</string>
+    <string name="appstrings_version_enb_installed_desc">Base instalada (fuente: eNB-Analytics)</string>
+    <string name="appstrings_version_enb_server_desc">Base del servidor (fuente: eNB-Analytics)</string>
+    <string name="appstrings_version_enb_unavailable">Versiones de archivos eNB no disponibles</string>
+    <string name="appstrings_version_enb_partner_label">Proveedor de archivos</string>
+    <string name="appstrings_operator_orange">Orange</string>
+    <string name="appstrings_operator_sfr">SFR</string>
+    <string name="appstrings_operator_bouygues">Bouygues Telecom</string>
+    <string name="appstrings_operator_free">Free Mobile</string>
     <string name="version_week_number_with_date">Semana %1$d\n%2$s</string>
     <string name="photo_exif_label_camera_model">Dispositivo</string>
     <string name="photo_exif_label_distance_to_site">Distancia al sitio</string>
@@ -3258,6 +3267,9 @@
     <string name="appstrings_release_v2063_summary_map_loading">Restaura la carga completa de antenas en el mapa</string>
     <string name="appstrings_release_v2064_summary_frequency_azimuths">Muestra los azimuts activos de cada sector de frecuencia</string>
     <string name="appstrings_release_v2064_summary_database_notifications">Notificaciones de descarga de bases de datos más claras</string>
+    <string name="appstrings_release_v2065_summary_enb_sources">Fechas de archivos fuente por operador para la base eNB</string>
+    <string name="appstrings_release_v2065_summary_database_updates">Comprobación y descarga de bases de datos más rápidas</string>
+    <string name="appstrings_release_v2065_summary_split_coverage">Cobertura teórica integrada en panel lateral para pantallas grandes</string>
     <string name="database_viewer_title">Visor de bases de datos</string>
     <string name="database_viewer_desc">Consulta todas las tablas y filas de las bases de datos locales. Solo lectura.</string>
     <string name="database_viewer_mobile">Base de datos móvil</string>

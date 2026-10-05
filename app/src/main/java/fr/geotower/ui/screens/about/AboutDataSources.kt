@@ -81,10 +81,17 @@ fun aboutSourceGroups(): List<AboutSourceGroup> {
                     // qui servent les fichiers, l'app les joint donc vraiment (OfficialSources).
                     AboutSourceLink(
                         label = stringResource(R.string.appstrings_src_download_hosts),
-                        host = "static.data.gouv.fr"
+                        host = "static.data.gouv.fr",
+                        url = "https://www.data.gouv.fr/"
                     ),
-                    AboutSourceLink(host = "object.files.data.gouv.fr"),
-                    AboutSourceLink(host = "arcep.s3.rbx.io.cloud.ovh.net")
+                    AboutSourceLink(
+                        host = "object.files.data.gouv.fr",
+                        url = "https://www.data.gouv.fr/"
+                    ),
+                    AboutSourceLink(
+                        host = "arcep.s3.rbx.io.cloud.ovh.net",
+                        url = "https://data.arcep.fr/"
+                    )
                 )
             )
         )
@@ -101,7 +108,7 @@ fun aboutSourceGroups(): List<AboutSourceGroup> {
         )
 
         // 3. Fichiers de pannes publiés par les opérateurs : la liste vient de l'enum, pas d'une
-        // copie. Non cliquables : l'URL est un CSV, l'ouvrir déclencherait un téléchargement.
+        // copie.
         add(
             AboutSourceGroup(
                 title = stringResource(R.string.appstrings_src_outages),
@@ -109,7 +116,8 @@ fun aboutSourceGroups(): List<AboutSourceGroup> {
                 links = OperatorOutageSource.entries.map { source ->
                     AboutSourceLink(
                         label = source.label,
-                        host = source.url.substringAfter("//").substringBefore('/')
+                        host = source.url.substringAfter("//").substringBefore('/'),
+                        url = source.url
                     )
                 }
             )
@@ -123,11 +131,13 @@ fun aboutSourceGroups(): List<AboutSourceGroup> {
                 links = listOf(
                     AboutSourceLink(
                         label = stringResource(R.string.appstrings_src_server_primary),
-                        host = ApiServer.PRIMARY.host
+                        host = ApiServer.PRIMARY.host,
+                        url = ApiServer.PRIMARY.baseUrl
                     ),
                     AboutSourceLink(
                         label = stringResource(R.string.appstrings_src_server_mirror),
-                        host = ApiServer.MIRROR.host
+                        host = ApiServer.MIRROR.host,
+                        url = ApiServer.MIRROR.baseUrl
                     )
                 )
             )
@@ -141,7 +151,7 @@ fun aboutSourceGroups(): List<AboutSourceGroup> {
                     stringResource(R.string.appstrings_src_ign_services),
                 links = listOf(
                     AboutSourceLink(host = "geoservices.ign.fr", url = "https://geoservices.ign.fr/"),
-                    AboutSourceLink(host = "data.geopf.fr")
+                    AboutSourceLink(host = "data.geopf.fr", url = "https://geoservices.ign.fr/")
                 )
             )
         )
@@ -158,7 +168,8 @@ fun aboutSourceGroups(): List<AboutSourceGroup> {
                     ),
                     AboutSourceLink(
                         label = stringResource(R.string.appstrings_src_tiles_label),
-                        host = "tile.openstreetmap.org"
+                        host = "tile.openstreetmap.org",
+                        url = "https://www.openstreetmap.org/"
                     )
                 )
             )

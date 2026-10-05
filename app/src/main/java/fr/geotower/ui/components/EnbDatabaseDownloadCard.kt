@@ -142,17 +142,13 @@ fun EnbDatabaseDownloadCard(
             var nextOperatorCounts = emptyList<EnbOperatorCount>()
 
             if (dbPath.exists()) {
-                val validation = EnbDatabaseValidator.validateDatabaseFile(dbPath)
-                if (validation.isValid) {
-                    readEnbMetadata(dbPath)?.let { metadata ->
-                        nextLocalVersionRaw = metadata.version
-                        nextLocalVersion = formatEnbVersion(metadata.version) ?: txtUnknown
-                        nextSourceDate = formatEnbDate(metadata.sourceDate).orEmpty()
-                        nextRowCount = metadata.rowCount
-                        nextOperatorCounts = EnbDatabaseOperatorCounts.read(context, dbPath, metadata.version).orEmpty()
-                    } ?: run {
-                        nextLocalVersion = txtInvalidDb
-                    }
+                val metadata = runCatching { readEnbMetadata(dbPath) }.getOrNull()
+                if (metadata != null) {
+                    nextLocalVersionRaw = metadata.version
+                    nextLocalVersion = formatEnbVersion(metadata.version) ?: txtUnknown
+                    nextSourceDate = formatEnbDate(metadata.sourceDate).orEmpty()
+                    nextRowCount = metadata.rowCount
+                    nextOperatorCounts = EnbDatabaseOperatorCounts.read(context, dbPath, metadata.version).orEmpty()
                 } else {
                     nextLocalVersion = txtInvalidDb
                 }

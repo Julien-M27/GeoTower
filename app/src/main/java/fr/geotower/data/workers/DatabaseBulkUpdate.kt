@@ -172,12 +172,7 @@ object DatabaseBulkUpdate {
         }
 
         val remote = RadioDatabaseDownloader.getLatestDatabaseVersion()
-        val dbFile = context.getDatabasePath(RadioDatabaseValidator.DB_NAME)
-        val local = if (RadioDatabaseValidator.validateDatabaseFile(dbFile).isValid) {
-            RadioDatabaseValidator.getInstalledDatabaseVersion(context)
-        } else {
-            null
-        }
+        val local = RadioDatabaseValidator.getInstalledDatabaseVersion(context)
         val isMissing = local == null
         if (remote == null) {
             return TargetCheckResult(isComplete = false, hasMissingDatabase = isMissing)
@@ -202,12 +197,7 @@ object DatabaseBulkUpdate {
         }
 
         val remote = EnbDatabaseDownloader.getLatestDatabaseVersion()
-        val dbFile = context.getDatabasePath(EnbDatabaseValidator.DB_NAME)
-        val local = if (EnbDatabaseValidator.validateDatabaseFile(dbFile).isValid) {
-            EnbDatabaseValidator.getInstalledDatabaseVersion(context)
-        } else {
-            null
-        }
+        val local = EnbDatabaseValidator.getInstalledDatabaseVersion(context)
         val isMissing = local == null
         // La version eNB contient un digest : une comparaison exacte est indispensable
         // pour detecter le changement d'une source plus ancienne que les autres.

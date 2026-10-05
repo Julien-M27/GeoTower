@@ -65,13 +65,13 @@ object DatabaseDownloader {
         return getLatestDatabaseUpdateInfo()?.version
     }
 
-    suspend fun getLatestDatabaseUpdateInfo(): UpdateInfo? {
+    suspend fun getLatestDatabaseUpdateInfo(forceRefresh: Boolean = false): UpdateInfo? {
         if (!RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.DATABASE_UPDATE_CHECK)) {
             return null
         }
         return withContext(Dispatchers.IO) {
             try {
-                readVerifiedDatabaseInfo()?.value?.let { database ->
+                DownloadManifestRepository.getPreferredMobileDatabase(forceRefresh)?.value?.let { database ->
                     UpdateInfo(version = database.version, sha256 = database.sha256)
                 }
             } catch (e: Exception) {
@@ -276,28 +276,7 @@ object DatabaseDownloader {
         }
 
     private fun readVerifiedDatabaseInfo(): ServedFrom<DownloadManifestDatabase>? {
-        // Seul le cran « autonomie maximale » coupe le manifeste. Aux crans « base en local », la
-        // version distante reste lue EXPRÈS : c'est elle qui dit « l'ANFR a publié du neuf », donc
-        // qu'il est temps de REGÉNÉRER. La couper laissait ces utilisateurs sans aucun signal de
-        // mise à jour. Le téléchargement, lui, reste bloqué (cf. [downloadUpdate]).
-        // ... et seulement si l'appareil peut se passer du serveur (cf. [AppConfig.blockServerDatabase]) :
-        // sur un appareil inéligible à la génération, couper ici ne donnerait pas de l'autonomie,
-        // mais une application sans la moindre donnée.
-        if (AppConfig.blockServerDatabase()) return null
-
-        // En mode automatique, les deux manifestes sont lus séparément. Le miroir peut avoir reçu
-        // le dernier fichier hebdomadaire alors que le principal répond encore avec le précédent.
-        // En mode forcé, un seul serveur est interrogé : le choix explicite de l'utilisateur reste
-        // prioritaire, même si l'autre serveur possède une version plus récente.
-        val candidates = if (ApiEndpoints.isAutomaticMode()) {
-            ApiServer.entries.mapNotNull { server -> readVerifiedDatabaseInfoFrom(server) }
-        } else {
-            listOfNotNull(readVerifiedDatabaseInfoFrom(ApiEndpoints.active()))
-        }
-
-        val primary = candidates.firstOrNull { it.host.equals(ApiServer.PRIMARY.host, ignoreCase = true) }
-        val mirror = candidates.firstOrNull { it.host.equals(ApiServer.MIRROR.host, ignoreCase = true) }
-        return selectPreferredDatabase(primary, mirror)
+        return DownloadManifestRepository.getPreferredMobileDatabaseSync()
     }
 
     private fun readVerifiedDatabaseInfoFrom(server: ApiServer): ServedFrom<DownloadManifestDatabase>? {

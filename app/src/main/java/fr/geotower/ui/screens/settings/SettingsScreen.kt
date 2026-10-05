@@ -79,7 +79,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.LinearWavyProgressIndicator
+import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -3806,7 +3806,14 @@ fun SectionDatabase(
     val bulkWorkInfos by workManager
         .getWorkInfosForUniqueWorkFlow(DatabaseBulkUpdate.UNIQUE_WORK_NAME)
         .collectAsState(initial = emptyList())
+    val taggedDbDownloadWorkInfos by workManager
+        .getWorkInfosByTagFlow(DownloadNotificationCenter.DATABASE_DOWNLOADS_WORK_TAG)
+        .collectAsState(initial = emptyList())
+    val allDbDownloadWorkInfos = remember(bulkWorkInfos, taggedDbDownloadWorkInfos) {
+        (bulkWorkInfos + taggedDbDownloadWorkInfos).distinctBy { it.id }
+    }
     val isBulkUpdateRunning = bulkWorkInfos.any { workInfo -> !workInfo.state.isFinished }
+    val isAnyDownloadRunning = allDbDownloadWorkInfos.any { workInfo -> !workInfo.state.isFinished }
     var isCheckingBulkUpdates by remember { mutableStateOf(false) }
     var queuedBulkUpdateTargets by remember {
         mutableStateOf<List<DatabaseBulkUpdate.TargetAction>>(emptyList())
@@ -3815,7 +3822,7 @@ fun SectionDatabase(
     var hasMissingDatabases by remember { mutableStateOf(false) }
     var hasDatabaseUpdates by remember { mutableStateOf(false) }
     var bulkUpdateCheckRequest by remember { mutableIntStateOf(0) }
-    var hadRunningBulkUpdate by remember { mutableStateOf(isBulkUpdateRunning) }
+    var hadRunningBulkUpdate by remember { mutableStateOf(isAnyDownloadRunning) }
 
     suspend fun applyBulkCheckResult(result: DatabaseBulkUpdate.AvailableUpdatesResult) {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main.immediate) {
@@ -3851,32 +3858,56 @@ fun SectionDatabase(
 
     // Une réouverture de la page doit aussi retrouver les bases d'une file créée avant la
     // navigation : les WorkInfo restent la source de vérité tant que le travail n'est pas terminé.
+    // Cela inclut aussi les téléchargements démarrés depuis une carte individuelle.
     val activeBulkUpdateTargets = listOf(
         DatabaseBulkUpdate.Target.MOBILE,
         DatabaseBulkUpdate.Target.RADIO,
         DatabaseBulkUpdate.Target.ENB
     ).mapNotNull { target ->
-        bulkWorkInfos.firstOrNull { workInfo ->
+        allDbDownloadWorkInfos.firstOrNull { workInfo ->
+            workTagFor(target) in workInfo.tags && workInfo.state == androidx.work.WorkInfo.State.RUNNING
+        } ?: allDbDownloadWorkInfos.firstOrNull { workInfo ->
             workTagFor(target) in workInfo.tags && !workInfo.state.isFinished
-        }?.let { workInfo ->
-            val action = if (DatabaseBulkUpdate.actionTag(DatabaseBulkUpdate.Action.DOWNLOAD) in workInfo.tags) {
-                DatabaseBulkUpdate.Action.DOWNLOAD
-            } else {
-                DatabaseBulkUpdate.Action.UPDATE
-            }
-            DatabaseBulkUpdate.TargetAction(target, action)
         }
+    }.map { workInfo ->
+        val target = when {
+            workTagFor(DatabaseBulkUpdate.Target.MOBILE) in workInfo.tags -> DatabaseBulkUpdate.Target.MOBILE
+            workTagFor(DatabaseBulkUpdate.Target.RADIO) in workInfo.tags -> DatabaseBulkUpdate.Target.RADIO
+            else -> DatabaseBulkUpdate.Target.ENB
+        }
+        val action = if (DatabaseBulkUpdate.actionTag(DatabaseBulkUpdate.Action.DOWNLOAD) in workInfo.tags) {
+            DatabaseBulkUpdate.Action.DOWNLOAD
+        } else if (DatabaseBulkUpdate.actionTag(DatabaseBulkUpdate.Action.UPDATE) in workInfo.tags) {
+            DatabaseBulkUpdate.Action.UPDATE
+        } else {
+            val isInstalled = when (target) {
+                DatabaseBulkUpdate.Target.MOBILE ->
+                    fr.geotower.data.db.GeoTowerDatabaseValidator.getInstalledDatabaseVersion(context) != null
+                DatabaseBulkUpdate.Target.RADIO ->
+                    fr.geotower.data.db.RadioDatabaseValidator.getInstalledDatabaseVersion(context) != null
+                DatabaseBulkUpdate.Target.ENB ->
+                    fr.geotower.data.db.EnbDatabaseValidator.getInstalledDatabaseVersion(context) != null
+            }
+            if (isInstalled) DatabaseBulkUpdate.Action.UPDATE else DatabaseBulkUpdate.Action.DOWNLOAD
+        }
+        DatabaseBulkUpdate.TargetAction(target, action)
     }
     val displayedBulkUpdateTargets = (queuedBulkUpdateTargets + activeBulkUpdateTargets)
         .distinctBy { targetAction -> targetAction.target }
 
-    val updateAllButtonBusy = isCheckingBulkUpdates || isBulkUpdateRunning
+    val updateAllButtonBusy = isCheckingBulkUpdates || isAnyDownloadRunning
+    // Les cartes individuelles vérifient chacune leur propre version distante. Elles doivent
+    // rester actionnables pendant que la vérification groupée termine, sinon une base déjà
+    // identifiée par sa carte resterait inutilement bloquée.
+    val disableIndividualDownloads = isBulkUpdateRunning
     val updateAllButtonContainerTarget = when {
+        isAnyDownloadRunning -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
         allDatabasesUpToDate == true -> MaterialTheme.colorScheme.surfaceVariant
         updateAllButtonBusy -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
         else -> MaterialTheme.colorScheme.primary
     }
     val updateAllButtonContentTarget = when {
+        isAnyDownloadRunning -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
         allDatabasesUpToDate == true -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
         updateAllButtonBusy -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
         else -> MaterialTheme.colorScheme.onPrimary
@@ -3896,11 +3927,14 @@ fun SectionDatabase(
     // Un résultat incomplet (réseau indisponible ou manifeste invalide) ne doit pas être présenté
     // comme « tout est à jour » : le bouton reste alors disponible pour permettre un nouvel essai.
     LaunchedEffect(sectionRefreshKey, featureFlags, showMobileCard, showRadioCard, showEnbCard, bulkUpdateCheckRequest) {
+        if (sectionRefreshKey > 0) {
+            fr.geotower.data.api.DownloadManifestRepository.clearCache()
+        }
         if (!showMobileCard && !showRadioCard && !showEnbCard) {
             allDatabasesUpToDate = null
             return@LaunchedEffect
         }
-        if (isBulkUpdateRunning) {
+        if (isBulkUpdateRunning || isAnyDownloadRunning) {
             allDatabasesUpToDate = null
             return@LaunchedEffect
         }
@@ -3908,10 +3942,10 @@ fun SectionDatabase(
         checkBulkUpdates()
     }
 
-    // Une file créée pendant la vérification ne l'interrompt pas. Quand elle se termine, on
-    // relance une vérification pour refléter les versions effectivement installées.
-    LaunchedEffect(isBulkUpdateRunning) {
-        if (isBulkUpdateRunning) {
+    // Une file créée pendant la vérification ou un téléchargement individuel ne l'interrompt pas.
+    // Quand il se termine, on relance une vérification pour refléter les versions effectivement installées.
+    LaunchedEffect(isAnyDownloadRunning) {
+        if (isAnyDownloadRunning) {
             hadRunningBulkUpdate = true
         } else if (hadRunningBulkUpdate) {
             hadRunningBulkUpdate = false
@@ -4046,12 +4080,13 @@ fun SectionDatabase(
                                 } else {
                                     queuedBulkUpdateTargets = emptyList()
                                     scope.launch {
+                                        fr.geotower.data.api.DownloadManifestRepository.clearCache()
                                         checkBulkUpdates()
                                     }
                                 }
                             }
                         },
-                        enabled = !isBulkUpdateRunning && allDatabasesUpToDate != true &&
+                        enabled = !isAnyDownloadRunning && allDatabasesUpToDate != true &&
                             (!isCheckingBulkUpdates || queuedBulkUpdateTargets.isNotEmpty()),
                         modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = sizing.component(50.dp)),
                         shape = RoundedCornerShape(sizing.component(12.dp)),
@@ -4062,14 +4097,21 @@ fun SectionDatabase(
                             disabledContentColor = updateAllButtonContentColor
                         )
                     ) {
-                        Icon(
-                            imageVector = if (allDatabasesUpToDate == true) Icons.Default.CheckCircle else Icons.Default.CloudDownload,
-                            contentDescription = null
-                        )
+                        if (isAnyDownloadRunning || (isCheckingBulkUpdates && queuedBulkUpdateTargets.isEmpty())) {
+                            CircularWavyProgressIndicator(
+                                modifier = Modifier.size(sizing.component(20.dp)),
+                                color = updateAllButtonContentColor
+                            )
+                        } else {
+                            Icon(
+                                imageVector = if (allDatabasesUpToDate == true) Icons.Default.CheckCircle else Icons.Default.CloudDownload,
+                                contentDescription = null
+                            )
+                        }
                         Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
                         Text(
                             text = when {
-                                isBulkUpdateRunning -> stringResource(R.string.database_update_all_running)
+                                isAnyDownloadRunning -> stringResource(R.string.database_update_all_running)
                                 allDatabasesUpToDate == true -> stringResource(R.string.database_update_all_none)
                                 hasMissingDatabases && hasDatabaseUpdates ->
                                     stringResource(R.string.database_download_and_update_all_action)
@@ -4081,7 +4123,7 @@ fun SectionDatabase(
                             fontWeight = FontWeight.Bold
                         )
                     }
-                    if (isCheckingBulkUpdates || isBulkUpdateRunning) {
+                    if (isCheckingBulkUpdates || isAnyDownloadRunning) {
                         Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
                         LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                     }
@@ -4098,7 +4140,9 @@ fun SectionDatabase(
                             // Les WorkInfo terminés peuvent rester dans l'historique WorkManager.
                             // Ils ne doivent pas être associés à une nouvelle base détectée comme
                             // manquante ou obsolète, sinon elle apparaît à tort comme terminée.
-                            val workInfo = bulkWorkInfos.firstOrNull { info ->
+                            val workInfo = allDbDownloadWorkInfos.firstOrNull { info ->
+                                workTagFor(target) in info.tags && info.state == androidx.work.WorkInfo.State.RUNNING
+                            } ?: allDbDownloadWorkInfos.firstOrNull { info ->
                                 workTagFor(target) in info.tags && !info.state.isFinished
                             }
                             val progress = (workInfo?.progress?.getInt(
@@ -4185,7 +4229,7 @@ fun SectionDatabase(
                     bubbleColor = bubbleColor,
                     title = stringResource(R.string.settings_database_online_title),
                     refreshState = refreshState,
-                    disableDownloadAction = updateAllButtonBusy
+                    disableDownloadAction = disableIndividualDownloads
                 )
             }
 
@@ -4200,7 +4244,7 @@ fun SectionDatabase(
                     border = border,
                     bubbleColor = bubbleColor,
                     refreshState = refreshState,
-                    disableDownloadAction = updateAllButtonBusy
+                    disableDownloadAction = disableIndividualDownloads
                 )
             }
 
@@ -4217,7 +4261,7 @@ fun SectionDatabase(
                     border = border,
                     bubbleColor = bubbleColor,
                     refreshState = refreshState,
-                    disableDownloadAction = updateAllButtonBusy
+                    disableDownloadAction = disableIndividualDownloads
                 )
             }
 

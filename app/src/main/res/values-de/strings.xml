@@ -1673,6 +1673,15 @@
     <string name="appstrings_version_live_db_published_label">Online gestellt</string>
     <string name="appstrings_version_live_db_server_label">Server</string>
     <string name="appstrings_version_live_db_unavailable">Der Server hat keine Angaben zu den Online-Daten geliefert.</string>
+    <string name="appstrings_version_enb_card_title">eNB-/gNB-Quelldateien</string>
+    <string name="appstrings_version_enb_installed_desc">Installierte Datenbank (Quelle: eNB-Analytics)</string>
+    <string name="appstrings_version_enb_server_desc">Server-Datenbank (Quelle: eNB-Analytics)</string>
+    <string name="appstrings_version_enb_unavailable">eNB-Dateiversionen nicht verfügbar</string>
+    <string name="appstrings_version_enb_partner_label">Dateianbieter</string>
+    <string name="appstrings_operator_orange">Orange</string>
+    <string name="appstrings_operator_sfr">SFR</string>
+    <string name="appstrings_operator_bouygues">Bouygues Telecom</string>
+    <string name="appstrings_operator_free">Free Mobile</string>
     <string name="version_week_number_with_date">Woche %1$d\n%2$s</string>
     <string name="photo_exif_label_camera_model">Gerät</string>
     <string name="photo_exif_label_distance_to_site">Entfernung zum Standort</string>
@@ -3258,6 +3267,9 @@
     <string name="appstrings_release_v2063_summary_map_loading">Vollständiges Laden der Antennen auf der Karte wiederhergestellt</string>
     <string name="appstrings_release_v2064_summary_frequency_azimuths">Aktive Azimute für jeden Frequenzsektor anzeigen</string>
     <string name="appstrings_release_v2064_summary_database_notifications">Klarere Benachrichtigungen zu Datenbankdownloads</string>
+    <string name="appstrings_release_v2065_summary_enb_sources">Quelldateidaten nach Betreiber für die eNB-Datenbank</string>
+    <string name="appstrings_release_v2065_summary_database_updates">Schnellere Prüfung und Herunterladen von Datenbanken</string>
+    <string name="appstrings_release_v2065_summary_split_coverage">Theoretische Abdeckung im Seitenbereich auf großen Bildschirmen</string>
     <string name="database_viewer_title">Datenbank-Viewer</string>
     <string name="database_viewer_desc">Alle Tabellen und Zeilen in den lokalen Datenbanken durchsuchen. Schreibgeschützt.</string>
     <string name="database_viewer_mobile">Mobilfunkdatenbank</string>

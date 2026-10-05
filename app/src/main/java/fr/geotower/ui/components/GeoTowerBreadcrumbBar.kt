@@ -296,6 +296,7 @@ private fun rememberGeoTowerBreadcrumbLabels(): GeoTowerBreadcrumbLabels {
         site = stringResource(R.string.appstrings_site_detail_title),
         elevationProfile = stringResource(R.string.appstrings_elevation_profile_title),
         throughputCalculator = stringResource(R.string.appstrings_throughput_calculator_title),
+        theoreticalCoverage = stringResource(R.string.appstrings_coverage_button),
         speedtests = stringResource(R.string.appstrings_speedtests_all_title),
         uploadHistory = stringResource(R.string.appstrings_upload_history_title),
         shareHistory = stringResource(R.string.share_history_title),
@@ -319,6 +320,7 @@ private data class GeoTowerBreadcrumbLabels(
     val site: String,
     val elevationProfile: String,
     val throughputCalculator: String,
+    val theoreticalCoverage: String,
     val speedtests: String,
     val uploadHistory: String,
     val shareHistory: String,
@@ -366,6 +368,7 @@ private fun NavBackStackEntry.toGeoTowerBreadcrumbItem(
         "throughput_calculator/{id}",
         "throughput_calculator/{id}?cfg={cfg}" ->
             GeoTowerBreadcrumbItem(labels.throughputCalculator, Icons.Default.Speed, onClick, "throughput_calculator")
+        "theoretical_coverage/{id}" -> GeoTowerBreadcrumbItem(labels.theoreticalCoverage, Icons.Default.Map, onClick, "theoretical_coverage")
         "site_speedtests?siteId={siteId}&anfrCode={anfrCode}&operator={operator}&market={market}&mcc={mcc}&mnc={mnc}" -> GeoTowerBreadcrumbItem(labels.speedtests, Icons.Default.Timer, onClick, "site_speedtests")
         "radio_site_detail/{stationId}/{supportId}" -> GeoTowerBreadcrumbItem(labels.radio, Icons.Default.VerticalAlignTop, onClick, "radio_site_detail")
         else -> null

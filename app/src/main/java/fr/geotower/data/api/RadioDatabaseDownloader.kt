@@ -43,13 +43,13 @@ object RadioDatabaseDownloader {
         }
     }
 
-    suspend fun getLatestDatabaseVersion(): String? {
+    suspend fun getLatestDatabaseVersion(forceRefresh: Boolean = false): String? {
         if (!RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.DATABASE_UPDATE_CHECK)) {
             return null
         }
         return withContext(Dispatchers.IO) {
             try {
-                readVerifiedRadioDatabaseInfo()?.value?.version
+                DownloadManifestRepository.getPreferredRadioDatabase(forceRefresh)?.value?.version
             } catch (e: Exception) {
                 null
             }
@@ -206,26 +206,7 @@ object RadioDatabaseDownloader {
         }
 
     private fun readVerifiedRadioDatabaseInfo(): ServedFrom<DownloadManifestDatabase>? {
-        // Comme pour la base mobile : seul le cran « autonomie maximale » coupe le manifeste. Aux
-        // crans « base en local », la version distante reste lue pour signaler qu'il y a du neuf à
-        // régénérer ; c'est le téléchargement qui est bloqué (cf. [downloadUpdate]).
-        // ... et seulement sur un appareil capable de générer la sienne (cf. [AppConfig.blockServerDatabase]).
-        if (AppConfig.blockServerDatabase()) return null
-        val served = readVerifiedDownloadManifest() ?: return null
-        val database = served.value.radioDatabase ?: return null
-        if (
-            !isOfficialRadioDatabaseDownloadUrl(database.url) ||
-            !isValidRemoteRadioDatabaseInfo(
-                filename = database.filename,
-                sizeBytes = database.sizeBytes,
-                sha256 = database.sha256,
-                schemaVersion = database.schemaVersion,
-                countryCode = database.countryCode
-            )
-        ) {
-            return null
-        }
-        return ServedFrom(database, served.host)
+        return DownloadManifestRepository.getPreferredRadioDatabaseSync()
     }
 
     private fun readVerifiedDownloadManifest(): ServedFrom<DownloadManifest>? {

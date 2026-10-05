@@ -15,6 +15,13 @@ data class EnbOperatorCount(
     val gnbCount: Int,
 )
 
+/** Date de version des donnees par operateur issues de la base eNB. */
+data class EnbOperatorDateInfo(
+    val plmn: String,
+    val operator: String,
+    val sourceDate: String?
+)
+
 /**
  * Lit la repartition des identifiants de la base eNB installee.
  *
@@ -22,6 +29,34 @@ data class EnbOperatorCount(
  * `enb_cell`, et ne doit donc pas etre relancee a chaque retour sur la page des reglages.
  */
 object EnbDatabaseOperatorCounts {
+
+    fun readOperatorDates(context: Context, dbPath: File = context.getDatabasePath(EnbDatabaseValidator.DB_NAME)): List<EnbOperatorDateInfo>? {
+        if (!dbPath.isFile) return null
+        return try {
+            SQLiteDatabase.openDatabase(dbPath.absolutePath, null, SQLiteDatabase.OPEN_READONLY).use { db ->
+                readOperatorDates(db)
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    fun readOperatorDates(db: SQLiteDatabase): List<EnbOperatorDateInfo> {
+        val list = ArrayList<EnbOperatorDateInfo>()
+        db.rawQuery(
+            "SELECT plmn, operator, source_date FROM enb_source ORDER BY mnc",
+            null
+        ).use { cursor ->
+            while (cursor.moveToNext()) {
+                list += EnbOperatorDateInfo(
+                    plmn = cursor.getString(0).orEmpty(),
+                    operator = cursor.getString(1).orEmpty(),
+                    sourceDate = if (cursor.isNull(2)) null else cursor.getString(2)
+                )
+            }
+        }
+        return list
+    }
 
     private const val CACHE_VERSION_KEY = "db_enb_operator_counts_version"
     private const val CACHE_VALUE_KEY = "db_enb_operator_counts"

@@ -274,7 +274,7 @@ object GeoTowerDatabaseValidator {
         "radio_stat_weekly" to listOf("week_key", "operator_name", "category", "item_key", "total_count", "active_count")
     )
 
-    fun getInstalledDatabaseStatus(context: Context): LocalDatabaseStatus {
+    fun getInstalledDatabaseStatus(context: Context, checkIntegrity: Boolean = false): LocalDatabaseStatus {
         migrateLegacyDatabaseIfCurrentMissing(context)
         val dbFile = context.getDatabasePath(DB_NAME)
         if (!dbFile.isFile || dbFile.length() <= 0L) {
@@ -282,7 +282,7 @@ object GeoTowerDatabaseValidator {
             return LocalDatabaseStatus(LocalDatabaseState.MISSING)
         }
 
-        val validation = validateDatabaseFile(dbFile)
+        val validation = validateDatabaseFile(dbFile, checkIntegrity = checkIntegrity)
         return if (validation.isValid) {
             deleteObsoleteDatabaseArtifacts(context)
             clearInstalledDatabaseInvalid(context)
@@ -299,12 +299,12 @@ object GeoTowerDatabaseValidator {
 
         val currentDb = context.getDatabasePath(DB_NAME)
         if (!currentDb.isFile || currentDb.length() <= 0L) return
-        if (!validateDatabaseFile(currentDb).isValid) return
+        if (!validateDatabaseFile(currentDb, checkIntegrity = false).isValid) return
 
         deleteObsoleteDatabaseArtifacts(context)
     }
 
-    fun validateDatabaseFile(file: File): ValidationResult {
+    fun validateDatabaseFile(file: File, checkIntegrity: Boolean = true): ValidationResult {
         if (!file.isFile || file.length() <= 0L) {
             return ValidationResult(false, "Fichier de base absent ou vide")
         }
@@ -312,7 +312,7 @@ object GeoTowerDatabaseValidator {
         var db: SQLiteDatabase? = null
         return try {
             db = SQLiteDatabase.openDatabase(file.absolutePath, null, SQLiteDatabase.OPEN_READONLY)
-            validateOpenDatabase(db)
+            validateOpenDatabase(db, checkIntegrity = checkIntegrity)
         } catch (e: Exception) {
             ValidationResult(false, e.message ?: "Base SQLite illisible")
         } finally {
@@ -334,8 +334,8 @@ object GeoTowerDatabaseValidator {
             .apply()
     }
 
-    private fun validateOpenDatabase(db: SQLiteDatabase): ValidationResult {
-        if (!runIntegrityCheck(db)) {
+    private fun validateOpenDatabase(db: SQLiteDatabase, checkIntegrity: Boolean = true): ValidationResult {
+        if (checkIntegrity && !runIntegrityCheck(db)) {
             return ValidationResult(false, "PRAGMA integrity_check a echoue")
         }
 
