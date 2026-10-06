@@ -462,10 +462,11 @@
     <string name="appstrings_bandwidth_total">Gesamtbandbreite</string>
     <string name="appstrings_bandwidth_total_warning">Die Gesamtbandbreite kann wegen wahrscheinlicher Meldefehler ungenau sein.</string>
     <string name="appstrings_bearing_label">Peilung von der Antenne gemessen:\u0020</string>
-    <string name="appstrings_bg_location_perm_desc">"Immer" erlauben, damit das Widget aktualisiert wird</string>
+    <string name="appstrings_bg_location_perm_desc">Erforderlich, um die Informationen auf deinem Startbildschirm automatisch zu aktualisieren.</string>
+    <string name="appstrings_bg_location_perm_option_hint">Auszuwählende Option: „%1$s“</string>
     <string name="appstrings_battery_opt_title">Akku-Optimierung deaktivieren</string>
     <string name="appstrings_battery_opt_desc">Auf manchen Geräten (Samsung…) wird das Live-Tracking im Hintergrund eingefroren. Erlaube der Anwendung, die Akku-Optimierung zu ignorieren, für unterbrechungsfreies Tracking.</string>
-    <string name="appstrings_bg_location_perm_title">Widget-Berechtigung</string>
+    <string name="appstrings_bg_location_perm_title">Widget-Standortzugriff</string>
     <string name="appstrings_blur_subtitle">Weichzeichnung aktivieren oder deaktivieren (verbraucht mehr Akku)</string>
     <string name="appstrings_blur_title">Scroll-Weichzeichnung</string>
     <string name="appstrings_bottom">Unten</string>

@@ -3727,7 +3727,7 @@ fun SectionSysteme(
                         append(stringResource(R.string.appstrings_bg_location_perm_desc))
                         if (!backgroundPermissionLabel.isNullOrBlank()) {
                             append('\n')
-                            append(backgroundPermissionLabel)
+                            append(stringResource(R.string.appstrings_bg_location_perm_option_hint, backgroundPermissionLabel))
                         }
                     },
                     // La divulgation passe d'abord : c'est elle qui déclenche la demande système.

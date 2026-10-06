@@ -490,10 +490,11 @@
     <string name="appstrings_bandwidth_total">Largeur de bande totale</string>
     <string name="appstrings_bandwidth_total_warning">La largeur de bande totale peut être erronée en raison de probables erreurs de déclaration.</string>
     <string name="appstrings_bearing_label">Cap mesuré depuis l’antenne :\u0020</string>
-    <string name="appstrings_bg_location_perm_desc">Autorisez "Toujours" pour que le widget s\'actualise</string>
+    <string name="appstrings_bg_location_perm_desc">Requis pour actualiser automatiquement les informations sur votre écran d\'accueil.</string>
+    <string name="appstrings_bg_location_perm_option_hint">Option à choisir : « %1$s »</string>
     <string name="appstrings_battery_opt_title">Désactiver l\'optimisation batterie</string>
     <string name="appstrings_battery_opt_desc">Sur certains téléphones (Samsung…), le suivi live est gelé en arrière-plan. Autorisez l\'application à ignorer l\'optimisation batterie pour un suivi sans interruption.</string>
-    <string name="appstrings_bg_location_perm_title">Autorisation Widget</string>
+    <string name="appstrings_bg_location_perm_title">Localisation du widget</string>
     <string name="appstrings_blur_subtitle">Activer ou désactiver le flou (plus énergivore)</string>
     <string name="appstrings_blur_title">Flou de défilement</string>
     <string name="appstrings_bottom">Bas</string>

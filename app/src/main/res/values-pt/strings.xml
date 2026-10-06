@@ -462,10 +462,11 @@
     <string name="appstrings_bandwidth_total">Largura de banda total</string>
     <string name="appstrings_bandwidth_total_warning">A largura de banda total pode estar incorreta devido a prováveis erros de declaração.</string>
     <string name="appstrings_bearing_label">Rumo medido a partir da antena :\u0020</string>
-    <string name="appstrings_bg_location_perm_desc">Permita "Sempre" para o widget atualizar</string>
+    <string name="appstrings_bg_location_perm_desc">Necessário para atualizar automaticamente as informações no ecrã inicial.</string>
+    <string name="appstrings_bg_location_perm_option_hint">Opção a escolher: «%1$s»</string>
     <string name="appstrings_battery_opt_title">Desativar a otimização de bateria</string>
     <string name="appstrings_battery_opt_desc">Em alguns telemóveis (Samsung…), o seguimento em direto fica congelado em segundo plano. Permita que a aplicação ignore a otimização de bateria para um seguimento sem interrupções.</string>
-    <string name="appstrings_bg_location_perm_title">Permissão do Widget</string>
+    <string name="appstrings_bg_location_perm_title">Localização do widget</string>
     <string name="appstrings_blur_subtitle">Ativar ou desativar o desfoque (consome mais bateria)</string>
     <string name="appstrings_blur_title">Desfoque de rolagem</string>
     <string name="appstrings_bottom">Fundo</string>

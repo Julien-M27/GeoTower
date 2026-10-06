@@ -462,10 +462,11 @@
     <string name="appstrings_bandwidth_total">Total bandwidth</string>
     <string name="appstrings_bandwidth_total_warning">The total bandwidth may be inaccurate due to likely declaration errors.</string>
     <string name="appstrings_bearing_label">Bearing measured from the antenna :\u0020</string>
-    <string name="appstrings_bg_location_perm_desc">Allow "Always" for the widget to refresh</string>
+    <string name="appstrings_bg_location_perm_desc">Required to automatically update information on your home screen.</string>
+    <string name="appstrings_bg_location_perm_option_hint">Option to choose: “%1$s”</string>
     <string name="appstrings_battery_opt_title">Disable battery optimization</string>
     <string name="appstrings_battery_opt_desc">On some phones (Samsung…), live tracking is frozen in the background. Allow the application to ignore battery optimization for uninterrupted tracking.</string>
-    <string name="appstrings_bg_location_perm_title">Widget Permission</string>
+    <string name="appstrings_bg_location_perm_title">Widget location access</string>
     <string name="appstrings_blur_subtitle">Enable or disable blur (consumes more battery)</string>
     <string name="appstrings_blur_title">Scroll Blur</string>
     <string name="appstrings_bottom">Bottom</string>

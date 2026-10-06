@@ -462,10 +462,11 @@
     <string name="appstrings_bandwidth_total">Larghezza di banda totale</string>
     <string name="appstrings_bandwidth_total_warning">La larghezza di banda totale può essere imprecisa a causa di probabili errori di dichiarazione.</string>
     <string name="appstrings_bearing_label">Direzione misurata dall\'antenna:\u0020</string>
-    <string name="appstrings_bg_location_perm_desc">Consenti "Sempre" per aggiornare il widget</string>
+    <string name="appstrings_bg_location_perm_desc">Necessario per aggiornare automaticamente le informazioni sulla schermata iniziale.</string>
+    <string name="appstrings_bg_location_perm_option_hint">Opzione da scegliere: «%1$s»</string>
     <string name="appstrings_battery_opt_title">Disattiva l\'ottimizzazione della batteria</string>
     <string name="appstrings_battery_opt_desc">Su alcuni telefoni (Samsung…), il monitoraggio live si blocca in background. Consenti all\'applicazione di ignorare l\'ottimizzazione della batteria per un monitoraggio senza interruzioni.</string>
-    <string name="appstrings_bg_location_perm_title">Autorizzazione widget</string>
+    <string name="appstrings_bg_location_perm_title">Posizione per il widget</string>
     <string name="appstrings_blur_subtitle">Attiva o disattiva la sfocatura (consuma più batteria)</string>
     <string name="appstrings_blur_title">Sfocatura scorrimento</string>
     <string name="appstrings_bottom">Basso</string>
