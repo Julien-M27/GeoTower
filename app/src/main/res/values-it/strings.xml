@@ -597,6 +597,11 @@
     <string name="photo_reports_delete_title">Elimina questa segnalazione</string>
     <string name="photo_reports_delete_message">Cancella soltanto la traccia sul tuo dispositivo. La segnalazione già inviata a SignalQuest non viene annullata.</string>
     <string name="photo_reports_delete_confirm">Elimina</string>
+    <string name="photo_reports_code_anfr">ID ANFR: %1$s</string>
+    <string name="photo_reports_code_support">ID supporto: %1$s</string>
+    <string name="photo_reports_code_support_with_anfr">ID supporto: %1$s (ANFR: %2$s)</string>
+    <string name="photo_reports_code_site">ID sito: %1$s</string>
+    <string name="photo_reports_open_site">Apri sito</string>
     <string name="notification_photo_report_channel_name">Segnalazioni di foto</string>
     <string name="notification_photo_report_sent_title">Segnalazione inviata</string>
     <string name="notification_photo_report_sent_desc">SignalQuest decide il seguito. Ti avviseremo se la foto verrà rimossa.</string>
@@ -2809,7 +2814,7 @@
     <!-- Informativa in evidenza richiesta da Google Play prima di qualsiasi richiesta di posizione in background. -->
     <string name="bg_location_disclosure_title">Uso dei dati di localizzazione in background</string>
     <string name="bg_location_disclosure_body">GeoTower raccoglie i dati sulla posizione per identificare le celle e le antenne nelle vicinanze e aggiornare automaticamente il widget sulla schermata iniziale, anche quando l\'app è chiusa o non in uso.\n\nQuesti dati vengono elaborati esclusivamente sul tuo dispositivo per calcolare il sito più vicino. Non vengono memorizzati né condivisi con terzi.</string>
-    <string name="bg_location_disclosure_option">Nella schermata successiva, scegli «%1$s».</string>
+    <string name="bg_location_disclosure_option">Nella schermata successiva, vai su Autorizzazioni &gt; Posizione, quindi scegli «%1$s».</string>
     <string name="bg_location_disclosure_accept">Accetta</string>
     <string name="bg_location_disclosure_deny">Rifiuta</string>
 
@@ -3320,4 +3325,7 @@
     <string name="map_clustering_strength_low">Bassa</string>
     <string name="map_clustering_strength_high">Alta</string>
     <string name="appstrings_release_v2067_widget_disclosure">Maggiore chiarezza sulla posizione in background per i widget e schermata informativa</string>
+    <string name="appstrings_release_v2068_summary_site_highlight">Animazione a onde luminose all\'apertura di un sito sulla mappa</string>
+    <string name="appstrings_release_v2068_summary_photo_reports">Accesso diretto ai dettagli del sito dalla cronologia delle segnalazioni di foto</string>
+    <string name="appstrings_release_v2068_summary_cluster_slider">Migliore leggibilità ed ergonomia per la regolazione del raggruppamento delle antenne</string>
 </resources>

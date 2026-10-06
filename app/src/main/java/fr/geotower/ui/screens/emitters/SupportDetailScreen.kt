@@ -542,8 +542,8 @@ fun SupportDetailScreen(
         // Seul le brouillon venu du partage suit l'utilisateur sur la carte : il y cherche encore
         // son pylône. Des photos ajoutées ici visent CE pylône, déjà choisi.
         val route = sharedPhotoDraftId
-            ?.let { "map?photoDraftId=${Uri.encode(it)}" }
-            ?: "map"
+            ?.let { "map?photoDraftId=${Uri.encode(it)}&focusLat=$latitude&focusLon=$longitude" }
+            ?: "map?focusLat=$latitude&focusLon=$longitude"
         navController.navigate(route)
     }
 

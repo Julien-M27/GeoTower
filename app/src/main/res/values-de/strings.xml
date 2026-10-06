@@ -597,6 +597,11 @@
     <string name="photo_reports_delete_title">Diese Meldung löschen</string>
     <string name="photo_reports_delete_message">Das löscht nur den Eintrag auf Ihrem Gerät. Die bereits an SignalQuest übermittelte Meldung bleibt bestehen.</string>
     <string name="photo_reports_delete_confirm">Löschen</string>
+    <string name="photo_reports_code_anfr">ANFR-ID: %1$s</string>
+    <string name="photo_reports_code_support">Mast-ID: %1$s</string>
+    <string name="photo_reports_code_support_with_anfr">Mast-ID: %1$s (ANFR: %2$s)</string>
+    <string name="photo_reports_code_site">Standort-ID: %1$s</string>
+    <string name="photo_reports_open_site">Standort öffnen</string>
     <string name="notification_photo_report_channel_name">Fotomeldungen</string>
     <string name="notification_photo_report_sent_title">Meldung übermittelt</string>
     <string name="notification_photo_report_sent_desc">SignalQuest entscheidet über das Weitere. Sie werden benachrichtigt, wenn das Foto entfernt wird.</string>
@@ -2809,7 +2814,7 @@
     <!-- Von Google Play geforderter deutlicher Hinweis vor jeder Standortabfrage im Hintergrund. -->
     <string name="bg_location_disclosure_title">Verwendung von Standortdaten im Hintergrund</string>
     <string name="bg_location_disclosure_body">GeoTower erfasst Standortdaten, um Funkzellen und Antennen in der Nähe zu erkennen und das Widget auf deinem Startbildschirm automatisch zu aktualisieren, selbst wenn die App geschlossen ist oder nicht verwendet wird.\n\nDiese Daten werden ausschließlich auf deinem Gerät verarbeitet, um den nächstgelegenen Standort zu ermitteln. Sie werden weder gespeichert noch an Dritte weitergegeben.</string>
-    <string name="bg_location_disclosure_option">Wähle im nächsten Bildschirm „%1$s“.</string>
+    <string name="bg_location_disclosure_option">Gehe im nächsten Bildschirm zu Berechtigungen &gt; Standort und wähle dann „%1$s“.</string>
     <string name="bg_location_disclosure_accept">Akzeptieren</string>
     <string name="bg_location_disclosure_deny">Ablehnen</string>
 
@@ -3320,4 +3325,7 @@
     <string name="map_clustering_strength_low">Niedrig</string>
     <string name="map_clustering_strength_high">Hoch</string>
     <string name="appstrings_release_v2067_widget_disclosure">Klarere Erklärung der Hintergrundortung für Widgets und konformer Informationsbildschirm</string>
+    <string name="appstrings_release_v2068_summary_site_highlight">Wellen-Hervorhebungsanimation beim Öffnen eines Standorts auf der Karte</string>
+    <string name="appstrings_release_v2068_summary_photo_reports">Direkter Zugriff auf Standortdetails aus dem Fotomeldungsverlauf</string>
+    <string name="appstrings_release_v2068_summary_cluster_slider">Verbesserte Lesbarkeit und Ergonomie für die Antennengruppierungseinstellung</string>
 </resources>

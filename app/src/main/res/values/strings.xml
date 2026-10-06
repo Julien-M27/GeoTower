@@ -702,6 +702,11 @@
     <string name="photo_reports_delete_title">Delete this report</string>
     <string name="photo_reports_delete_message">This only clears the entry from your device. The report already sent to SignalQuest is unaffected.</string>
     <string name="photo_reports_delete_confirm">Delete</string>
+    <string name="photo_reports_code_anfr">ANFR ID: %1$s</string>
+    <string name="photo_reports_code_support">Support ID: %1$s</string>
+    <string name="photo_reports_code_support_with_anfr">Support ID: %1$s (ANFR: %2$s)</string>
+    <string name="photo_reports_code_site">Site ID: %1$s</string>
+    <string name="photo_reports_open_site">Open site</string>
     <string name="notification_photo_report_channel_name">Photo reports</string>
     <string name="notification_photo_report_sent_title">Report sent</string>
     <string name="notification_photo_report_sent_desc">SignalQuest decides what happens next. You will be notified if the photo is taken down.</string>
@@ -2891,7 +2896,7 @@
          purpose, and be accepted through an explicit user action. -->
     <string name="bg_location_disclosure_title">Background location data usage</string>
     <string name="bg_location_disclosure_body">GeoTower collects location data to identify nearby cell towers and automatically update the home screen widget, even when the app is closed or not in use.\n\nThis data is processed exclusively on your device to determine nearby sites. It is never stored and never shared with third parties.</string>
-    <string name="bg_location_disclosure_option">On the next screen, choose “%1$s”.</string>
+    <string name="bg_location_disclosure_option">On the next screen, go to Permissions &gt; Location, then choose “%1$s”.</string>
     <string name="bg_location_disclosure_accept">Accept</string>
     <string name="bg_location_disclosure_deny">Deny</string>
 
@@ -3343,4 +3348,7 @@
     <string name="map_clustering_strength_low">Low</string>
     <string name="map_clustering_strength_high">High</string>
     <string name="appstrings_release_v2067_widget_disclosure">Clearer background location explanation for widgets and prominent disclosure screen</string>
+    <string name="appstrings_release_v2068_summary_site_highlight">Wave highlight animation when opening a site on the map</string>
+    <string name="appstrings_release_v2068_summary_photo_reports">Direct access to site details from photo report history</string>
+    <string name="appstrings_release_v2068_summary_cluster_slider">Improved readability and ergonomics for antenna clustering settings</string>
 </resources>

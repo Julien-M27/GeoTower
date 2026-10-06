@@ -88,7 +88,7 @@ fun SupportSiteWrapperScreen(
     // (`selectSupportAnchor`, mêmes règles : coordonnées cliquées → position GPS → première) et
     // réécrit `clicked_lat`/`clicked_lon`. Le refaire ici doublait la requête la plus lourde de
     // l'ouverture d'une fiche et ajoutait un second écran de chargement.
-    var selectedSiteId by remember { mutableStateOf<String?>(null) }
+    var selectedSiteId by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedSidePane by remember { mutableStateOf<SiteDetailSidePane?>(null) }
     val splitDisplay = splitDisplayEnabled()
 

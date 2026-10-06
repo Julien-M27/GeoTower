@@ -640,8 +640,7 @@ fun SiteDetailScreen(
             .putFloat("last_map_lon", longitude.toFloat())
             .putFloat("last_map_zoom", 18f)
             .apply()
-        if (isSplitScreen) onCloseSplitScreen()
-        navController.navigate("map")
+        navController.navigate("map?focusLat=$latitude&focusLon=$longitude")
     }
     val openElevationProfile = onOpenElevationProfile ?: { id: String ->
         if (canUseElevationProfile) {
@@ -2444,7 +2443,7 @@ fun RadioSiteDetailScreen(
             .putFloat("last_map_lon", site.longitude.toFloat())
             .putFloat("last_map_zoom", 18f)
             .apply()
-        navController.navigate("map")
+        navController.navigate("map?focusLat=${site.latitude}&focusLon=${site.longitude}")
     }
 
     SiteDetailScaffold(

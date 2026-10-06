@@ -760,7 +760,7 @@ class MainActivity : ComponentActivity() {
 
                             // Carte
                             composable(
-                                route = "map?photoDraftId={photoDraftId}&tripId={tripId}&tripMode={tripMode}",
+                                route = "map?photoDraftId={photoDraftId}&tripId={tripId}&tripMode={tripMode}&focusLat={focusLat}&focusLon={focusLon}",
                                 arguments = listOf(
                                     navArgument("photoDraftId") {
                                         type = NavType.StringType
@@ -778,12 +778,24 @@ class MainActivity : ComponentActivity() {
                                         type = NavType.StringType
                                         nullable = true
                                         defaultValue = null
+                                    },
+                                    navArgument("focusLat") {
+                                        type = NavType.StringType
+                                        nullable = true
+                                        defaultValue = null
+                                    },
+                                    navArgument("focusLon") {
+                                        type = NavType.StringType
+                                        nullable = true
+                                        defaultValue = null
                                     }
                                 )
                             ) { backStackEntry ->
                                 val photoDraftId = backStackEntry.arguments?.getString("photoDraftId")
                                 val plannedTripId = backStackEntry.arguments?.getString("tripId")
                                 val plannedTripMode = backStackEntry.arguments?.getString("tripMode")
+                                val focusLat = backStackEntry.arguments?.getString("focusLat")?.toDoubleOrNull()
+                                val focusLon = backStackEntry.arguments?.getString("focusLon")?.toDoubleOrNull()
                                 if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.MAP)) {
                                     // Mode simplifié : la carte est la racine, le tiroir remplace
                                     // l'accueil. Il n'enveloppe que cette destination.
@@ -800,6 +812,8 @@ class MainActivity : ComponentActivity() {
                                                 photoDraftId = photoDraftId,
                                                 plannedTripId = plannedTripId,
                                                 plannedTripMode = plannedTripMode,
+                                                focusLat = focusLat,
+                                                focusLon = focusLon,
                                                 onOpenSimpleModeMenu = {
                                                     drawerScope.launch { drawerState.open() }
                                                 }
@@ -811,7 +825,9 @@ class MainActivity : ComponentActivity() {
                                             viewModel = sharedMapViewModel,
                                             photoDraftId = photoDraftId,
                                             plannedTripId = plannedTripId,
-                                            plannedTripMode = plannedTripMode
+                                            plannedTripMode = plannedTripMode,
+                                            focusLat = focusLat,
+                                            focusLon = focusLon
                                         )
                                     }
                                 } else {
@@ -1029,7 +1045,8 @@ class MainActivity : ComponentActivity() {
                             ) {
                                 Box(modifier = Modifier.padding(innerPadding)) {
                                     fr.geotower.ui.screens.settings.PhotoReportsScreen(
-                                        navController = navController
+                                        navController = navController,
+                                        repository = repository
                                     )
                                 }
                             }

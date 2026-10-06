@@ -1659,6 +1659,9 @@ fun MapScreen(
     plannedTripId: String? = null,
     // Comment on ouvre ce trajet : consultation (défaut), édition ou suivi. Voir [TripMapMode].
     plannedTripMode: String? = null,
+    // Cible de centrage / mise en valeur visuelle animée demandée à l'ouverture (ex: clic "Ouvrir la carte" depuis fiche)
+    focusLat: Double? = null,
+    focusLon: Double? = null,
     // Mode simplifié : fourni par l'hôte qui porte le tiroir. Non nul ⇒ le bouton en haut à
     // gauche ouvre le menu au lieu de revenir en arrière (la carte est la racine du backstack).
     onOpenSimpleModeMenu: (() -> Unit)? = null
@@ -2984,6 +2987,33 @@ fun MapScreen(
         delay(PowerProfile.mapReloadDebounceMs)
         if (AppConfig.mapClusterStrength.intValue != clusterStrength) return@LaunchedEffect
         map.loadVisibleAntennas(viewModel)
+    }
+
+    fun triggerSiteFocusAnimation(target: GeoPoint) {
+        val map = mapViewRef ?: return
+        map.controller.stopAnimation(false)
+        map.controller.setCenter(target)
+        map.controller.setZoom(18.0)
+        currentZoom = 18.0
+        currentLat = target.latitude
+
+        map.overlays.removeAll { it is SiteFocusHighlightOverlay }
+        val overlay = SiteFocusHighlightOverlay(map, target, safePrimaryColor)
+        val markerIndex = map.overlays.indexOf(markersOverlay)
+        val insertIndex = if (markerIndex >= 0) markerIndex else map.overlays.size
+        map.overlays.add(insertIndex, overlay)
+        map.loadVisibleAntennas(viewModel)
+        map.postInvalidateOnAnimation()
+    }
+
+    var lastAnimatedFocusTarget by remember { mutableStateOf<Pair<Double, Double>?>(null) }
+    LaunchedEffect(mapViewRef, focusLat, focusLon) {
+        if (focusLat == null || focusLon == null) return@LaunchedEffect
+        val key = Pair(focusLat, focusLon)
+        if (lastAnimatedFocusTarget == key) return@LaunchedEffect
+        lastAnimatedFocusTarget = key
+
+        triggerSiteFocusAnimation(GeoPoint(focusLat, focusLon))
     }
 
     var azimuth by remember { mutableFloatStateOf(0f) }
@@ -5196,12 +5226,18 @@ fun MapScreen(
                     val prefs = ctx.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
                     val hasSavedPosition = hasSavedMapPosition(prefs)
 
-                    controller.setCenter(GeoPoint(
-                        prefs.getFloat("last_map_lat", 46.2276f).toDouble(),
-                        prefs.getFloat("last_map_lon", 2.2137f).toDouble()
-                    ))
-
-                    controller.setZoom(prefs.getFloat("last_map_zoom", 6.0f).toDouble())
+                    if (focusLat != null && focusLon != null) {
+                        controller.setCenter(GeoPoint(focusLat, focusLon))
+                        controller.setZoom(18.0)
+                        currentZoom = 18.0
+                        currentLat = focusLat
+                    } else {
+                        controller.setCenter(GeoPoint(
+                            prefs.getFloat("last_map_lat", 46.2276f).toDouble(),
+                            prefs.getFloat("last_map_lon", 2.2137f).toDouble()
+                        ))
+                        controller.setZoom(prefs.getFloat("last_map_zoom", 6.0f).toDouble())
+                    }
                     // On retrouve la carte comme on l'a laissée, sauf si la rotation a été coupée
                     // entre-temps : le `update` remettra alors le nord en haut.
                     mapOrientation = normalizeMapOrientation(prefs.getFloat(PREF_LAST_MAP_ORIENTATION, 0f))
@@ -5265,7 +5301,7 @@ fun MapScreen(
                         if (initialLoc != null) {
                             post {
                                 myCurrentLoc = initialLoc
-                                if (!hasSavedPosition) {
+                                if (!hasSavedPosition && focusLat == null) {
                                     val initialZoom = preferredLocationZoom()
                                     controller.stopAnimation(false)
                                     controller.setZoom(initialZoom)

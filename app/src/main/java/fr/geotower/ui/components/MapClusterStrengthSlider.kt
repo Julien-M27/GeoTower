@@ -99,61 +99,62 @@ fun MapClusterStrengthSlider(
         }
 
         Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
+        if (useOneUi) {
+            Slider(
+                value = sliderValue,
+                onValueChange = ::updateStrength,
+                onValueChangeFinished = ::persistStrength,
+                valueRange = 0f..100f,
+                steps = 0,
+                modifier = Modifier.fillMaxWidth(),
+                thumb = {
+                    Box(
+                        modifier = Modifier
+                            .size(sizing.component(24.dp))
+                            .background(MaterialTheme.colorScheme.surface, CircleShape)
+                            .border(
+                                sizing.component(3.dp),
+                                MaterialTheme.colorScheme.primary,
+                                CircleShape
+                            )
+                    )
+                },
+                track = { _ ->
+                    Canvas(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(sizing.component(14.dp))
+                    ) {
+                        drawLine(
+                            color = Color.Gray.copy(alpha = 0.3f),
+                            start = Offset(0f, size.height / 2),
+                            end = Offset(size.width, size.height / 2),
+                            strokeWidth = sizing.component(14.dp).toPx(),
+                            cap = StrokeCap.Round
+                        )
+                    }
+                }
+            )
+        } else {
+            Slider(
+                value = sliderValue,
+                onValueChange = ::updateStrength,
+                onValueChangeFinished = ::persistStrength,
+                valueRange = 0f..100f,
+                steps = 0,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
         Row(
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(
                 text = stringResource(R.string.map_clustering_strength_low),
                 style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            if (useOneUi) {
-                Slider(
-                    value = sliderValue,
-                    onValueChange = ::updateStrength,
-                    onValueChangeFinished = ::persistStrength,
-                    valueRange = 0f..100f,
-                    steps = 0,
-                    modifier = Modifier.weight(1f),
-                    thumb = {
-                        Box(
-                            modifier = Modifier
-                                .size(sizing.component(24.dp))
-                                .background(MaterialTheme.colorScheme.surface, CircleShape)
-                                .border(
-                                    sizing.component(3.dp),
-                                    MaterialTheme.colorScheme.primary,
-                                    CircleShape
-                                )
-                        )
-                    },
-                    track = { _ ->
-                        Canvas(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(sizing.component(14.dp))
-                        ) {
-                            drawLine(
-                                color = Color.Gray.copy(alpha = 0.3f),
-                                start = Offset(0f, size.height / 2),
-                                end = Offset(size.width, size.height / 2),
-                                strokeWidth = sizing.component(14.dp).toPx(),
-                                cap = StrokeCap.Round
-                            )
-                        }
-                    }
-                )
-            } else {
-                Slider(
-                    value = sliderValue,
-                    onValueChange = ::updateStrength,
-                    onValueChangeFinished = ::persistStrength,
-                    valueRange = 0f..100f,
-                    steps = 0,
-                    modifier = Modifier.weight(1f)
-                )
-            }
             Text(
                 text = stringResource(R.string.map_clustering_strength_high),
                 style = sizing.textStyle(MaterialTheme.typography.bodySmall),
