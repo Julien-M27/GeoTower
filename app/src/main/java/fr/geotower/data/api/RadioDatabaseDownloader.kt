@@ -32,7 +32,7 @@ object RadioDatabaseDownloader {
     }
 
     fun getDatabaseSize(): Double {
-        if (!RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.DATABASE_UPDATE_CHECK)) {
+        if (!RemoteFeatureFlags.isDatabaseUpdateCheckAllowed(RemoteFeatureFlags.DatabaseTarget.RADIO)) {
             return 0.0
         }
         return try {
@@ -44,7 +44,7 @@ object RadioDatabaseDownloader {
     }
 
     suspend fun getLatestDatabaseVersion(forceRefresh: Boolean = false): String? {
-        if (!RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.DATABASE_UPDATE_CHECK)) {
+        if (!RemoteFeatureFlags.isDatabaseUpdateCheckAllowed(RemoteFeatureFlags.DatabaseTarget.RADIO)) {
             return null
         }
         return withContext(Dispatchers.IO) {
@@ -57,7 +57,7 @@ object RadioDatabaseDownloader {
     }
 
     suspend fun downloadUpdate(context: Context, onProgress: suspend (Int) -> Unit): Boolean {
-        if (!RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.DATABASE_DOWNLOAD)) {
+        if (!RemoteFeatureFlags.isDatabaseDownloadAllowed(RemoteFeatureFlags.DatabaseTarget.RADIO)) {
             return false
         }
         // Crans « base en local » : version lisible, fichier non (cf. DatabaseDownloader).
@@ -73,6 +73,10 @@ object RadioDatabaseDownloader {
             }
 
             val remoteInfo = served.value
+            if (!RemoteFeatureFlags.isDatabaseDownloadAllowed(RemoteFeatureFlags.DatabaseTarget.RADIO, remoteInfo.version)) {
+                AppLogger.w(TAG, "Radio database download skipped: blocked by policy (version ${remoteInfo.version})")
+                return@withContext false
+            }
             val expectedSizeBytes = remoteInfo.sizeBytes
             val expectedSha256 = remoteInfo.sha256
             val maxAllowedBytes = maxAllowedRadioDatabaseDownloadBytes(expectedSizeBytes)

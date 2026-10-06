@@ -166,6 +166,7 @@ import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.activeOperatorKeysForSiteStatusFilter
 import fr.geotower.utils.combineOperatorKeyFilters
+import fr.geotower.utils.resolveActiveOperatorKeys
 import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.OperatorLogos
 import fr.geotower.utils.PageScrollPrefs
@@ -412,6 +413,8 @@ fun SiteDetailScreen(
     // Identifiants eNB/gNB du pylône pour cet opérateur (base optionnelle geotower_fr_enb.db).
     var networkIds by remember { mutableStateOf(fr.geotower.data.EnbRepository.SiteNetworkIds()) }
     var hsDataMap by remember { mutableStateOf<Map<String, fr.geotower.data.models.SiteHsEntity>>(emptyMap()) } // 🚨 AJOUT
+    var supportAntennas by remember { mutableStateOf<List<LocalisationEntity>>(emptyList()) }
+    var fullSupportHsData by remember { mutableStateOf<Map<String, fr.geotower.data.models.SiteHsEntity>>(emptyMap()) }
     var userLocation by remember { mutableStateOf<Location?>(null) }
     var communityPhotos by remember { mutableStateOf<List<CommunityPhoto>>(emptyList()) }
 
@@ -801,6 +804,7 @@ fun SiteDetailScreen(
                 val siblings = (listOf(anchor) + siteSiblings)
                     .distinctBy { it.idAnfr }
                     .filter { it.physicalSiteKey() == siteKey }
+                supportAntennas = siblings
 
                 // Pannes réellement déclarées sur ce site physique (tous opérateurs confondus).
                 val declaredOnSite = mutableMapOf<String, fr.geotower.data.models.SiteHsEntity>()
@@ -815,6 +819,7 @@ fun SiteDetailScreen(
                 fr.geotower.utils.zbPotentialOutagesForSite(siblings, declaredOnSite.values.toList())
                     .forEach { potential -> tempOutageMap.putIfAbsent(potential.idAnfr, potential) }
 
+                fullSupportHsData = tempOutageMap
                 // Cet écran n'affiche qu'un opérateur → on ne garde que son entrée (déclarée ou déduite).
                 hsDataMap = tempOutageMap.filterKeys { it == anchor.idAnfr }
             } catch (e: Exception) { AppLogger.w(TAG_SITE_DETAIL, "Outage data request failed", e) }
@@ -1190,24 +1195,28 @@ fun SiteDetailScreen(
                 info.operateur?.contains("SFR", true) == true -> 20810
                 else -> null
             }
-            val operatorFilterKeys = if (applyMapFilters) {
-                AppConfig.selectedOperatorKeys.value
-                    .takeUnless { selectedKeys -> selectedKeys.containsAll(OperatorColors.defaultVisibleKeys) }
-            } else {
-                null
+            val allSupportAntennas = remember(info, supportAntennas) {
+                supportAntennas.ifEmpty { listOf(info) }
             }
-            val siteStatusFilterKeys = if (applyMapFilters) {
-                activeOperatorKeysForSiteStatusFilter(
-                    antennas = listOf(info),
-                    sitesHs = hsDataMap.values,
-                    showSitesInService = AppConfig.showSitesInService.value,
-                    showSitesOutOfService = AppConfig.showSitesOutOfService.value,
-                    showProjectSites = AppConfig.showProjectSites.value
+            val activeOperatorKeys = remember(
+                allSupportAntennas,
+                fullSupportHsData,
+                hsDataMap,
+                applyMapFilters,
+                AppConfig.selectedOperatorKeys.value,
+                AppConfig.showSitesInService.value,
+                AppConfig.showSitesOutOfService.value,
+                AppConfig.showProjectSites.value,
+                AppConfig.hideUndergroundSites.value,
+                AppConfig.showOnlyZbSites.value
+            ) {
+                resolveActiveOperatorKeys(
+                    context = context,
+                    antennas = allSupportAntennas,
+                    sitesHs = fullSupportHsData.values.ifEmpty { hsDataMap.values },
+                    applyFilters = true
                 )
-            } else {
-                null
             }
-            val activeOperatorKeys = combineOperatorKeyFilters(operatorFilterKeys, siteStatusFilterKeys)
             val isOperatorMutedByFilter = activeOperatorKeys != null &&
                 OperatorColors.keysFor(info.operateur).none { operatorKey -> operatorKey in activeOperatorKeys }
 
@@ -1678,20 +1687,20 @@ fun SiteDetailScreen(
                         }
                         "map" -> {
                             if (showMap) {
-                                val mappedAntennas = remember(info) { listOf(info) }
                                 fr.geotower.ui.components.SharedMiniMapCard(
                                     modifier = Modifier.fillMaxWidth(),
                                     centerLat = info.latitude,
                                     centerLon = info.longitude,
-                                    mappedAntennas = mappedAntennas,
-                                    sitesHs = hsDataMap.values.toList(),
+                                    mappedAntennas = allSupportAntennas,
+                                    sitesHs = fullSupportHsData.values.toList().ifEmpty { hsDataMap.values.toList() },
                                     blockShape = blockShape,
                                     cardBorder = cardBorder,
                                     onMapReady = { globalMapRef = it },
                                     focusOperator = info.operateur,
                                     userLocation = userLocation,
                                     defaultViewMode = miniMapDefaultMode,
-                                    showViewModeToggle = true
+                                    showViewModeToggle = true,
+                                    activeOperatorKeys = activeOperatorKeys
                                 )
                             }
                         }

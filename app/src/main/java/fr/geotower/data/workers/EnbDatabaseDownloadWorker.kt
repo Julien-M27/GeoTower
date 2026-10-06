@@ -44,11 +44,7 @@ class EnbDatabaseDownloadWorker(
     private var isUpdatingExistingDatabase = false
 
     override suspend fun doWork(): Result {
-        if (
-            !RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.DATABASE_DOWNLOAD) ||
-            !RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.ENB_DATABASE) ||
-            !RemoteFeatureFlags.isWorkerEnabled(RemoteFeatureFlags.Workers.DATABASE_DOWNLOAD)
-        ) {
+        if (!RemoteFeatureFlags.isDatabaseDownloadAllowed(RemoteFeatureFlags.DatabaseTarget.ENB)) {
             return Result.success()
         }
 

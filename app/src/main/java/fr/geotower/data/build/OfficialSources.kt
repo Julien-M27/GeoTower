@@ -269,6 +269,41 @@ object OfficialSources {
         Triple(Regex("""([1-4])(?:er|e)?[\s_-]*(?:trim(?:estre)?)[\s_-]*(20\d{2})""", RegexOption.IGNORE_CASE), 2, 1),
     )
 
+    /** Dataset data.gouv du fichier journalier unifié des pannes Arcep ("Sites indisponibles"). */
+    const val ARCEP_SITES_INDISPONIBLES_DATASET_API_URL =
+        "https://www.data.gouv.fr/api/1/datasets/sites-indisponibles/"
+
+    data class DailyOutageResource(val url: String, val date: String?)
+
+    /**
+     * Extrait la ressource GeoJSON la plus récente du dataset "Sites indisponibles" de data.gouv.fr.
+     * Renvoie l'URL de téléchargement et la date identifiée (ex: "2026-10-05").
+     */
+    fun selectLatestDailyOutageResource(datasetJson: String): DailyOutageResource? {
+        val resources = try {
+            JsonParser.parseString(datasetJson).asJsonObject.getAsJsonArray("resources")
+        } catch (_: Exception) {
+            null
+        } ?: return null
+
+        val dateRegex = Regex("""(\d{4}-\d{2}-\d{2})""")
+
+        for (element in resources) {
+            val obj = element.takeIf { it.isJsonObject }?.asJsonObject ?: continue
+            val url = obj.get("url").stringOrNull() ?: continue
+            val format = obj.get("format").stringOrNull()?.lowercase().orEmpty()
+            val title = obj.get("title").stringOrNull().orEmpty()
+
+            if ((format == "geojson" || url.endsWith(".geojson", ignoreCase = true)) && isAllowedHost(url)) {
+                val date = dateRegex.find(title)?.value
+                    ?: dateRegex.find(url)?.value
+                    ?: obj.get("last_modified").stringOrNull()?.take(10)
+                return DailyOutageResource(url, date)
+            }
+        }
+        return null
+    }
+
     private fun JsonElement?.stringOrNull(): String? =
         this?.takeIf { it.isJsonPrimitive }?.asString
 }

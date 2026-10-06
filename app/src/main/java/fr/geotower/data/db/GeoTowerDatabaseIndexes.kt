@@ -36,7 +36,9 @@ object GeoTowerDatabaseIndexes {
         "CREATE INDEX IF NOT EXISTS idx_antenne_anfr_support ON antenne(id_anfr, id_support)",
         // La PK de `support` est (id_anfr, id_support) : une recherche par id_support seul (ouverture
         // d'une fiche support depuis la carte) balayait toute la table.
-        "CREATE INDEX IF NOT EXISTS idx_support_id_support ON support(id_support)"
+        "CREATE INDEX IF NOT EXISTS idx_support_id_support ON support(id_support)",
+        "CREATE INDEX IF NOT EXISTS idx_support_nat ON support(nat_id, id_anfr)",
+        "CREATE INDEX IF NOT EXISTS idx_ref_nature_libelle ON ref_nature(libelle, nat_id)"
     )
 
     /** Appelé depuis le callback Room `onOpen` (base ouverte en écriture par Room). */

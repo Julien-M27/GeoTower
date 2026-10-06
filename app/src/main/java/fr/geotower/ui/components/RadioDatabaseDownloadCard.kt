@@ -107,9 +107,7 @@ fun RadioDatabaseDownloadCard(
     val txtLatestDb = stringResource(R.string.database_latest_available)
     val txtDownloadedDb = stringResource(R.string.database_currently_downloaded)
     val canStartDownload =
-        featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.DATABASE_DOWNLOAD) &&
-            featureFlags.isActionEnabled(RemoteFeatureFlags.Actions.START_DATABASE_DOWNLOAD) &&
-            featureFlags.isWorkerEnabled(RemoteFeatureFlags.Workers.DATABASE_DOWNLOAD)
+        featureFlags.isDatabaseDownloadAllowed(RemoteFeatureFlags.DatabaseTarget.RADIO)
 
     var dbSizeMb by remember { mutableDoubleStateOf(-1.0) }
     var localVersion by remember { mutableStateOf(txtSearching) }
@@ -313,6 +311,7 @@ fun RadioDatabaseDownloadCard(
                 // locale est imposée, le téléchargement non — le bouton doit le refuser lui-même.
                 val canDownload = remoteVersionRaw != null &&
                     canStartDownload &&
+                    featureFlags.isDatabaseDownloadAllowed(RemoteFeatureFlags.DatabaseTarget.RADIO, remoteVersionRaw) &&
                     !fr.geotower.utils.AppConfig.dbForcedLocal()
                 // Base radio générée sur l'appareil : jamais « à jour » vis-à-vis de l'en ligne, on propose de la remplacer.
                 // Provenance non encore vérifiée (null) → comportement « téléchargée » (bouton de toute façon en attente).
@@ -336,10 +335,7 @@ fun RadioDatabaseDownloadCard(
                 Button(
                     onClick = {
                         safeClick("radio_database_start_download") {
-                            if (RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.DATABASE_DOWNLOAD) &&
-                                RemoteFeatureFlags.isActionEnabled(RemoteFeatureFlags.Actions.START_DATABASE_DOWNLOAD) &&
-                                RemoteFeatureFlags.isWorkerEnabled(RemoteFeatureFlags.Workers.DATABASE_DOWNLOAD)
-                            ) {
+                            if (RemoteFeatureFlags.isDatabaseDownloadAllowed(RemoteFeatureFlags.DatabaseTarget.RADIO, remoteVersionRaw)) {
                                 OperationPauseStore.clear(context, OperationPauseStore.RADIO_DB_DOWNLOAD)
                                 pauseStateVersion++
                                 RadioDatabaseDownloadWorker.enqueue(workManager)

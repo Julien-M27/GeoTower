@@ -43,10 +43,7 @@ class DatabaseDownloadWorker(
     private var isUpdatingExistingDatabase = false
 
     override suspend fun doWork(): Result {
-        if (
-            !RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.DATABASE_DOWNLOAD) ||
-            !RemoteFeatureFlags.isWorkerEnabled(RemoteFeatureFlags.Workers.DATABASE_DOWNLOAD)
-        ) {
+        if (!RemoteFeatureFlags.isDatabaseDownloadAllowed(RemoteFeatureFlags.DatabaseTarget.MOBILE)) {
             return Result.success()
         }
         createChannel()

@@ -285,6 +285,7 @@ fun NearEmittersScreen(
     var searchCenter by remember { mutableStateOf<Location?>(null) }
     var isResolvingInitialLocation by remember { mutableStateOf(hasNearbyLocationPermission(context)) }
     var isLoading by remember { mutableStateOf(true) }
+    var hasCompletedInitialLoad by remember { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }
     var refreshTrigger by remember { mutableIntStateOf(0) }
     var sites by remember { mutableStateOf<List<UiSite>>(emptyList()) }
@@ -400,7 +401,8 @@ fun NearEmittersScreen(
         }
     }
 
-    LaunchedEffect(searchCenter, maxItemsToShow, isZbNearbySearch, nearbyFrequencyFilter, showOnlyOutOfServiceSites, sitesHs, refreshTrigger) {
+    val hsSitesKey = if (showOnlyOutOfServiceSites) sitesHs else Unit
+    LaunchedEffect(searchCenter, maxItemsToShow, isZbNearbySearch, nearbyFrequencyFilter, showOnlyOutOfServiceSites, hsSitesKey, refreshTrigger) {
         val currentLoc = searchCenter ?: return@LaunchedEffect
 
         if (!isRefreshing) {
@@ -408,75 +410,75 @@ fun NearEmittersScreen(
         }
 
         try {
-        withContext(Dispatchers.IO) {
-            // A. RÉCUPÉRATION DES DONNÉES
-            val loadedSiteLimit = maxItemsToShow + NEARBY_VISIBLE_PAGE_SIZE
-            val queryLimit = nearbyFrequencyQueryLimit(
-                visibleLimit = loadedSiteLimit,
-                frequencyFilter = nearbyFrequencyFilter,
-                maxQueryLimit = Int.MAX_VALUE
-            )
-            val detailBackedBandMask = nearbyFrequencyFilter.detailBackedBandMaskForEnrichment()
-            val newAntennas = when {
-                // « Hors service uniquement » : on cible directement les sites HS proches (comme la carte),
-                // sinon le filtre vide souvent la liste des N sites les plus proches.
-                showOnlyOutOfServiceSites -> getNearestHsAntennas(
-                    repository = repository,
-                    sitesHs = sitesHs,
-                    center = currentLoc,
-                    limit = queryLimit,
-                    detailBackedBandMask = detailBackedBandMask
+            withContext(Dispatchers.IO) {
+                // A. RÉCUPÉRATION DES DONNÉES
+                val loadedSiteLimit = maxItemsToShow + NEARBY_VISIBLE_PAGE_SIZE
+                val queryLimit = nearbyFrequencyQueryLimit(
+                    visibleLimit = loadedSiteLimit,
+                    frequencyFilter = nearbyFrequencyFilter,
+                    maxQueryLimit = Int.MAX_VALUE
                 )
-                isZbNearbySearch -> repository.getNearestZb(
-                    lat = currentLoc.latitude,
-                    lon = currentLoc.longitude,
-                    limit = queryLimit,
-                    detailBackedBandMask = detailBackedBandMask
-                )
-                else -> repository.getNearest(
-                    lat = currentLoc.latitude,
-                    lon = currentLoc.longitude,
-                    limit = queryLimit,
-                    detailBackedBandMask = detailBackedBandMask
-                )
-            }
-            // Pas de rayon de recherche : on garde les sites les plus proches quelle que soit
-            // leur distance, et c'est maxItemsToShow (100 par défaut) qui borne la liste.
-            val frequencyFilteredAntennas = filterNearbyAntennasByFrequency(newAntennas, nearbyFrequencyFilter)
+                val detailBackedBandMask = nearbyFrequencyFilter.detailBackedBandMaskForEnrichment()
+                val newAntennas = when {
+                    // « Hors service uniquement » : on cible directement les sites HS proches (comme la carte),
+                    // sinon le filtre vide souvent la liste des N sites les plus proches.
+                    showOnlyOutOfServiceSites -> getNearestHsAntennas(
+                        repository = repository,
+                        sitesHs = sitesHs,
+                        center = currentLoc,
+                        limit = queryLimit,
+                        detailBackedBandMask = detailBackedBandMask
+                    )
+                    isZbNearbySearch -> repository.getNearestZb(
+                        lat = currentLoc.latitude,
+                        lon = currentLoc.longitude,
+                        limit = queryLimit,
+                        detailBackedBandMask = detailBackedBandMask
+                    )
+                    else -> repository.getNearest(
+                        lat = currentLoc.latitude,
+                        lon = currentLoc.longitude,
+                        limit = queryLimit,
+                        detailBackedBandMask = detailBackedBandMask
+                    )
+                }
+                // Pas de rayon de recherche : on garde les sites les plus proches quelle que soit
+                // leur distance, et c'est maxItemsToShow (100 par défaut) qui borne la liste.
+                val frequencyFilteredAntennas = filterNearbyAntennasByFrequency(newAntennas, nearbyFrequencyFilter)
 
-            // B. TRAITEMENT ET FORMATAGE
-            val finalSites = if (frequencyFilteredAntennas.isNotEmpty()) {
-                mapAntennasToUiSites(
-                    repository = repository,
-                    antennas = frequencyFilteredAntennas,
-                    referenceLocation = currentLoc,
-                    unknownAddressText = unknownAddressText,
-                    siteAnfrLabel = siteAnfrLabel,
-                    siteLimit = loadedSiteLimit
-                ).sortedBy { it.distance }
-            } else {
-                emptyList()
-            }
+                // B. TRAITEMENT ET FORMATAGE
+                val finalSites = if (frequencyFilteredAntennas.isNotEmpty()) {
+                    mapAntennasToUiSites(
+                        repository = repository,
+                        antennas = frequencyFilteredAntennas,
+                        referenceLocation = currentLoc,
+                        unknownAddressText = unknownAddressText,
+                        siteAnfrLabel = siteAnfrLabel,
+                        siteLimit = loadedSiteLimit
+                    ).sortedBy { it.distance }
+                } else {
+                    emptyList()
+                }
 
-            withContext(Dispatchers.Main) {
-                sites = finalSites
-                hasMoreNearbySites = finalSites.size > maxItemsToShow ||
-                    frequencyFilteredAntennas.size >= queryLimit
+                // C. APPLICATION ATOMIQUE DES RÉSULTATS ET FIN DE CHARGEMENT
+                withContext(Dispatchers.Main) {
+                    sites = finalSites
+                    hasMoreNearbySites = finalSites.size > maxItemsToShow ||
+                        frequencyFilteredAntennas.size >= queryLimit
+                    hasCompletedInitialLoad = true
+                    isLoading = false
+                    isRefreshing = false
+                }
             }
-
-            // C. ON ARRÊTE LE CHARGEMENT (Garanti de s'exécuter à 100%)
-            withContext(Dispatchers.Main) {
-                isLoading = false
-                isRefreshing = false
-            }
-        }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             AppLogger.w(TAG_NEAR_EMITTERS, "Nearby search refresh failed", e)
-        } finally {
-            isLoading = false
-            isRefreshing = false
+            withContext(Dispatchers.Main) {
+                hasCompletedInitialLoad = true
+                isLoading = false
+                isRefreshing = false
+            }
         }
     }
 
@@ -547,9 +549,8 @@ fun NearEmittersScreen(
 
         // On ne lance le scan distant que si ce n'est pas un opérateur ET qu'il y a au moins 3 caractères
         if (shouldSearchRemote) {
-
-            delay(NEARBY_REMOTE_SEARCH_DEBOUNCE_MS) // Petit delai pour ne pas spammer la recherche pendant la frappe
             isSearchingRemote = true
+            delay(NEARBY_REMOTE_SEARCH_DEBOUNCE_MS) // Petit delai pour ne pas spammer la recherche pendant la frappe
 
             val referenceLocation = searchCenter ?: userLocation
             withContext(Dispatchers.IO) {
@@ -717,6 +718,7 @@ fun NearEmittersScreen(
                         withContext(Dispatchers.Main) {
                             remoteSearchSites = filteredGlobal
                             remoteSearchQuery = query
+                            hasCompletedInitialLoad = true
                             isSearchingRemote = false
                         }
                     } else {
@@ -724,6 +726,7 @@ fun NearEmittersScreen(
                         withContext(Dispatchers.Main) {
                             remoteSearchSites = emptyList()
                             remoteSearchQuery = query
+                            hasCompletedInitialLoad = true
                             isSearchingRemote = false
                         }
                     }
@@ -734,6 +737,7 @@ fun NearEmittersScreen(
                     withContext(Dispatchers.Main) {
                         remoteSearchSites = emptyList()
                         remoteSearchQuery = query
+                        hasCompletedInitialLoad = true
                         isSearchingRemote = false
                     }
                 }
@@ -895,7 +899,7 @@ fun NearEmittersScreen(
                                             Text(stringResource(R.string.appstrings_search_gps), style = sizing.textStyle(MaterialTheme.typography.bodyMedium), color = MaterialTheme.colorScheme.onSurface)
                                         }
                                     }
-                                    filteredSites.isEmpty() && (isLoading || isSearchingRemote || isResolvingInitialLocation) -> {
+                                    filteredSites.isEmpty() && (isLoading || isSearchingRemote || isResolvingInitialLocation || (!hasCompletedInitialLoad && searchQuery.isBlank())) -> {
                                         Column(
                                             modifier = Modifier
                                                 .align(Alignment.Center)

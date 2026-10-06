@@ -18,7 +18,7 @@ internal object MapClusterStrengthProfile {
 
     fun aggregationZoom(mapZoom: Double, strength: Int): Double {
         if (mapZoom >= 13.0) return mapZoom
-        val finestZoom = maxOf(mapZoom, 12.5)
+        val finestZoom = minOf(12.5, mapZoom + 2.5)
         val finerLevelFraction = (100 - normalize(strength)) / 100.0
         return mapZoom + (finestZoom - mapZoom) * finerLevelFraction
     }

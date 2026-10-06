@@ -1,4 +1,4 @@
-package fr.geotower.data
+﻿package fr.geotower.data
 
 import android.content.Context
 import android.os.Handler
@@ -37,7 +37,10 @@ import fr.geotower.data.api.SignalQuestClient
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.models.SiteHsEntity
 import fr.geotower.data.outages.LocalOutageGenerator
+import fr.geotower.data.outages.DailyOutageFetcher
 import fr.geotower.data.outages.LocalOutageProvider
+import fr.geotower.data.outages.OutageSourceMode
+import fr.geotower.data.outages.SitesHsGeoJsonParser
 import fr.geotower.data.outages.NoOutageProgress
 import fr.geotower.data.outages.OutageLocalCache
 import fr.geotower.data.outages.OutageLocalConfig
@@ -451,7 +454,7 @@ class AnfrRepository(
         LocalOutageProvider(
             cache = OutageLocalCache(context),
             frequencyMillis = { outageLocalConfig.frequencyMillis },
-            markGenerated = { at, sites -> outageLocalConfig.recordGeneration(at, sites) },
+            markGenerated = { at, sites -> outageLocalConfig.recordGeneration(at, sites, AppConfig.outageSourceMode.value) },
             generate = { lastUpdate, progress -> LocalOutageGenerator.create(dao).generate(lastUpdate, progress) },
         )
     }
@@ -897,6 +900,10 @@ class AnfrRepository(
             }
 
         return MacroClusterGrouper.mergeTargetedTerritories(clusters, zoom)
+    }
+
+    fun clusterDetailedAntennas(sites: List<LocalisationEntity>, zoom: Double): List<DbCluster> {
+        return buildLiveClusters(sites, zoom)
     }
 
     // =================================================================
@@ -1812,7 +1819,8 @@ class AnfrRepository(
 
     /** Distingue les deux sources possibles : un changement de réglage doit invalider le cache. */
     private fun currentSitesHsSourceKey(): String {
-        return if (AppConfig.outagesLocal()) SOURCE_KEY_LOCAL else SOURCE_KEY_REMOTE
+        val base = if (AppConfig.outagesLocal()) SOURCE_KEY_LOCAL else SOURCE_KEY_REMOTE
+        return "${base}_${AppConfig.outageSourceMode.value.key}"
     }
 
     private fun readSitesHsCache(sourceKey: String): List<SiteHsEntity>? {
@@ -1876,119 +1884,64 @@ class AnfrRepository(
      * l'échec pour le dire à l'utilisateur. C'est [loadServerSitesHs] qui décide du repli.
      */
     private suspend fun downloadServerSitesHsFile(): List<SiteHsEntity> {
-        val sourceLastUpdate = runCatching {
-            api.getSitesHsInfo().lastUpdate
+        val sourceMode = AppConfig.outageSourceMode.value
+        val sourceKey = sourceMode.key
+
+        var sourceLastUpdate = runCatching {
+            api.getSitesHsInfo(source = sourceKey).lastUpdate
                 ?.trim()
                 ?.takeIf { it.isNotBlank() && !it.equals("Inconnue", ignoreCase = true) }
         }.getOrNull()
 
-        // 1. On télécharge le fichier brut depuis ton serveur
-        val response = api.getSitesHsGeoJson()
-        val jsonString = response.string()
-
-        // 2. On lit la structure GeoJSON
-        val jsonObject = org.json.JSONObject(jsonString)
-        val features = jsonObject.getJSONArray("features")
-
-        val hsList = mutableListOf<SiteHsEntity>()
-
-        // 3. On extrait chaque point (Version blindée anti-crash)
-        for (i in 0 until features.length()) {
-            val feature = features.getJSONObject(i)
-            val properties = feature.optJSONObject("properties") ?: org.json.JSONObject()
-
-            // 🚨 CORRECTION : L'ARCEP publie parfois des pannes SANS coordonnées GPS !
-            // optJSONObject évite que l'application ne crashe si la géométrie est absente.
-            val geometry = feature.optJSONObject("geometry")
-            val coordinates = geometry?.optJSONArray("coordinates")
-            val geometryType = geometry?.optNullableString("type")
-
-            // GeoJSON range toujours [Longitude, Latitude]
-            val lon = coordinates?.optDouble(0, 0.0) ?: 0.0
-            val lat = coordinates?.optDouble(1, 0.0) ?: 0.0
-
-            // 1. Extraction de toutes les propriétés du JSON
-            val stationAnfr = properties.optString("station_anfr", "")
-            val operateurStr = properties.optString("operateur", "")
-
-            // Détail technique des pannes par technologie
-            val v2g = properties.optNullableString("voix2g")
-            val v3g = properties.optNullableString("voix3g")
-            val v4g = properties.optNullableString("voix4g")
-            val v5g = properties.optNullableString("voix5g")
-
-            val d2g = properties.optNullableString("data2g")
-            val d3g = properties.optNullableString("data3g")
-            val d4g = properties.optNullableString("data4g")
-            val d5g = properties.optNullableString("data5g")
-
-            // Infos de localisation
-            val dept = properties.optNullableString("departement")
-            val cp = properties.optNullableString("code_postal")
-            val insee = properties.optNullableString("code_insee")
-            val com = properties.optNullableString("commune")
-
-            // 2. Création de l'objet complet
-            val site = SiteHsEntity(
-                idAnfr = stationAnfr,
-                operateur = operateurStr,
-                latitude = lat,
-                longitude = lon,
-                geometryType = geometryType,
-
-                // Localisation
-                departement = dept,
-                codePostal = cp,
-                codeInsee = insee,
-                commune = com,
-
-                // Voix
-                voix2g = v2g,
-                voix3g = v3g,
-                voix4g = v4g,
-                voix5g = v5g,
-
-                // Data
-                data2g = d2g,
-                data3g = d3g,
-                data4g = d4g,
-                data5g = d5g,
-
-                // Global et Détails
-                voixGlobal = properties.optNullableString("voix"),
-                dataGlobal = properties.optNullableString("data"),
-                raison = properties.optNullableString("raison"),
-                detail = properties.optNullableString("detail"),
-                propre = properties.optInt("propre", 0),
-
-                // Dates
-                debutVoix = properties.optNullableString("debut_voix"),
-                finVoix = properties.optNullableString("fin_voix"),
-                debutData = properties.optNullableString("debut_data"),
-                finData = properties.optNullableString("fin_data"),
-                dateDebut = properties.optNullableString("debut"),
-                dateFin = properties.optNullableString("fin"),
-                sourceLastUpdate = sourceLastUpdate
-            )
-            hsList.add(site)
+        val jsonString = try {
+            val response = api.getSitesHsGeoJson(source = sourceKey)
+            response.string()
+        } catch (e: Exception) {
+            if (sourceMode == OutageSourceMode.DAILY) {
+                try {
+                    val dailyResult = DailyOutageFetcher.real().fetch()
+                    val effectiveDate = dailyResult.sourceDate ?: sourceLastUpdate
+                    val downloadedAt = System.currentTimeMillis()
+                    val currentDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(downloadedAt))
+                    val generatedAt = OutageServerInfo.recordDownload(
+                        prefs = outagePrefs,
+                        lastUpdate = effectiveDate ?: currentDate,
+                        generatedAtIso = null,
+                        sites = dailyResult.sites,
+                        downloadedAtMillis = downloadedAt,
+                    )
+                    withContext(Dispatchers.IO) {
+                        serverOutageCache.save(
+                            CachedServerOutages(
+                                downloadedAtMillis = downloadedAt,
+                                sourceLastUpdate = effectiveDate,
+                                serverGeneratedAtMillis = generatedAt,
+                                sites = dailyResult.sites,
+                            )
+                        )
+                    }
+                    return dailyResult.sites
+                } catch (_: Exception) {
+                    throw e
+                }
+            } else {
+                throw e
+            }
         }
 
-        // 🚨 AJOUT : Sauvegarde de la date du jour (Dernière vérification réussie), plus
-        // l'heure de génération que le fichier porte dans ses métadonnées : c'est le seul
-        // endroit où le serveur la publie, et « À propos » l'affiche à la minute, comme pour
-        // une génération locale. Le résumé (nombre, répartition) sert la carte des réglages.
+        val parseResult = SitesHsGeoJsonParser.parse(jsonString, sourceLastUpdate)
+        val hsList = parseResult.sites
+
         val downloadedAt = System.currentTimeMillis()
         val currentDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(downloadedAt))
         val generatedAt = OutageServerInfo.recordDownload(
             prefs = outagePrefs,
             lastUpdate = sourceLastUpdate ?: currentDate,
-            generatedAtIso = jsonObject.optJSONObject("metadata")?.optNullableString("generated_at"),
+            generatedAtIso = parseResult.generatedAtIso,
             sites = hsList,
             downloadedAtMillis = downloadedAt,
         )
 
-        // Un fichier vide est enregistré comme tel : il dit « plus aucune panne », et garder
-        // l'ancienne copie afficherait des pannes déjà résolues.
         withContext(Dispatchers.IO) {
             serverOutageCache.save(
                 CachedServerOutages(
@@ -2002,7 +1955,6 @@ class AnfrRepository(
 
         return hsList
     }
-
     /**
      * Force le téléchargement du fichier de pannes du SERVEUR (bouton « Télécharger les pannes »
      * des réglages), en ignorant la copie conservée. Propage l'échec pour que la carte puisse le dire.

@@ -111,10 +111,7 @@ object EnbDatabaseDownloader {
     }
 
     suspend fun downloadUpdate(context: Context, onProgress: suspend (Int) -> Unit): Boolean {
-        if (
-            !RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.DATABASE_DOWNLOAD) ||
-            !RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.ENB_DATABASE)
-        ) {
+        if (!RemoteFeatureFlags.isDatabaseDownloadAllowed(RemoteFeatureFlags.DatabaseTarget.ENB)) {
             return false
         }
         return withContext(Dispatchers.IO) {
@@ -125,6 +122,10 @@ object EnbDatabaseDownloader {
             }
 
             val remoteInfo = served.value
+            if (!RemoteFeatureFlags.isDatabaseDownloadAllowed(RemoteFeatureFlags.DatabaseTarget.ENB, remoteInfo.version)) {
+                AppLogger.w(TAG, "eNB database download skipped: blocked by policy (version ${remoteInfo.version})")
+                return@withContext false
+            }
             val expectedSizeBytes = remoteInfo.sizeBytes
             val expectedSha256 = remoteInfo.sha256
             val maxAllowedBytes = maxAllowedEnbDatabaseDownloadBytes(expectedSizeBytes)
@@ -232,8 +233,7 @@ object EnbDatabaseDownloader {
      * toute verification de mise a jour.
      */
     private fun isEnbDatabaseUpdateCheckEnabled(): Boolean {
-        return RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.DATABASE_UPDATE_CHECK) &&
-            RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.ENB_DATABASE)
+        return RemoteFeatureFlags.isDatabaseUpdateCheckAllowed(RemoteFeatureFlags.DatabaseTarget.ENB)
     }
 
     private fun readVerifiedEnbDatabaseInfo(): ServedFrom<DownloadManifestDatabase>? {

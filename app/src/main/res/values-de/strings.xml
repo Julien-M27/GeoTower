@@ -2639,6 +2639,11 @@
     <string name="appstrings_release_v1964_db_timings">Auf den Datenbanken angezeigte Zeiten: verstrichene Zeit während des Vorgangs, dann „Erstellt in…“ oder „Heruntergeladen in…“</string>
     <!-- Störungsquelle (lokale Erzeugung) -->
     <string name="outage_local_settings_title">Abruf der gestörten Standorte auf dem Gerät</string>
+    <string name="outage_source_selection_title">Quelle der Störungen</string>
+    <string name="outage_source_operators_title">Betreiber-Dateien (Echtzeit)</string>
+    <string name="outage_source_operators_desc">Lädt direkte Meldungen der einzelnen Betreiber herunter</string>
+    <string name="outage_source_daily_title">Täglich konsolidierte Datei</string>
+    <string name="outage_source_daily_desc">Nationale Arcep- / data.gouv.fr-Datei, täglich aktualisiert</string>
     <string name="outage_source_frequency_title">Aktualisierungsintervall der gestörten Standorte</string>
     <string name="outage_source_frequency_unit">%1$d Std.</string>
     <string name="outage_source_frequency_footer">Gültigkeitsdauer der zwischengespeicherten gestörten Standorte und Hintergrundintervall, falls aktiviert.</string>
@@ -3270,6 +3275,9 @@
     <string name="appstrings_release_v2065_summary_enb_sources">Quelldateidaten nach Betreiber für die eNB-Datenbank</string>
     <string name="appstrings_release_v2065_summary_database_updates">Schnellere Prüfung und Herunterladen von Datenbanken</string>
     <string name="appstrings_release_v2065_summary_split_coverage">Theoretische Abdeckung im Seitenbereich auf großen Bildschirmen</string>
+    <string name="appstrings_release_v2066_summary_outage_sources">Auswahl der Störungsquelle (Betreiber-Feeds oder Arcep täglich)</string>
+    <string name="appstrings_release_v2066_summary_filter_effects">Verbesserte Kartenfilter und visuelle Dämpfung für inaktive Betreiber</string>
+    <string name="appstrings_release_v2066_summary_nearby_and_maps">Reibungslosere Suche nach Antennen in der Nähe und optimierte Kartenverwaltung</string>
     <string name="database_viewer_title">Datenbank-Viewer</string>
     <string name="database_viewer_desc">Alle Tabellen und Zeilen in den lokalen Datenbanken durchsuchen. Schreibgeschützt.</string>
     <string name="database_viewer_mobile">Mobilfunkdatenbank</string>

@@ -466,6 +466,12 @@ fun MapDownloadCard(
             dismissButton = {
                 DialogDestructiveButton(text = stringResource(R.string.appstrings_yes), onClick = {
                     OfflineMapDownloadValidator.safeMapFile(mapsDir, mapToDelete!!.mapFilename)?.delete()
+                    val remainingMaps = OfflineMapDownloadValidator.listSafeMapFiles(mapsDir)
+                    if (remainingMaps.isEmpty() && fr.geotower.utils.AppConfig.mapProvider.intValue == 4) {
+                        fr.geotower.utils.AppConfig.mapProvider.value = 1
+                        context.getSharedPreferences(fr.geotower.utils.PreferenceStores.APP, android.content.Context.MODE_PRIVATE)
+                            .edit().putInt("map_provider", 1).apply()
+                    }
                     fileRefreshTrigger++
                     mapToDelete = null
                 })
@@ -485,6 +491,11 @@ fun MapDownloadCard(
             dismissButton = {
                 DialogDestructiveButton(text = stringResource(R.string.appstrings_yes), onClick = {
                     OfflineMapDownloadValidator.deleteAllSafeMapFiles(mapsDir)
+                    if (fr.geotower.utils.AppConfig.mapProvider.intValue == 4) {
+                        fr.geotower.utils.AppConfig.mapProvider.value = 1
+                        context.getSharedPreferences(fr.geotower.utils.PreferenceStores.APP, android.content.Context.MODE_PRIVATE)
+                            .edit().putInt("map_provider", 1).apply()
+                    }
                     fileRefreshTrigger++
                     showDeleteAllDialog = false
                 })

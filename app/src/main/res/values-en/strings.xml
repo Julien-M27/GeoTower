@@ -2639,6 +2639,11 @@
     <string name="appstrings_release_v1964_db_timings">Timings shown on databases: elapsed time during the operation, then Generated in… or Downloaded in…</string>
     <!-- Outage source (local generation) -->
     <string name="outage_local_settings_title">Retrieving outage sites on this device</string>
+    <string name="outage_source_selection_title">Outage data source</string>
+    <string name="outage_source_operators_title">Operator feeds (real-time)</string>
+    <string name="outage_source_operators_desc">Downloads direct outage feeds from each operator</string>
+    <string name="outage_source_daily_title">Daily consolidated feed</string>
+    <string name="outage_source_daily_desc">National Arcep / data.gouv.fr feed updated daily</string>
     <string name="outage_source_frequency_title">Outage sites update frequency</string>
     <string name="outage_source_frequency_unit">%1$d h</string>
     <string name="outage_source_frequency_footer">How long cached outage sites stay valid, and the background interval when enabled.</string>
@@ -3270,6 +3275,9 @@
     <string name="appstrings_release_v2065_summary_enb_sources">Display source file dates by operator for the eNB database</string>
     <string name="appstrings_release_v2065_summary_database_updates">Faster database update checks and downloads</string>
     <string name="appstrings_release_v2065_summary_split_coverage">Theoretical coverage integrated in side pane on large screens</string>
+    <string name="appstrings_release_v2066_summary_outage_sources">Choice of outage source (operator feeds or Arcep daily)</string>
+    <string name="appstrings_release_v2066_summary_filter_effects">Improved map filters and visual muting for inactive operators</string>
+    <string name="appstrings_release_v2066_summary_nearby_and_maps">Smoother nearby antenna search and optimized map management</string>
     <string name="database_viewer_title">Database viewer</string>
     <string name="database_viewer_desc">Browse every table and row in the local databases. Read-only.</string>
     <string name="database_viewer_mobile">Mobile database</string>

@@ -2639,6 +2639,11 @@
     <string name="appstrings_release_v1964_db_timings">Tempi mostrati sui database: tempo trascorso durante l\'operazione, poi «Generato in…» o «Scaricato in…»</string>
     <!-- Origine dei guasti (generazione locale) -->
     <string name="outage_local_settings_title">Recupero dei siti guasti sul dispositivo</string>
+    <string name="outage_source_selection_title">Origine dei guasti</string>
+    <string name="outage_source_operators_title">File operatori (tempo reale)</string>
+    <string name="outage_source_operators_desc">Scarica le dichiarazioni dirette di ciascun operatore</string>
+    <string name="outage_source_daily_title">File consolidato giornaliero</string>
+    <string name="outage_source_daily_desc">File nazionale Arcep / data.gouv.fr aggiornato quotidianamente</string>
     <string name="outage_source_frequency_title">Frequenza di aggiornamento dei siti guasti</string>
     <string name="outage_source_frequency_unit">%1$d h</string>
     <string name="outage_source_frequency_footer">Validità dei siti guasti in cache e periodo in background se attivo.</string>
@@ -3270,6 +3275,9 @@
     <string name="appstrings_release_v2065_summary_enb_sources">Date dei file sorgente per operatore per il database eNB</string>
     <string name="appstrings_release_v2065_summary_database_updates">Verifica e download dei database più veloci</string>
     <string name="appstrings_release_v2065_summary_split_coverage">Copertura teorica integrata nel pannello laterale su schermi grandi</string>
+    <string name="appstrings_release_v2066_summary_outage_sources">Scelta della sorgente dei guasti (feed degli operatori o giornaliero Arcep)</string>
+    <string name="appstrings_release_v2066_summary_filter_effects">Filtri mappa migliorati e attenuazione visiva per gli operatori inattivi</string>
+    <string name="appstrings_release_v2066_summary_nearby_and_maps">Ricerca delle antenne vicine più fluida e gestione ottimizzata delle mappe</string>
     <string name="database_viewer_title">Visualizzatore database</string>
     <string name="database_viewer_desc">Consulta tutte le tabelle e le righe dei database locali. Sola lettura.</string>
     <string name="database_viewer_mobile">Database mobile</string>

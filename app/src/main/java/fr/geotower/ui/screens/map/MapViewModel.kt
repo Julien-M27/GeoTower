@@ -392,6 +392,31 @@ class MapViewModel(
                     // ✅ 3. SI UNE VILLE EST CIBLÉE, ON LA GARDE STRICTEMENT FILTRÉE !
                     if (cityPolygons != null) {
                         _antennas.value = areaAntennas.filter { isPointInPolygon(it.latitude, it.longitude, cityPolygons!!) }
+                    } else if (zoom < 13.0 && !keepDetailedAzimuths && areaAntennas.size > 200) {
+                        // En dézoom avec filtres actifs, agréger en arrière-plan pour éviter de figer le thread UI avec des milliers de marqueurs
+                        val aggregationZoom = MapClusterStrengthProfile.aggregationZoom(
+                            mapZoom = zoom,
+                            strength = AppConfig.mapClusterStrength.intValue
+                        )
+                        val clusters = repository.clusterDetailedAntennas(areaAntennas, aggregationZoom)
+                        val clusterIsZb = if (AppConfig.showOnlyZbSites.value) 1 else 0
+                        val fakeAntennas = clusters.map { cluster ->
+                            val singleAntennaId = cluster.singleIdAnfr
+                                ?.takeIf { cluster.count == 1 && it.isNotBlank() }
+
+                            LocalisationEntity(
+                                idAnfr = singleAntennaId ?: "CLUSTER_${cluster.count}",
+                                operateur = OperatorColors.keysFor(cluster.operators).joinToString(", "),
+                                latitude = cluster.centerLat,
+                                longitude = cluster.centerLon,
+                                azimuts = null, codeInsee = null, azimutsFh = null,
+                                techMask = 0,
+                                bandMask = 0,
+                                isZb = clusterIsZb,
+                                hasActive = 1
+                            )
+                        }
+                        _antennas.value = fakeAntennas
                     } else {
                         _antennas.value = areaAntennas
                     }

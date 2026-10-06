@@ -313,6 +313,8 @@ object GeoTowerDatabaseValidator {
         return try {
             db = SQLiteDatabase.openDatabase(file.absolutePath, null, SQLiteDatabase.OPEN_READONLY)
             validateOpenDatabase(db, checkIntegrity = checkIntegrity)
+        } catch (e: android.database.sqlite.SQLiteDatabaseLockedException) {
+            ValidationResult(true)
         } catch (e: Exception) {
             ValidationResult(false, e.message ?: "Base SQLite illisible")
         } finally {

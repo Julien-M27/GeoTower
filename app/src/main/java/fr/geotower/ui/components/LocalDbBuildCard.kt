@@ -65,6 +65,7 @@ import fr.geotower.data.build.BuildImportType
 import fr.geotower.data.build.BuildSourceLink
 import fr.geotower.data.build.labelRes
 import fr.geotower.data.build.LocalBuildCapability
+import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.db.DbOperationTimings
 import fr.geotower.data.db.LocalDbProvenance
 import fr.geotower.data.workers.DatabaseDownloadWorker
@@ -622,6 +623,7 @@ fun LocalDbBuildCard(
                             }
                         },
                         enabled = !isDownloading &&
+                            RemoteFeatureFlags.isLocalDbBuildAllowed() &&
                             (packMobile || packRadioBroadcast || packNonMobileTech) &&
                             (eligibility.eligible || forceBuild),
                         modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = sizing.component(56.dp)),

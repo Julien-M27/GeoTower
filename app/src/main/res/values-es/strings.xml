@@ -2639,6 +2639,11 @@
     <string name="appstrings_release_v1964_db_timings">Tiempos mostrados en las bases de datos: tiempo transcurrido durante la operación y luego «Generado en…» o «Descargado en…»</string>
     <!-- Origen de las incidencias (generación local) -->
     <string name="outage_local_settings_title">Recuperación de los sitios averiados en el dispositivo</string>
+    <string name="outage_source_selection_title">Fuente de averías</string>
+    <string name="outage_source_operators_title">Archivos de operadores (tiempo real)</string>
+    <string name="outage_source_operators_desc">Descarga las declaraciones directas de cada operador</string>
+    <string name="outage_source_daily_title">Archivo consolidado diario</string>
+    <string name="outage_source_daily_desc">Archivo nacional Arcep / data.gouv.fr actualizado diariamente</string>
     <string name="outage_source_frequency_title">Frecuencia de actualización de los sitios averiados</string>
     <string name="outage_source_frequency_unit">%1$d h</string>
     <string name="outage_source_frequency_footer">Validez de los sitios averiados en caché y periodo en segundo plano si está activado.</string>
@@ -3270,6 +3275,9 @@
     <string name="appstrings_release_v2065_summary_enb_sources">Fechas de archivos fuente por operador para la base eNB</string>
     <string name="appstrings_release_v2065_summary_database_updates">Comprobación y descarga de bases de datos más rápidas</string>
     <string name="appstrings_release_v2065_summary_split_coverage">Cobertura teórica integrada en panel lateral para pantallas grandes</string>
+    <string name="appstrings_release_v2066_summary_outage_sources">Elección de la fuente de incidencias (flujos de operadores o diario de Arcep)</string>
+    <string name="appstrings_release_v2066_summary_filter_effects">Filtros de mapa mejorados y atenuación visual para operadores inactivos</string>
+    <string name="appstrings_release_v2066_summary_nearby_and_maps">Búsqueda de antenas cercanas más fluida y gestión optimizada de mapas</string>
     <string name="database_viewer_title">Visor de bases de datos</string>
     <string name="database_viewer_desc">Consulta todas las tablas y filas de las bases de datos locales. Solo lectura.</string>
     <string name="database_viewer_mobile">Base de datos móvil</string>

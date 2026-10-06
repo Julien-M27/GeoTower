@@ -1003,21 +1003,19 @@ interface GeoTowerDao {
         SELECT
             AVG(l.latitude) AS centerLat,
             AVG(l.longitude) AS centerLon,
-            COUNT(DISTINCT COALESCE(NULLIF(TRIM(s.id_support), ''), l.id_anfr)) AS count,
+            COUNT(l.id_anfr) AS count,
             GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators,
             MIN(l.id_anfr) AS singleIdAnfr
         FROM localisation l
         LEFT JOIN ref_operateur o ON l.operateur_id = o.id
-        LEFT JOIN support s ON s.id_anfr = l.id_anfr
         WHERE l.latitude BETWEEN :minLat AND :maxLat
         AND l.longitude BETWEEN :minLon AND :maxLon
         AND (:showOnlyZbSites = 0 OR l.is_zb = 1)
-        AND (:hideUndergroundSites = 0 OR NOT EXISTS (
-            SELECT 1
+        AND (:hideUndergroundSites = 0 OR l.id_anfr NOT IN (
+            SELECT underground_support.id_anfr
             FROM support underground_support
-            LEFT JOIN ref_nature underground_nature ON underground_support.nat_id = underground_nature.nat_id
-            WHERE underground_support.id_anfr = l.id_anfr
-            AND underground_nature.libelle = 'Intérieur sous-terrain'
+            JOIN ref_nature underground_nature ON underground_support.nat_id = underground_nature.nat_id
+            WHERE underground_nature.libelle = 'Intérieur sous-terrain'
         ))
         GROUP BY ROUND(l.latitude / 2.5), ROUND(l.longitude / 3.0)
     """)
@@ -1027,21 +1025,19 @@ interface GeoTowerDao {
         SELECT
             AVG(l.latitude) AS centerLat,
             AVG(l.longitude) AS centerLon,
-            COUNT(DISTINCT COALESCE(NULLIF(TRIM(s.id_support), ''), l.id_anfr)) AS count,
+            COUNT(l.id_anfr) AS count,
             GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators,
             MIN(l.id_anfr) AS singleIdAnfr
         FROM localisation l
         LEFT JOIN ref_operateur o ON l.operateur_id = o.id
-        LEFT JOIN support s ON s.id_anfr = l.id_anfr
         WHERE l.latitude BETWEEN :minLat AND :maxLat
         AND l.longitude BETWEEN :minLon AND :maxLon
         AND (:showOnlyZbSites = 0 OR l.is_zb = 1)
-        AND (:hideUndergroundSites = 0 OR NOT EXISTS (
-            SELECT 1
+        AND (:hideUndergroundSites = 0 OR l.id_anfr NOT IN (
+            SELECT underground_support.id_anfr
             FROM support underground_support
-            LEFT JOIN ref_nature underground_nature ON underground_support.nat_id = underground_nature.nat_id
-            WHERE underground_support.id_anfr = l.id_anfr
-            AND underground_nature.libelle = 'Intérieur sous-terrain'
+            JOIN ref_nature underground_nature ON underground_support.nat_id = underground_nature.nat_id
+            WHERE underground_nature.libelle = 'Intérieur sous-terrain'
         ))
         GROUP BY ROUND(l.latitude / 1.0), ROUND(l.longitude / 1.2)
     """)
@@ -1051,21 +1047,19 @@ interface GeoTowerDao {
         SELECT
             AVG(l.latitude) AS centerLat,
             AVG(l.longitude) AS centerLon,
-            COUNT(DISTINCT COALESCE(NULLIF(TRIM(s.id_support), ''), l.id_anfr)) AS count,
+            COUNT(l.id_anfr) AS count,
             GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators,
             MIN(l.id_anfr) AS singleIdAnfr
         FROM localisation l
         LEFT JOIN ref_operateur o ON l.operateur_id = o.id
-        LEFT JOIN support s ON s.id_anfr = l.id_anfr
         WHERE l.latitude BETWEEN :minLat AND :maxLat
         AND l.longitude BETWEEN :minLon AND :maxLon
         AND (:showOnlyZbSites = 0 OR l.is_zb = 1)
-        AND (:hideUndergroundSites = 0 OR NOT EXISTS (
-            SELECT 1
+        AND (:hideUndergroundSites = 0 OR l.id_anfr NOT IN (
+            SELECT underground_support.id_anfr
             FROM support underground_support
-            LEFT JOIN ref_nature underground_nature ON underground_support.nat_id = underground_nature.nat_id
-            WHERE underground_support.id_anfr = l.id_anfr
-            AND underground_nature.libelle = 'Intérieur sous-terrain'
+            JOIN ref_nature underground_nature ON underground_support.nat_id = underground_nature.nat_id
+            WHERE underground_nature.libelle = 'Intérieur sous-terrain'
         ))
         GROUP BY ROUND(l.latitude / 0.4), ROUND(l.longitude / 0.5)
     """)
@@ -1075,21 +1069,19 @@ interface GeoTowerDao {
         SELECT
             AVG(l.latitude) AS centerLat,
             AVG(l.longitude) AS centerLon,
-            COUNT(DISTINCT COALESCE(NULLIF(TRIM(s.id_support), ''), l.id_anfr)) AS count,
+            COUNT(l.id_anfr) AS count,
             GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators,
             MIN(l.id_anfr) AS singleIdAnfr
         FROM localisation l
         LEFT JOIN ref_operateur o ON l.operateur_id = o.id
-        LEFT JOIN support s ON s.id_anfr = l.id_anfr
         WHERE l.latitude BETWEEN :minLat AND :maxLat
         AND l.longitude BETWEEN :minLon AND :maxLon
         AND (:showOnlyZbSites = 0 OR l.is_zb = 1)
-        AND (:hideUndergroundSites = 0 OR NOT EXISTS (
-            SELECT 1
+        AND (:hideUndergroundSites = 0 OR l.id_anfr NOT IN (
+            SELECT underground_support.id_anfr
             FROM support underground_support
-            LEFT JOIN ref_nature underground_nature ON underground_support.nat_id = underground_nature.nat_id
-            WHERE underground_support.id_anfr = l.id_anfr
-            AND underground_nature.libelle = 'Intérieur sous-terrain'
+            JOIN ref_nature underground_nature ON underground_support.nat_id = underground_nature.nat_id
+            WHERE underground_nature.libelle = 'Intérieur sous-terrain'
         ))
         GROUP BY ROUND(l.latitude / 0.15), ROUND(l.longitude / 0.2)
     """)
@@ -1099,21 +1091,19 @@ interface GeoTowerDao {
         SELECT
             AVG(l.latitude) AS centerLat,
             AVG(l.longitude) AS centerLon,
-            COUNT(DISTINCT COALESCE(NULLIF(TRIM(s.id_support), ''), l.id_anfr)) AS count,
+            COUNT(l.id_anfr) AS count,
             GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators,
             MIN(l.id_anfr) AS singleIdAnfr
         FROM localisation l
         LEFT JOIN ref_operateur o ON l.operateur_id = o.id
-        LEFT JOIN support s ON s.id_anfr = l.id_anfr
         WHERE l.latitude BETWEEN :minLat AND :maxLat
         AND l.longitude BETWEEN :minLon AND :maxLon
         AND (:showOnlyZbSites = 0 OR l.is_zb = 1)
-        AND (:hideUndergroundSites = 0 OR NOT EXISTS (
-            SELECT 1
+        AND (:hideUndergroundSites = 0 OR l.id_anfr NOT IN (
+            SELECT underground_support.id_anfr
             FROM support underground_support
-            LEFT JOIN ref_nature underground_nature ON underground_support.nat_id = underground_nature.nat_id
-            WHERE underground_support.id_anfr = l.id_anfr
-            AND underground_nature.libelle = 'Intérieur sous-terrain'
+            JOIN ref_nature underground_nature ON underground_support.nat_id = underground_nature.nat_id
+            WHERE underground_nature.libelle = 'Intérieur sous-terrain'
         ))
         GROUP BY ROUND(l.latitude, 1), ROUND(l.longitude, 1)
     """)
@@ -1123,21 +1113,19 @@ interface GeoTowerDao {
         SELECT
             AVG(l.latitude) AS centerLat,
             AVG(l.longitude) AS centerLon,
-            COUNT(DISTINCT COALESCE(NULLIF(TRIM(s.id_support), ''), l.id_anfr)) AS count,
+            COUNT(l.id_anfr) AS count,
             GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators,
             MIN(l.id_anfr) AS singleIdAnfr
         FROM localisation l
         LEFT JOIN ref_operateur o ON l.operateur_id = o.id
-        LEFT JOIN support s ON s.id_anfr = l.id_anfr
         WHERE l.latitude BETWEEN :minLat AND :maxLat
         AND l.longitude BETWEEN :minLon AND :maxLon
         AND (:showOnlyZbSites = 0 OR l.is_zb = 1)
-        AND (:hideUndergroundSites = 0 OR NOT EXISTS (
-            SELECT 1
+        AND (:hideUndergroundSites = 0 OR l.id_anfr NOT IN (
+            SELECT underground_support.id_anfr
             FROM support underground_support
-            LEFT JOIN ref_nature underground_nature ON underground_support.nat_id = underground_nature.nat_id
-            WHERE underground_support.id_anfr = l.id_anfr
-            AND underground_nature.libelle = 'Intérieur sous-terrain'
+            JOIN ref_nature underground_nature ON underground_support.nat_id = underground_nature.nat_id
+            WHERE underground_nature.libelle = 'Intérieur sous-terrain'
         ))
         GROUP BY ROUND(l.latitude / 0.05), ROUND(l.longitude / 0.06)
     """)
@@ -1147,21 +1135,19 @@ interface GeoTowerDao {
         SELECT
             AVG(l.latitude) AS centerLat,
             AVG(l.longitude) AS centerLon,
-            COUNT(DISTINCT COALESCE(NULLIF(TRIM(s.id_support), ''), l.id_anfr)) AS count,
+            COUNT(l.id_anfr) AS count,
             GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators,
             MIN(l.id_anfr) AS singleIdAnfr
         FROM localisation l
         LEFT JOIN ref_operateur o ON l.operateur_id = o.id
-        LEFT JOIN support s ON s.id_anfr = l.id_anfr
         WHERE l.latitude BETWEEN :minLat AND :maxLat
         AND l.longitude BETWEEN :minLon AND :maxLon
         AND (:showOnlyZbSites = 0 OR l.is_zb = 1)
-        AND (:hideUndergroundSites = 0 OR NOT EXISTS (
-            SELECT 1
+        AND (:hideUndergroundSites = 0 OR l.id_anfr NOT IN (
+            SELECT underground_support.id_anfr
             FROM support underground_support
-            LEFT JOIN ref_nature underground_nature ON underground_support.nat_id = underground_nature.nat_id
-            WHERE underground_support.id_anfr = l.id_anfr
-            AND underground_nature.libelle = 'Intérieur sous-terrain'
+            JOIN ref_nature underground_nature ON underground_support.nat_id = underground_nature.nat_id
+            WHERE underground_nature.libelle = 'Intérieur sous-terrain'
         ))
         GROUP BY ROUND(l.latitude / 0.02), ROUND(l.longitude / 0.025)
     """)

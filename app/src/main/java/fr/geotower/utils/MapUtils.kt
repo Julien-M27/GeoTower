@@ -121,7 +121,8 @@ object MapUtils {
     }
 
     val markerIconCache = android.util.LruCache<String, BitmapDrawable>(500)
-    val clusterIconCache = android.util.LruCache<String, BitmapDrawable>(200)
+    val clusterIconCache = android.util.LruCache<String, BitmapDrawable>(1500)
+    val clusterBackgroundCache = android.util.LruCache<String, Bitmap>(64)
     val radioIconCache = android.util.LruCache<String, BitmapDrawable>(300)
 
     fun createAdaptiveMarker(

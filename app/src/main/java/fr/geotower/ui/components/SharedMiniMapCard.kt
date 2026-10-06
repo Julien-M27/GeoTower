@@ -978,7 +978,8 @@ class MiniMapAntennaMarker(
         }
 
         return operatorKeys.sortedWith(
-            compareBy<String> { if (preferredOperatorKey != null && it == preferredOperatorKey) 0 else 1 }
+            compareBy<String> { if (it in inactiveOperatorKeys) 1 else 0 }
+                .thenBy { if (preferredOperatorKey != null && it == preferredOperatorKey) 0 else 1 }
                 .thenBy { orderIndex(it) }
         )
     }
@@ -1099,7 +1100,8 @@ class MiniMapAntennaMarker(
             val sortedColors = sortAzimuthOperatorKeys(operatorKeys, preferredOperatorKey)
                 .map(::colorForOperatorKey)
             val mainColor = sortedColors.first()
-            val isMuted = hasFocusedMobileAzimuths && focusOperatorKey !in operatorKeys
+            val allOperatorsInactive = inactiveOperatorKeys.isNotEmpty() && operatorKeys.all { it in inactiveOperatorKeys }
+            val isMuted = allOperatorsInactive || (hasFocusedMobileAzimuths && focusOperatorKey !in operatorKeys)
             val lineAlpha = if (isMuted) 70 else 255
             val coneAlpha = if (isMuted) 14 else 50
             val coneEdgeAlpha = if (isMuted) 55 else 170
@@ -1149,7 +1151,8 @@ class MiniMapAntennaMarker(
             val sortedColors = sortAzimuthOperatorKeys(operatorKeys, preferredOperatorKey)
                 .map(::colorForOperatorKey)
             val mainColor = sortedColors.first()
-            val isMuted = hasFocusedFhAzimuths && focusOperatorKey !in operatorKeys
+            val allOperatorsInactive = inactiveOperatorKeys.isNotEmpty() && operatorKeys.all { it in inactiveOperatorKeys }
+            val isMuted = allOperatorsInactive || (hasFocusedFhAzimuths && focusOperatorKey !in operatorKeys)
             val lineAlpha = if (isMuted) 70 else 200
             val dotColors = if (isMuted) sortedColors.map { ColorUtils.setAlphaComponent(it, 80) } else sortedColors
 
@@ -1168,22 +1171,28 @@ class MiniMapAntennaMarker(
             )
         }
 
+        val radioCategoryMask = AppConfig.radioMapCategoryMask()
+        val isRadioCategoryFiltered = radioCategoryMask != fr.geotower.data.models.RadioMapCategoryMasks.ALL
         angleToRadioKinds.forEach { (az, kindsSet) ->
             val rad = Math.toRadians(az - 90.0)
             val cos = Math.cos(rad).toFloat()
             val sin = Math.sin(rad).toFloat()
             val radioKinds = kindsSet.toList()
-            val dotColors = radioKinds.map { radioUsageColor(it).toArgb() }
+            val isMuted = isRadioCategoryFiltered && radioKinds.none { (radioCategoryMask and radioCategoryMaskForKind(it)) != 0 }
+            val dotColors = radioKinds.map { kind ->
+                val baseColor = radioUsageColor(kind).toArgb()
+                if (isMuted) ColorUtils.setAlphaComponent(baseColor, 80) else baseColor
+            }
             val mainColor = dotColors.first()
 
             val radioPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
                 style = android.graphics.Paint.Style.STROKE
-                color = ColorUtils.setAlphaComponent(mainColor, 230)
+                color = ColorUtils.setAlphaComponent(mainColor, if (isMuted) 70 else 230)
                 strokeWidth = 2.1f * density
                 strokeCap = android.graphics.Paint.Cap.ROUND
             }
 
-            val radioOutlinePaint = if (satelliteContrast) outlinePaintFor(radioPaint, mainColor) else null
+            val radioOutlinePaint = if (satelliteContrast && !isMuted) outlinePaintFor(radioPaint, mainColor) else null
 
             precalculatedRadioAzimuths.add(
                 GroupedAzimuthData(az, cos, sin, radioPaint, null, null, dotColors, radioOutlinePaint)

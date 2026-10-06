@@ -28,6 +28,7 @@ import fr.geotower.data.build.BuildSourceLink
 import fr.geotower.data.build.BuildProgressUpdate
 import fr.geotower.data.build.LocalDbBuildPipeline
 import fr.geotower.data.build.labelRes
+import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.db.DbOperationTimings
 import fr.geotower.data.db.LocalDbProvenance
 import fr.geotower.utils.AppLogger
@@ -76,6 +77,10 @@ class LocalDbBuildWorker(
     private val channelId = "db_download_channel"
 
     override suspend fun doWork(): Result = coroutineScope {
+        if (!RemoteFeatureFlags.isLocalDbBuildAllowed()) {
+            AppLogger.w(TAG, "Local build skipped: disabled by remote feature flags")
+            return@coroutineScope Result.success()
+        }
         createChannel()
         // Le réseau est nécessaire pour récupérer les sources, mais pas pour le traitement local.
         // Une contrainte WorkManager CONNECTED sur toute la tâche ferait arrêter un build d'une

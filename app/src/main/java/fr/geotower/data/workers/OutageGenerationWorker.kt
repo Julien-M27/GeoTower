@@ -61,9 +61,10 @@ class OutageGenerationWorker(
                 return@coroutineScope Result.success()
             }
             // Pendant du verrou de la page : sans base ANFR, le géocodage n'a pas de référentiel et
-            // les pannes sortiraient sans identifiant de station. On saute le cycle en silence
-            // (l'utilisateur n'a rien demandé) plutôt que de produire une liste inexploitable.
-            val databaseReady = withContext(Dispatchers.IO) {
+            // les pannes sortiraient sans identifiant de station. En mode journalier (Arcep), les identifiants
+            // sont déjà présents dans le fichier consolidé.
+            val isDaily = config.sourceMode == fr.geotower.data.outages.OutageSourceMode.DAILY
+            val databaseReady = isDaily || withContext(Dispatchers.IO) {
                 GeoTowerDatabaseValidator.getInstalledDatabaseStatus(context).state ==
                     GeoTowerDatabaseValidator.LocalDatabaseState.VALID
             }

@@ -5,6 +5,7 @@ import fr.geotower.data.models.OfflineMapDto
 import retrofit2.Response
 import retrofit2.http.GET
 import retrofit2.http.POST
+import retrofit2.http.Query
 
 data class SitesHsInfoDto(
     @SerializedName("last_update")
@@ -73,10 +74,10 @@ interface AnfrService {
     suspend fun getMapsCatalog(): List<OfflineMapDto>
 
     @GET("/api/v2/antennes/hs")
-    suspend fun getSitesHsGeoJson(): okhttp3.ResponseBody
+    suspend fun getSitesHsGeoJson(@Query("source") source: String? = null): okhttp3.ResponseBody
 
     @GET("/api/v2/antennes/hs/info")
-    suspend fun getSitesHsInfo(): SitesHsInfoDto
+    suspend fun getSitesHsInfo(@Query("source") source: String? = null): SitesHsInfoDto
 
     @GET("/api/v2/antennes/hs/rebuild")
     suspend fun getSitesHsRebuildStatus(): SitesHsRebuildDto

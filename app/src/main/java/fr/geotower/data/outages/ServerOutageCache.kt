@@ -3,6 +3,7 @@ package fr.geotower.data.outages
 import android.content.Context
 import com.google.gson.Gson
 import fr.geotower.data.models.SiteHsEntity
+import fr.geotower.utils.AppConfig
 import java.io.File
 
 /** Copie conservée du fichier de pannes du serveur : les pannes, et ce qui les date. */
@@ -26,18 +27,34 @@ data class CachedServerOutages(
  *
  * Écriture atomique via un fichier temporaire, comme le cache local.
  */
-class ServerOutageCache(private val file: File) {
+class ServerOutageCache(
+    private val staticFile: File? = null,
+    private val context: Context? = null,
+) {
 
-    constructor(context: Context) : this(File(context.filesDir, FILE_NAME))
+    constructor(file: File) : this(staticFile = file, context = null)
+    constructor(context: Context) : this(staticFile = null, context = context)
 
     private val gson = Gson()
 
+    private fun targetFile(): File {
+        if (staticFile != null) return staticFile
+        val mode = AppConfig.outageSourceMode.value
+        val file = File(context!!.filesDir, fileFor(mode))
+        if (!file.exists() && mode == OutageSourceMode.OPERATORS) {
+            val legacy = File(context.filesDir, FILE_NAME)
+            if (legacy.exists()) return legacy
+        }
+        return file
+    }
+
     fun load(): CachedServerOutages? = try {
-        if (!file.exists()) {
+        val target = targetFile()
+        if (!target.exists()) {
             null
         } else {
             // Même filet que le cache local : voir [cachedOutageSitesAreUsable].
-            gson.fromJson(file.readText(), CachedServerOutages::class.java)
+            gson.fromJson(target.readText(), CachedServerOutages::class.java)
                 ?.takeIf { cachedOutageSitesAreUsable(it.sites) }
         }
     } catch (_: Exception) {
@@ -46,6 +63,7 @@ class ServerOutageCache(private val file: File) {
 
     fun save(cache: CachedServerOutages) {
         try {
+            val file = targetFile()
             file.parentFile?.mkdirs()
             val temp = File(file.parentFile, "${file.name}.tmp")
             temp.writeText(gson.toJson(cache))
@@ -59,13 +77,21 @@ class ServerOutageCache(private val file: File) {
     }
 
     /** Taille de la copie sur l'appareil (octets), 0 si aucune. Sert la ligne « espace occupé ». */
-    fun sizeBytes(): Long = if (file.exists()) file.length() else 0L
+    fun sizeBytes(): Long {
+        val target = targetFile()
+        return if (target.exists()) target.length() else 0L
+    }
 
     fun clear() {
-        runCatching { file.delete() }
+        val target = targetFile()
+        val ctx = context
+        if (ctx != null && AppConfig.outageSourceMode.value == OutageSourceMode.OPERATORS) {
+            runCatching { File(ctx.filesDir, FILE_NAME).delete() }
+        }
     }
 
     companion object {
         const val FILE_NAME = "sites_hs_server.json"
+        fun fileFor(mode: OutageSourceMode): String = "sites_hs_server_${mode.key}.json"
     }
 }

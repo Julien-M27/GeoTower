@@ -1,5 +1,7 @@
 package fr.geotower.utils
 
+import android.content.Context
+import fr.geotower.data.hidden.HiddenSitesStore
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.SiteHsEntity
 import fr.geotower.data.models.isDeclaredActive
@@ -11,6 +13,102 @@ fun combineOperatorKeyFilters(vararg filters: Set<String>?): Set<String>? {
     return filters
         .filterNotNull()
         .reduceOrNull { activeKeys, filterKeys -> activeKeys intersect filterKeys }
+}
+
+fun isAnyMapFilterActive(
+    context: Context? = null,
+    antennas: List<LocalisationEntity> = emptyList(),
+    selectedOperatorKeys: Set<String> = AppConfig.selectedOperatorKeys.value,
+    frequencyFilter: FrequencyFilterSelection = FrequencyFilterSelection.fromMapConfig(),
+    showSitesInService: Boolean = AppConfig.showSitesInService.value,
+    showSitesOutOfService: Boolean = AppConfig.showSitesOutOfService.value,
+    showProjectSites: Boolean = AppConfig.showProjectSites.value,
+    hideUndergroundSites: Boolean = AppConfig.hideUndergroundSites.value,
+    showOnlyZbSites: Boolean = AppConfig.showOnlyZbSites.value
+): Boolean {
+    val normalizedSelectedKeys = selectedOperatorKeys.map { it.uppercase() }.toSet()
+    val operatorFilterActive = !normalizedSelectedKeys.containsAll(OperatorColors.defaultVisibleKeys)
+    val frequencyFilterActive = !frequencyFilter.isFullyEnabled
+    val statusFilterActive = !(showSitesInService && showSitesOutOfService && showProjectSites)
+    val hiddenFilterActive = context != null && (
+        if (antennas.isNotEmpty()) {
+            antennas.any { antenna ->
+                val opKeys = OperatorColors.keysFor(antenna.operateur)
+                opKeys.isNotEmpty() && opKeys.any { HiddenSitesStore.isHidden(context, antenna.physicalSiteKey(), it) }
+            }
+        } else {
+            HiddenSitesStore.hasAny(context)
+        }
+    )
+
+    return operatorFilterActive ||
+        frequencyFilterActive ||
+        statusFilterActive ||
+        hideUndergroundSites ||
+        showOnlyZbSites ||
+        hiddenFilterActive
+}
+
+fun resolveActiveOperatorKeys(
+    context: Context?,
+    antennas: List<LocalisationEntity>,
+    sitesHs: Collection<SiteHsEntity>,
+    selectedOperatorKeys: Set<String> = AppConfig.selectedOperatorKeys.value,
+    frequencyFilter: FrequencyFilterSelection = FrequencyFilterSelection.fromMapConfig(),
+    showSitesInService: Boolean = AppConfig.showSitesInService.value,
+    showSitesOutOfService: Boolean = AppConfig.showSitesOutOfService.value,
+    showProjectSites: Boolean = AppConfig.showProjectSites.value,
+    hideUndergroundSites: Boolean = AppConfig.hideUndergroundSites.value,
+    showOnlyZbSites: Boolean = AppConfig.showOnlyZbSites.value,
+    applyFilters: Boolean = true
+): Set<String>? {
+    if (!applyFilters) return null
+
+    val isFilterActive = isAnyMapFilterActive(
+        context = context,
+        antennas = antennas,
+        selectedOperatorKeys = selectedOperatorKeys,
+        frequencyFilter = frequencyFilter,
+        showSitesInService = showSitesInService,
+        showSitesOutOfService = showSitesOutOfService,
+        showProjectSites = showProjectSites,
+        hideUndergroundSites = hideUndergroundSites,
+        showOnlyZbSites = showOnlyZbSites
+    )
+
+    if (!isFilterActive) return null
+
+    val normalizedSelectedKeys = selectedOperatorKeys.map { it.uppercase() }.toSet()
+    val hsOperatorMap = buildHsOperatorMap(sitesHs)
+    val activeKeys = mutableSetOf<String>()
+
+    antennas.forEach { antenna ->
+        if (hideUndergroundSites && antenna.hasUndergroundSupport == 1) return@forEach
+        if (showOnlyZbSites && antenna.isZb != 1) return@forEach
+        if (!frequencyFilter.matchesAntenna(antenna)) return@forEach
+
+        val isProjectSite = !antenna.isDeclaredActive()
+        val opKeys = OperatorColors.keysFor(antenna.operateur)
+
+        opKeys.forEach { operatorKey ->
+            if (context != null && HiddenSitesStore.isHidden(context, antenna.physicalSiteKey(), operatorKey)) {
+                return@forEach
+            }
+            if (operatorKey !in normalizedSelectedKeys) {
+                return@forEach
+            }
+            val matchesStatus = when {
+                isProjectSite -> showProjectSites
+                isOperatorDeclaredHs(antenna, operatorKey, hsOperatorMap) -> showSitesOutOfService
+                else -> showSitesInService
+            }
+            if (matchesStatus) {
+                activeKeys.add(operatorKey)
+            }
+        }
+    }
+
+    return activeKeys
 }
 
 fun activeOperatorKeysForSiteStatusFilter(

@@ -2697,6 +2697,11 @@
     <string name="appstrings_release_v1964_db_timings">Durées affichées sur les bases de données : temps écoulé pendant l\'opération, puis « Généré en… » ou « Téléchargé en… »</string>
     <!-- Source des pannes (génération locale) -->
     <string name="outage_local_settings_title">Récupération des sites en panne sur l\'appareil</string>
+    <string name="outage_source_selection_title">Source des pannes</string>
+    <string name="outage_source_operators_title">Fichiers opérateurs (temps réel)</string>
+    <string name="outage_source_operators_desc">Télécharge les déclarations directes de chaque opérateur</string>
+    <string name="outage_source_daily_title">Fichier consolidé journalier</string>
+    <string name="outage_source_daily_desc">Fichier national Arcep / data.gouv.fr mis à jour quotidiennement</string>
     <string name="outage_source_frequency_title">Fréquence de mise à jour des sites en panne</string>
     <string name="outage_source_frequency_unit">%1$d h</string>
     <string name="outage_source_frequency_footer">Durée de validité des sites en panne en cache, et période en arrière-plan si activé.</string>
@@ -3306,6 +3311,9 @@
     <string name="appstrings_release_v2065_summary_enb_sources">Dates des fichiers sources par opérateur pour la base eNB</string>
     <string name="appstrings_release_v2065_summary_database_updates">Vérification et téléchargement des bases plus rapides</string>
     <string name="appstrings_release_v2065_summary_split_coverage">Couverture théorique intégrée en volet latéral sur grand écran</string>
+    <string name="appstrings_release_v2066_summary_outage_sources">Choix de la source des pannes (flux opérateurs ou journalier Arcep)</string>
+    <string name="appstrings_release_v2066_summary_filter_effects">Filtres de carte améliorés et atténuation visuelle des opérateurs inactifs</string>
+    <string name="appstrings_release_v2066_summary_nearby_and_maps">Recherche des antennes proches plus fluide et gestion optimisée des cartes</string>
     <string name="map_clustering_strength_title">Intensité du regroupement des antennes</string>
     <string name="map_clustering_strength_desc">Une valeur basse regroupe moins d’antennes et affiche des marqueurs plus petits et simplifiés.</string>
     <string name="map_clustering_strength_low">Faible</string>

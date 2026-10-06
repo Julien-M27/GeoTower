@@ -134,6 +134,7 @@ import fr.geotower.utils.AppLogger
 import fr.geotower.utils.FrequencyFilterSelection
 import fr.geotower.utils.activeOperatorKeysForSiteStatusFilter
 import fr.geotower.utils.combineOperatorKeyFilters
+import fr.geotower.utils.resolveActiveOperatorKeys
 import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.PageScrollPrefs
 import fr.geotower.utils.SupportPagePrefs
@@ -559,39 +560,24 @@ fun SupportDetailScreen(
     // ne mène nulle part — d'où la garde côté liste des opérateurs.
     var supportPdfExportRequest by remember { mutableIntStateOf(0) }
     var showOperators by remember { mutableStateOf(SupportPagePrefs.operators.read(prefs)) }
-    val mapFrequencyFilter = if (applyMapFilters) FrequencyFilterSelection.fromMapConfig() else null
-    val frequencyMatchedOperatorKeys = remember(antennas, mapFrequencyFilter) {
-        if (mapFrequencyFilter == null || mapFrequencyFilter.isFullyEnabled) {
-            null
-        } else {
-            antennas
-                .filter { mapFrequencyFilter.matchesAntenna(it) }
-                .flatMap { OperatorColors.keysFor(it.operateur) }
-                .toSet()
-        }
-    }
-    val operatorMatchedKeys = if (applyMapFilters) {
-        AppConfig.selectedOperatorKeys.value
-            .takeUnless { selectedKeys -> selectedKeys.containsAll(OperatorColors.defaultVisibleKeys) }
-    } else {
-        null
-    }
-    val siteStatusMatchedOperatorKeys = if (applyMapFilters) {
-        activeOperatorKeysForSiteStatusFilter(
+    val activeOperatorKeys = remember(
+        antennas,
+        hsDataMap,
+        applyMapFilters,
+        AppConfig.selectedOperatorKeys.value,
+        AppConfig.showSitesInService.value,
+        AppConfig.showSitesOutOfService.value,
+        AppConfig.showProjectSites.value,
+        AppConfig.hideUndergroundSites.value,
+        AppConfig.showOnlyZbSites.value
+    ) {
+        resolveActiveOperatorKeys(
+            context = context,
             antennas = antennas,
             sitesHs = hsDataMap.values,
-            showSitesInService = AppConfig.showSitesInService.value,
-            showSitesOutOfService = AppConfig.showSitesOutOfService.value,
-            showProjectSites = AppConfig.showProjectSites.value
+            applyFilters = true
         )
-    } else {
-        null
     }
-    val activeOperatorKeys = combineOperatorKeyFilters(
-        frequencyMatchedOperatorKeys,
-        operatorMatchedKeys,
-        siteStatusMatchedOperatorKeys
-    )
     val priorityOperatorKey = effectiveHighlightedOperatorKey ?: activeOperatorKeys?.singleOrNull()
     val navigationTarget = antennas.firstOrNull()?.let { it.latitude to it.longitude }
         ?: radioSupportMarkers.firstOrNull { !it.isCluster }?.let { it.latitude to it.longitude }

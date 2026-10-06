@@ -165,3 +165,14 @@ fun radioUsageColor(kind: RadioUsageKind): Color {
         RadioUsageKind.Other -> Color(0xFF111111)
     }
 }
+
+fun radioCategoryMaskForKind(kind: RadioUsageKind): Int {
+    return when (kind) {
+        RadioUsageKind.Tv -> fr.geotower.data.models.RadioMapCategoryMasks.TV
+        RadioUsageKind.Radio -> fr.geotower.data.models.RadioMapCategoryMasks.RADIO
+        RadioUsageKind.PrivateMobile -> fr.geotower.data.models.RadioMapCategoryMasks.PRIVATE_MOBILE
+        RadioUsageKind.Fh -> fr.geotower.data.models.RadioMapCategoryMasks.FH
+        RadioUsageKind.Other -> fr.geotower.data.models.RadioMapCategoryMasks.OTHER
+    }
+}
+

@@ -112,10 +112,7 @@ fun EnbDatabaseDownloadCard(
     val txtLatestDb = stringResource(R.string.database_latest_available)
     val txtDownloadedDb = stringResource(R.string.database_currently_downloaded)
     val canStartDownload =
-        featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.DATABASE_DOWNLOAD) &&
-            featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.ENB_DATABASE) &&
-            featureFlags.isActionEnabled(RemoteFeatureFlags.Actions.START_DATABASE_DOWNLOAD) &&
-            featureFlags.isWorkerEnabled(RemoteFeatureFlags.Workers.DATABASE_DOWNLOAD)
+        featureFlags.isDatabaseDownloadAllowed(RemoteFeatureFlags.DatabaseTarget.ENB)
 
     var dbSizeMb by remember { mutableDoubleStateOf(-1.0) }
     var localVersion by remember { mutableStateOf(txtSearching) }
@@ -358,7 +355,9 @@ fun EnbDatabaseDownloadCard(
                 // operateur a une date anterieure au maximum s'est rafraichi.
                 val isUpToDate = remoteVersionRaw != null && remoteVersionRaw == localVersionRaw
                 val isSearching = localVersion == txtSearching || remoteVersion == txtSearching
-                val canDownload = remoteVersionRaw != null && canStartDownload
+                val canDownload = remoteVersionRaw != null &&
+                    canStartDownload &&
+                    featureFlags.isDatabaseDownloadAllowed(RemoteFeatureFlags.DatabaseTarget.ENB, remoteVersionRaw)
                 val buttonLabel = if (isUpToDate) {
                     stringResource(R.string.database_up_to_date)
                 } else {
@@ -382,11 +381,7 @@ fun EnbDatabaseDownloadCard(
                 Button(
                     onClick = {
                         safeClick("enb_database_start_download") {
-                            if (RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.DATABASE_DOWNLOAD) &&
-                                RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.ENB_DATABASE) &&
-                                RemoteFeatureFlags.isActionEnabled(RemoteFeatureFlags.Actions.START_DATABASE_DOWNLOAD) &&
-                                RemoteFeatureFlags.isWorkerEnabled(RemoteFeatureFlags.Workers.DATABASE_DOWNLOAD)
-                            ) {
+                            if (RemoteFeatureFlags.isDatabaseDownloadAllowed(RemoteFeatureFlags.DatabaseTarget.ENB, remoteVersionRaw)) {
                                 OperationPauseStore.clear(context, OperationPauseStore.ENB_DB_DOWNLOAD)
                                 pauseStateVersion++
                                 EnbDatabaseDownloadWorker.enqueue(workManager)

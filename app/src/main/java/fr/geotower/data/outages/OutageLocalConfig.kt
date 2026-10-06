@@ -8,15 +8,23 @@ import fr.geotower.data.models.SiteHsEntity
  * Réglages de la récupération LOCALE des pannes (vs source serveur). Persistés dans les prefs
  * partagées "settings" (même store que `last_hs_update`).
  *
- * Le CHOIX de la source ne vit plus ici : il est porté par le niveau de « Provenance des données »
- * ([fr.geotower.utils.AppConfig.outagesLocal], crans « pannes en local »), seule vérité de l'app. Cette classe ne
- * garde que les réglages d'exécution (fréquence, arrière-plan) et le résumé de la dernière
- * récupération. L'ancienne clé `outages_source` est migrée au démarrage puis supprimée
- * (cf. `AppConfig.migrateLegacyOutageSourcePref`).
+ * Le niveau de « Provenance des données » ([fr.geotower.utils.AppConfig.outagesLocal], crans « pannes en local »)
+ * décide si les pannes sont traitées sur l'appareil. Le choix de la sous-source ([sourceMode]) décide ensuite
+ * d'utiliser les 4 fichiers opérateurs CSV en direct ou le fichier consolidé quotidien Arcep (data.gouv.fr).
  */
 class OutageLocalConfig(private val prefs: SharedPreferences) {
 
     constructor(context: Context) : this(context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE))
+
+    /** Mode de source pour les pannes : direct opérateurs (temps réel) ou journalier consolidé (Arcep). */
+    var sourceMode: OutageSourceMode
+        get() = OutageSourceMode.fromKey(prefs.getString(KEY_SOURCE_MODE, OutageSourceMode.OPERATORS.key))
+        set(value) = prefs.edit().putString(KEY_SOURCE_MODE, value.key).apply()
+
+    /** Mode de source utilisé lors de la dernière génération réussie. */
+    var lastSourceMode: OutageSourceMode
+        get() = OutageSourceMode.fromKey(prefs.getString(KEY_LAST_SOURCE_MODE, OutageSourceMode.OPERATORS.key))
+        set(value) = prefs.edit().putString(KEY_LAST_SOURCE_MODE, value.key).apply()
 
     /** Fréquence (heures) : durée de validité du cache ET période de la planification en fond. */
     var frequencyHours: Int
@@ -28,15 +36,24 @@ class OutageLocalConfig(private val prefs: SharedPreferences) {
         get() = prefs.getBoolean(KEY_BACKGROUND, false)
         set(value) = prefs.edit().putBoolean(KEY_BACKGROUND, value).apply()
 
+    private fun keyFor(baseKey: String, mode: OutageSourceMode): String =
+        if (mode == OutageSourceMode.OPERATORS) baseKey else "${baseKey}_${mode.key}"
+
     /** Horodatage (ms) de la dernière génération locale réussie. 0 si jamais. */
     var lastGeneratedAtMillis: Long
-        get() = prefs.getLong(KEY_LAST_GENERATED, 0L)
-        set(value) = prefs.edit().putLong(KEY_LAST_GENERATED, value).apply()
+        get() = getLastGeneratedAtMillis(sourceMode)
+        set(value) = prefs.edit().putLong(keyFor(KEY_LAST_GENERATED, sourceMode), value).apply()
+
+    fun getLastGeneratedAtMillis(mode: OutageSourceMode = sourceMode): Long =
+        prefs.getLong(keyFor(KEY_LAST_GENERATED, mode), 0L)
 
     /** Nombre de pannes produites par la dernière génération réussie. -1 si inconnu. */
     var lastGeneratedCount: Int
-        get() = prefs.getInt(KEY_LAST_COUNT, -1)
-        set(value) = prefs.edit().putInt(KEY_LAST_COUNT, value).apply()
+        get() = getLastGeneratedCount(sourceMode)
+        set(value) = prefs.edit().putInt(keyFor(KEY_LAST_COUNT, sourceMode), value).apply()
+
+    fun getLastGeneratedCount(mode: OutageSourceMode = sourceMode): Int =
+        prefs.getInt(keyFor(KEY_LAST_COUNT, mode), -1)
 
     /**
      * Répartition par opérateur de la dernière génération réussie (ordre décroissant), vide si
@@ -44,10 +61,13 @@ class OutageLocalConfig(private val prefs: SharedPreferences) {
      * et les tabulations/retours ligne sont neutralisés à l'écriture.
      */
     var lastBreakdown: List<Pair<String, Int>>
-        get() = decodeBreakdown(prefs.getString(KEY_LAST_BREAKDOWN, null))
+        get() = getLastBreakdown(sourceMode)
         set(value) {
-            prefs.edit().putString(KEY_LAST_BREAKDOWN, encodeBreakdown(value)).apply()
+            prefs.edit().putString(keyFor(KEY_LAST_BREAKDOWN, sourceMode), encodeBreakdown(value)).apply()
         }
+
+    fun getLastBreakdown(mode: OutageSourceMode = sourceMode): List<Pair<String, Int>> =
+        decodeBreakdown(prefs.getString(keyFor(KEY_LAST_BREAKDOWN, mode), null))
 
     /**
      * Détail par génération (2G/3G/4G/5G) de la dernière génération réussie, vide si inconnu.
@@ -55,10 +75,15 @@ class OutageLocalConfig(private val prefs: SharedPreferences) {
      * complète des pannes. Voir [OutageTechBreakdown].
      */
     var lastTechBreakdown: List<OutageTechRow>
-        get() = OutageTechBreakdown.decode(prefs.getString(KEY_LAST_TECH_BREAKDOWN, null))
-        set(value) {
-            prefs.edit().putString(KEY_LAST_TECH_BREAKDOWN, OutageTechBreakdown.encode(value)).apply()
-        }
+        get() = getLastTechBreakdown(sourceMode)
+        set(value) = setLastTechBreakdown(value, sourceMode)
+
+    fun getLastTechBreakdown(mode: OutageSourceMode = sourceMode): List<OutageTechRow> =
+        OutageTechBreakdown.decode(prefs.getString(keyFor(KEY_LAST_TECH_BREAKDOWN, mode), null))
+
+    fun setLastTechBreakdown(rows: List<OutageTechRow>, mode: OutageSourceMode = sourceMode) {
+        prefs.edit().putString(keyFor(KEY_LAST_TECH_BREAKDOWN, mode), OutageTechBreakdown.encode(rows)).apply()
+    }
 
     /**
      * Mémorise le résultat d'une génération réussie (horodatage, total, répartition par opérateur
@@ -66,11 +91,14 @@ class OutageLocalConfig(private val prefs: SharedPreferences) {
      * planification en arrière-plan ou régénération paresseuse à l'expiration du cache. C'est ce que
      * relit la page « Source des pannes ».
      */
-    fun recordGeneration(atMillis: Long, sites: List<SiteHsEntity>) {
-        lastGeneratedAtMillis = atMillis
-        lastGeneratedCount = sites.size
-        lastBreakdown = breakdownOf(sites)
-        lastTechBreakdown = OutageTechBreakdown.of(sites)
+    fun recordGeneration(atMillis: Long, sites: List<SiteHsEntity>, mode: OutageSourceMode = sourceMode) {
+        prefs.edit()
+            .putLong(keyFor(KEY_LAST_GENERATED, mode), atMillis)
+            .putInt(keyFor(KEY_LAST_COUNT, mode), sites.size)
+            .putString(keyFor(KEY_LAST_BREAKDOWN, mode), encodeBreakdown(breakdownOf(sites)))
+            .putString(keyFor(KEY_LAST_TECH_BREAKDOWN, mode), OutageTechBreakdown.encode(OutageTechBreakdown.of(sites)))
+            .putString(KEY_LAST_SOURCE_MODE, mode.key)
+            .apply()
     }
 
     val frequencyMillis: Long get() = frequencyHours.toLong() * 3_600_000L
@@ -105,6 +133,8 @@ class OutageLocalConfig(private val prefs: SharedPreferences) {
         const val LEGACY_KEY_SOURCE = "outages_source"
         const val LEGACY_SOURCE_LOCAL = "local"
 
+        const val KEY_SOURCE_MODE = "outages_source_mode"
+        const val KEY_LAST_SOURCE_MODE = "outages_local_last_source_mode"
         const val KEY_FREQUENCY_HOURS = "outages_local_frequency_hours"
         const val KEY_BACKGROUND = "outages_local_background_enabled"
         const val KEY_LAST_GENERATED = "outages_local_last_generated_at"

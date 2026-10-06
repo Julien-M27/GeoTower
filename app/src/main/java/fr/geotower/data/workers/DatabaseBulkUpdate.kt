@@ -83,14 +83,23 @@ object DatabaseBulkUpdate {
                 // Les deux bases ANFR se reconstruisent localement quand ce mode est impose : les
                 // telecharger ici ecraserait cette decision de provenance.
                 if (!AppConfig.dbForcedLocal()) {
-                    add { checkMobile(context, workManager) }
-                    add { checkRadio(context, workManager) }
+                    if (RemoteFeatureFlags.isDatabaseUpdateCheckAllowed(RemoteFeatureFlags.DatabaseTarget.MOBILE) &&
+                        RemoteFeatureFlags.isDatabaseDownloadAllowed(RemoteFeatureFlags.DatabaseTarget.MOBILE)
+                    ) {
+                        add { checkMobile(context, workManager) }
+                    }
+                    if (RemoteFeatureFlags.isDatabaseUpdateCheckAllowed(RemoteFeatureFlags.DatabaseTarget.RADIO) &&
+                        RemoteFeatureFlags.isDatabaseDownloadAllowed(RemoteFeatureFlags.DatabaseTarget.RADIO)
+                    ) {
+                        add { checkRadio(context, workManager) }
+                    }
                 }
 
                 // Au niveau d'autonomie maximal, cette base partenaire n'est plus servie du tout.
                 if (
                     !AppConfig.blockCommunityAndUpdates() &&
-                    RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.ENB_DATABASE)
+                    RemoteFeatureFlags.isDatabaseUpdateCheckAllowed(RemoteFeatureFlags.DatabaseTarget.ENB) &&
+                    RemoteFeatureFlags.isDatabaseDownloadAllowed(RemoteFeatureFlags.DatabaseTarget.ENB)
                 ) {
                     add { checkEnb(context, workManager) }
                 }
@@ -148,6 +157,9 @@ object DatabaseBulkUpdate {
         if (remote == null) {
             return TargetCheckResult(isComplete = false, hasMissingDatabase = isMissing)
         }
+        if (!RemoteFeatureFlags.isDatabaseDownloadAllowed(RemoteFeatureFlags.DatabaseTarget.MOBILE, remote.version)) {
+            return TargetCheckResult(hasMissingDatabase = isMissing)
+        }
         if (!DatabaseDownloader.isRemoteDatabaseUpdateAvailable(context, remote, local)) {
             return TargetCheckResult(hasMissingDatabase = isMissing)
         }
@@ -177,6 +189,9 @@ object DatabaseBulkUpdate {
         if (remote == null) {
             return TargetCheckResult(isComplete = false, hasMissingDatabase = isMissing)
         }
+        if (!RemoteFeatureFlags.isDatabaseDownloadAllowed(RemoteFeatureFlags.DatabaseTarget.RADIO, remote)) {
+            return TargetCheckResult(hasMissingDatabase = isMissing)
+        }
         if (!DatabaseVersionPolicy.isRemoteNewer(remote, local)) {
             return TargetCheckResult(hasMissingDatabase = isMissing)
         }
@@ -203,6 +218,9 @@ object DatabaseBulkUpdate {
         // pour detecter le changement d'une source plus ancienne que les autres.
         if (remote.isNullOrBlank()) {
             return TargetCheckResult(isComplete = false, hasMissingDatabase = isMissing)
+        }
+        if (!RemoteFeatureFlags.isDatabaseDownloadAllowed(RemoteFeatureFlags.DatabaseTarget.ENB, remote)) {
+            return TargetCheckResult(hasMissingDatabase = isMissing)
         }
         if (remote == local) {
             return TargetCheckResult(hasMissingDatabase = isMissing)
@@ -233,7 +251,15 @@ object DatabaseBulkUpdate {
     }
 
     fun enqueueDetailed(workManager: WorkManager, targetActions: List<TargetAction>) {
-        val requests = targetActions.distinctBy { it.target }.mapNotNull(::requestFor)
+        val allowedTargetActions = targetActions.filter {
+            val dbTarget = when (it.target) {
+                Target.MOBILE -> RemoteFeatureFlags.DatabaseTarget.MOBILE
+                Target.RADIO -> RemoteFeatureFlags.DatabaseTarget.RADIO
+                Target.ENB -> RemoteFeatureFlags.DatabaseTarget.ENB
+            }
+            RemoteFeatureFlags.isDatabaseDownloadAllowed(dbTarget)
+        }
+        val requests = allowedTargetActions.distinctBy { it.target }.mapNotNull(::requestFor)
         if (requests.isEmpty()) return
 
         var continuation = workManager.beginUniqueWork(

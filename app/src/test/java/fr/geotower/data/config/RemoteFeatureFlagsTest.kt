@@ -195,4 +195,133 @@ class RemoteFeatureFlagsTest {
         assertFalse(config.homeAnnouncement.isVisibleForAppVersion("1.9.9.4.2"))
         assertFalse(config.homeAnnouncement.isVisibleForAppVersion("1.9.9.4.3"))
     }
+
+    @Test
+    fun homeAnnouncement_maxAppVersionInclusive_takesPrecedenceAndIsInclusive() {
+        val config = RemoteFeatureFlags.parseConfig(
+            """
+            {
+              "homeAnnouncement": {
+                "enabled": true,
+                "title": "Update",
+                "message": "Please update",
+                "minAppVersionInclusive": "2.0.60",
+                "maxAppVersionInclusive": "2.0.64",
+                "maxAppVersionExclusive": "2.0.65"
+              }
+            }
+            """.trimIndent()
+        )
+
+        requireNotNull(config)
+        assertFalse(config.homeAnnouncement.isVisibleForAppVersion("2.0.59"))
+        assertTrue(config.homeAnnouncement.isVisibleForAppVersion("2.0.60"))
+        assertTrue(config.homeAnnouncement.isVisibleForAppVersion("2.0.64"))
+        assertFalse(config.homeAnnouncement.isVisibleForAppVersion("2.0.65"))
+    }
+
+    @Test
+    fun databasePolicy_enforcesPerTargetDownloadAndMaxAllowedVersion() {
+        val config = RemoteFeatureFlags.parseConfig(
+            """
+            {
+              "schemaVersion": 2,
+              "databasePolicy": {
+                "mobile": {
+                  "download": true,
+                  "updateCheck": true,
+                  "maxAllowedVersion": "20261001_1200",
+                  "minAppVersion": "2.0.60"
+                },
+                "radio": {
+                  "download": false,
+                  "updateCheck": true
+                },
+                "enb": {
+                  "download": true,
+                  "updateCheck": false
+                },
+                "localBuild": {
+                  "enabled": false
+                }
+              }
+            }
+            """.trimIndent()
+        )
+
+        requireNotNull(config)
+
+        // Mobile checks with maxAllowedVersion
+        assertTrue(config.isDatabaseDownloadAllowed(RemoteFeatureFlags.DatabaseTarget.MOBILE, "20260901_1200", "2.0.64"))
+        assertTrue(config.isDatabaseDownloadAllowed(RemoteFeatureFlags.DatabaseTarget.MOBILE, "20261001_1200", "2.0.64"))
+        assertFalse(config.isDatabaseDownloadAllowed(RemoteFeatureFlags.DatabaseTarget.MOBILE, "20261002_0000", "2.0.64"))
+
+        // Mobile minAppVersion checks
+        assertFalse(config.isDatabaseDownloadAllowed(RemoteFeatureFlags.DatabaseTarget.MOBILE, "20260901_1200", "2.0.59"))
+        assertTrue(config.isDatabaseDownloadAllowed(RemoteFeatureFlags.DatabaseTarget.MOBILE, "20260901_1200", "2.0.60"))
+
+        // Radio checks (download blocked by policy)
+        assertFalse(config.isDatabaseDownloadAllowed(RemoteFeatureFlags.DatabaseTarget.RADIO))
+        assertTrue(config.isDatabaseUpdateCheckAllowed(RemoteFeatureFlags.DatabaseTarget.RADIO))
+
+        // Enb checks (updateCheck blocked by policy)
+        assertTrue(config.isDatabaseDownloadAllowed(RemoteFeatureFlags.DatabaseTarget.ENB))
+        assertFalse(config.isDatabaseUpdateCheckAllowed(RemoteFeatureFlags.DatabaseTarget.ENB))
+
+        // Local build disabled by policy
+        assertFalse(config.isLocalDbBuildAllowed())
+    }
+
+    @Test
+    fun databasePolicy_granularFeatureSwitchesOverrideDefaults() {
+        val config = RemoteFeatureFlags.parseConfig(
+            """
+            {
+              "features": {
+                "database.mobile.download": false,
+                "database.radio.download": true
+              }
+            }
+            """.trimIndent()
+        )
+
+        requireNotNull(config)
+        assertFalse(config.isDatabaseDownloadAllowed(RemoteFeatureFlags.DatabaseTarget.MOBILE))
+        assertTrue(config.isDatabaseDownloadAllowed(RemoteFeatureFlags.DatabaseTarget.RADIO))
+    }
+
+    @Test
+    fun databasePolicy_globalMasterSwitchDisablesAllDatabases() {
+        val config = RemoteFeatureFlags.parseConfig(
+            """
+            {
+              "features": {
+                "database.download": false
+              }
+            }
+            """.trimIndent()
+        )
+
+        requireNotNull(config)
+        assertFalse(config.isDatabaseDownloadAllowed(RemoteFeatureFlags.DatabaseTarget.MOBILE))
+        assertFalse(config.isDatabaseDownloadAllowed(RemoteFeatureFlags.DatabaseTarget.RADIO))
+        assertFalse(config.isDatabaseDownloadAllowed(RemoteFeatureFlags.DatabaseTarget.ENB))
+        // Outages should remain unaffected by SQLite database.download master switch
+        assertTrue(config.isDatabaseDownloadAllowed(RemoteFeatureFlags.DatabaseTarget.OUTAGES))
+    }
+
+    @Test
+    fun databasePolicy_backwardCompatibilityWithEmptyJson() {
+        val config = RemoteFeatureFlags.parseConfig("{}")
+
+        requireNotNull(config)
+        assertTrue(config.isDatabaseDownloadAllowed(RemoteFeatureFlags.DatabaseTarget.MOBILE))
+        assertTrue(config.isDatabaseDownloadAllowed(RemoteFeatureFlags.DatabaseTarget.RADIO))
+        assertTrue(config.isDatabaseDownloadAllowed(RemoteFeatureFlags.DatabaseTarget.ENB))
+        assertTrue(config.isDatabaseDownloadAllowed(RemoteFeatureFlags.DatabaseTarget.OUTAGES))
+        assertTrue(config.isDatabaseUpdateCheckAllowed(RemoteFeatureFlags.DatabaseTarget.MOBILE))
+        assertTrue(config.isDatabaseUpdateCheckAllowed(RemoteFeatureFlags.DatabaseTarget.RADIO))
+        assertTrue(config.isDatabaseUpdateCheckAllowed(RemoteFeatureFlags.DatabaseTarget.ENB))
+        assertTrue(config.isLocalDbBuildAllowed())
+    }
 }

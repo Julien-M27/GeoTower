@@ -233,9 +233,7 @@ fun HomeScreen(navController: NavController) {
     val homeLogoChoice = prefs.getString("home_logo_choice", "app") ?: "app"
     val featureFlags by RemoteFeatureFlags.config
     val canStartDatabaseDownload =
-        featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.DATABASE_DOWNLOAD) &&
-            featureFlags.isActionEnabled(RemoteFeatureFlags.Actions.START_DATABASE_DOWNLOAD) &&
-            featureFlags.isWorkerEnabled(RemoteFeatureFlags.Workers.DATABASE_DOWNLOAD)
+        featureFlags.isDatabaseDownloadAllowed(RemoteFeatureFlags.DatabaseTarget.MOBILE)
     var dismissedHomeAnnouncementKey by remember {
         mutableStateOf(prefs.getString(PREF_HOME_ANNOUNCEMENT_DISMISSED, "") ?: "")
     }

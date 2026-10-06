@@ -4,6 +4,8 @@ import android.content.SharedPreferences
 import fr.geotower.data.models.SiteHsEntity
 import fr.geotower.utils.LocalizedDateLabels
 
+import fr.geotower.utils.AppConfig
+
 /**
  * Ce que l'app retient de la source SERVEUR des pannes, dans les prefs partagées "settings" :
  *  - la date de la donnée (`last_update` de `/api/v2/antennes/hs/info`, connue au jour près) ;
@@ -27,34 +29,44 @@ object OutageServerInfo {
     const val KEY_BREAKDOWN = "last_hs_breakdown"
     const val KEY_TECH_BREAKDOWN = "last_hs_tech_breakdown"
 
+    private fun keyFor(baseKey: String, mode: OutageSourceMode): String =
+        if (mode == OutageSourceMode.OPERATORS) baseKey else "${baseKey}_${mode.key}"
+
     /** Date de la donnée serveur, « - » tant qu'aucun téléchargement n'a abouti. */
-    fun lastUpdate(prefs: SharedPreferences): String =
-        prefs.getString(KEY_LAST_UPDATE, null)?.takeIf { it.isNotBlank() } ?: "-"
+    fun lastUpdate(prefs: SharedPreferences, mode: OutageSourceMode = AppConfig.outageSourceMode.value): String =
+        prefs.getString(keyFor(KEY_LAST_UPDATE, mode), null)?.takeIf { it.isNotBlank() } ?: "-"
 
     /** Instant (ms) de production du fichier par le serveur, 0 si le serveur ne le publie pas. */
-    fun generatedAtMillis(prefs: SharedPreferences): Long = prefs.getLong(KEY_GENERATED_AT, 0L)
+    fun generatedAtMillis(prefs: SharedPreferences, mode: OutageSourceMode = AppConfig.outageSourceMode.value): Long =
+        prefs.getLong(keyFor(KEY_GENERATED_AT, mode), 0L)
 
     /** Instant (ms) du dernier téléchargement réussi, 0 si aucun. */
-    fun downloadedAtMillis(prefs: SharedPreferences): Long = prefs.getLong(KEY_DOWNLOADED_AT, 0L)
+    fun downloadedAtMillis(prefs: SharedPreferences, mode: OutageSourceMode = AppConfig.outageSourceMode.value): Long =
+        prefs.getLong(keyFor(KEY_DOWNLOADED_AT, mode), 0L)
 
     /** Nombre de pannes du dernier téléchargement réussi, -1 si inconnu. */
-    fun count(prefs: SharedPreferences): Int = prefs.getInt(KEY_COUNT, -1)
+    fun count(prefs: SharedPreferences, mode: OutageSourceMode = AppConfig.outageSourceMode.value): Int =
+        prefs.getInt(keyFor(KEY_COUNT, mode), -1)
 
     /** Répartition par opérateur du dernier téléchargement réussi, vide si inconnue. */
-    fun breakdown(prefs: SharedPreferences): List<Pair<String, Int>> =
-        OutageLocalConfig.decodeBreakdown(prefs.getString(KEY_BREAKDOWN, null))
+    fun breakdown(prefs: SharedPreferences, mode: OutageSourceMode = AppConfig.outageSourceMode.value): List<Pair<String, Int>> =
+        OutageLocalConfig.decodeBreakdown(prefs.getString(keyFor(KEY_BREAKDOWN, mode), null))
 
     /** Détail par génération (2G/3G/4G/5G) du dernier téléchargement réussi, vide si inconnu. */
-    fun techBreakdown(prefs: SharedPreferences): List<OutageTechRow> =
-        OutageTechBreakdown.decode(prefs.getString(KEY_TECH_BREAKDOWN, null))
+    fun techBreakdown(prefs: SharedPreferences, mode: OutageSourceMode = AppConfig.outageSourceMode.value): List<OutageTechRow> =
+        OutageTechBreakdown.decode(prefs.getString(keyFor(KEY_TECH_BREAKDOWN, mode), null))
 
     /**
      * Range un détail par génération recalculé après coup, pour une copie téléchargée AVANT que le
      * résumé ne le retienne : sans ça, le tableau des réglages resterait vide jusqu'au prochain
      * téléchargement alors que la donnée est déjà sur l'appareil.
      */
-    fun recordTechBreakdown(prefs: SharedPreferences, rows: List<OutageTechRow>) {
-        prefs.edit().putString(KEY_TECH_BREAKDOWN, OutageTechBreakdown.encode(rows)).apply()
+    fun recordTechBreakdown(
+        prefs: SharedPreferences,
+        rows: List<OutageTechRow>,
+        mode: OutageSourceMode = AppConfig.outageSourceMode.value,
+    ) {
+        prefs.edit().putString(keyFor(KEY_TECH_BREAKDOWN, mode), OutageTechBreakdown.encode(rows)).apply()
     }
 
     /**
@@ -70,32 +82,35 @@ object OutageServerInfo {
         generatedAtIso: String?,
         sites: List<SiteHsEntity>,
         downloadedAtMillis: Long,
+        mode: OutageSourceMode = AppConfig.outageSourceMode.value,
     ): Long {
         val generatedAt = LocalizedDateLabels.isoInstantMillis(generatedAtIso)
+        val genKey = keyFor(KEY_GENERATED_AT, mode)
         val editor = prefs.edit()
-            .putString(KEY_LAST_UPDATE, lastUpdate)
-            .putLong(KEY_DOWNLOADED_AT, downloadedAtMillis)
-            .putInt(KEY_COUNT, sites.size)
-            .putString(KEY_BREAKDOWN, OutageLocalConfig.encodeBreakdown(OutageLocalConfig.breakdownOf(sites)))
-            .putString(KEY_TECH_BREAKDOWN, OutageTechBreakdown.encode(OutageTechBreakdown.of(sites)))
+            .putString(keyFor(KEY_LAST_UPDATE, mode), lastUpdate)
+            .putLong(keyFor(KEY_DOWNLOADED_AT, mode), downloadedAtMillis)
+            .putInt(keyFor(KEY_COUNT, mode), sites.size)
+            .putString(keyFor(KEY_BREAKDOWN, mode), OutageLocalConfig.encodeBreakdown(OutageLocalConfig.breakdownOf(sites)))
+            .putString(keyFor(KEY_TECH_BREAKDOWN, mode), OutageTechBreakdown.encode(OutageTechBreakdown.of(sites)))
         if (generatedAt > 0L) {
-            editor.putLong(KEY_GENERATED_AT, generatedAt)
+            editor.putLong(genKey, generatedAt)
         } else {
-            editor.remove(KEY_GENERATED_AT)
+            editor.remove(genKey)
         }
         editor.apply()
         return generatedAt
     }
 
     /** Oublie tout du fichier serveur (suppression de la copie depuis les réglages). */
-    fun clear(prefs: SharedPreferences) {
+    fun clear(prefs: SharedPreferences, mode: OutageSourceMode = AppConfig.outageSourceMode.value) {
+        val genKey = keyFor(KEY_GENERATED_AT, mode)
         prefs.edit()
-            .remove(KEY_LAST_UPDATE)
-            .remove(KEY_GENERATED_AT)
-            .remove(KEY_DOWNLOADED_AT)
-            .remove(KEY_COUNT)
-            .remove(KEY_BREAKDOWN)
-            .remove(KEY_TECH_BREAKDOWN)
+            .remove(keyFor(KEY_LAST_UPDATE, mode))
+            .remove(genKey)
+            .remove(keyFor(KEY_DOWNLOADED_AT, mode))
+            .remove(keyFor(KEY_COUNT, mode))
+            .remove(keyFor(KEY_BREAKDOWN, mode))
+            .remove(keyFor(KEY_TECH_BREAKDOWN, mode))
             .apply()
     }
 }

@@ -91,6 +91,7 @@ data class RemoteHomeAnnouncement(
     val actionUrl: String = "",
     val dismissible: Boolean = true,
     val minAppVersionInclusive: String = "",
+    val maxAppVersionInclusive: String = "",
     val maxAppVersionExclusive: String = "",
     val translations: Map<String, RemoteHomeAnnouncementText> = emptyMap()
 ) {
@@ -123,10 +124,16 @@ data class RemoteHomeAnnouncement(
             if (comparison != null && comparison < 0) return false
         }
 
-        val maxVersion = maxAppVersionExclusive.trim()
-        if (maxVersion.isNotBlank()) {
-            val comparison = compareAppVersionNames(installedVersionName, maxVersion)
-            if (comparison != null && comparison >= 0) return false
+        val maxInclusive = maxAppVersionInclusive.trim()
+        if (maxInclusive.isNotBlank()) {
+            val comparison = compareAppVersionNames(installedVersionName, maxInclusive)
+            if (comparison != null && comparison > 0) return false
+        } else {
+            val maxExclusive = maxAppVersionExclusive.trim()
+            if (maxExclusive.isNotBlank()) {
+                val comparison = compareAppVersionNames(installedVersionName, maxExclusive)
+                if (comparison != null && comparison >= 0) return false
+            }
         }
 
         return true
@@ -147,10 +154,58 @@ data class RemoteHomeAnnouncement(
     }
 }
 
+typealias DatabaseTarget = RemoteFeatureFlags.DatabaseTarget
+
+data class DatabaseTargetPolicy(
+    val download: Boolean = true,
+    val updateCheck: Boolean = true,
+    val maxAllowedVersion: String = "",
+    val minAppVersion: String = ""
+) {
+    fun isDownloadAllowed(remoteVersion: String? = null, installedAppVersion: String? = null): Boolean {
+        if (!download) return false
+        if (minAppVersion.isNotBlank() && !installedAppVersion.isNullOrBlank()) {
+            val cmp = compareAppVersionNames(installedAppVersion, minAppVersion)
+            if (cmp != null && cmp < 0) return false
+        }
+        if (maxAllowedVersion.isNotBlank() && !remoteVersion.isNullOrBlank()) {
+            if (fr.geotower.data.db.DatabaseVersionPolicy.isRemoteNewer(remoteVersion, maxAllowedVersion)) {
+                return false
+            }
+        }
+        return true
+    }
+
+    fun isUpdateCheckAllowed(installedAppVersion: String? = null): Boolean {
+        if (!updateCheck) return false
+        if (minAppVersion.isNotBlank() && !installedAppVersion.isNullOrBlank()) {
+            val cmp = compareAppVersionNames(installedAppVersion, minAppVersion)
+            if (cmp != null && cmp < 0) return false
+        }
+        return true
+    }
+}
+
+data class DatabasePolicyConfig(
+    val mobile: DatabaseTargetPolicy = DatabaseTargetPolicy(),
+    val radio: DatabaseTargetPolicy = DatabaseTargetPolicy(),
+    val enb: DatabaseTargetPolicy = DatabaseTargetPolicy(),
+    val outages: DatabaseTargetPolicy = DatabaseTargetPolicy(),
+    val localBuildEnabled: Boolean = true
+) {
+    fun forTarget(target: DatabaseTarget): DatabaseTargetPolicy = when (target) {
+        DatabaseTarget.MOBILE -> mobile
+        DatabaseTarget.RADIO -> radio
+        DatabaseTarget.ENB -> enb
+        DatabaseTarget.OUTAGES -> outages
+    }
+}
+
 data class RemoteFeatureFlagConfig(
     val cacheTtlSeconds: Long,
     val screens: Map<String, Boolean>,
     val menus: Map<String, Boolean>,
+    val databasePolicy: DatabasePolicyConfig = DatabasePolicyConfig(),
     val features: Map<String, Boolean>,
     val actions: Map<String, Boolean>,
     val providers: Map<String, Boolean>,
@@ -182,6 +237,85 @@ data class RemoteFeatureFlagConfig(
 
     fun limitOrDefault(limitId: String, defaultValue: Int): Int = limits[limitId] ?: defaultValue
 
+    fun isDatabaseDownloadAllowed(
+        target: DatabaseTarget,
+        remoteVersion: String? = null,
+        installedAppVersion: String? = null
+    ): Boolean {
+        val appVersion = installedAppVersion ?: runCatching { fr.geotower.BuildConfig.VERSION_NAME }.getOrNull()
+
+        if (target != DatabaseTarget.OUTAGES) {
+            // Interrupteurs généraux (rétrocompatibilité avec les versions sans politique fine)
+            if (!isFeatureEnabled(RemoteFeatureFlags.Features.DATABASE_DOWNLOAD)) return false
+            if (!isActionEnabled(RemoteFeatureFlags.Actions.START_DATABASE_DOWNLOAD)) return false
+            if (!isWorkerEnabled(RemoteFeatureFlags.Workers.DATABASE_DOWNLOAD)) return false
+        }
+
+        // Interrupteurs spécifiques à la base ciblée
+        val targetFeatureKey = when (target) {
+            DatabaseTarget.MOBILE -> RemoteFeatureFlags.Features.DATABASE_MOBILE_DOWNLOAD
+            DatabaseTarget.RADIO -> RemoteFeatureFlags.Features.DATABASE_RADIO_DOWNLOAD
+            DatabaseTarget.ENB -> RemoteFeatureFlags.Features.DATABASE_ENB_DOWNLOAD
+            DatabaseTarget.OUTAGES -> RemoteFeatureFlags.Features.OUTAGES_DATA
+        }
+        if (!isFeatureEnabled(targetFeatureKey)) return false
+
+        val targetWorkerKey = when (target) {
+            DatabaseTarget.MOBILE -> RemoteFeatureFlags.Workers.MOBILE_DATABASE_DOWNLOAD
+            DatabaseTarget.RADIO -> RemoteFeatureFlags.Workers.RADIO_DATABASE_DOWNLOAD
+            DatabaseTarget.ENB -> RemoteFeatureFlags.Workers.ENB_DATABASE_DOWNLOAD
+            DatabaseTarget.OUTAGES -> RemoteFeatureFlags.Workers.OUTAGE_GENERATION
+        }
+        if (!isWorkerEnabled(targetWorkerKey)) return false
+
+        val targetActionKey = when (target) {
+            DatabaseTarget.MOBILE -> RemoteFeatureFlags.Actions.START_MOBILE_DATABASE_DOWNLOAD
+            DatabaseTarget.RADIO -> RemoteFeatureFlags.Actions.START_RADIO_DATABASE_DOWNLOAD
+            DatabaseTarget.ENB -> RemoteFeatureFlags.Actions.START_ENB_DATABASE_DOWNLOAD
+            DatabaseTarget.OUTAGES -> null
+        }
+        if (targetActionKey != null && !isActionEnabled(targetActionKey)) return false
+
+        if (target == DatabaseTarget.ENB && !isFeatureEnabled(RemoteFeatureFlags.Features.ENB_DATABASE)) {
+            return false
+        }
+
+        return databasePolicy.forTarget(target).isDownloadAllowed(remoteVersion, appVersion)
+    }
+
+    fun isDatabaseUpdateCheckAllowed(
+        target: DatabaseTarget,
+        installedAppVersion: String? = null
+    ): Boolean {
+        val appVersion = installedAppVersion ?: runCatching { fr.geotower.BuildConfig.VERSION_NAME }.getOrNull()
+
+        if (target != DatabaseTarget.OUTAGES) {
+            if (!isFeatureEnabled(RemoteFeatureFlags.Features.DATABASE_UPDATE_CHECK)) return false
+            if (!isWorkerEnabled(RemoteFeatureFlags.Workers.DATABASE_UPDATE_CHECK)) return false
+        }
+
+        val targetFeatureKey = when (target) {
+            DatabaseTarget.MOBILE -> RemoteFeatureFlags.Features.DATABASE_MOBILE_UPDATE_CHECK
+            DatabaseTarget.RADIO -> RemoteFeatureFlags.Features.DATABASE_RADIO_UPDATE_CHECK
+            DatabaseTarget.ENB -> RemoteFeatureFlags.Features.DATABASE_ENB_UPDATE_CHECK
+            DatabaseTarget.OUTAGES -> RemoteFeatureFlags.Features.OUTAGES_DATA
+        }
+        if (!isFeatureEnabled(targetFeatureKey)) return false
+
+        if (target == DatabaseTarget.ENB && !isFeatureEnabled(RemoteFeatureFlags.Features.ENB_DATABASE)) {
+            return false
+        }
+
+        return databasePolicy.forTarget(target).isUpdateCheckAllowed(appVersion)
+    }
+
+    fun isLocalDbBuildAllowed(): Boolean {
+        return isFeatureEnabled(RemoteFeatureFlags.Features.DATABASE_LOCAL_BUILD) &&
+            isWorkerEnabled(RemoteFeatureFlags.Workers.LOCAL_DB_BUILD) &&
+            isActionEnabled(RemoteFeatureFlags.Actions.START_LOCAL_DB_BUILD) &&
+            databasePolicy.localBuildEnabled
+    }
+
     fun isCommunitySourceEnabled(featureId: String, sourceId: String): Boolean {
         return when {
             featureId == "photos" && sourceId == "signalquest" -> isFeatureEnabled(RemoteFeatureFlags.Features.SIGNALQUEST_PHOTOS)
@@ -202,6 +336,13 @@ data class RemoteFeatureFlagConfig(
 }
 
 object RemoteFeatureFlags {
+    enum class DatabaseTarget {
+        MOBILE,
+        RADIO,
+        ENB,
+        OUTAGES
+    }
+
     private const val TAG = "GeoTowerFeatureFlags"
     private const val PREFS_NAME = "GeoTowerPrefs"
     private const val PREF_CONFIG_JSON = "remote_feature_flags_json"
@@ -229,6 +370,12 @@ object RemoteFeatureFlags {
         const val THROUGHPUT_CALCULATOR = "throughputCalculator"
         const val SIGNALQUEST_UPLOAD = "signalQuestUpload"
         const val FIRST_START = "firstStart"
+        const val DATABASE_VIEWER = "databaseViewer"
+        const val BACKUP = "backup"
+        const val HIDDEN_SITES = "hiddenSites"
+        const val NOTIFICATION_HISTORY = "notificationHistory"
+        const val PHOTO_REPORTS = "photoReports"
+        const val FREQUENCY_REFERENCE = "frequencyReference"
     }
 
     /**
@@ -264,6 +411,13 @@ object RemoteFeatureFlags {
     object Features {
         const val DATABASE_DOWNLOAD = "database.download"
         const val DATABASE_UPDATE_CHECK = "database.updateCheck"
+        const val DATABASE_MOBILE_DOWNLOAD = "database.mobile.download"
+        const val DATABASE_RADIO_DOWNLOAD = "database.radio.download"
+        const val DATABASE_ENB_DOWNLOAD = "database.enb.download"
+        const val DATABASE_LOCAL_BUILD = "database.localBuild"
+        const val DATABASE_MOBILE_UPDATE_CHECK = "database.mobile.updateCheck"
+        const val DATABASE_RADIO_UPDATE_CHECK = "database.radio.updateCheck"
+        const val DATABASE_ENB_UPDATE_CHECK = "database.enb.updateCheck"
         // Kill-switch de la base des identifiants eNB/gNB : la donnée vient d'un partenaire
         // (eNB-Analytics), elle doit pouvoir être coupée sans toucher aux bases ANFR.
         const val ENB_DATABASE = "enbDatabase.enabled"
@@ -292,11 +446,13 @@ object RemoteFeatureFlags {
         const val MAP_SHARE = "map.share"
         const val MAP_AZIMUTHS = "map.azimuths"
         const val MAP_LOCATION = "map.location"
+        const val MAP_ROUTING = "map.routing"
         const val SITE_PHOTOS = "site.photos"
         const val SITE_PHOTO_UPLOAD = "site.photoUpload"
         const val SITE_PHOTO_CAMERA = "site.photoCamera"
         const val SITE_PHOTO_GALLERY = "site.photoGallery"
         const val SITE_PHOTO_EXIF = "site.photoExif"
+        const val SITE_PHOTO_REPORT = "site.photoReport"
         const val SITE_SCHEMES = "site.schemes"
         const val SITE_SPEEDTESTS = "site.speedtests"
         const val SITE_EXTERNAL_NAVIGATION = "site.externalNavigation"
@@ -313,6 +469,11 @@ object RemoteFeatureFlags {
         const val STATS_HISTORY = "stats.history"
         const val COMPASS_RADAR = "compass.radar"
         const val COMPASS_REVERSE_GEOCODING = "compass.reverseGeocoding"
+        const val TRIPS_TRACKING = "trips.tracking"
+        const val TRIPS_EXPORT = "trips.export"
+        const val BACKUP_EXPORT = "backup.export"
+        const val BACKUP_IMPORT = "backup.import"
+        const val DIAGNOSTIC_NETWORK_TESTS = "diagnostic.networkTests"
         const val SIGNALQUEST_PHOTOS = "signalQuest.photos"
         const val SIGNALQUEST_UPLOAD = "signalQuest.upload"
         const val SIGNALQUEST_PHOTO_REPORT = "signalQuest.photoReport"
@@ -337,6 +498,10 @@ object RemoteFeatureFlags {
         const val OPEN_EXTERNAL_NAVIGATION = "externalNavigation.open"
         const val OPEN_EXTERNAL_LINK = "externalLink.open"
         const val START_DATABASE_DOWNLOAD = "databaseDownload.start"
+        const val START_MOBILE_DATABASE_DOWNLOAD = "databaseDownload.mobile.start"
+        const val START_RADIO_DATABASE_DOWNLOAD = "databaseDownload.radio.start"
+        const val START_ENB_DATABASE_DOWNLOAD = "databaseDownload.enb.start"
+        const val START_LOCAL_DB_BUILD = "localDbBuild.start"
         const val START_OFFLINE_MAP_DOWNLOAD = "offlineMapDownload.start"
         const val START_SIGNALQUEST_UPLOAD = "signalQuestUpload.start"
     }
@@ -361,11 +526,18 @@ object RemoteFeatureFlags {
 
     object Workers {
         const val DATABASE_DOWNLOAD = "databaseDownload"
+        const val MOBILE_DATABASE_DOWNLOAD = "mobileDatabaseDownload"
+        const val RADIO_DATABASE_DOWNLOAD = "radioDatabaseDownload"
+        const val ENB_DATABASE_DOWNLOAD = "enbDatabaseDownload"
+        const val LOCAL_DB_BUILD = "localDbBuild"
         const val DATABASE_UPDATE_CHECK = "databaseUpdateCheck"
         const val APP_UPDATE_CHECK = "appUpdateCheck"
         const val OFFLINE_MAP_DOWNLOAD = "offlineMapDownload"
         const val SIGNALQUEST_UPLOAD = "signalQuestUpload"
         const val WIDGET_UPDATE = "widgetUpdate"
+        const val OUTAGE_GENERATION = "outageGeneration"
+        const val PHOTO_REPORT_CHECK = "photoReportCheck"
+        const val TRIP_REMINDER = "tripReminder"
     }
 
     object Platform {
@@ -405,10 +577,17 @@ object RemoteFeatureFlags {
             Screens.MAP to true,
             Screens.COMPASS to true,
             Screens.STATS to true,
+            Screens.TRIPS to true,
             Screens.SETTINGS to true,
             Screens.HELP to true,
             Screens.ABOUT to true,
             Screens.DIAGNOSTIC to true,
+            Screens.DATABASE_VIEWER to true,
+            Screens.BACKUP to true,
+            Screens.HIDDEN_SITES to true,
+            Screens.NOTIFICATION_HISTORY to true,
+            Screens.PHOTO_REPORTS to true,
+            Screens.FREQUENCY_REFERENCE to true,
             Screens.PHOTO_UPLOAD_HISTORY to true,
             Screens.SUPPORT_DETAIL to true,
             Screens.SITE_DETAIL to true,
@@ -431,9 +610,17 @@ object RemoteFeatureFlags {
             Menus.STATS_SETTINGS to true,
             Menus.THROUGHPUT_SETTINGS to true
         ),
+        databasePolicy = DatabasePolicyConfig(),
         features = mapOf(
             Features.DATABASE_DOWNLOAD to true,
             Features.DATABASE_UPDATE_CHECK to true,
+            Features.DATABASE_MOBILE_DOWNLOAD to true,
+            Features.DATABASE_RADIO_DOWNLOAD to true,
+            Features.DATABASE_ENB_DOWNLOAD to true,
+            Features.DATABASE_LOCAL_BUILD to true,
+            Features.DATABASE_MOBILE_UPDATE_CHECK to true,
+            Features.DATABASE_RADIO_UPDATE_CHECK to true,
+            Features.DATABASE_ENB_UPDATE_CHECK to true,
             Features.APP_UPDATE_CHECK to true,
             Features.LOCAL_MODE_ENABLED to true,
             Features.SIMPLE_MODE_ENABLED to true,
@@ -455,11 +642,13 @@ object RemoteFeatureFlags {
             Features.MAP_SHARE to true,
             Features.MAP_AZIMUTHS to true,
             Features.MAP_LOCATION to true,
+            Features.MAP_ROUTING to true,
             Features.SITE_PHOTOS to true,
             Features.SITE_PHOTO_UPLOAD to true,
             Features.SITE_PHOTO_CAMERA to true,
             Features.SITE_PHOTO_GALLERY to true,
             Features.SITE_PHOTO_EXIF to true,
+            Features.SITE_PHOTO_REPORT to true,
             Features.SITE_SCHEMES to true,
             Features.SITE_SPEEDTESTS to true,
             Features.SITE_EXTERNAL_NAVIGATION to true,
@@ -476,6 +665,11 @@ object RemoteFeatureFlags {
             Features.STATS_HISTORY to true,
             Features.COMPASS_RADAR to true,
             Features.COMPASS_REVERSE_GEOCODING to true,
+            Features.TRIPS_TRACKING to true,
+            Features.TRIPS_EXPORT to true,
+            Features.BACKUP_EXPORT to true,
+            Features.BACKUP_IMPORT to true,
+            Features.DIAGNOSTIC_NETWORK_TESTS to true,
             Features.SIGNALQUEST_PHOTOS to true,
             Features.SIGNALQUEST_UPLOAD to true,
             Features.SIGNALQUEST_PHOTO_REPORT to true,
@@ -499,6 +693,10 @@ object RemoteFeatureFlags {
             Actions.OPEN_EXTERNAL_NAVIGATION to true,
             Actions.OPEN_EXTERNAL_LINK to true,
             Actions.START_DATABASE_DOWNLOAD to true,
+            Actions.START_MOBILE_DATABASE_DOWNLOAD to true,
+            Actions.START_RADIO_DATABASE_DOWNLOAD to true,
+            Actions.START_ENB_DATABASE_DOWNLOAD to true,
+            Actions.START_LOCAL_DB_BUILD to true,
             Actions.START_OFFLINE_MAP_DOWNLOAD to true,
             Actions.START_SIGNALQUEST_UPLOAD to true
         ),
@@ -521,11 +719,18 @@ object RemoteFeatureFlags {
         ),
         workers = mapOf(
             Workers.DATABASE_DOWNLOAD to true,
+            Workers.MOBILE_DATABASE_DOWNLOAD to true,
+            Workers.RADIO_DATABASE_DOWNLOAD to true,
+            Workers.ENB_DATABASE_DOWNLOAD to true,
+            Workers.LOCAL_DB_BUILD to true,
             Workers.DATABASE_UPDATE_CHECK to true,
             Workers.APP_UPDATE_CHECK to true,
             Workers.OFFLINE_MAP_DOWNLOAD to true,
             Workers.SIGNALQUEST_UPLOAD to true,
-            Workers.WIDGET_UPDATE to true
+            Workers.WIDGET_UPDATE to true,
+            Workers.OUTAGE_GENERATION to true,
+            Workers.PHOTO_REPORT_CHECK to true,
+            Workers.TRIP_REMINDER to true
         ),
         platform = mapOf(
             Platform.WIDGETS to true,
@@ -575,6 +780,19 @@ object RemoteFeatureFlags {
     fun isScreenEnabled(screenId: String): Boolean = currentConfig.value.isScreenEnabled(screenId)
 
     fun isMenuEnabled(menuId: String): Boolean = currentConfig.value.isMenuEnabled(menuId)
+
+    fun isDatabaseDownloadAllowed(
+        target: DatabaseTarget,
+        remoteVersion: String? = null,
+        installedAppVersion: String? = null
+    ): Boolean = currentConfig.value.isDatabaseDownloadAllowed(target, remoteVersion, installedAppVersion)
+
+    fun isDatabaseUpdateCheckAllowed(
+        target: DatabaseTarget,
+        installedAppVersion: String? = null
+    ): Boolean = currentConfig.value.isDatabaseUpdateCheckAllowed(target, installedAppVersion)
+
+    fun isLocalDbBuildAllowed(): Boolean = currentConfig.value.isLocalDbBuildAllowed()
 
     fun isFeatureEnabled(featureId: String): Boolean = currentConfig.value.isFeatureEnabled(featureId)
 
@@ -644,6 +862,7 @@ object RemoteFeatureFlags {
                 cacheTtlSeconds = cacheTtlSeconds,
                 screens = mergeBooleanMap(defaultConfig.screens, root.booleanMap("screens")),
                 menus = mergeBooleanMap(defaultConfig.menus, root.booleanMap("menus")),
+                databasePolicy = root.databasePolicyOrDefault(),
                 features = mergeBooleanMap(defaultConfig.features, root.booleanMap("features")),
                 actions = mergeBooleanMap(defaultConfig.actions, root.booleanMap("actions")),
                 providers = mergeBooleanMap(defaultConfig.providers, root.booleanMap("providers")),
@@ -654,6 +873,29 @@ object RemoteFeatureFlags {
                 homeAnnouncement = root.homeAnnouncementOrDefault()
             )
         }.getOrNull()
+    }
+
+    private fun JsonObject.databasePolicyOrDefault(): DatabasePolicyConfig {
+        val obj = get("databasePolicy")?.asJsonObjectOrNull() ?: return defaultConfig.databasePolicy
+        return DatabasePolicyConfig(
+            mobile = obj.targetPolicyOrDefault("mobile", defaultConfig.databasePolicy.mobile),
+            radio = obj.targetPolicyOrDefault("radio", defaultConfig.databasePolicy.radio),
+            enb = obj.targetPolicyOrDefault("enb", defaultConfig.databasePolicy.enb),
+            outages = obj.targetPolicyOrDefault("outages", defaultConfig.databasePolicy.outages),
+            localBuildEnabled = obj.get("localBuild")?.asJsonObjectOrNull()
+                ?.booleanOrDefault("enabled", defaultConfig.databasePolicy.localBuildEnabled)
+                ?: defaultConfig.databasePolicy.localBuildEnabled
+        )
+    }
+
+    private fun JsonObject.targetPolicyOrDefault(key: String, defaultPolicy: DatabaseTargetPolicy): DatabaseTargetPolicy {
+        val obj = get(key)?.asJsonObjectOrNull() ?: return defaultPolicy
+        return DatabaseTargetPolicy(
+            download = obj.booleanOrDefault("download", defaultPolicy.download),
+            updateCheck = obj.booleanOrDefault("updateCheck", defaultPolicy.updateCheck),
+            maxAllowedVersion = obj.stringOrBlank("maxAllowedVersion", 64).ifBlank { defaultPolicy.maxAllowedVersion },
+            minAppVersion = obj.stringOrBlank("minAppVersion", 64).ifBlank { defaultPolicy.minAppVersion }
+        )
     }
 
     private fun prefs(context: Context): SharedPreferences {
@@ -706,6 +948,7 @@ object RemoteFeatureFlags {
             actionUrl = actionUrl,
             dismissible = obj.booleanOrDefault("dismissible", defaultConfig.homeAnnouncement.dismissible),
             minAppVersionInclusive = obj.stringOrBlank("minAppVersionInclusive", 64),
+            maxAppVersionInclusive = obj.stringOrBlank("maxAppVersionInclusive", 64),
             maxAppVersionExclusive = obj.stringOrBlank("maxAppVersionExclusive", 64),
             translations = obj.announcementTranslations("translations")
         )

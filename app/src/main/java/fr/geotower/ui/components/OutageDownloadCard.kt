@@ -152,6 +152,11 @@ fun OutageDownloadCard(
                 )
             }
 
+            OutageSourceSelector(
+                useOneUi = useOneUi,
+                modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(12.dp)),
+            )
+
             if (locallyGenerated) {
                 Text(
                     text = stringResource(R.string.outage_download_local_source_note),
@@ -209,8 +214,9 @@ private fun OutageServerCopySection(
     var errorText by remember { mutableStateOf<String?>(null) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var refreshTrigger by remember { mutableIntStateOf(0) }
+    val currentMode = AppConfig.outageSourceMode.value
 
-    LaunchedEffect(refreshTrigger, sectionRefreshKey, isDownloading) {
+    LaunchedEffect(refreshTrigger, sectionRefreshKey, isDownloading, currentMode) {
         summary = withContext(Dispatchers.IO) { readServerOutageSummary(context) }
         refreshState?.reportRefreshed(DatabaseRefreshIds.OUTAGES, sectionRefreshKey)
     }
@@ -399,7 +405,8 @@ private fun OutageServerCopySection(
 
     // Le relevé du serveur peut être plus vieux que la panne constatée : on lui demande alors
     // d'aller le refaire, dans la limite de ce qu'il accepte (deux générations par heure).
-    if (rebuildAvailable) {
+    // Pertinent uniquement pour la source directe opérateurs, la source journalière dépendant du fichier officiel Arcep.
+    if (rebuildAvailable && currentMode == fr.geotower.data.outages.OutageSourceMode.OPERATORS) {
         Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
         OutageServerRebuildControls(
             repository = repository,
@@ -479,15 +486,16 @@ private fun OutageInfoRow(
 /** Résumé lu des prefs (écrites au téléchargement) + taille réelle du fichier conservé. */
 private fun readServerOutageSummary(context: Context): ServerOutageSummary {
     val prefs = context.getSharedPreferences(OutageLocalConfig.PREFS_NAME, Context.MODE_PRIVATE)
+    val mode = AppConfig.outageSourceMode.value
     val cache = ServerOutageCache(context)
-    val count = OutageServerInfo.count(prefs)
+    val count = OutageServerInfo.count(prefs, mode)
     return ServerOutageSummary(
-        downloadedAtMillis = OutageServerInfo.downloadedAtMillis(prefs),
-        serverGeneratedAtMillis = OutageServerInfo.generatedAtMillis(prefs),
-        serverDate = OutageServerInfo.lastUpdate(prefs),
+        downloadedAtMillis = OutageServerInfo.downloadedAtMillis(prefs, mode),
+        serverGeneratedAtMillis = OutageServerInfo.generatedAtMillis(prefs, mode),
+        serverDate = OutageServerInfo.lastUpdate(prefs, mode),
         count = count,
-        breakdown = OutageServerInfo.breakdown(prefs),
-        techBreakdown = techBreakdownOrBackfill(prefs, cache, count),
+        breakdown = OutageServerInfo.breakdown(prefs, mode),
+        techBreakdown = techBreakdownOrBackfill(prefs, cache, count, mode),
         sizeBytes = cache.sizeBytes(),
     )
 }
@@ -501,10 +509,11 @@ private fun techBreakdownOrBackfill(
     prefs: SharedPreferences,
     cache: ServerOutageCache,
     count: Int,
+    mode: fr.geotower.data.outages.OutageSourceMode = AppConfig.outageSourceMode.value,
 ): List<OutageTechRow> {
-    val stored = OutageServerInfo.techBreakdown(prefs)
+    val stored = OutageServerInfo.techBreakdown(prefs, mode)
     if (stored.isNotEmpty() || count <= 0) return stored
     val rebuilt = cache.load()?.sites?.let(OutageTechBreakdown::of).orEmpty()
-    if (rebuilt.isNotEmpty()) OutageServerInfo.recordTechBreakdown(prefs, rebuilt)
+    if (rebuilt.isNotEmpty()) OutageServerInfo.recordTechBreakdown(prefs, rebuilt, mode)
     return rebuilt
 }

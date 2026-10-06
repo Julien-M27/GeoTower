@@ -3,6 +3,7 @@ package fr.geotower.data.api
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import fr.geotower.data.config.DatabaseTarget
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.db.DatabaseStorageCleanup
 import fr.geotower.data.db.AppDatabase
@@ -50,7 +51,7 @@ object DatabaseDownloader {
     }
 
     fun getDatabaseSize(): Double {
-        if (!RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.DATABASE_UPDATE_CHECK)) {
+        if (!RemoteFeatureFlags.isDatabaseUpdateCheckAllowed(DatabaseTarget.MOBILE)) {
             return 0.0
         }
         return try {
@@ -66,7 +67,7 @@ object DatabaseDownloader {
     }
 
     suspend fun getLatestDatabaseUpdateInfo(forceRefresh: Boolean = false): UpdateInfo? {
-        if (!RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.DATABASE_UPDATE_CHECK)) {
+        if (!RemoteFeatureFlags.isDatabaseUpdateCheckAllowed(DatabaseTarget.MOBILE)) {
             return null
         }
         return withContext(Dispatchers.IO) {
@@ -105,7 +106,7 @@ object DatabaseDownloader {
     ): Boolean = remote != null && !isInstalledDatabaseCurrent(context, remote, localVersion)
 
     suspend fun downloadUpdate(context: Context, onProgress: suspend (Int) -> Unit): Boolean {
-        if (!RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.DATABASE_DOWNLOAD)) {
+        if (!RemoteFeatureFlags.isDatabaseDownloadAllowed(DatabaseTarget.MOBILE)) {
             return false
         }
         // Crans « base en local » : la version distante est lisible, le fichier non — l'appareil
@@ -122,6 +123,10 @@ object DatabaseDownloader {
                 return@withContext false
             }
             val remoteInfo = served.value
+            if (!RemoteFeatureFlags.isDatabaseDownloadAllowed(DatabaseTarget.MOBILE, remoteInfo.version)) {
+                AppLogger.w(TAG, "Mobile database download skipped: blocked by policy (version ${remoteInfo.version})")
+                return@withContext false
+            }
             val expectedSizeBytes = remoteInfo.sizeBytes
             val expectedSha256 = remoteInfo.sha256
             val maxAllowedBytes = maxAllowedDatabaseDownloadBytes(expectedSizeBytes)

@@ -10,6 +10,7 @@ import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.db.GeoTowerDatabaseValidator
 import fr.geotower.data.models.RadioMapCategoryMasks
 import fr.geotower.data.outages.OutageLocalConfig
+import fr.geotower.data.outages.OutageSourceMode
 import fr.geotower.data.workers.OutageBackgroundScheduler
 
 object AppConfig {
@@ -83,6 +84,9 @@ object AppConfig {
     const val LOCAL_MODE_OUTAGES = 2
     const val LOCAL_MODE_BOTH = 3
     const val LOCAL_MODE_MAX = 4
+
+    const val PREF_OUTAGE_SOURCE_MODE = "outage_source_mode"
+    var outageSourceMode = mutableStateOf(OutageSourceMode.OPERATORS)
 
     // Mode simplifié : carte au lancement, tiroir latéral à la place de l'accueil, fiche
     // support et fiches opérateurs fusionnées. Un seul interrupteur pilote l'ensemble.
@@ -517,6 +521,20 @@ object AppConfig {
         level >= LOCAL_MODE_MAX && localBuildEligible
 
     /** Applique un niveau : persiste, recalcule l'éligibilité et réconcilie la planif des pannes. */
+    fun setOutageSourceMode(context: Context, mode: OutageSourceMode) {
+        outageSourceMode.value = mode
+        context.applicationContext
+            .getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
+            .edit()
+            .putString(PREF_OUTAGE_SOURCE_MODE, mode.key)
+            .apply()
+        context.applicationContext
+            .getSharedPreferences(PreferenceStores.ANFR_SETTINGS, Context.MODE_PRIVATE)
+            .edit()
+            .putString(PREF_OUTAGE_SOURCE_MODE, mode.key)
+            .apply()
+    }
+
     fun setLocalModeLevel(context: Context, level: Int) {
         val clamped = level.coerceIn(LOCAL_MODE_SERVER, LOCAL_MODE_MAX)
         localModeLevel.intValue = clamped
@@ -731,6 +749,9 @@ object AppConfig {
             prefs.getBoolean(PREF_LOW_POWER_FOLLOW_SYSTEM, DEFAULT_LOW_POWER_FOLLOW_SYSTEM)
 
         // Mode « traitement local » (crans LOCAL_MODE_*, échelle migrée au démarrage du process).
+        outageSourceMode.value = OutageSourceMode.fromKey(
+            prefs.getString(PREF_OUTAGE_SOURCE_MODE, OutageSourceMode.OPERATORS.key)
+        )
         localModeLevel.intValue = prefs.getInt(PREF_LOCAL_MODE_LEVEL, LOCAL_MODE_SERVER)
             .coerceIn(LOCAL_MODE_SERVER, LOCAL_MODE_MAX)
 

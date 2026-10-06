@@ -2852,15 +2852,28 @@ fun MapScreen(
     // Synchronisation si l'utilisateur change la carte dans les paramètres
     LaunchedEffect(AppConfig.mapProvider.intValue, featureFlags) {
         val requestedProvider = MapProviderRules.sanitize(AppConfig.mapProvider.intValue)
-        val nextProvider = if (isMapProviderEnabled(requestedProvider)) {
+        val offlineDir = java.io.File(context.getExternalFilesDir(null), "maps")
+        val availableFiles = offlineDir.listFiles { file -> file.extension == "map" && file.length() > 0L } ?: emptyArray()
+        mapFiles = availableFiles
+
+        val nextProvider = if (requestedProvider == 4 && availableFiles.isEmpty()) {
+            fallbackMapProvider()
+        } else if (isMapProviderEnabled(requestedProvider)) {
             requestedProvider
         } else {
             fallbackMapProvider()
         }
+        val providerChanged = effectiveProvider != nextProvider
         effectiveProvider = nextProvider
         if (nextProvider != requestedProvider) {
             AppConfig.mapProvider.value = nextProvider
             prefs.edit().putInt("map_provider", nextProvider).apply()
+        }
+        if (providerChanged) {
+            mapViewRef?.let { map ->
+                map.loadVisibleAntennas(viewModel)
+                map.invalidate()
+            }
         }
     }
 
@@ -5418,7 +5431,9 @@ fun MapScreen(
                                 mapFiles = emptyArray()
                                 effectiveProvider = 1
                                 AppConfig.mapProvider.value = 1
+                                prefs.edit().putInt("map_provider", 1).apply()
                                 if (map.tileProvider is MapsForgeTileProvider) {
+                                    runCatching { (map.tileProvider as? MapsForgeTileProvider)?.detach() }
                                     map.tileProvider = MapTileProviderBasic(context)
                                     shouldInvalidateMap = true
                                 }
@@ -5426,14 +5441,26 @@ fun MapScreen(
                                     map.setTileSource(MapUtils.OSM_Source)
                                     shouldInvalidateMap = true
                                 }
+                                map.loadVisibleAntennas(viewModel)
                             }
                         }
                     } else {
+                        effectiveProvider = 1
                         AppConfig.mapProvider.value = 1
+                        prefs.edit().putInt("map_provider", 1).apply()
+                        if (map.tileProvider is MapsForgeTileProvider) {
+                            runCatching { (map.tileProvider as? MapsForgeTileProvider)?.detach() }
+                            map.tileProvider = MapTileProviderBasic(context)
+                            val newSource = if (ignStyle == 2) MapUtils.EsriSource.SATELLITE else MapUtils.OSM_Source
+                            map.setTileSource(newSource)
+                            shouldInvalidateMap = true
+                        }
+                        map.loadVisibleAntennas(viewModel)
                     }
                 } else {
                     // 🌐 LOGIQUE EN LIGNE
                     if (map.tileProvider is MapsForgeTileProvider) {
+                        runCatching { (map.tileProvider as? MapsForgeTileProvider)?.detach() }
                         map.tileProvider = MapTileProviderBasic(context)
                         shouldInvalidateMap = true
                     }
@@ -7637,8 +7664,15 @@ fun MapScreen(
             // 🚀 NOUVEAU : On vérifie si au moins une carte est téléchargée
             val hasOfflineMaps = remember(showLayerSheet) {
                 val offlineDir = java.io.File(context.getExternalFilesDir(null), "maps")
-                val mapFiles = offlineDir.listFiles { file -> file.extension == "map" }
-                !mapFiles.isNullOrEmpty()
+                val files = offlineDir.listFiles { file -> file.extension == "map" && file.length() > 0L }
+                !files.isNullOrEmpty()
+            }
+
+            LaunchedEffect(showLayerSheet) {
+                if (showLayerSheet) {
+                    val offlineDir = java.io.File(context.getExternalFilesDir(null), "maps")
+                    mapFiles = offlineDir.listFiles { file -> file.extension == "map" && file.length() > 0L } ?: emptyArray()
+                }
             }
 
             val txtOfflineMessage = stringResource(R.string.appstrings_offline_message)
@@ -7661,19 +7695,28 @@ fun MapScreen(
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp))) {
                                 if (isMapProviderEnabled(1)) {
                                     MapLayerButton(txtMapOsmLayer, mapProvider == 1, Modifier.weight(1f)) {
-                                        AppConfig.mapProvider.value = 1; prefs.edit().putInt("map_provider", 1).apply()
+                                        AppConfig.mapProvider.value = 1
+                                        prefs.edit().putInt("map_provider", 1).apply()
+                                        effectiveProvider = 1
+                                        mapViewRef?.loadVisibleAntennas(viewModel)
                                     }
                                 }
                                 if (isMapProviderEnabled(0)) {
                                     MapLayerButton(txtMapIgnLayer, mapProvider == 0, Modifier.weight(1f)) {
-                                        AppConfig.mapProvider.value = 0; prefs.edit().putInt("map_provider", 0).apply()
+                                        AppConfig.mapProvider.value = 0
+                                        prefs.edit().putInt("map_provider", 0).apply()
+                                        effectiveProvider = 0
+                                        mapViewRef?.loadVisibleAntennas(viewModel)
                                     }
                                 }
                             }
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp))) {
                                 if (isMapProviderEnabled(3)) {
                                     MapLayerButton(txtMapTopo, mapProvider == 3, Modifier.weight(1f)) {
-                                        AppConfig.mapProvider.value = 3; prefs.edit().putInt("map_provider", 3).apply()
+                                        AppConfig.mapProvider.value = 3
+                                        prefs.edit().putInt("map_provider", 3).apply()
+                                        effectiveProvider = 3
+                                        mapViewRef?.loadVisibleAntennas(viewModel)
                                     }
                                 }
                             }
@@ -7693,6 +7736,8 @@ fun MapScreen(
                             MapLayerButton(txtMapOfflineLayer, mapProvider == 4, Modifier.fillMaxWidth()) {
                                 AppConfig.mapProvider.value = 4
                                 prefs.edit().putInt("map_provider", 4).apply()
+                                effectiveProvider = 4
+                                mapViewRef?.loadVisibleAntennas(viewModel)
                             }
                         } else if (!isOnline) {
                             // Optionnel : un petit message pour dire qu'aucune carte n'est dispo si on est hors ligne

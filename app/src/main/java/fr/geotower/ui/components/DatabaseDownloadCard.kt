@@ -86,9 +86,7 @@ fun DatabaseDownloadCard(
     val txtLatestDb = stringResource(R.string.database_latest_available)
     val txtDownloadedDb = stringResource(R.string.database_currently_downloaded)
     val canStartDatabaseDownload =
-        featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.DATABASE_DOWNLOAD) &&
-            featureFlags.isActionEnabled(RemoteFeatureFlags.Actions.START_DATABASE_DOWNLOAD) &&
-            featureFlags.isWorkerEnabled(RemoteFeatureFlags.Workers.DATABASE_DOWNLOAD)
+        featureFlags.isDatabaseDownloadAllowed(RemoteFeatureFlags.DatabaseTarget.MOBILE)
 
     var dbSizeMb by remember { mutableDoubleStateOf(-1.0) }
     var localDbVersion by remember { mutableStateOf(txtSearching) }
@@ -455,6 +453,7 @@ fun DatabaseDownloadCard(
                 // plus bas dans DatabaseDownloader.
                 val canDownloadRemoteDatabase = remoteDbUpdateInfo != null &&
                     canStartDatabaseDownload &&
+                    featureFlags.isDatabaseDownloadAllowed(RemoteFeatureFlags.DatabaseTarget.MOBILE, remoteDbUpdateInfo?.version) &&
                     !AppConfig.dbForcedLocal()
                 // Une base générée sur l'appareil n'est jamais « à jour » vis-à-vis de l'en ligne : on
                 // propose toujours de la remplacer par celle du serveur (sinon sa version récente la ferait
@@ -547,10 +546,7 @@ fun DatabaseDownloadCard(
                 Button(
                     onClick = {
                         safeClick("database_start_download") {
-                            if (RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.DATABASE_DOWNLOAD) &&
-                                RemoteFeatureFlags.isActionEnabled(RemoteFeatureFlags.Actions.START_DATABASE_DOWNLOAD) &&
-                                RemoteFeatureFlags.isWorkerEnabled(RemoteFeatureFlags.Workers.DATABASE_DOWNLOAD)
-                            ) {
+                            if (RemoteFeatureFlags.isDatabaseDownloadAllowed(RemoteFeatureFlags.DatabaseTarget.MOBILE, remoteDbUpdateInfo?.version)) {
                                 OperationPauseStore.clear(context, OperationPauseStore.MOBILE_DB_DOWNLOAD)
                                 pauseStateVersion++
                                 DatabaseDownloadWorker.enqueue(workManager)

@@ -27,6 +27,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
@@ -281,19 +283,33 @@ fun OperatorDetailItem(
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(sizing.spacing(16.dp))
     }
 
+    val mutedColorFilter = remember(isMuted) {
+        if (isMuted) ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) }) else null
+    }
+
     Column(modifier = modifier.alpha(if (isMuted) 0.42f else 1f)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             val opName = antenna.operateur ?: stringResource(R.string.appstrings_unknown)
             val logoRes = getLocalLogoRes(opName)
 
             if (logoRes != null) {
-                Image(painter = painterResource(id = logoRes), contentDescription = null, modifier = Modifier.size(sizing.component(60.dp)).clip(RoundedCornerShape(8.dp)))
+                Image(
+                    painter = painterResource(id = logoRes),
+                    contentDescription = null,
+                    colorFilter = mutedColorFilter,
+                    modifier = Modifier.size(sizing.component(60.dp)).clip(RoundedCornerShape(8.dp))
+                )
             } else {
                 Box(modifier = Modifier.size(sizing.component(60.dp)).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)))
             }
             Spacer(modifier = Modifier.width(sizing.spacing(16.dp)))
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = opName, fontWeight = FontWeight.Bold, fontSize = sizing.text(18.sp), color = MaterialTheme.colorScheme.onSurface)
+                Text(
+                    text = opName,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = sizing.text(18.sp),
+                    color = if (isMuted) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface
+                )
 
                 // ✅ LECTURE DES FILTRES SPÉCIFIQUES AU DÉTAIL DU SITE
                 val s2G = AppConfig.siteShowTechno2G.value && (AppConfig.siteF2G_900.value || AppConfig.siteF2G_1800.value)
@@ -306,7 +322,12 @@ fun OperatorDetailItem(
                 val rawTechs = technique?.technologies?.takeIf { it.isNotBlank() } ?: antenna.frequences
                 // ✅ On envoie les filtres au formateur
                 val realTechs = formatSiteTechnologies(rawTechs, stringResource(R.string.appstrings_unknown), s2G, s3G, s4G, s5G, sFh)
-                Text(text = realTechs, fontSize = sizing.text(16.sp), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    text = realTechs,
+                    fontSize = sizing.text(16.sp),
+                    fontWeight = FontWeight.Bold,
+                    color = if (isMuted) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurfaceVariant
+                )
 
             } // <-- Fin de la Column(weight = 1f)
 
@@ -317,7 +338,12 @@ fun OperatorDetailItem(
                 isExpanded -> Icons.Default.ExpandLess
                 else -> Icons.Default.ExpandMore
             }
-            Icon(trailingIcon, null, modifier = Modifier.size(sizing.component(28.dp)), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Icon(
+                trailingIcon,
+                null,
+                modifier = Modifier.size(sizing.component(28.dp)),
+                tint = if (isMuted) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurfaceVariant
+            )
         } // <-- Fin de la Row contenant le logo, le titre et la flèche
 
         // 🚨 NOUVEAU PLACEMENT : Sous le logo complet, et au-dessus des dates (Implémentation)

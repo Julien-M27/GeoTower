@@ -30,6 +30,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -41,6 +42,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
 import fr.geotower.R
 import fr.geotower.data.models.RadioMapMarker
+import fr.geotower.utils.AppConfig
 
 @Composable
 fun SupportRadioPresenceCard(
@@ -96,13 +98,18 @@ fun SupportRadioPresenceCard(
             )
 
             Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp))) {
+                val categoryMask = AppConfig.radioMapCategoryMask()
+                val isCategoryFiltered = categoryMask != fr.geotower.data.models.RadioMapCategoryMasks.ALL
                 radioMarkers.forEach { marker ->
                     val key = markerKey(marker)
                     val isExpanded = expandable && key in expandedKeys
+                    val kinds = radioUsageKindsFor(marker.serviceMask, marker.systemMask)
+                    val isMuted = isCategoryFiltered && kinds.none { (categoryMask and radioCategoryMaskForKind(it)) != 0 }
                     SupportRadioItem(
                         marker = marker,
                         expandable = expandable,
                         isExpanded = isExpanded,
+                        isMuted = isMuted,
                         onClick = {
                             if (expandable) {
                                 expandedKeys = if (isExpanded) expandedKeys - key else expandedKeys + key
@@ -127,6 +134,7 @@ private fun SupportRadioItem(
     marker: RadioMapMarker,
     expandable: Boolean = false,
     isExpanded: Boolean = false,
+    isMuted: Boolean = false,
     onClick: () -> Unit
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
@@ -136,7 +144,8 @@ private fun SupportRadioItem(
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
-            .padding(vertical = sizing.spacing(6.dp)),
+            .padding(vertical = sizing.spacing(6.dp))
+            .alpha(if (isMuted) 0.42f else 1f),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
@@ -159,14 +168,14 @@ private fun SupportRadioItem(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = if (isMuted) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface,
                 fontSize = sizing.text(16.sp)
             )
             Text(
                 text = marker.broadcastProgramSummary ?: marker.systemSummary ?: marker.subtitle(context),
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (isMuted) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = sizing.text(13.sp),
                 fontWeight = FontWeight.SemiBold
             )
@@ -179,7 +188,7 @@ private fun SupportRadioItem(
                 else -> Icons.Default.ExpandMore
             },
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            tint = if (isMuted) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(sizing.component(26.dp))
         )
     }
