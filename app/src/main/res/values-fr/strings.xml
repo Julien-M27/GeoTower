@@ -425,8 +425,8 @@
     <string name="widget_updated_at">Mis à jour à %1$s</string>
     <string name="widget_waiting_gps">En attente du GPS...</string>
     <string name="widget_immediate_search">Recherche immédiate...</string>
-    <string name="widget_bg_location_warning">Localisation arrière-plan requise</string>
-    <string name="widget_bg_location_desc">Touchez ici, allez dans Autorisations &gt; Localisation, puis choisissez "Toujours autoriser".</string>
+    <string name="widget_bg_location_warning">Localisation requise</string>
+    <string name="widget_bg_location_desc">Touchez pour en savoir plus et configurer l\'accès dans l\'application.</string>
     <string name="live_tracking_title">À proximité</string>
     <string name="live_tracking_channel_name">Suivi d\'antennes en direct</string>
     <string name="live_tracking_searching">Recherche en cours...</string>
@@ -2866,9 +2866,11 @@
     <!-- Divulgation « bien visible » exigee par Google Play avant toute demande de localisation
          en arriere-plan : doit nommer la donnee, dire qu'elle est collectee application fermee,
          expliquer l'usage, et n'etre validee que par une action explicite de l'utilisateur. -->
-    <string name="bg_location_disclosure_title">Localisation en arrière-plan</string>
-    <string name="bg_location_disclosure_body">Pour afficher l\'antenne la plus proche et se mettre à jour tout seul, le widget GeoTower a besoin d\'accéder à votre position en arrière-plan, y compris lorsque l\'application est fermée.\n\nCette position est utilisée uniquement sur votre appareil, pour calculer le site le plus proche. Elle n\'est ni enregistrée, ni transmise à un tiers.\n\nVous pourrez révoquer cette autorisation à tout moment : seul le widget cessera de s\'actualiser.</string>
+    <string name="bg_location_disclosure_title">Utilisation des données de localisation en arrière-plan</string>
+    <string name="bg_location_disclosure_body">GeoTower collecte vos données de localisation pour identifier les cellules radio et antennes à proximité et actualiser automatiquement le widget sur votre écran d\'accueil, même lorsque l\'application est fermée ou n\'est pas en cours d\'utilisation.\n\nCes données sont traitées exclusivement sur votre appareil pour calculer le site mobile à proximité. Elles ne sont ni conservées, ni transmises à des tiers.</string>
     <string name="bg_location_disclosure_option">Dans l\'écran suivant, choisissez « %1$s ».</string>
+    <string name="bg_location_disclosure_accept">Accepter</string>
+    <string name="bg_location_disclosure_deny">Refuser</string>
 
     <!-- Notes de version 2.0 -->
     <string name="appstrings_release_section_diagnostic">Diagnostic</string>
@@ -3318,4 +3320,5 @@
     <string name="map_clustering_strength_desc">Une valeur basse regroupe moins d’antennes et affiche des marqueurs plus petits et simplifiés.</string>
     <string name="map_clustering_strength_low">Faible</string>
     <string name="map_clustering_strength_high">Forte</string>
+    <string name="appstrings_release_v2067_widget_disclosure">Clarté de la localisation en arrière-plan pour les widgets et écran d\'information conforme</string>
 </resources>

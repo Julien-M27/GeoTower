@@ -23,6 +23,7 @@ internal object SettingsSectionIds {
     fun forDeepLink(section: String?): Int? = when (section) {
         "offline_maps" -> MAPPING
         "database", "db_mobile", "db_radio", "db_enb", "db_outages", "db_local_build" -> DATA
+        "background_disclosure" -> SYSTEM
         else -> null
     }
 }

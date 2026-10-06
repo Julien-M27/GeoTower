@@ -23,6 +23,7 @@ class SettingsSectionRoutingTest {
         assertEquals(SettingsSectionIds.DATA, SettingsSectionIds.forDeepLink("db_mobile"))
         assertEquals(SettingsSectionIds.DATA, SettingsSectionIds.forDeepLink("db_local_build"))
         assertEquals(SettingsSectionIds.MAPPING, SettingsSectionIds.forDeepLink("offline_maps"))
+        assertEquals(SettingsSectionIds.SYSTEM, SettingsSectionIds.forDeepLink("background_disclosure"))
         assertNull(SettingsSectionIds.forDeepLink("unknown"))
     }
 }

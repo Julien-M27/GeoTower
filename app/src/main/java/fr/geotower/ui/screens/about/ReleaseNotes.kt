@@ -31,12 +31,8 @@ internal data class ReleaseNoteItem(
  */
 @Composable
 internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
-    section(stringResource(R.string.appstrings_release_section_outages)) {
-        item(stringResource(R.string.appstrings_release_v2066_summary_outage_sources))
-    }
-    section(stringResource(R.string.appstrings_release_section_map)) {
-        item(stringResource(R.string.appstrings_release_v2066_summary_filter_effects))
-        item(stringResource(R.string.appstrings_release_v2066_summary_nearby_and_maps))
+    section(stringResource(R.string.appstrings_release_section_widgets)) {
+        item(stringResource(R.string.appstrings_release_v2067_widget_disclosure))
     }
 }
 

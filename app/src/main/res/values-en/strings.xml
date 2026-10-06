@@ -397,8 +397,8 @@
     <string name="widget_updated_at">Updated at %1$s</string>
     <string name="widget_waiting_gps">Waiting for GPS...</string>
     <string name="widget_immediate_search">Searching...</string>
-    <string name="widget_bg_location_warning">Background location required</string>
-    <string name="widget_bg_location_desc">Tap here, go to Permissions &gt; Location, then select "Allow all the time".</string>
+    <string name="widget_bg_location_warning">Location access required</string>
+    <string name="widget_bg_location_desc">Tap to learn more and configure access in the app.</string>
     <string name="live_tracking_title">Nearby</string>
     <string name="live_tracking_channel_name">Live antenna tracking</string>
     <string name="live_tracking_searching">Searching...</string>
@@ -2806,9 +2806,11 @@
     <string name="appstrings_release_v1966_operators_actions">Operator list: buttons to expand all, collapse all and share every operator as a PDF</string>
 
     <!-- Prominent disclosure required by Google Play before any background location request. -->
-    <string name="bg_location_disclosure_title">Background location</string>
-    <string name="bg_location_disclosure_body">To show the nearest antenna and refresh on its own, the GeoTower widget needs to access your location in the background, including when the application is closed.\n\nThis location is used only on your device, to work out the nearest site. It is never stored, nor shared with anyone.\n\nYou can revoke this permission at any time: only the widget will stop refreshing.</string>
+    <string name="bg_location_disclosure_title">Background location data usage</string>
+    <string name="bg_location_disclosure_body">GeoTower collects location data to identify nearby cell towers and automatically update the home screen widget, even when the app is closed or not in use.\n\nThis data is processed exclusively on your device to determine nearby sites. It is never stored and never shared with third parties.</string>
     <string name="bg_location_disclosure_option">On the next screen, choose “%1$s”.</string>
+    <string name="bg_location_disclosure_accept">Accept</string>
+    <string name="bg_location_disclosure_deny">Deny</string>
 
     <!-- Release notes 2.0 -->
     <string name="appstrings_release_section_diagnostic">Diagnostics</string>
@@ -3316,4 +3318,5 @@
     <string name="map_clustering_strength_desc">Lower values group fewer antennas and show smaller, simpler markers.</string>
     <string name="map_clustering_strength_low">Low</string>
     <string name="map_clustering_strength_high">High</string>
+    <string name="appstrings_release_v2067_widget_disclosure">Clearer background location explanation for widgets and prominent disclosure screen</string>
 </resources>

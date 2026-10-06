@@ -397,8 +397,8 @@
     <string name="widget_updated_at">Aktualisiert um %1$s</string>
     <string name="widget_waiting_gps">Warten auf GPS...</string>
     <string name="widget_immediate_search">Sofortige Suche...</string>
-    <string name="widget_bg_location_warning">Hintergrundstandort erforderlich</string>
-    <string name="widget_bg_location_desc">Tippe hier, gehe zu Berechtigungen &gt; Standort und wähle dann "Immer zulassen".</string>
+    <string name="widget_bg_location_warning">Standortzugriff erforderlich</string>
+    <string name="widget_bg_location_desc">Tippe hier, um mehr zu erfahren und den Zugriff in der App einzurichten.</string>
     <string name="live_tracking_title">In der Nähe</string>
     <string name="live_tracking_channel_name">Live-Antennenverfolgung</string>
     <string name="live_tracking_searching">Suche läuft...</string>
@@ -2806,9 +2806,11 @@
     <string name="appstrings_release_v1966_operators_actions">Betreiberliste: Schaltflächen zum vollständigen Auf- und Zuklappen sowie zum Teilen aller Betreiber als PDF</string>
 
     <!-- Von Google Play geforderter deutlicher Hinweis vor jeder Standortabfrage im Hintergrund. -->
-    <string name="bg_location_disclosure_title">Standort im Hintergrund</string>
-    <string name="bg_location_disclosure_body">Damit das GeoTower-Widget die nächstgelegene Antenne anzeigen und sich selbst aktualisieren kann, benötigt es Zugriff auf deinen Standort im Hintergrund – auch wenn die Anwendung geschlossen ist.\n\nDieser Standort wird ausschließlich auf deinem Gerät verwendet, um die nächstgelegene Station zu berechnen. Er wird weder gespeichert noch an Dritte weitergegeben.\n\nDu kannst diese Berechtigung jederzeit widerrufen: Dann aktualisiert sich lediglich das Widget nicht mehr.</string>
+    <string name="bg_location_disclosure_title">Verwendung von Standortdaten im Hintergrund</string>
+    <string name="bg_location_disclosure_body">GeoTower erfasst Standortdaten, um Funkzellen und Antennen in der Nähe zu erkennen und das Widget auf deinem Startbildschirm automatisch zu aktualisieren, selbst wenn die App geschlossen ist oder nicht verwendet wird.\n\nDiese Daten werden ausschließlich auf deinem Gerät verarbeitet, um den nächstgelegenen Standort zu ermitteln. Sie werden weder gespeichert noch an Dritte weitergegeben.</string>
     <string name="bg_location_disclosure_option">Wähle im nächsten Bildschirm „%1$s“.</string>
+    <string name="bg_location_disclosure_accept">Akzeptieren</string>
+    <string name="bg_location_disclosure_deny">Ablehnen</string>
 
     <!-- Versionshinweise 2.0 -->
     <string name="appstrings_release_section_diagnostic">Diagnose</string>
@@ -3316,4 +3318,5 @@
     <string name="map_clustering_strength_desc">Niedrigere Werte gruppieren weniger Antennen und zeigen kleinere, einfachere Markierungen.</string>
     <string name="map_clustering_strength_low">Niedrig</string>
     <string name="map_clustering_strength_high">Hoch</string>
+    <string name="appstrings_release_v2067_widget_disclosure">Klarere Erklärung der Hintergrundortung für Widgets und konformer Informationsbildschirm</string>
 </resources>

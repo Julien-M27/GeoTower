@@ -397,8 +397,8 @@
     <string name="widget_updated_at">Atualizado às %1$s</string>
     <string name="widget_waiting_gps">À espera do GPS...</string>
     <string name="widget_immediate_search">Pesquisa imediata...</string>
-    <string name="widget_bg_location_warning">Localização em segundo plano necessária</string>
-    <string name="widget_bg_location_desc">Toque aqui, vá em Permissões &gt; Localização e selecione "Permitir o tempo todo".</string>
+    <string name="widget_bg_location_warning">Localização necessária</string>
+    <string name="widget_bg_location_desc">Toque para saber mais e configurar o acesso na aplicação.</string>
     <string name="live_tracking_title">Nas proximidades</string>
     <string name="live_tracking_channel_name">Rastreamento de antenas ao vivo</string>
     <string name="live_tracking_searching">A pesquisar...</string>
@@ -2806,9 +2806,11 @@
     <string name="appstrings_release_v1966_operators_actions">Lista de operadoras: botões para expandir tudo, recolher tudo e partilhar todas as operadoras em PDF</string>
 
     <!-- Divulgacao em destaque exigida pelo Google Play antes de qualquer pedido de localizacao em segundo plano. -->
-    <string name="bg_location_disclosure_title">Localização em segundo plano</string>
-    <string name="bg_location_disclosure_body">Para mostrar a antena mais próxima e atualizar-se sozinho, o widget GeoTower precisa de aceder à sua localização em segundo plano, incluindo quando a aplicação está fechada.\n\nEsta localização é usada apenas no seu dispositivo, para calcular o site mais próximo. Não é armazenada nem partilhada com terceiros.\n\nPode revogar esta autorização a qualquer momento: apenas o widget deixará de se atualizar.</string>
+    <string name="bg_location_disclosure_title">Utilização de dados de localização em segundo plano</string>
+    <string name="bg_location_disclosure_body">O GeoTower recolhe dados de localização para identificar células e antenas próximas e atualizar automaticamente o widget no ecrã inicial, mesmo quando a aplicação está fechada ou não está em uso.\n\nEstes dados são processados exclusivamente no seu dispositivo para calcular o local mais próximo. Não são armazenados nem partilhados com terceiros.</string>
     <string name="bg_location_disclosure_option">No ecrã seguinte, escolha «%1$s».</string>
+    <string name="bg_location_disclosure_accept">Aceitar</string>
+    <string name="bg_location_disclosure_deny">Recusar</string>
 
     <!-- Notas da versão 2.0 -->
     <string name="appstrings_release_section_diagnostic">Diagnóstico</string>
@@ -3316,4 +3318,5 @@
     <string name="map_clustering_strength_desc">Valores mais baixos agrupam menos antenas e mostram marcadores mais pequenos e simples.</string>
     <string name="map_clustering_strength_low">Baixa</string>
     <string name="map_clustering_strength_high">Alta</string>
+    <string name="appstrings_release_v2067_widget_disclosure">Maior clareza sobre a localização em segundo plano para widgets e ecrã informativo</string>
 </resources>

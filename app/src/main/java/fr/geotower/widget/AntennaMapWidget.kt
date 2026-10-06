@@ -139,6 +139,7 @@ class AntennaMapWidget : GlanceAppWidget() {
 
                     if (!hasBackgroundLocation) {
                         PermissionCard(
+                            context = context,
                             title = context.getString(R.string.widget_bg_location_warning),
                             description = context.getString(R.string.widget_bg_location_desc),
                             showDescription = !isShortWidget,
@@ -203,19 +204,25 @@ private fun HeaderRow(title: String, updatedAt: String, showUpdatedAt: Boolean) 
 
 @Composable
 private fun PermissionCard(
+    context: Context,
     title: String,
     description: String,
     showDescription: Boolean,
     useOneUi: Boolean,
     cardBgColor: GlanceColorProvider
 ) {
+    val disclosureIntent = Intent(context, MainActivity::class.java).apply {
+        action = "ACTION_SHOW_BG_LOCATION_DISCLOSURE"
+        putExtra("widget_dest", "bg_location_disclosure")
+        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+    }
     Column(
         modifier = GlanceModifier
             .fillMaxWidth()
             .background(cardBgColor)
             .cornerRadius(if (useOneUi) 24.dp else 12.dp)
             .padding(10.dp)
-            .clickable(actionRunCallback<CheckPermissionAndRefreshAction>()),
+            .clickable(actionStartActivity(disclosureIntent)),
         verticalAlignment = Alignment.CenterVertically,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {

@@ -367,6 +367,8 @@ class MainActivity : ComponentActivity() {
             navigateToSiteFlow.tryEmit("map")
         } else if (widgetDest == "nearby") {
             navigateToSiteFlow.tryEmit("emitters")
+        } else if (widgetDest == "bg_location_disclosure" || intent.action == "ACTION_SHOW_BG_LOCATION_DISCLOSURE") {
+            navigateToSiteFlow.tryEmit("settings?section=background_disclosure")
         }
     }
 
@@ -527,6 +529,8 @@ class MainActivity : ComponentActivity() {
             "support_detail/$widgetSiteId" // Ouvre la page SupportDetailScreen du pylône sélectionné
         } else if (widgetDest == "map") {
             "map"
+        } else if (widgetDest == "bg_location_disclosure" || intent.action == "ACTION_SHOW_BG_LOCATION_DISCLOSURE") {
+            "settings?section=background_disclosure"
         } else if (assistantFeature != null) {
             "map" // 🗺️ Téléportation directe sur la carte si demandé par la voix !
         } else {

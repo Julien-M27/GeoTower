@@ -1616,7 +1616,8 @@ fun SettingsScreen(
                                     onHiddenSites = { navController.navigate("hidden_sites") },
                                     onLocalMode = { navController.navigate("local_mode") },
                                     databaseCardModifiers = databaseCardAnchorModifiers,
-                                    databaseRefreshState = databaseRefreshState
+                                    databaseRefreshState = databaseRefreshState,
+                                    initialOpenDisclosure = initialSection == "background_disclosure"
                                 )
                                 run {
                                     // Passage à l'accueil par sections : pendant du bouton de la
@@ -1724,7 +1725,8 @@ fun SettingsScreen(
                                         bubbleColor = bubbleBaseColor,
                                         useOneUi = useOneUi,
                                         safeClick = safeClick,
-                                        onOpenDiagnostic = { navController.navigate("diagnostic") }
+                                        onOpenDiagnostic = { navController.navigate("diagnostic") },
+                                        initialOpenDisclosure = initialSection == "background_disclosure"
                                     )
                                     SECTION_DATABASE -> SectionDatabase(
                                         cardShape,
@@ -2784,7 +2786,8 @@ fun AllSettingsContent(
     onHiddenSites: () -> Unit = {},
     onLocalMode: () -> Unit = {},
     databaseCardModifiers: Map<String, Modifier> = emptyMap(),
-    databaseRefreshState: DatabaseRefreshState? = null
+    databaseRefreshState: DatabaseRefreshState? = null,
+    initialOpenDisclosure: Boolean = false
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
     Column(modifier = appearanceSectionModifier.fillMaxWidth()) {
@@ -2819,7 +2822,10 @@ fun AllSettingsContent(
     }
     Spacer(Modifier.height(sizing.spacing(32.dp)))
     Column(modifier = systemSectionModifier.fillMaxWidth()) {
-        SectionSysteme(ctx, shape, border, bubbleColor, useOneUi, safeClick, onOpenDiagnostic)
+        SectionSysteme(
+            ctx, shape, border, bubbleColor, useOneUi, safeClick, onOpenDiagnostic,
+            initialOpenDisclosure = initialOpenDisclosure
+        )
     }
     Spacer(Modifier.height(sizing.spacing(32.dp)))
     SectionDatabase(
@@ -3557,7 +3563,8 @@ fun SectionSysteme(
     bubbleColor: Color,
     useOneUi: Boolean,
     safeClick: SafeClick,
-    onOpenDiagnostic: () -> Unit = {}
+    onOpenDiagnostic: () -> Unit = {},
+    initialOpenDisclosure: Boolean = false
 ) {
     SectionTitle(stringResource(R.string.settings_section_system));
     val sizing = LocalGeoTowerUiStyle.current.sizing
@@ -3600,7 +3607,7 @@ fun SectionSysteme(
         // Divulgation « bien visible » exigée par Google Play : elle doit précéder TOUTE demande de
         // localisation en arrière-plan, et n'être franchie que par une action explicite. La carte
         // ne déclenche donc plus la demande directement, elle ouvre ce dialogue.
-        var showBgDisclosure by remember { mutableStateOf(false) }
+        var showBgDisclosure by remember { mutableStateOf(initialOpenDisclosure) }
 
         fun requestBackgroundLocation() {
             // Trouver la VRAIE activité (on déballe le contexte de Compose pour réparer
@@ -3663,6 +3670,7 @@ fun SectionSysteme(
         if (showBgDisclosure) {
             AlertDialog(
                 onDismissRequest = { showBgDisclosure = false },
+                properties = androidx.compose.ui.window.DialogProperties(dismissOnClickOutside = false),
                 icon = { Icon(Icons.Default.Place, contentDescription = null) },
                 title = { Text(stringResource(R.string.bg_location_disclosure_title)) },
                 text = {
@@ -3685,11 +3693,11 @@ fun SectionSysteme(
                     TextButton(onClick = {
                         showBgDisclosure = false
                         requestBackgroundLocation()
-                    }) { Text(stringResource(R.string.common_continue)) }
+                    }) { Text(stringResource(R.string.bg_location_disclosure_accept)) }
                 },
                 dismissButton = {
                     TextButton(onClick = { showBgDisclosure = false }) {
-                        Text(stringResource(R.string.common_cancel))
+                        Text(stringResource(R.string.bg_location_disclosure_deny))
                     }
                 }
             )

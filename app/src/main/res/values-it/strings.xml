@@ -397,8 +397,8 @@
     <string name="widget_updated_at">Aggiornato alle %1$s</string>
     <string name="widget_waiting_gps">In attesa del GPS...</string>
     <string name="widget_immediate_search">Ricerca immediata...</string>
-    <string name="widget_bg_location_warning">Localizzazione in background richiesta</string>
-    <string name="widget_bg_location_desc">Tocca qui, vai in Autorizzazioni &gt; Posizione, poi seleziona "Consenti sempre".</string>
+    <string name="widget_bg_location_warning">Posizione richiesta</string>
+    <string name="widget_bg_location_desc">Tocca per saperne di più e configurare l\'accesso nell\'applicazione.</string>
     <string name="live_tracking_title">Nelle vicinanze</string>
     <string name="live_tracking_channel_name">Tracciamento antenne live</string>
     <string name="live_tracking_searching">Ricerca in corso...</string>
@@ -2806,9 +2806,11 @@
     <string name="appstrings_release_v1966_operators_actions">Elenco degli operatori: pulsanti per espandere tutto, comprimere tutto e condividere tutti gli operatori in PDF</string>
 
     <!-- Informativa in evidenza richiesta da Google Play prima di qualsiasi richiesta di posizione in background. -->
-    <string name="bg_location_disclosure_title">Posizione in background</string>
-    <string name="bg_location_disclosure_body">Per mostrare l\'antenna più vicina e aggiornarsi da solo, il widget GeoTower deve accedere alla tua posizione in background, anche quando l\'applicazione è chiusa.\n\nQuesta posizione viene usata solo sul tuo dispositivo, per calcolare il sito più vicino. Non viene né memorizzata né condivisa con terzi.\n\nPuoi revocare questa autorizzazione in qualsiasi momento: solo il widget smetterà di aggiornarsi.</string>
+    <string name="bg_location_disclosure_title">Uso dei dati di localizzazione in background</string>
+    <string name="bg_location_disclosure_body">GeoTower raccoglie i dati sulla posizione per identificare le celle e le antenne nelle vicinanze e aggiornare automaticamente il widget sulla schermata iniziale, anche quando l\'app è chiusa o non in uso.\n\nQuesti dati vengono elaborati esclusivamente sul tuo dispositivo per calcolare il sito più vicino. Non vengono memorizzati né condivisi con terzi.</string>
     <string name="bg_location_disclosure_option">Nella schermata successiva, scegli «%1$s».</string>
+    <string name="bg_location_disclosure_accept">Accetta</string>
+    <string name="bg_location_disclosure_deny">Rifiuta</string>
 
     <!-- Note di versione 2.0 -->
     <string name="appstrings_release_section_diagnostic">Diagnostica</string>
@@ -3316,4 +3318,5 @@
     <string name="map_clustering_strength_desc">I valori più bassi raggruppano meno antenne e mostrano indicatori più piccoli e semplici.</string>
     <string name="map_clustering_strength_low">Bassa</string>
     <string name="map_clustering_strength_high">Alta</string>
+    <string name="appstrings_release_v2067_widget_disclosure">Maggiore chiarezza sulla posizione in background per i widget e schermata informativa</string>
 </resources>

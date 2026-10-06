@@ -203,7 +203,11 @@ class AntennaWidget : GlanceAppWidget() {
                                 .background(cardBgColor)
                                 .cornerRadius(if (useOneUi) 24.dp else 12.dp)
                                 .padding(8.dp)
-                                .clickable(actionRunCallback<CheckPermissionAndRefreshAction>()), // ✅ On appelle notre nouvelle action ici !
+                                .clickable(actionStartActivity(Intent(context, MainActivity::class.java).apply {
+                                    action = "ACTION_SHOW_BG_LOCATION_DISCLOSURE"
+                                    putExtra("widget_dest", "bg_location_disclosure")
+                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                                })),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
@@ -561,9 +565,10 @@ class CheckPermissionAndRefreshAction : androidx.glance.appwidget.action.ActionC
             workManager.enqueueUniqueWork("widget_manual_refresh", androidx.work.ExistingWorkPolicy.REPLACE, request)
         } else {
             // L'utilisateur n'a pas la permission -> On ouvre les paramètres
-            val intent = android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                data = android.net.Uri.parse("package:${context.packageName}")
-                flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+            val intent = android.content.Intent(context, MainActivity::class.java).apply {
+                action = "ACTION_SHOW_BG_LOCATION_DISCLOSURE"
+                putExtra("widget_dest", "bg_location_disclosure")
+                flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK
             }
             context.startActivity(intent)
 
