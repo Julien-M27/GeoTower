@@ -1094,7 +1094,7 @@ fun SettingsScreen(
             // deux vocabulaires, mais mène à la page qui les regroupe.
             directEntry(
                 context.getString(R.string.histories_title),
-                "historiques historique envoi photos signalquest upload partages partage export pdf sites supports genere notifications notification journal alertes rappels",
+                "historiques historique envoi photos signalquest upload signalements signalement partages partage export pdf sites supports genere notifications notification journal alertes rappels",
                 Icons.Default.History
             ) { navController.navigate("histories") }
             directEntry(

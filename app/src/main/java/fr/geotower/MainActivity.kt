@@ -1106,13 +1106,13 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
 
-                            // Aiguillage vers les deux journaux locaux (bouton unique d'« À propos ») ;
-                            // les Réglages, eux, listent les deux pages séparément.
+                            // Aiguillage vers les journaux locaux (photos envoyées, signalements, partages, notifications).
                             composable("histories") {
                                 Box(modifier = Modifier.padding(innerPadding)) {
                                     fr.geotower.ui.screens.settings.HistoriesScreen(
                                         onNavigateBack = { navController.popBackStack() },
                                         onOpenPhotoUploadHistory = { navController.navigate("photo_upload_history") },
+                                        onOpenPhotoReports = { navController.navigate("photo_reports") },
                                         onOpenShareHistory = { navController.navigate("share_history") },
                                         onOpenNotificationHistory = { navController.navigate("notification_history") }
                                     )

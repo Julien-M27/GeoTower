@@ -592,6 +592,7 @@
     <string name="photo_reports_desc">Haz seguimiento de las fotos que has denunciado a SignalQuest.</string>
     <string name="photo_reports_intro">SignalQuest no publica el resultado de una denuncia. GeoTower solo puede confirmar que se ha enviado y avisarle si la foto acaba desapareciendo.</string>
     <string name="photo_reports_empty">Todavía no ha denunciado ninguna foto.</string>
+    <string name="photo_reports_none">Ninguna denuncia registrada</string>
     <string name="photo_reports_status_sent">Enviada — pendiente de moderación</string>
     <string name="photo_reports_status_removed">Foto retirada</string>
     <string name="photo_reports_delete_title">Eliminar esta denuncia</string>
@@ -3336,4 +3337,5 @@
     <string name="appstrings_release_v2068_summary_cluster_slider">Mayor legibilidad y ergonomía en el ajuste de agrupación de antenas</string>
     <string name="appstrings_release_v2069_summary_photo_report_operator">Selección precisa del operador al abrir un sitio desde los reportes de fotos</string>
     <string name="appstrings_release_v2070_summary_photo_reports_customization">Personalización de la visualización y ayudas de desplazamiento en el historial de reportes de fotos</string>
+    <string name="appstrings_release_v2071_summary_photo_reports_histories_shortcut">Acceso a los reportes de fotos con contador en vivo desde el centro de historiales</string>
 </resources>

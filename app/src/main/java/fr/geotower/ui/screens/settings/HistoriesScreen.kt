@@ -45,15 +45,15 @@ import fr.geotower.utils.AppConfig
 import fr.geotower.utils.PageScrollPrefs
 
 /**
- * Point d'entrée unique vers les journaux locaux de l'application : photos envoyées et sites ou
- * supports partagés. « À propos » comme les Réglages n'ont qu'un seul bouton « Historiques » à
- * proposer ; les deux pages ne sont plus listées séparément.
+ * Point d'entrée unique vers les journaux locaux de l'application : photos envoyées, signalements,
+ * sites ou supports partagés et notifications.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HistoriesScreen(
     onNavigateBack: () -> Unit,
     onOpenPhotoUploadHistory: () -> Unit,
+    onOpenPhotoReports: () -> Unit = {},
     onOpenShareHistory: () -> Unit,
     onOpenNotificationHistory: () -> Unit
 ) {
@@ -127,6 +127,11 @@ fun HistoriesScreen(
                     cardShape = cardShape,
                     cardColor = cardColor,
                     onOpenHistory = onOpenPhotoUploadHistory
+                )
+                PhotoReportsShortcut(
+                    cardShape = cardShape,
+                    cardColor = cardColor,
+                    onOpenReports = onOpenPhotoReports
                 )
                 ShareHistoryShortcut(
                     cardShape = cardShape,

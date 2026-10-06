@@ -592,6 +592,7 @@
     <string name="photo_reports_desc">Verfolge die Fotos, die du SignalQuest gemeldet hast.</string>
     <string name="photo_reports_intro">SignalQuest veröffentlicht nicht, was aus einer Meldung wird. GeoTower kann nur bestätigen, dass sie übermittelt wurde, und Bescheid geben, falls das Foto irgendwann verschwindet.</string>
     <string name="photo_reports_empty">Sie haben noch kein Foto gemeldet.</string>
+    <string name="photo_reports_none">Keine Meldung gespeichert</string>
     <string name="photo_reports_status_sent">Übermittelt — Moderation ausstehend</string>
     <string name="photo_reports_status_removed">Foto entfernt</string>
     <string name="photo_reports_delete_title">Diese Meldung löschen</string>
@@ -3336,4 +3337,5 @@
     <string name="appstrings_release_v2068_summary_cluster_slider">Verbesserte Lesbarkeit und Ergonomie für die Antennengruppierungseinstellung</string>
     <string name="appstrings_release_v2069_summary_photo_report_operator">Präzise Betreiberzuordnung beim Öffnen eines Standorts aus den Fotomeldungen</string>
     <string name="appstrings_release_v2070_summary_photo_reports_customization">Anzeigeanpassung und Scroll-Hilfen im Fotomeldungsverlauf</string>
+    <string name="appstrings_release_v2071_summary_photo_reports_histories_shortcut">Zugriff auf Fotomeldungen mit Live-Zähler direkt aus der Verlaufsübersicht</string>
 </resources>

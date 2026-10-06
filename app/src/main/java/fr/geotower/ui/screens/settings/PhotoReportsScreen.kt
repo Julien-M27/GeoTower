@@ -21,9 +21,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Settings
@@ -35,6 +37,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -52,6 +55,8 @@ import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.utils.PageScrollPrefs
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -77,6 +82,68 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+/**
+ * Raccourci vers la page des signalements, avec son compteur : pendant de [ShareHistoryShortcut]
+ * et [NotificationHistoryShortcut].
+ */
+@Composable
+fun PhotoReportsShortcut(
+    cardShape: Shape,
+    cardColor: Color,
+    onOpenReports: () -> Unit
+) {
+    val context = LocalContext.current
+    val safeClick = rememberSafeClick()
+    var historyCount by remember { mutableStateOf(0) }
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+
+    LaunchedEffect(Unit) {
+        historyCount = PhotoReportHistoryStore.read(context).size
+    }
+
+    Surface(
+        onClick = { safeClick("photo_reports_shortcut") { onOpenReports() } },
+        color = cardColor,
+        shape = cardShape,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(sizing.spacing(16.dp)),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                Icons.Default.Flag,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.width(sizing.spacing(12.dp)))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.photo_reports_title),
+                    style = sizing.textStyle(MaterialTheme.typography.titleSmall),
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = if (historyCount == 0) {
+                        stringResource(R.string.photo_reports_none)
+                    } else {
+                        pluralStringResource(R.plurals.photo_reports_recorded, historyCount, historyCount)
+                    },
+                    style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Icon(
+                Icons.AutoMirrored.Filled.ArrowForward,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
 
 /**
  * Page « Mes signalements » : ce que l'utilisateur a signalé à SignalQuest, et où ça en est.

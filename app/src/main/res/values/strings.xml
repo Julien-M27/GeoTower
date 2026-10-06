@@ -697,6 +697,7 @@
     <string name="photo_reports_desc">Track the photos you reported to SignalQuest.</string>
     <string name="photo_reports_intro">SignalQuest does not publish the outcome of a report. GeoTower can only tell you that it was sent, and let you know if the photo eventually disappears.</string>
     <string name="photo_reports_empty">You have not reported any photo yet.</string>
+    <string name="photo_reports_none">No report recorded</string>
     <string name="photo_reports_status_sent">Sent — awaiting moderation</string>
     <string name="photo_reports_status_removed">Photo no longer published</string>
     <string name="photo_reports_delete_title">Delete this report</string>
@@ -3359,4 +3360,5 @@
     <string name="appstrings_release_v2068_summary_cluster_slider">Improved readability and ergonomics for antenna clustering settings</string>
     <string name="appstrings_release_v2069_summary_photo_report_operator">Accurate operator targeting when opening a site from photo reports</string>
     <string name="appstrings_release_v2070_summary_photo_reports_customization">Display customization and scroll aids in photo report history</string>
+    <string name="appstrings_release_v2071_summary_photo_reports_histories_shortcut">Access to photo reports with live counter directly from the histories hub</string>
 </resources>

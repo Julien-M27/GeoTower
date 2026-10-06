@@ -100,4 +100,12 @@ class PhotoReportsScreenTest {
         )
         assertEquals(5, keys.distinct().size)
     }
+
+    @Test
+    fun photoReportHistoryStore_statusConstantsAreDistinct() {
+        org.junit.Assert.assertNotEquals(
+            fr.geotower.data.community.PhotoReportHistoryStore.STATUS_SENT,
+            fr.geotower.data.community.PhotoReportHistoryStore.STATUS_REMOVED
+        )
+    }
 }
