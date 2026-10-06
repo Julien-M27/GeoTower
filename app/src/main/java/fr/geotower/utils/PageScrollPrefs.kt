@@ -44,6 +44,7 @@ object PageScrollPrefs {
     const val DEPARTMENT_STATS = "department_stats"
     const val TRIPS = "trips"
     const val HIDDEN_SITES = "hidden_sites"
+    const val PHOTO_REPORTS = "photo_reports"
 
     /** Les trois aides réglables indépendamment (l'ordre est celui affiché dans les réglages). */
     enum class Aid(val keyPrefix: String) {
@@ -89,7 +90,8 @@ object PageScrollPrefs {
         PHOTO_UPLOAD_HISTORY,
         SHARE_HISTORY,
         NOTIFICATION_HISTORY,
-        HIDDEN_SITES
+        HIDDEN_SITES,
+        PHOTO_REPORTS
     )
 
     val allPages = customizablePages + otherPages
@@ -103,7 +105,7 @@ object PageScrollPrefs {
      */
     fun defaultEnabled(aid: Aid, page: String): Boolean = when {
         page == NEARBY && (aid == Aid.TOP || aid == Aid.BOTTOM) -> true
-        page in setOf(PHOTO_UPLOAD_HISTORY, SHARE_HISTORY, NOTIFICATION_HISTORY) && aid == Aid.BAR -> true
+        page in setOf(PHOTO_UPLOAD_HISTORY, SHARE_HISTORY, NOTIFICATION_HISTORY, PHOTO_REPORTS) && aid == Aid.BAR -> true
         else -> false
     }
 

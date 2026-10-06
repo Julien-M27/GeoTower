@@ -287,6 +287,11 @@ object HistoryPagePreferences {
     const val NOTIF_COUNTER = "page_notification_history_counter"
     const val NOTIF_DETAIL = "page_notification_history_detail"
     const val NOTIF_DATE_BAR = "page_notification_history_date_bar"
+    const val REPORT_COUNTER = "page_photo_reports_counter"
+    const val REPORT_INTRO = "page_photo_reports_intro"
+    const val REPORT_STATUS = "page_photo_reports_status"
+    const val REPORT_ADDRESS = "page_photo_reports_address"
+    const val REPORT_DETAILS = "page_photo_reports_details"
 
     const val DEFAULT_ENABLED = true
 

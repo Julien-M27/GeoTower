@@ -71,6 +71,10 @@
         <item quantity="one">%1$d share recorded</item>
         <item quantity="other">%1$d shares recorded</item>
     </plurals>
+    <plurals name="photo_reports_recorded">
+        <item quantity="one">%1$d report recorded</item>
+        <item quantity="other">%1$d reports recorded</item>
+    </plurals>
     <plurals name="share_history_trips">
         <item quantity="one">%1$d trip</item>
         <item quantity="other">%1$d trips</item>

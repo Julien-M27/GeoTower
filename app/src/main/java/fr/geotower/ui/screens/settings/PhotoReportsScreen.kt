@@ -19,21 +19,25 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -41,6 +45,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.res.pluralStringResource
+import fr.geotower.ui.components.PageScrollEdgeButtons
+import fr.geotower.ui.components.pageScrollbar
+import fr.geotower.ui.components.rememberSafeClick
+import fr.geotower.utils.PageScrollPrefs
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -77,6 +86,7 @@ import kotlinx.coroutines.withContext
  * photos publiées. Un refus, lui, ressemble en tout point à une attente — la page ne prétend donc
  * jamais dire « refusé ».
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PhotoReportsScreen(
     navController: NavController,
@@ -88,6 +98,19 @@ fun PhotoReportsScreen(
     val sizing = uiStyle.sizing
     val scrollState = rememberScrollState()
     val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = "settings")
+    val safeClick = rememberSafeClick()
+
+    val prefs = remember(context) {
+        context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
+    }
+    var showSettingsSheet by remember { mutableStateOf(false) }
+    val settingsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    var showCounter by remember { mutableStateOf(HistoryPagePreferences.read(prefs, HistoryPagePreferences.REPORT_COUNTER)) }
+    var showIntro by remember { mutableStateOf(HistoryPagePreferences.read(prefs, HistoryPagePreferences.REPORT_INTRO)) }
+    var showStatus by remember { mutableStateOf(HistoryPagePreferences.read(prefs, HistoryPagePreferences.REPORT_STATUS)) }
+    var showAddress by remember { mutableStateOf(HistoryPagePreferences.read(prefs, HistoryPagePreferences.REPORT_ADDRESS)) }
+    var showDetails by remember { mutableStateOf(HistoryPagePreferences.read(prefs, HistoryPagePreferences.REPORT_DETAILS)) }
 
     var entries by remember { mutableStateOf<List<PhotoReportHistoryEntry>>(emptyList()) }
     var resolvedSites by remember { mutableStateOf<Map<String, ResolvedPhotoReportSite>>(emptyMap()) }
@@ -95,7 +118,11 @@ fun PhotoReportsScreen(
     var reloadTick by remember { mutableStateOf(0) }
 
     BackHandler(enabled = !safeBackNavigation.isLocked) {
-        safeBackNavigation.navigateBack()
+        if (showSettingsSheet) {
+            showSettingsSheet = false
+        } else {
+            safeBackNavigation.navigateBack()
+        }
     }
 
     LaunchedEffect(reloadTick) {
@@ -127,62 +154,166 @@ fun PhotoReportsScreen(
             GeoTowerBackTopBar(
                 title = stringResource(R.string.photo_reports_title),
                 onBack = { safeBackNavigation.navigateBack() },
-                backEnabled = !safeBackNavigation.isLocked
+                backEnabled = !safeBackNavigation.isLocked,
+                backgroundColor = uiStyle.backgroundColor,
+                actions = {
+                    IconButton(
+                        onClick = { safeClick("photo_reports_settings") { showSettingsSheet = true } }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = stringResource(R.string.appstrings_settings_title),
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
             )
         }
     ) { innerPadding ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .geoTowerFadingEdge(scrollState)
-                .verticalScroll(scrollState)
-                .padding(horizontal = sizing.spacing(16.dp)),
-            verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))
         ) {
-            Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .geoTowerFadingEdge(scrollState, fadeHeight = sizing.component(72.dp))
+                    .pageScrollbar(PageScrollPrefs.PHOTO_REPORTS, scrollState)
+                    .verticalScroll(scrollState)
+                    .navigationBarsPadding()
+                    .padding(horizontal = sizing.spacing(16.dp)),
+                verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))
+            ) {
+                Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
 
-            Text(
-                text = stringResource(R.string.photo_reports_intro),
-                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            if (entries.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = sizing.spacing(48.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
+                if (showIntro) {
                     Text(
-                        text = stringResource(R.string.photo_reports_empty),
-                        style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center
+                        text = stringResource(R.string.photo_reports_intro),
+                        style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-            }
 
-            entries.forEach { entry ->
-                val siteInfo = resolvedSites[entry.id]
-                PhotoReportRow(
-                    entry = entry,
-                    siteInfo = siteInfo,
-                    onOpenSite = {
-                        openReportedSite(
-                            context = context,
-                            navController = navController,
-                            repository = repository,
-                            entry = entry,
-                            siteInfo = siteInfo,
-                            coroutineScope = coroutineScope
+                if (showCounter && entries.isNotEmpty()) {
+                    Text(
+                        text = pluralStringResource(
+                            R.plurals.photo_reports_recorded,
+                            entries.size,
+                            entries.size
+                        ),
+                        style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                if (entries.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = sizing.spacing(48.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = stringResource(R.string.photo_reports_empty),
+                            style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
                         )
-                    },
-                    onDelete = { pendingDeletion = entry }
-                )
+                    }
+                }
+
+                entries.forEach { entry ->
+                    val siteInfo = resolvedSites[entry.id]
+                    PhotoReportRow(
+                        entry = entry,
+                        siteInfo = siteInfo,
+                        showStatus = showStatus,
+                        showAddress = showAddress,
+                        showDetails = showDetails,
+                        onOpenSite = {
+                            openReportedSite(
+                                context = context,
+                                navController = navController,
+                                repository = repository,
+                                entry = entry,
+                                siteInfo = siteInfo,
+                                coroutineScope = coroutineScope
+                            )
+                        },
+                        onDelete = { pendingDeletion = entry }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
             }
 
-            Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
+            PageScrollEdgeButtons(PageScrollPrefs.PHOTO_REPORTS, scrollState)
         }
+    }
+
+    if (showSettingsSheet) {
+        HistoryPageSettingsSheet(
+            title = stringResource(R.string.photo_reports_settings_title),
+            page = PageScrollPrefs.PHOTO_REPORTS,
+            options = listOf(
+                HistoryPageOption(
+                    title = stringResource(R.string.photo_reports_option_counter),
+                    checked = showCounter,
+                    onCheckedChange = {
+                        showCounter = it
+                        HistoryPagePreferences.write(prefs, HistoryPagePreferences.REPORT_COUNTER, it)
+                    }
+                ),
+                HistoryPageOption(
+                    title = stringResource(R.string.photo_reports_option_intro),
+                    checked = showIntro,
+                    onCheckedChange = {
+                        showIntro = it
+                        HistoryPagePreferences.write(prefs, HistoryPagePreferences.REPORT_INTRO, it)
+                    }
+                ),
+                HistoryPageOption(
+                    title = stringResource(R.string.photo_reports_option_status),
+                    checked = showStatus,
+                    onCheckedChange = {
+                        showStatus = it
+                        HistoryPagePreferences.write(prefs, HistoryPagePreferences.REPORT_STATUS, it)
+                    }
+                ),
+                HistoryPageOption(
+                    title = stringResource(R.string.photo_reports_option_address),
+                    checked = showAddress,
+                    onCheckedChange = {
+                        showAddress = it
+                        HistoryPagePreferences.write(prefs, HistoryPagePreferences.REPORT_ADDRESS, it)
+                    }
+                ),
+                HistoryPageOption(
+                    title = stringResource(R.string.photo_reports_option_details),
+                    checked = showDetails,
+                    onCheckedChange = {
+                        showDetails = it
+                        HistoryPagePreferences.write(prefs, HistoryPagePreferences.REPORT_DETAILS, it)
+                    }
+                ),
+            ),
+            onReset = {
+                showCounter = HistoryPagePreferences.DEFAULT_ENABLED
+                showIntro = HistoryPagePreferences.DEFAULT_ENABLED
+                showStatus = HistoryPagePreferences.DEFAULT_ENABLED
+                showAddress = HistoryPagePreferences.DEFAULT_ENABLED
+                showDetails = HistoryPagePreferences.DEFAULT_ENABLED
+                HistoryPagePreferences.write(prefs, HistoryPagePreferences.REPORT_COUNTER, HistoryPagePreferences.DEFAULT_ENABLED)
+                HistoryPagePreferences.write(prefs, HistoryPagePreferences.REPORT_INTRO, HistoryPagePreferences.DEFAULT_ENABLED)
+                HistoryPagePreferences.write(prefs, HistoryPagePreferences.REPORT_STATUS, HistoryPagePreferences.DEFAULT_ENABLED)
+                HistoryPagePreferences.write(prefs, HistoryPagePreferences.REPORT_ADDRESS, HistoryPagePreferences.DEFAULT_ENABLED)
+                HistoryPagePreferences.write(prefs, HistoryPagePreferences.REPORT_DETAILS, HistoryPagePreferences.DEFAULT_ENABLED)
+            },
+            onDismiss = { showSettingsSheet = false },
+            onBack = { showSettingsSheet = false },
+            sheetState = settingsSheetState,
+            useOneUi = uiStyle.useOneUi,
+            bubbleColor = uiStyle.bubbleColor
+        )
     }
 
     pendingDeletion?.let { entry ->
@@ -212,17 +343,22 @@ fun PhotoReportsScreen(
 private fun PhotoReportRow(
     entry: PhotoReportHistoryEntry,
     siteInfo: ResolvedPhotoReportSite?,
+    showStatus: Boolean,
+    showAddress: Boolean,
+    showDetails: Boolean,
     onOpenSite: () -> Unit,
     onDelete: () -> Unit
 ) {
     val context = LocalContext.current
-    val sizing = LocalGeoTowerUiStyle.current.sizing
+    val uiStyle = LocalGeoTowerUiStyle.current
+    val sizing = uiStyle.sizing
     val removed = entry.status == PhotoReportHistoryStore.STATUS_REMOVED
     val canOpen = entry.siteId.isNotBlank()
 
     Card(
-        shape = RoundedCornerShape(sizing.component(14.dp)),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        shape = uiStyle.cardShape,
+        colors = CardDefaults.cardColors(containerColor = uiStyle.cardColor),
+        border = uiStyle.cardBorder,
         elevation = CardDefaults.cardElevation(0.dp),
         modifier = Modifier
             .fillMaxWidth()
@@ -262,20 +398,22 @@ private fun PhotoReportRow(
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                Text(
-                    text = stringResource(
-                        if (removed) {
-                            R.string.photo_reports_status_removed
-                        } else {
-                            R.string.photo_reports_status_sent
-                        }
-                    ),
-                    style = sizing.textStyle(MaterialTheme.typography.bodySmall),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                if (showStatus) {
+                    Text(
+                        text = stringResource(
+                            if (removed) {
+                                R.string.photo_reports_status_removed
+                            } else {
+                                R.string.photo_reports_status_sent
+                            }
+                        ),
+                        style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
 
                 val addressText = formatSiteAddress(siteInfo?.address, siteInfo?.commune)
-                if (!addressText.isNullOrBlank()) {
+                if (showAddress && !addressText.isNullOrBlank()) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.padding(top = sizing.spacing(2.dp))
@@ -297,19 +435,21 @@ private fun PhotoReportRow(
                     }
                 }
 
-                val codeLabel = formatSiteCodeLabel(entry.siteId, siteInfo)
-                val subtitleParts = listOfNotNull(
-                    entry.operatorLabel?.takeIf { it.isNotBlank() },
-                    codeLabel,
-                    formatReportDate(context, entry.createdAtMillis, AppConfig.appLanguage.value)
-                )
-                if (subtitleParts.isNotEmpty()) {
-                    Text(
-                        text = subtitleParts.joinToString(" · "),
-                        style = sizing.textStyle(MaterialTheme.typography.labelSmall),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = sizing.spacing(2.dp))
+                if (showDetails) {
+                    val codeLabel = formatSiteCodeLabel(entry.siteId, siteInfo)
+                    val subtitleParts = listOfNotNull(
+                        entry.operatorLabel?.takeIf { it.isNotBlank() },
+                        codeLabel,
+                        formatReportDate(context, entry.createdAtMillis, AppConfig.appLanguage.value)
                     )
+                    if (subtitleParts.isNotEmpty()) {
+                        Text(
+                            text = subtitleParts.joinToString(" · "),
+                            style = sizing.textStyle(MaterialTheme.typography.labelSmall),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = sizing.spacing(2.dp))
+                        )
+                    }
                 }
             }
 

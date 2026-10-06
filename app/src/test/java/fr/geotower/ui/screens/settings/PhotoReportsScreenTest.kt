@@ -68,4 +68,36 @@ class PhotoReportsScreenTest {
         assertEquals("SFR", fr.geotower.utils.OperatorColors.keyFor("SFR"))
         assertEquals("BOUYGUES", fr.geotower.utils.OperatorColors.keyFor("Bouygues Telecom"))
     }
+
+    @Test
+    fun pageScrollPrefs_photoReportsHasBarActiveByDefault() {
+        assertEquals("photo_reports", fr.geotower.utils.PageScrollPrefs.PHOTO_REPORTS)
+        org.junit.Assert.assertTrue(
+            fr.geotower.utils.PageScrollPrefs.otherPages.contains(fr.geotower.utils.PageScrollPrefs.PHOTO_REPORTS)
+        )
+        org.junit.Assert.assertTrue(
+            fr.geotower.utils.PageScrollPrefs.defaultEnabled(
+                fr.geotower.utils.PageScrollPrefs.Aid.BAR,
+                fr.geotower.utils.PageScrollPrefs.PHOTO_REPORTS
+            )
+        )
+        org.junit.Assert.assertFalse(
+            fr.geotower.utils.PageScrollPrefs.defaultEnabled(
+                fr.geotower.utils.PageScrollPrefs.Aid.TOP,
+                fr.geotower.utils.PageScrollPrefs.PHOTO_REPORTS
+            )
+        )
+    }
+
+    @Test
+    fun historyPagePreferences_photoReportsKeysAreDistinct() {
+        val keys = listOf(
+            HistoryPagePreferences.REPORT_COUNTER,
+            HistoryPagePreferences.REPORT_INTRO,
+            HistoryPagePreferences.REPORT_STATUS,
+            HistoryPagePreferences.REPORT_ADDRESS,
+            HistoryPagePreferences.REPORT_DETAILS
+        )
+        assertEquals(5, keys.distinct().size)
+    }
 }

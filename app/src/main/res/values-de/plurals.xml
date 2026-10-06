@@ -71,6 +71,10 @@
         <item quantity="one">%1$d Freigabe gespeichert</item>
         <item quantity="other">%1$d Freigaben gespeichert</item>
     </plurals>
+    <plurals name="photo_reports_recorded">
+        <item quantity="one">%1$d Meldung gespeichert</item>
+        <item quantity="other">%1$d Meldungen gespeichert</item>
+    </plurals>
     <plurals name="share_history_trips">
         <item quantity="one">%1$d Route</item>
         <item quantity="other">%1$d Routen</item>

@@ -71,6 +71,10 @@
         <item quantity="one">%1$d partilha registada</item>
         <item quantity="other">%1$d partilhas registadas</item>
     </plurals>
+    <plurals name="photo_reports_recorded">
+        <item quantity="one">%1$d relatório registado</item>
+        <item quantity="other">%1$d relatórios registados</item>
+    </plurals>
     <plurals name="share_history_trips">
         <item quantity="one">%1$d percurso</item>
         <item quantity="other">%1$d percursos</item>

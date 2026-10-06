@@ -71,6 +71,10 @@
         <item quantity="one">%1$d partage enregistré</item>
         <item quantity="other">%1$d partages enregistrés</item>
     </plurals>
+    <plurals name="photo_reports_recorded">
+        <item quantity="one">%1$d signalement enregistré</item>
+        <item quantity="other">%1$d signalements enregistrés</item>
+    </plurals>
     <plurals name="share_history_trips">
         <item quantity="one">%1$d trajet</item>
         <item quantity="other">%1$d trajets</item>
