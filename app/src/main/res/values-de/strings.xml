@@ -3328,4 +3328,5 @@
     <string name="appstrings_release_v2068_summary_site_highlight">Wellen-Hervorhebungsanimation beim Öffnen eines Standorts auf der Karte</string>
     <string name="appstrings_release_v2068_summary_photo_reports">Direkter Zugriff auf Standortdetails aus dem Fotomeldungsverlauf</string>
     <string name="appstrings_release_v2068_summary_cluster_slider">Verbesserte Lesbarkeit und Ergonomie für die Antennengruppierungseinstellung</string>
+    <string name="appstrings_release_v2069_summary_photo_report_operator">Präzise Betreiberzuordnung beim Öffnen eines Standorts aus den Fotomeldungen</string>
 </resources>

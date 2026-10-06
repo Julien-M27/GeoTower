@@ -104,14 +104,17 @@ fun PhotoReportsScreen(
 
     LaunchedEffect(entries, repository) {
         if (repository == null) return@LaunchedEffect
-        val distinctSiteIds = entries.map { it.siteId.trim() }.filter { it.isNotBlank() }.distinct()
-        if (distinctSiteIds.isEmpty()) {
+        if (entries.isEmpty()) {
             resolvedSites = emptyMap()
             return@LaunchedEffect
         }
         resolvedSites = withContext(Dispatchers.IO) {
-            distinctSiteIds.associateWith { siteId ->
-                resolveReportSite(repository, siteId)
+            entries.associate { entry ->
+                entry.id to resolveReportSite(
+                    repository = repository,
+                    siteId = entry.siteId,
+                    operatorLabel = entry.operatorLabel
+                )
             }
         }
     }
@@ -160,16 +163,17 @@ fun PhotoReportsScreen(
             }
 
             entries.forEach { entry ->
+                val siteInfo = resolvedSites[entry.id]
                 PhotoReportRow(
                     entry = entry,
-                    siteInfo = resolvedSites[entry.siteId.trim()],
+                    siteInfo = siteInfo,
                     onOpenSite = {
                         openReportedSite(
                             context = context,
                             navController = navController,
                             repository = repository,
                             entry = entry,
-                            siteInfo = resolvedSites[entry.siteId.trim()],
+                            siteInfo = siteInfo,
                             coroutineScope = coroutineScope
                         )
                     },
@@ -344,7 +348,8 @@ internal data class ResolvedPhotoReportSite(
 
 internal suspend fun resolveReportSite(
     repository: AnfrRepository,
-    siteId: String
+    siteId: String,
+    operatorLabel: String? = null
 ): ResolvedPhotoReportSite {
     val cleanId = siteId.trim()
     if (cleanId.isBlank()) {
@@ -361,6 +366,8 @@ internal suspend fun resolveReportSite(
         )
     }
 
+    val operatorKey = OperatorColors.keyFor(operatorLabel)
+
     val rows = try {
         repository.getFavoriteScopeSiteRows(cleanId)
     } catch (_: Exception) {
@@ -370,12 +377,30 @@ internal suspend fun resolveReportSite(
     if (rows.isNotEmpty()) {
         val matchedSupport = rows.any { it.idSupport == cleanId }
         val matchedAnfr = rows.any { it.idAnfr == cleanId }
-        val address = rows.firstNotNullOfOrNull { it.adresse?.trim()?.takeIf(String::isNotBlank) }
-        val commune = rows.firstNotNullOfOrNull { it.commune?.trim()?.takeIf(String::isNotBlank) }
-        val targetAnfrId = rows.firstNotNullOfOrNull { it.idAnfr.takeIf(String::isNotBlank) }
+
+        val operatorMatchingRow = if (!operatorKey.isNullOrBlank()) {
+            rows.firstOrNull { row ->
+                val rowOpKeys = OperatorColors.keysFor(row.operateur)
+                val signalQuestOp = SignalQuestOperators.operatorParamFor(row.operateur)
+                operatorKey in rowOpKeys || signalQuestOp.equals(operatorLabel, ignoreCase = true)
+            }
+        } else null
+
+        // Si l'opérateur est spécifié, on cible exclusivement son antenne ; sinon première disponible
+        val targetAnfrId = if (!operatorLabel.isNullOrBlank()) {
+            operatorMatchingRow?.idAnfr?.takeIf(String::isNotBlank)
+        } else {
+            rows.firstNotNullOfOrNull { it.idAnfr.takeIf(String::isNotBlank) }
+        }
+
         val targetSupportId = rows.firstNotNullOfOrNull { it.idSupport?.takeIf(String::isNotBlank) }
-        val latitude = rows.firstNotNullOfOrNull { it.latitude }
-        val longitude = rows.firstNotNullOfOrNull { it.longitude }
+        val preferredRow = operatorMatchingRow ?: rows.first()
+        val address = preferredRow.adresse?.trim()?.takeIf(String::isNotBlank)
+            ?: rows.firstNotNullOfOrNull { it.adresse?.trim()?.takeIf(String::isNotBlank) }
+        val commune = preferredRow.commune?.trim()?.takeIf(String::isNotBlank)
+            ?: rows.firstNotNullOfOrNull { it.commune?.trim()?.takeIf(String::isNotBlank) }
+        val latitude = preferredRow.latitude ?: rows.firstNotNullOfOrNull { it.latitude }
+        val longitude = preferredRow.longitude ?: rows.firstNotNullOfOrNull { it.longitude }
 
         val isSupport = matchedSupport || (!matchedAnfr && targetSupportId == cleanId)
         val isAnfr = matchedAnfr || (!matchedSupport && targetAnfrId == cleanId)
@@ -401,9 +426,24 @@ internal suspend fun resolveReportSite(
 
     if (antennas.isNotEmpty()) {
         val matchedAnfr = antennas.any { it.idAnfr == cleanId }
-        val targetAnfrId = antennas.firstNotNullOfOrNull { it.idAnfr.takeIf(String::isNotBlank) }
-        val latitude = antennas.firstNotNullOfOrNull { it.latitude }
-        val longitude = antennas.firstNotNullOfOrNull { it.longitude }
+
+        val operatorMatchingAntenna = if (!operatorKey.isNullOrBlank()) {
+            antennas.firstOrNull { antenna ->
+                val antennaKeys = OperatorColors.keysFor(antenna.operateur)
+                val signalQuestOp = SignalQuestOperators.operatorParamFor(antenna.operateur)
+                operatorKey in antennaKeys || signalQuestOp.equals(operatorLabel, ignoreCase = true)
+            }
+        } else null
+
+        val selectedAntenna = if (!operatorLabel.isNullOrBlank()) {
+            operatorMatchingAntenna
+        } else {
+            antennas.first()
+        }
+
+        val targetAnfrId = selectedAntenna?.idAnfr?.takeIf(String::isNotBlank)
+        val latitude = selectedAntenna?.latitude ?: antennas.firstNotNullOfOrNull { it.latitude }
+        val longitude = selectedAntenna?.longitude ?: antennas.firstNotNullOfOrNull { it.longitude }
 
         val techniques = targetAnfrId?.let { anfr ->
             runCatching { repository.getTechniqueByAnfr(anfr) }.getOrDefault(emptyList())
@@ -470,24 +510,29 @@ private fun openReportedSite(
                 .apply()
         }
 
-        // 2. Si un ID ANFR cible est connu, aller directement sur site_detail
+        // 2. Si un ID ANFR cible est connu (et correspond à l'opérateur du signalement),
+        // aller directement sur site_detail
         val targetAnfr = siteInfo?.targetAnfrId
         if (!targetAnfr.isNullOrBlank()) {
             navController.navigate("site_detail/${Uri.encode(targetAnfr)}")
             return@launch
         }
 
-        // 3. Si un repository est disponible, chercher l'antenne correspondante
+        // 3. Si aucun ID ANFR spécifique n'était résolu mais qu'un repository est disponible,
+        // chercher une antenne correspondant à l'opérateur
         val targetAntenna = if (repository != null) {
             withContext(Dispatchers.IO) {
                 val operatorKey = OperatorColors.keyFor(entry.operatorLabel)
                 val antennas = runCatching { repository.getAntennasByExactId(siteId) }.getOrDefault(emptyList())
-                antennas.firstOrNull { antenna ->
-                    val antennaKeys = OperatorColors.keysFor(antenna.operateur)
-                    val signalQuestOperator = SignalQuestOperators.operatorParamFor(antenna.operateur)
-                    (operatorKey != null && operatorKey in antennaKeys) ||
-                        signalQuestOperator.equals(entry.operatorLabel, ignoreCase = true)
-                } ?: antennas.firstOrNull()
+                if (!operatorKey.isNullOrBlank()) {
+                    antennas.firstOrNull { antenna ->
+                        val antennaKeys = OperatorColors.keysFor(antenna.operateur)
+                        val signalQuestOperator = SignalQuestOperators.operatorParamFor(antenna.operateur)
+                        operatorKey in antennaKeys || signalQuestOperator.equals(entry.operatorLabel, ignoreCase = true)
+                    }
+                } else {
+                    antennas.firstOrNull()
+                }
             }
         } else null
 
@@ -499,7 +544,8 @@ private fun openReportedSite(
                 .apply()
             navController.navigate("site_detail/${Uri.encode(targetAntenna.idAnfr)}")
         } else {
-            // 4. Repli si antenne non trouvée
+            // 4. Repli si aucune antenne spécifique n'a été trouvée pour cet opérateur :
+            // Si c'est un support, ouvrir la fiche support avec le filtre opérateur
             if (siteInfo?.isSupportId == true) {
                 val operatorParam = OperatorColors.keyFor(entry.operatorLabel)
                     ?.let { "?operator=${Uri.encode(it)}" }

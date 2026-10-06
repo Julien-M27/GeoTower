@@ -3330,4 +3330,5 @@
     <string name="appstrings_release_v2068_summary_site_highlight">Animation d\'ondes lumineuses lors de l\'ouverture d\'un site sur la carte</string>
     <string name="appstrings_release_v2068_summary_photo_reports">Accès direct aux fiches des sites depuis l\'historique des signalements de photos</string>
     <string name="appstrings_release_v2068_summary_cluster_slider">Lisibilité et ergonomie améliorées pour le réglage du regroupement des antennes</string>
+    <string name="appstrings_release_v2069_summary_photo_report_operator">Ciblage précis de l\'opérateur lors de l\'ouverture d\'un site depuis les signalements de photos</string>
 </resources>

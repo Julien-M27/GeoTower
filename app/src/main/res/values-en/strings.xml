@@ -3328,4 +3328,5 @@
     <string name="appstrings_release_v2068_summary_site_highlight">Wave highlight animation when opening a site on the map</string>
     <string name="appstrings_release_v2068_summary_photo_reports">Direct access to site details from photo report history</string>
     <string name="appstrings_release_v2068_summary_cluster_slider">Improved readability and ergonomics for antenna clustering settings</string>
+    <string name="appstrings_release_v2069_summary_photo_report_operator">Accurate operator targeting when opening a site from photo reports</string>
 </resources>

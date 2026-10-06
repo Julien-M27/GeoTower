@@ -59,4 +59,13 @@ class PhotoReportsScreenTest {
         assertEquals(43.2965, site.latitude!!, 0.0001)
         assertEquals(5.3698, site.longitude!!, 0.0001)
     }
+
+    @Test
+    fun operatorResolution_matchesMainOperatorsConsistently() {
+        assertEquals("ORANGE", fr.geotower.utils.OperatorColors.keyFor("Orange"))
+        assertEquals("FREE", fr.geotower.utils.OperatorColors.keyFor("Free"))
+        assertEquals("FREE", fr.geotower.utils.OperatorColors.keyFor("Free Mobile"))
+        assertEquals("SFR", fr.geotower.utils.OperatorColors.keyFor("SFR"))
+        assertEquals("BOUYGUES", fr.geotower.utils.OperatorColors.keyFor("Bouygues Telecom"))
+    }
 }

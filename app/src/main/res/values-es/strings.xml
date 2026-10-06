@@ -3328,4 +3328,5 @@
     <string name="appstrings_release_v2068_summary_site_highlight">Animación de ondas luminosas al abrir un sitio en el mapa</string>
     <string name="appstrings_release_v2068_summary_photo_reports">Acceso directo a los detalles del sitio desde el historial de reportes de fotos</string>
     <string name="appstrings_release_v2068_summary_cluster_slider">Mayor legibilidad y ergonomía en el ajuste de agrupación de antenas</string>
+    <string name="appstrings_release_v2069_summary_photo_report_operator">Selección precisa del operador al abrir un sitio desde los reportes de fotos</string>
 </resources>
