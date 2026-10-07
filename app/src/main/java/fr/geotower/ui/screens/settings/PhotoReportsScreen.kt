@@ -3,33 +3,42 @@ package fr.geotower.ui.screens.settings
 import android.content.Context
 import android.net.Uri
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -47,9 +56,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.pluralStringResource
 import fr.geotower.ui.components.PageScrollEdgeButtons
+import fr.geotower.ui.components.formatHistoryStorageBytes
 import fr.geotower.ui.components.pageScrollbar
 import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.utils.PageScrollPrefs
@@ -181,19 +192,31 @@ fun PhotoReportsScreen(
 
     var entries by remember { mutableStateOf<List<PhotoReportHistoryEntry>>(emptyList()) }
     var resolvedSites by remember { mutableStateOf<Map<String, ResolvedPhotoReportSite>>(emptyMap()) }
-    var pendingDeletion by remember { mutableStateOf<PhotoReportHistoryEntry?>(null) }
+    var selectedIds by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
+    val selectedIdSet = selectedIds.toSet()
+    val isSelectionMode = selectedIds.isNotEmpty()
+    val selectedItems = entries.filter { it.id in selectedIdSet }
+    val selectedFreedBytes = PhotoReportHistoryStore.estimatedFreedBytes(selectedItems)
+    val totalFreedBytes = PhotoReportHistoryStore.estimatedFreedBytes(entries)
+    val isAllSelected = entries.isNotEmpty() && entries.all { it.id in selectedIdSet }
+    var showClearDialog by rememberSaveable { mutableStateOf(false) }
     var reloadTick by remember { mutableStateOf(0) }
 
     BackHandler(enabled = !safeBackNavigation.isLocked) {
         if (showSettingsSheet) {
             showSettingsSheet = false
+        } else if (isSelectionMode) {
+            selectedIds = emptyList()
         } else {
             safeBackNavigation.navigateBack()
         }
     }
 
     LaunchedEffect(reloadTick) {
-        entries = PhotoReportHistoryStore.read(context)
+        val next = PhotoReportHistoryStore.read(context)
+        entries = next
+        val nextIds = next.map { it.id }.toSet()
+        selectedIds = selectedIds.filter { it in nextIds }
     }
 
     LaunchedEffect(entries, repository) {
@@ -218,23 +241,57 @@ fun PhotoReportsScreen(
         // Les routes du NavHost padent déjà avec l'innerPadding racine.
         contentWindowInsets = WindowInsets(0),
         topBar = {
-            GeoTowerBackTopBar(
-                title = stringResource(R.string.photo_reports_title),
-                onBack = { safeBackNavigation.navigateBack() },
-                backEnabled = !safeBackNavigation.isLocked,
-                backgroundColor = uiStyle.backgroundColor,
-                actions = {
-                    IconButton(
-                        onClick = { safeClick("photo_reports_settings") { showSettingsSheet = true } }
+            if (isSelectionMode) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(uiStyle.backgroundColor)
+                        .padding(top = sizing.spacing(2.dp), bottom = sizing.spacing(6.dp)),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(
+                        onClick = {
+                            safeClick("photo_reports_toggle_all") {
+                                selectedIds = if (isAllSelected) emptyList() else entries.map { it.id }
+                            }
+                        },
+                        modifier = Modifier.padding(start = sizing.spacing(4.dp))
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = stringResource(R.string.appstrings_settings_title),
-                            tint = MaterialTheme.colorScheme.onSurface
+                        Text(
+                            if (isAllSelected) {
+                                stringResource(R.string.appstrings_clear_all)
+                            } else {
+                                stringResource(R.string.appstrings_select_all)
+                            }
                         )
                     }
+                    Spacer(modifier = Modifier.weight(1f))
+                    IconButton(
+                        onClick = { selectedIds = emptyList() },
+                        modifier = Modifier.padding(end = sizing.spacing(4.dp))
+                    ) {
+                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.appstrings_cancel))
+                    }
                 }
-            )
+            } else {
+                GeoTowerBackTopBar(
+                    title = stringResource(R.string.photo_reports_title),
+                    onBack = { safeBackNavigation.navigateBack() },
+                    backEnabled = !safeBackNavigation.isLocked,
+                    backgroundColor = uiStyle.backgroundColor,
+                    actions = {
+                        IconButton(
+                            onClick = { safeClick("photo_reports_settings") { showSettingsSheet = true } }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = stringResource(R.string.appstrings_settings_title),
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                )
+            }
         }
     ) { innerPadding ->
         Box(
@@ -249,7 +306,14 @@ fun PhotoReportsScreen(
                     .pageScrollbar(PageScrollPrefs.PHOTO_REPORTS, scrollState)
                     .verticalScroll(scrollState)
                     .navigationBarsPadding()
-                    .padding(horizontal = sizing.spacing(16.dp)),
+                    .padding(horizontal = sizing.spacing(16.dp))
+                    .then(
+                        if (isSelectionMode) {
+                            Modifier.padding(bottom = sizing.spacing(76.dp))
+                        } else {
+                            Modifier
+                        }
+                    ),
                 verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))
             ) {
                 Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
@@ -290,12 +354,15 @@ fun PhotoReportsScreen(
 
                 entries.forEach { entry ->
                     val siteInfo = resolvedSites[entry.id]
+                    val isSelected = entry.id in selectedIdSet
                     PhotoReportRow(
                         entry = entry,
                         siteInfo = siteInfo,
                         showStatus = showStatus,
                         showAddress = showAddress,
                         showDetails = showDetails,
+                        isSelected = isSelected,
+                        isSelectionMode = isSelectionMode,
                         onOpenSite = {
                             openReportedSite(
                                 context = context,
@@ -306,14 +373,81 @@ fun PhotoReportsScreen(
                                 coroutineScope = coroutineScope
                             )
                         },
-                        onDelete = { pendingDeletion = entry }
+                        onSelect = {
+                            if (entry.id !in selectedIds) selectedIds = selectedIds + entry.id
+                        },
+                        onToggleSelection = {
+                            selectedIds = if (entry.id in selectedIds) {
+                                selectedIds.filterNot { it == entry.id }
+                            } else {
+                                selectedIds + entry.id
+                            }
+                        }
                     )
                 }
 
-                Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
+                if (!isSelectionMode && entries.isNotEmpty()) {
+                    TextButton(
+                        onClick = {
+                            safeClick("photo_reports_clear_open") { showClearDialog = true }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = sizing.spacing(8.dp), bottom = sizing.spacing(24.dp))
+                    ) {
+                        Icon(
+                            Icons.Default.DeleteSweep,
+                            contentDescription = null,
+                            modifier = Modifier.size(sizing.component(18.dp))
+                        )
+                        Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
+                        Text(
+                            "${stringResource(R.string.photo_reports_clear)} " +
+                                "(${formatHistoryStorageBytes(totalFreedBytes)})"
+                        )
+                    }
+                } else {
+                    Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
+                }
             }
 
             PageScrollEdgeButtons(PageScrollPrefs.PHOTO_REPORTS, scrollState)
+
+            if (isSelectionMode) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(
+                            start = sizing.spacing(16.dp),
+                            end = sizing.spacing(16.dp),
+                            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() +
+                                sizing.spacing(16.dp)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Button(
+                        onClick = {
+                            safeClick("photo_reports_delete_selected") {
+                                PhotoReportHistoryStore.remove(context, selectedIds)
+                                selectedIds = emptyList()
+                                reloadTick++
+                            }
+                        },
+                        shape = CircleShape
+                    ) {
+                        Icon(
+                            Icons.Default.DeleteSweep,
+                            contentDescription = null,
+                            modifier = Modifier.size(sizing.component(18.dp))
+                        )
+                        Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
+                        Text(
+                            "${stringResource(R.string.appstrings_delete)} (${selectedIds.size}) - " +
+                                formatHistoryStorageBytes(selectedFreedBytes)
+                        )
+                    }
+                }
+            }
         }
     }
 
@@ -383,22 +517,27 @@ fun PhotoReportsScreen(
         )
     }
 
-    pendingDeletion?.let { entry ->
+    if (showClearDialog) {
         AlertDialog(
-            onDismissRequest = { pendingDeletion = null },
-            title = { Text(stringResource(R.string.photo_reports_delete_title)) },
-            text = { Text(stringResource(R.string.photo_reports_delete_message)) },
+            onDismissRequest = { showClearDialog = false },
+            title = { Text(stringResource(R.string.photo_reports_clear_title)) },
+            text = { Text(stringResource(R.string.photo_reports_clear_desc)) },
             confirmButton = {
-                TextButton(onClick = {
-                    PhotoReportHistoryStore.remove(context, listOf(entry.id))
-                    pendingDeletion = null
-                    reloadTick++
-                }) {
-                    Text(stringResource(R.string.photo_reports_delete_confirm))
+                TextButton(
+                    onClick = {
+                        safeClick("photo_reports_clear_confirm") {
+                            PhotoReportHistoryStore.clear(context)
+                            showClearDialog = false
+                            selectedIds = emptyList()
+                            reloadTick++
+                        }
+                    }
+                ) {
+                    Text(stringResource(R.string.photo_reports_clear))
                 }
             },
             dismissButton = {
-                TextButton(onClick = { pendingDeletion = null }) {
+                TextButton(onClick = { showClearDialog = false }) {
                     Text(stringResource(R.string.appstrings_cancel))
                 }
             }
@@ -407,14 +546,40 @@ fun PhotoReportsScreen(
 }
 
 @Composable
+private fun PhotoReportSelectionIndicator(isSelected: Boolean) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    Surface(
+        shape = CircleShape,
+        color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+        contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.outline,
+        border = if (isSelected) null else BorderStroke(2.dp, MaterialTheme.colorScheme.outline),
+        modifier = Modifier.size(sizing.component(24.dp))
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            if (isSelected) {
+                Icon(
+                    Icons.Default.Check,
+                    contentDescription = null,
+                    modifier = Modifier.size(sizing.component(16.dp))
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
 private fun PhotoReportRow(
     entry: PhotoReportHistoryEntry,
     siteInfo: ResolvedPhotoReportSite?,
     showStatus: Boolean,
     showAddress: Boolean,
     showDetails: Boolean,
+    isSelected: Boolean,
+    isSelectionMode: Boolean,
     onOpenSite: () -> Unit,
-    onDelete: () -> Unit
+    onSelect: () -> Unit,
+    onToggleSelection: () -> Unit
 ) {
     val context = LocalContext.current
     val uiStyle = LocalGeoTowerUiStyle.current
@@ -424,25 +589,42 @@ private fun PhotoReportRow(
 
     Card(
         shape = uiStyle.cardShape,
-        colors = CardDefaults.cardColors(containerColor = uiStyle.cardColor),
-        border = uiStyle.cardBorder,
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected) {
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.36f)
+            } else {
+                uiStyle.cardColor
+            }
+        ),
+        border = if (isSelected) {
+            BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+        } else {
+            uiStyle.cardBorder
+        },
         elevation = CardDefaults.cardElevation(0.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(
-                if (canOpen) {
-                    Modifier.clickable(onClick = onOpenSite)
-                } else {
-                    Modifier
-                }
-            )
+        modifier = Modifier.fillMaxWidth()
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .combinedClickable(
+                    onClick = {
+                        if (isSelectionMode) {
+                            onToggleSelection()
+                        } else if (canOpen) {
+                            onOpenSite()
+                        }
+                    },
+                    onLongClick = onSelect
+                )
                 .padding(sizing.spacing(14.dp)),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            if (isSelectionMode) {
+                PhotoReportSelectionIndicator(isSelected)
+                Spacer(modifier = Modifier.width(sizing.spacing(12.dp)))
+            }
+
             Icon(
                 imageVector = if (removed) Icons.Default.CheckCircle else Icons.Default.Schedule,
                 contentDescription = null,
@@ -520,22 +702,13 @@ private fun PhotoReportRow(
                 }
             }
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onDelete) {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = stringResource(R.string.photo_reports_delete_title),
-                        modifier = Modifier.size(sizing.component(20.dp))
-                    )
-                }
-                if (canOpen) {
-                    Icon(
-                        imageVector = Icons.Default.ChevronRight,
-                        contentDescription = stringResource(R.string.photo_reports_open_site),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                        modifier = Modifier.size(sizing.component(20.dp))
-                    )
-                }
+            if (canOpen && !isSelectionMode) {
+                Icon(
+                    imageVector = Icons.Default.ChevronRight,
+                    contentDescription = stringResource(R.string.photo_reports_open_site),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.size(sizing.component(20.dp))
+                )
             }
         }
     }

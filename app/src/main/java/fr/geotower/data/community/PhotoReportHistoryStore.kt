@@ -161,6 +161,11 @@ object PhotoReportHistoryStore {
         historyFile(context).delete()
     }
 
+    fun estimatedFreedBytes(entries: List<PhotoReportHistoryEntry>): Long {
+        if (entries.isEmpty()) return 0L
+        return entries.sumOf { gson.toJson(it).toByteArray().size.toLong() }
+    }
+
     private fun readInternal(context: Context): List<PhotoReportHistoryEntry> {
         val file = historyFile(context)
         if (!file.isFile) return emptyList()

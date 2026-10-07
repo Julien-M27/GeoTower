@@ -598,6 +598,9 @@
     <string name="photo_reports_delete_title">Delete this report</string>
     <string name="photo_reports_delete_message">This only clears the entry from your device. The report already sent to SignalQuest is unaffected.</string>
     <string name="photo_reports_delete_confirm">Delete</string>
+    <string name="photo_reports_clear">Clear history</string>
+    <string name="photo_reports_clear_title">Clear report history?</string>
+    <string name="photo_reports_clear_desc">All recorded reports will be deleted from this device. Reports already sent to SignalQuest are unaffected.</string>
     <string name="photo_reports_code_anfr">ANFR ID: %1$s</string>
     <string name="photo_reports_code_support">Support ID: %1$s</string>
     <string name="photo_reports_code_support_with_anfr">Support ID: %1$s (ANFR: %2$s)</string>
@@ -3338,4 +3341,5 @@
     <string name="appstrings_release_v2069_summary_photo_report_operator">Accurate operator targeting when opening a site from photo reports</string>
     <string name="appstrings_release_v2070_summary_photo_reports_customization">Display customization and scroll aids in photo report history</string>
     <string name="appstrings_release_v2071_summary_photo_reports_histories_shortcut">Access to photo reports with live counter directly from the histories hub</string>
+    <string name="appstrings_release_v2072_summary_photo_reports_selection_clear">Multi-select, batch deletion and clearing of photo report history</string>
 </resources>

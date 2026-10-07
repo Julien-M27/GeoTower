@@ -108,4 +108,22 @@ class PhotoReportsScreenTest {
             fr.geotower.data.community.PhotoReportHistoryStore.STATUS_REMOVED
         )
     }
+
+    @Test
+    fun photoReportHistoryStore_estimatedFreedBytes_handlesEmptyAndEntries() {
+        assertEquals(0L, fr.geotower.data.community.PhotoReportHistoryStore.estimatedFreedBytes(emptyList()))
+        val entry = fr.geotower.data.community.PhotoReportHistoryEntry(
+            id = "test-1",
+            photoId = "p-1",
+            siteId = "12345",
+            reason = "other",
+            description = null,
+            photoUrl = null,
+            operatorLabel = null,
+            createdAtMillis = 1000L,
+            status = fr.geotower.data.community.PhotoReportHistoryStore.STATUS_SENT
+        )
+        val freed = fr.geotower.data.community.PhotoReportHistoryStore.estimatedFreedBytes(listOf(entry))
+        org.junit.Assert.assertTrue(freed > 0L)
+    }
 }

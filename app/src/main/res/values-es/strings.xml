@@ -598,6 +598,9 @@
     <string name="photo_reports_delete_title">Eliminar esta denuncia</string>
     <string name="photo_reports_delete_message">Esto solo borra el registro de su dispositivo. La denuncia ya enviada a SignalQuest no se anula.</string>
     <string name="photo_reports_delete_confirm">Eliminar</string>
+    <string name="photo_reports_clear">Borrar el historial</string>
+    <string name="photo_reports_clear_title">¿Borrar el historial de denuncias?</string>
+    <string name="photo_reports_clear_desc">Se eliminarán de este dispositivo todas las denuncias registradas. Las denuncias ya enviadas a SignalQuest no se anulan.</string>
     <string name="photo_reports_code_anfr">ID de la ANFR: %1$s</string>
     <string name="photo_reports_code_support">ID de soporte: %1$s</string>
     <string name="photo_reports_code_support_with_anfr">ID de soporte: %1$s (ANFR: %2$s)</string>
@@ -3338,4 +3341,5 @@
     <string name="appstrings_release_v2069_summary_photo_report_operator">Selección precisa del operador al abrir un sitio desde los reportes de fotos</string>
     <string name="appstrings_release_v2070_summary_photo_reports_customization">Personalización de la visualización y ayudas de desplazamiento en el historial de reportes de fotos</string>
     <string name="appstrings_release_v2071_summary_photo_reports_histories_shortcut">Acceso a los reportes de fotos con contador en vivo desde el centro de historiales</string>
+    <string name="appstrings_release_v2072_summary_photo_reports_selection_clear">Selección múltiple, eliminación por lotes y borrado del historial de reportes de fotos</string>
 </resources>
