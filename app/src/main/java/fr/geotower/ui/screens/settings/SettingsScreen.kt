@@ -281,7 +281,8 @@ fun SettingsScreen(
     navController: NavController,
      repository: AnfrRepository,
     initialSection: String? = null,
-    targetOfflineMapFilename: String? = null
+    targetOfflineMapFilename: String? = null,
+    initialProfileData: String? = null
 ) {
     val context = LocalContext.current
     val activity = LocalActivity.current
@@ -736,7 +737,9 @@ fun SettingsScreen(
     var showCoverageDefaultsSheet by remember { mutableStateOf(false) }
     var showElevationDefaultsSheet by remember { mutableStateOf(false) }
     var showMapFiltersDefaultsSheet by remember { mutableStateOf(false) }
-    var showPreferenceProfilesSheet by remember { mutableStateOf(false) }
+    var showPreferenceProfilesSheet by rememberSaveable(initialSection, initialProfileData) {
+        mutableStateOf(initialSection == "preference_profiles" || !initialProfileData.isNullOrBlank())
+    }
     var showFrequenciesSheet by remember { mutableStateOf(false) }
     var showCommunityDataSheet by remember { mutableStateOf(false) }
     var communityDataSettingsFeatureId by remember { mutableStateOf<String?>(null) }
@@ -844,6 +847,7 @@ fun SettingsScreen(
                     "site" -> showSiteSettingsSheet = true
                     "frequency_reference" -> showFrequencyReferenceSettingsSheet = true
                     "throughput" -> showThroughputCalculatorSettingsSheet = true
+                    "preference_profiles" -> showPreferenceProfilesSheet = true
                 }
             }
         }
@@ -1853,7 +1857,8 @@ fun SettingsScreen(
             PreferenceProfilesSheet(
                 onDismiss = { showPreferenceProfilesSheet = false },
                 sheetState = sheetState,
-                useOneUi = useOneUi
+                useOneUi = useOneUi,
+                initialProfileData = initialProfileData
             )
         }
 

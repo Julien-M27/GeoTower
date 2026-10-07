@@ -2328,6 +2328,31 @@
     <string name="preference_profiles_save">Guardar</string>
     <string name="preference_profiles_export_saved">Exportação guardada</string>
     <string name="preference_profiles_export_failed">Falha na exportação</string>
+    <string name="preference_profiles_details_title">Detalhes do perfil</string>
+    <string name="preference_profiles_diff_base_title">Diferenças em relação à versão padrão</string>
+    <string name="preference_profiles_diff_base_identical">Todas as preferências deste perfil são idênticas à versão padrão.</string>
+    <plurals name="preference_profiles_diff_count">
+        <item quantity="one">%1$d preferência modificada</item>
+        <item quantity="other">%1$d preferências modificadas</item>
+    </plurals>
+    <string name="preference_profiles_base_version">Versão padrão</string>
+    <string name="preference_profiles_diff_from_base">Padrão: %1$s</string>
+    <string name="preference_profiles_diff_in_profile">Este perfil: %1$s</string>
+    <string name="preference_profiles_share_qr">Partilhar por código QR</string>
+    <string name="preference_profiles_share_qr_title">Partilhar perfil por código QR</string>
+    <string name="preference_profiles_share_qr_desc">Leia este código QR com outro dispositivo para importar instantaneamente este perfil.</string>
+    <string name="preference_profiles_share_qr_action">Partilhar imagem</string>
+    <string name="preference_profiles_copy_link">Copiar ligação</string>
+    <string name="preference_profiles_link_copied">Ligação copiada para a área de transferência</string>
+    <string name="preference_profiles_import_qr_image">Digitalizar código QR</string>
+    <string name="preference_profiles_import_qr_image_desc">Digitalizar com a câmara ou importar uma imagem.</string>
+    <string name="preference_profiles_import_qr_image_error">Nenhum código QR de perfil GeoTower detetado nesta imagem.</string>
+    <string name="preference_profiles_import_qr_dialog_title">Digitalizar código QR</string>
+    <string name="preference_profiles_import_qr_camera_title">Câmara</string>
+    <string name="preference_profiles_import_qr_camera_desc">Tirar uma foto do código QR a digitalizar</string>
+    <string name="preference_profiles_import_qr_gallery_title">Digitalização de imagem</string>
+    <string name="preference_profiles_import_qr_gallery_desc">Escolher uma captura de ecrã ou foto do dispositivo</string>
+    <string name="preference_profiles_view_details">Ver detalhes</string>
     <string name="appstrings_release_profiles_save_restore">Adição de perfis de preferências para guardar e recuperar as suas definições</string>
     <string name="appstrings_release_profiles_create_customize">Criação de um perfil a partir das definições atuais, com cor, ícone ou imagem</string>
     <string name="appstrings_release_profiles_preview_before_apply">Pré-visualização das alterações antes de aplicar um perfil</string>
@@ -3342,4 +3367,5 @@
     <string name="appstrings_release_v2070_summary_photo_reports_customization">Personalização da visualização e ajudas de deslocamento no histórico de relatos de fotos</string>
     <string name="appstrings_release_v2071_summary_photo_reports_histories_shortcut">Acesso aos relatos de fotos com contador em tempo real a partir do centro de históricos</string>
     <string name="appstrings_release_v2072_summary_photo_reports_selection_clear">Seleção múltipla, eliminação em lote e limpeza do histórico de relatos de fotos</string>
+    <string name="appstrings_release_v2073_summary_preference_profiles_qr_and_diff">Partilha e importação de perfis de preferências por código QR e comparação com a versão base</string>
 </resources>

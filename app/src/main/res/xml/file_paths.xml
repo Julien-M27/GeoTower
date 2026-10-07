@@ -3,6 +3,7 @@
     <cache-path name="shared_images" path="images/"/>
     <cache-path name="sq_camera" path="sq_camera/"/>
     <cache-path name="profile_exports" path="profile_exports/"/>
+    <cache-path name="profile_shares" path="profile_shares/"/>
     <!-- Exports de trajets (GPX/JSON). Sans cette ligne, FileProvider refuse le fichier et le
          partage plante avant même d'ouvrir le sélecteur. -->
     <cache-path name="trip_exports" path="trip_exports/"/>

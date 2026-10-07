@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -34,13 +35,20 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.QrCode
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
@@ -48,25 +56,32 @@ import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -83,6 +98,7 @@ import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.PreferenceProfile
 import fr.geotower.utils.PreferenceProfileChange
+import fr.geotower.utils.PreferenceProfileImportConflict
 import fr.geotower.utils.PreferenceProfileImportPreview
 import fr.geotower.utils.PreferenceProfileImportResolution
 import fr.geotower.utils.PreferenceProfileManager
@@ -93,7 +109,8 @@ import java.io.File
 fun PreferenceProfilesSheet(
     onDismiss: () -> Unit,
     sheetState: SheetState,
-    useOneUi: Boolean
+    useOneUi: Boolean,
+    initialProfileData: String? = null
 ) {
     val context = LocalContext.current
     val sizing = LocalGeoTowerUiStyle.current.sizing
@@ -109,6 +126,8 @@ fun PreferenceProfilesSheet(
     var profileToDelete by remember { mutableStateOf<PreferenceProfile?>(null) }
     var profileToRename by remember { mutableStateOf<PreferenceProfile?>(null) }
     var profileToApply by remember { mutableStateOf<PreferenceProfile?>(null) }
+    var profileToShowDetails by remember { mutableStateOf<PreferenceProfile?>(null) }
+    var profileToShareQr by remember { mutableStateOf<PreferenceProfile?>(null) }
     var importPreview by remember { mutableStateOf<PreferenceProfileImportPreview?>(null) }
     var importError by remember { mutableStateOf<String?>(null) }
     var exportIds by remember { mutableStateOf<Set<String>?>(null) }
@@ -119,6 +138,19 @@ fun PreferenceProfilesSheet(
     fun refreshProfiles() {
         profiles = PreferenceProfileManager.profiles(context)
         activeProfileId = PreferenceProfileManager.activeProfileId(context)
+    }
+
+    LaunchedEffect(initialProfileData) {
+        if (!initialProfileData.isNullOrBlank()) {
+            val imported = PreferenceProfileManager.decodeProfileFromQrData(context, initialProfileData)
+            if (imported != null) {
+                val conflicts = profiles.filter { it.name.equals(imported.name, ignoreCase = true) }
+                    .map { PreferenceProfileImportConflict(imported, it) }
+                importPreview = PreferenceProfileImportPreview(listOf(imported), conflicts)
+            } else {
+                importError = context.getString(R.string.preference_profiles_import_failed)
+            }
+        }
     }
 
     fun selectedProfiles(ids: Set<String>): List<PreferenceProfile> {
@@ -161,6 +193,41 @@ fun PreferenceProfilesSheet(
             }
         }.onFailure {
             importError = context.getString(R.string.preference_profiles_import_failed)
+        }
+    }
+
+    var showScanQrSourceDialog by remember { mutableStateOf(false) }
+    var pendingCameraUri by rememberSaveable { mutableStateOf<String?>(null) }
+
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        val uriStr = pendingCameraUri
+        pendingCameraUri = null
+        if (!success || uriStr == null) return@rememberLauncherForActivityResult
+        val uri = Uri.parse(uriStr)
+        val imported = PreferenceProfileManager.decodeProfileFromImageUri(context, uri)
+        if (imported != null) {
+            val conflicts = profiles.filter { it.name.equals(imported.name, ignoreCase = true) }
+                .map { PreferenceProfileImportConflict(imported, it) }
+            importPreview = PreferenceProfileImportPreview(listOf(imported), conflicts)
+        } else {
+            importError = context.getString(R.string.preference_profiles_import_qr_image_error)
+        }
+        runCatching { context.contentResolver.delete(uri, null, null) }
+    }
+
+    val qrImageLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        val imported = PreferenceProfileManager.decodeProfileFromImageUri(context, uri)
+        if (imported != null) {
+            val conflicts = profiles.filter { it.name.equals(imported.name, ignoreCase = true) }
+                .map { PreferenceProfileImportConflict(imported, it) }
+            importPreview = PreferenceProfileImportPreview(listOf(imported), conflicts)
+        } else {
+            importError = context.getString(R.string.preference_profiles_import_qr_image_error)
         }
     }
 
@@ -218,8 +285,14 @@ fun PreferenceProfilesSheet(
                     active = profile.id == activeProfileId,
                     useOneUi = useOneUi,
                     onClick = {
-                        if (profile.id != activeProfileId) profileToApply = profile
+                        if (profile.id != activeProfileId) {
+                            profileToApply = profile
+                        } else {
+                            profileToShowDetails = profile
+                        }
                     },
+                    onShowDetails = { profileToShowDetails = profile },
+                    onShareQr = { profileToShareQr = profile },
                     onRename = {
                         if (!profile.isDefault) profileToRename = profile
                     },
@@ -254,6 +327,14 @@ fun PreferenceProfilesSheet(
             )
             Spacer(Modifier.height(sizing.spacing(10.dp)))
             ProfileActionButton(
+                title = stringResource(R.string.preference_profiles_import_qr_image),
+                desc = stringResource(R.string.preference_profiles_import_qr_image_desc),
+                icon = Icons.Default.QrCodeScanner,
+                useOneUi = useOneUi,
+                onClick = { showScanQrSourceDialog = true }
+            )
+            Spacer(Modifier.height(sizing.spacing(10.dp)))
+            ProfileActionButton(
                 title = stringResource(R.string.preference_profiles_export_selected),
                 desc = stringResource(R.string.preference_profiles_export_selected_desc),
                 icon = Icons.Default.FileDownload,
@@ -274,6 +355,23 @@ fun PreferenceProfilesSheet(
                 showCreateDialog = false
                 refreshProfiles()
                 Toast.makeText(context, R.string.preference_profiles_created, Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
+
+    if (showScanQrSourceDialog) {
+        ScanQrSourceDialog(
+            useOneUi = useOneUi,
+            onDismiss = { showScanQrSourceDialog = false },
+            onSelectCamera = {
+                showScanQrSourceDialog = false
+                val uri = PreferenceProfileManager.createQrCameraCaptureUri(context)
+                pendingCameraUri = uri.toString()
+                cameraLauncher.launch(uri)
+            },
+            onSelectGallery = {
+                showScanQrSourceDialog = false
+                qrImageLauncher.launch(arrayOf("image/*"))
             }
         )
     }
@@ -322,11 +420,49 @@ fun PreferenceProfilesSheet(
             profile = profile,
             changes = changes,
             onDismiss = { profileToApply = null },
+            onShowBaseDiffs = {
+                val p = profile
+                profileToApply = null
+                profileToShowDetails = p
+            },
             onApply = {
                 PreferenceProfileManager.applyProfile(context, profile.id)
                 profileToApply = null
                 refreshProfiles()
                 recreateHostActivity(context)
+            }
+        )
+    }
+
+    profileToShowDetails?.let { profile ->
+        val changesFromBase = remember(profile.id, profiles) {
+            PreferenceProfileManager.profileDifferencesFromDefault(context, profile)
+        }
+        ProfileDetailsDialog(
+            profile = profile,
+            active = profile.id == activeProfileId,
+            changes = changesFromBase,
+            onDismiss = { profileToShowDetails = null },
+            onShareQr = {
+                val p = profile
+                profileToShowDetails = null
+                profileToShareQr = p
+            },
+            onApply = {
+                PreferenceProfileManager.applyProfile(context, profile.id)
+                profileToShowDetails = null
+                refreshProfiles()
+                recreateHostActivity(context)
+            }
+        )
+    }
+
+    profileToShareQr?.let { profile ->
+        ShareProfileQrDialog(
+            profile = profile,
+            onDismiss = { profileToShareQr = null },
+            onShare = {
+                PreferenceProfileManager.shareProfileQr(context, profile)
             }
         )
     }
@@ -430,10 +566,13 @@ private fun PreferenceProfileRow(
     active: Boolean,
     useOneUi: Boolean,
     onClick: () -> Unit,
+    onShowDetails: () -> Unit,
+    onShareQr: () -> Unit,
     onRename: () -> Unit,
     onImageClick: () -> Unit,
     onDelete: () -> Unit
 ) {
+    val context = LocalContext.current
     val sizing = LocalGeoTowerUiStyle.current.sizing
     val shape = RoundedCornerShape(if (useOneUi) sizing.component(24.dp) else sizing.component(12.dp))
     val cardColor = if (useOneUi) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f) else Color.Transparent
@@ -464,45 +603,93 @@ private fun PreferenceProfileRow(
                     style = sizing.textStyle(MaterialTheme.typography.titleMedium),
                     fontWeight = FontWeight.Bold
                 )
+                val diffCount = remember(profile.id, profile.updatedAt) {
+                    PreferenceProfileManager.profileDifferencesCount(context, profile)
+                }
+                val subtitle = if (profile.isDefault) {
+                    if (active) {
+                        "${stringResource(R.string.preference_profiles_active)} • ${stringResource(R.string.preference_profiles_base_version)}"
+                    } else {
+                        "${stringResource(R.string.preference_profiles_base_version)} • ${stringResource(R.string.preference_profiles_tap_to_apply)}"
+                    }
+                } else {
+                    val diffText = if (diffCount == 0) {
+                        stringResource(R.string.preference_profiles_diff_base_identical)
+                    } else {
+                        pluralStringResource(R.plurals.preference_profiles_diff_count, diffCount, diffCount)
+                    }
+                    if (active) {
+                        "${stringResource(R.string.preference_profiles_active)} • $diffText"
+                    } else {
+                        "$diffText • ${stringResource(R.string.preference_profiles_tap_to_apply)}"
+                    }
+                }
                 Text(
-                    text = if (active) stringResource(R.string.preference_profiles_active) else stringResource(R.string.preference_profiles_tap_to_apply),
+                    text = subtitle,
                     style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            if (!active) {
+            Spacer(Modifier.width(sizing.spacing(4.dp)))
+            IconButton(onClick = onShowDetails) {
+                Icon(
+                    Icons.Default.Info,
+                    contentDescription = stringResource(R.string.preference_profiles_view_details),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(Modifier.width(sizing.spacing(2.dp)))
+            IconButton(onClick = onShareQr) {
+                Icon(
+                    Icons.Default.QrCode,
+                    contentDescription = stringResource(R.string.preference_profiles_share_qr),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            if (!profile.isDefault) {
+                var showMenu by remember { mutableStateOf(false) }
+                Box {
+                    IconButton(onClick = { showMenu = true }) {
+                        Icon(
+                            Icons.Default.MoreVert,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.preference_profiles_rename)) },
+                            onClick = {
+                                showMenu = false
+                                onRename()
+                            },
+                            leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.preference_profiles_image_change)) },
+                            onClick = {
+                                showMenu = false
+                                onImageClick()
+                            },
+                            leadingIcon = { Icon(Icons.Default.Image, contentDescription = null) }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.preference_profiles_delete), color = MaterialTheme.colorScheme.error) },
+                            onClick = {
+                                showMenu = false
+                                onDelete()
+                            },
+                            leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) }
+                        )
+                    }
+                }
+            } else if (!active) {
                 Icon(
                     Icons.AutoMirrored.Filled.KeyboardArrowRight,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(sizing.component(24.dp))
                 )
-            }
-            if (!profile.isDefault) {
-                Spacer(Modifier.width(sizing.spacing(4.dp)))
-                IconButton(onClick = onRename) {
-                    Icon(
-                        Icons.Default.Edit,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Spacer(Modifier.width(sizing.spacing(4.dp)))
-                IconButton(onClick = onImageClick) {
-                    Icon(
-                        Icons.Default.Image,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Spacer(Modifier.width(sizing.spacing(4.dp)))
-                IconButton(onClick = onDelete) {
-                    Icon(
-                        Icons.Default.Delete,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
             }
         }
     }
@@ -746,26 +933,303 @@ private fun ApplyPreferenceProfileDialog(
     profile: PreferenceProfile,
     changes: List<PreferenceProfileChange>,
     onDismiss: () -> Unit,
+    onShowBaseDiffs: () -> Unit,
     onApply: () -> Unit
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.preference_profiles_apply_title, profile.name)) },
         text = {
-            if (changes.isEmpty()) {
-                Text(stringResource(R.string.preference_profiles_no_changes))
-            } else {
-                ChangePreviewList(changes = changes)
+            Column {
+                if (changes.isEmpty()) {
+                    Text(stringResource(R.string.preference_profiles_no_changes))
+                } else {
+                    ChangePreviewList(changes = changes)
+                }
+                Spacer(Modifier.height(sizing.spacing(12.dp)))
+                OutlinedButton(
+                    onClick = onShowBaseDiffs,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        Icons.Default.Info,
+                        contentDescription = null,
+                        modifier = Modifier.size(sizing.component(18.dp))
+                    )
+                    Spacer(Modifier.width(sizing.spacing(8.dp)))
+                    Text(stringResource(R.string.preference_profiles_diff_base_title))
+                }
             }
         },
         confirmButton = {
-            TextButton(onClick = onApply) {
+            Button(onClick = onApply) {
                 Text(stringResource(R.string.preference_profiles_apply))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
                 Text(stringResource(R.string.common_cancel))
+            }
+        }
+    )
+}
+
+@Composable
+private fun ProfileDetailsDialog(
+    profile: PreferenceProfile,
+    active: Boolean,
+    changes: List<PreferenceProfileChange>,
+    onDismiss: () -> Unit,
+    onShareQr: () -> Unit,
+    onApply: () -> Unit
+) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    val scrollState = rememberScrollState()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ProfileIconBadge(profile = profile)
+                Spacer(Modifier.width(sizing.spacing(12.dp)))
+                Column {
+                    Text(
+                        text = profile.name,
+                        style = sizing.textStyle(MaterialTheme.typography.titleMedium),
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = if (active) {
+                            stringResource(R.string.preference_profiles_active)
+                        } else {
+                            stringResource(R.string.preference_profiles_details_title)
+                        },
+                        style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .heightIn(max = sizing.component(440.dp))
+                    .verticalScroll(scrollState)
+            ) {
+                if (profile.isDefault || changes.isEmpty()) {
+                    Text(
+                        text = stringResource(R.string.preference_profiles_diff_base_identical),
+                        style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else {
+                    Text(
+                        text = pluralStringResource(
+                            R.plurals.preference_profiles_diff_count,
+                            changes.size,
+                            changes.size
+                        ),
+                        style = sizing.textStyle(MaterialTheme.typography.titleSmall),
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(Modifier.height(sizing.spacing(10.dp)))
+                    changes.groupBy { it.section }.forEach { (section, sectionChanges) ->
+                        Text(
+                            text = section,
+                            style = sizing.textStyle(MaterialTheme.typography.titleSmall),
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(top = sizing.spacing(6.dp))
+                        )
+                        Spacer(Modifier.height(sizing.spacing(4.dp)))
+                        sectionChanges.forEach { change ->
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = sizing.spacing(4.dp)),
+                                shape = RoundedCornerShape(sizing.component(10.dp)),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                            ) {
+                                Column(modifier = Modifier.padding(sizing.spacing(10.dp))) {
+                                    Text(
+                                        text = change.label,
+                                        style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Spacer(Modifier.height(sizing.spacing(2.dp)))
+                                    Text(
+                                        text = stringResource(R.string.preference_profiles_diff_from_base, change.oldValue),
+                                        style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = stringResource(R.string.preference_profiles_diff_in_profile, change.newValue),
+                                        style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))) {
+                TextButton(onClick = onShareQr) {
+                    Icon(
+                        Icons.Default.QrCode,
+                        contentDescription = null,
+                        modifier = Modifier.size(sizing.component(18.dp))
+                    )
+                    Spacer(Modifier.width(sizing.spacing(6.dp)))
+                    Text(stringResource(R.string.preference_profiles_share_qr))
+                }
+                if (!active) {
+                    Button(onClick = onApply) {
+                        Text(stringResource(R.string.preference_profiles_apply))
+                    }
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.appstrings_close))
+            }
+        }
+    )
+}
+
+@Composable
+private fun ShareProfileQrDialog(
+    profile: PreferenceProfile,
+    onDismiss: () -> Unit,
+    onShare: () -> Unit
+) {
+    val context = LocalContext.current
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    val scrollState = rememberScrollState()
+    val deepLink = remember(profile.id, profile.updatedAt) {
+        PreferenceProfileManager.generateProfileQrDeepLink(context, profile)
+    }
+    val qrBitmap = remember(deepLink) {
+        PreferenceProfileManager.generateProfileQrBitmap(deepLink, 480)
+    }
+    val diffCount = remember(profile.id, profile.updatedAt) {
+        PreferenceProfileManager.profileDifferencesCount(context, profile)
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ProfileIconBadge(profile = profile)
+                Spacer(Modifier.width(sizing.spacing(12.dp)))
+                Column {
+                    Text(
+                        text = stringResource(R.string.preference_profiles_share_qr_title),
+                        style = sizing.textStyle(MaterialTheme.typography.titleMedium),
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = profile.name,
+                        style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(scrollState),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = stringResource(R.string.preference_profiles_share_qr_desc),
+                    style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(bottom = sizing.spacing(12.dp))
+                )
+
+                Surface(
+                    shape = RoundedCornerShape(sizing.component(16.dp)),
+                    color = Color.White,
+                    border = BorderStroke(sizing.component(1.dp), MaterialTheme.colorScheme.outlineVariant),
+                    modifier = Modifier
+                        .size(sizing.component(240.dp))
+                        .padding(sizing.spacing(8.dp))
+                ) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        if (qrBitmap != null) {
+                            Image(
+                                bitmap = qrBitmap.asImageBitmap(),
+                                contentDescription = "QR Code",
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(sizing.spacing(8.dp))
+                            )
+                        } else {
+                            CircularProgressIndicator()
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(sizing.spacing(12.dp)))
+
+                val summaryText = if (profile.isDefault) {
+                    stringResource(R.string.preference_profiles_base_version)
+                } else if (diffCount == 0) {
+                    stringResource(R.string.preference_profiles_diff_base_identical)
+                } else {
+                    pluralStringResource(R.plurals.preference_profiles_diff_count, diffCount, diffCount)
+                }
+                Text(
+                    text = summaryText,
+                    style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary,
+                    textAlign = TextAlign.Center
+                )
+            }
+        },
+        confirmButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))) {
+                TextButton(
+                    onClick = {
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                        val clip = android.content.ClipData.newPlainText("Profil GeoTower", deepLink)
+                        clipboard.setPrimaryClip(clip)
+                        Toast.makeText(context, R.string.preference_profiles_link_copied, Toast.LENGTH_SHORT).show()
+                    }
+                ) {
+                    Icon(
+                        Icons.Default.ContentCopy,
+                        contentDescription = null,
+                        modifier = Modifier.size(sizing.component(18.dp))
+                    )
+                    Spacer(Modifier.width(sizing.spacing(4.dp)))
+                    Text(stringResource(R.string.preference_profiles_copy_link))
+                }
+                Button(onClick = onShare) {
+                    Icon(
+                        Icons.Default.Share,
+                        contentDescription = null,
+                        modifier = Modifier.size(sizing.component(18.dp))
+                    )
+                    Spacer(Modifier.width(sizing.spacing(4.dp)))
+                    Text(stringResource(R.string.preference_profiles_share_qr_action))
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.appstrings_close))
             }
         }
     )
@@ -964,4 +1428,125 @@ private fun recreateHostActivity(context: Context) {
         current = current.baseContext
     }
     (current as? Activity)?.recreate()
+}
+
+@Composable
+private fun ScanQrSourceDialog(
+    useOneUi: Boolean,
+    onDismiss: () -> Unit,
+    onSelectCamera: () -> Unit,
+    onSelectGallery: () -> Unit
+) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    val shape = RoundedCornerShape(if (useOneUi) sizing.component(28.dp) else sizing.component(16.dp))
+    val itemShape = RoundedCornerShape(if (useOneUi) sizing.component(20.dp) else sizing.component(12.dp))
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = shape,
+        title = {
+            Text(
+                text = stringResource(R.string.preference_profiles_import_qr_dialog_title),
+                fontWeight = FontWeight.Bold,
+                style = sizing.textStyle(MaterialTheme.typography.titleLarge)
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))
+            ) {
+                Surface(
+                    onClick = onSelectCamera,
+                    shape = itemShape,
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(sizing.spacing(16.dp)),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(sizing.component(44.dp))
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.PhotoCamera,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(sizing.component(24.dp))
+                            )
+                        }
+                        Spacer(Modifier.width(sizing.spacing(14.dp)))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = stringResource(R.string.preference_profiles_import_qr_camera_title),
+                                fontWeight = FontWeight.Bold,
+                                style = sizing.textStyle(MaterialTheme.typography.titleMedium)
+                            )
+                            Text(
+                                text = stringResource(R.string.preference_profiles_import_qr_camera_desc),
+                                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                Surface(
+                    onClick = onSelectGallery,
+                    shape = itemShape,
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(sizing.spacing(16.dp)),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(sizing.component(44.dp))
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.PhotoLibrary,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.secondary,
+                                modifier = Modifier.size(sizing.component(24.dp))
+                            )
+                        }
+                        Spacer(Modifier.width(sizing.spacing(14.dp)))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = stringResource(R.string.preference_profiles_import_qr_gallery_title),
+                                fontWeight = FontWeight.Bold,
+                                style = sizing.textStyle(MaterialTheme.typography.titleMedium)
+                            )
+                            Text(
+                                text = stringResource(R.string.preference_profiles_import_qr_gallery_desc),
+                                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.common_cancel))
+            }
+        }
+    )
 }

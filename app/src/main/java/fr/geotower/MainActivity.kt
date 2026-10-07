@@ -939,21 +939,32 @@ class MainActivity : ComponentActivity() {
 
                             // Paramètres
                             composable(
-                                route = "settings?section={section}&target_map={targetMapFilename}",
+                                route = "settings?section={section}&target_map={targetMapFilename}&profile_data={profileData}",
                                 arguments = listOf(
                                     navArgument("section") { type = NavType.StringType; nullable = true; defaultValue = null },
-                                    navArgument("targetMapFilename") { type = NavType.StringType; nullable = true; defaultValue = null }
+                                    navArgument("targetMapFilename") { type = NavType.StringType; nullable = true; defaultValue = null },
+                                    navArgument("profileData") { type = NavType.StringType; nullable = true; defaultValue = null }
                                 ),
                                 deepLinks = listOf(
-                                    navDeepLink { uriPattern = "geotower://settings?section={section}&target_map={targetMapFilename}" },
-                                    navDeepLink { uriPattern = "geotower://settings?section={section}" }
+                                    navDeepLink { uriPattern = "geotower://settings?section={section}&target_map={targetMapFilename}&profile_data={profileData}" },
+                                    navDeepLink { uriPattern = "geotower://settings?section={section}" },
+                                    navDeepLink { uriPattern = "geotower://profile?data={profileData}" },
+                                    navDeepLink { uriPattern = "geotower://profile" },
+                                    navDeepLink { uriPattern = "geotower://preference_profiles" }
                                 )
                             ) { backStackEntry ->
                                 val section = backStackEntry.arguments?.getString("section")
                                 val targetMapFilename = backStackEntry.arguments?.getString("targetMapFilename")
+                                val profileData = backStackEntry.arguments?.getString("profileData")
                                 Box(modifier = Modifier.padding(innerPadding)) {
                                     if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.SETTINGS)) {
-                                        SettingsScreen(navController, repository, section, targetMapFilename)
+                                        SettingsScreen(
+                                            navController = navController,
+                                            repository = repository,
+                                            initialSection = section ?: if (profileData != null) "preference_profiles" else null,
+                                            targetOfflineMapFilename = targetMapFilename,
+                                            initialProfileData = profileData
+                                        )
                                     } else {
                                         DisabledFeatureRoute(navController, txtUnavailable)
                                     }

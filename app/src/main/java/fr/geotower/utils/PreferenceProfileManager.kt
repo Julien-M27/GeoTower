@@ -3,17 +3,29 @@ package fr.geotower.utils
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.RectF
+import android.graphics.Typeface
 import android.net.Uri
 import android.util.Base64
 import androidx.core.content.FileProvider
+import fr.geotower.R
+import fr.geotower.data.share.ShareHistoryStore
 import fr.geotower.data.workers.UpdateCheckScheduler
 import fr.geotower.services.LiveTrackingController
 import fr.geotower.widget.WidgetUpdateScheduler
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.text.Normalizer
 import java.util.UUID
+import java.util.zip.GZIPInputStream
+import java.util.zip.GZIPOutputStream
 
 data class PreferenceProfileValue(
     val type: String,
@@ -112,6 +124,7 @@ object PreferenceProfileManager {
     private var listener: SharedPreferences.OnSharedPreferenceChangeListener? = null
     private var suppressProfileSync = false
     private val compactPersonalizedNameRegex = Regex("^Personnalisé(\\d+)$")
+    val personalizedNameRegex = Regex("^Personnalisé(\\s*\\d+)?$", RegexOption.IGNORE_CASE)
 
     private val explicitVisibleKeys = setOf(
         "theme_mode",
@@ -332,14 +345,35 @@ object PreferenceProfileManager {
     fun ensureProfiles(context: Context): List<PreferenceProfile> {
         val prefs = appPrefs(context)
         val store = readProfiles(prefs)
+        val baseDefaults = factoryDefaultValues()
         if (store.any { it.id == DEFAULT_PROFILE_ID }) {
             val now = System.currentTimeMillis()
-            val normalizedStore = store.map { profile ->
-                val normalizedName = normalizedProfileName(profile)
-                if (profile.name != normalizedName) {
-                    profile.copy(name = normalizedName, updatedAt = now)
+            val (spuriousProfiles, validProfiles) = store.partition { profile ->
+                !profile.isDefault &&
+                    profile.name.matches(personalizedNameRegex) &&
+                    diffValues(baseDefaults, profile.values).isEmpty()
+            }
+            if (spuriousProfiles.isNotEmpty()) {
+                spuriousProfiles.forEach { profile ->
+                    profile.imagePath?.let { runCatching { File(it).delete() } }
+                    clearProfileImages(context, profile.id)
+                }
+            }
+            val normalizedStore = validProfiles.map { profile ->
+                if (profile.id == DEFAULT_PROFILE_ID) {
+                    val normalizedName = DEFAULT_PROFILE_NAME
+                    if (profile.name != normalizedName || profile.values != baseDefaults) {
+                        profile.copy(name = normalizedName, values = baseDefaults, updatedAt = now)
+                    } else {
+                        profile
+                    }
                 } else {
-                    profile
+                    val normalizedName = normalizedProfileName(profile)
+                    if (profile.name != normalizedName) {
+                        profile.copy(name = normalizedName, updatedAt = now)
+                    } else {
+                        profile
+                    }
                 }
             }
             if (normalizedStore != store) {
@@ -357,7 +391,7 @@ object PreferenceProfileManager {
             icon = "settings",
             createdAt = now,
             updatedAt = now,
-            values = currentVisibleValues(prefs)
+            values = baseDefaults
         )
         writeProfiles(prefs, listOf(defaultProfile))
         prefs.edit().putString(ACTIVE_PROFILE_ID_KEY, DEFAULT_PROFILE_ID).apply()
@@ -460,7 +494,23 @@ object PreferenceProfileManager {
     }
 
     fun profileChanges(context: Context, profile: PreferenceProfile): List<PreferenceProfileChange> {
-        return diffValues(currentVisibleValues(appPrefs(context)), profile.values)
+        return diffValues(currentVisibleValues(appPrefs(context)), profile.values, context)
+    }
+
+    fun defaultProfile(context: Context): PreferenceProfile? {
+        val default = ensureProfiles(context).firstOrNull { it.isDefault } ?: return null
+        return default.copy(values = factoryDefaultValues())
+    }
+
+    fun profileDifferencesFromDefault(context: Context, profile: PreferenceProfile): List<PreferenceProfileChange> {
+        val default = defaultProfile(context) ?: return emptyList()
+        if (profile.isDefault) return emptyList()
+        return diffValues(default.values, profile.values, context)
+    }
+
+    fun profileDifferencesCount(context: Context, profile: PreferenceProfile): Int {
+        if (profile.isDefault) return 0
+        return profileDifferencesFromDefault(context, profile).size
     }
 
     fun applyProfile(context: Context, profileId: String): List<PreferenceProfileChange> {
@@ -590,6 +640,398 @@ object PreferenceProfileManager {
         return "${baseName.sanitizeFileName()}.json"
     }
 
+    fun compressGzip(data: ByteArray): ByteArray {
+        val byteStream = ByteArrayOutputStream()
+        GZIPOutputStream(byteStream).use { it.write(data) }
+        return byteStream.toByteArray()
+    }
+
+    fun decompressGzip(compressed: ByteArray): String {
+        val inputStream = GZIPInputStream(ByteArrayInputStream(compressed))
+        return inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+    }
+
+    private const val BASE64_URL_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+
+    internal fun encodeBase64Url(bytes: ByteArray): String {
+        val out = StringBuilder((bytes.size + 2) / 3 * 4)
+        var index = 0
+        while (index + 2 < bytes.size) {
+            val chunk = ((bytes[index].toInt() and 0xFF) shl 16) or
+                ((bytes[index + 1].toInt() and 0xFF) shl 8) or
+                (bytes[index + 2].toInt() and 0xFF)
+            out.append(BASE64_URL_ALPHABET[(chunk ushr 18) and 0x3F])
+            out.append(BASE64_URL_ALPHABET[(chunk ushr 12) and 0x3F])
+            out.append(BASE64_URL_ALPHABET[(chunk ushr 6) and 0x3F])
+            out.append(BASE64_URL_ALPHABET[chunk and 0x3F])
+            index += 3
+        }
+        when (bytes.size - index) {
+            1 -> {
+                val chunk = (bytes[index].toInt() and 0xFF) shl 16
+                out.append(BASE64_URL_ALPHABET[(chunk ushr 18) and 0x3F])
+                out.append(BASE64_URL_ALPHABET[(chunk ushr 12) and 0x3F])
+            }
+            2 -> {
+                val chunk = ((bytes[index].toInt() and 0xFF) shl 16) or
+                    ((bytes[index + 1].toInt() and 0xFF) shl 8)
+                out.append(BASE64_URL_ALPHABET[(chunk ushr 18) and 0x3F])
+                out.append(BASE64_URL_ALPHABET[(chunk ushr 12) and 0x3F])
+                out.append(BASE64_URL_ALPHABET[(chunk ushr 6) and 0x3F])
+            }
+        }
+        return out.toString()
+    }
+
+    internal fun decodeBase64Url(text: String): ByteArray {
+        val out = ByteArrayOutputStream()
+        var buffer = 0
+        var bits = 0
+        for (ch in text) {
+            if (ch == '=') break
+            val v = when (ch) {
+                in 'A'..'Z' -> ch - 'A'
+                in 'a'..'z' -> ch - 'a' + 26
+                in '0'..'9' -> ch - '0' + 52
+                '-', '+' -> 62
+                '_', '/' -> 63
+                else -> continue
+            }
+            buffer = (buffer shl 6) or v
+            bits += 6
+            if (bits >= 8) {
+                bits -= 8
+                out.write((buffer ushr bits) and 0xFF)
+            }
+        }
+        return out.toByteArray()
+    }
+
+    fun generateProfileQrData(profile: PreferenceProfile, baseProfile: PreferenceProfile?): String {
+        val exportedValues = if (baseProfile != null && !profile.isDefault) {
+            profile.values.filter { (k, v) -> effectiveValue(baseProfile.values, k) != v }
+        } else {
+            profile.values
+        }
+
+        val json = JSONObject().apply {
+            put("v", 1)
+            put("diff", true)
+            put("name", profile.name)
+            put("color", profile.colorArgb)
+            put("icon", profile.icon)
+            put("values", JSONObject().also { vJson ->
+                exportedValues.toSortedMap().forEach { (k, v) ->
+                    vJson.put(k, valueToJson(v))
+                }
+            })
+        }
+        val compressed = compressGzip(json.toString().toByteArray(Charsets.UTF_8))
+        return encodeBase64Url(compressed)
+    }
+
+    fun generateProfileQrDeepLink(context: Context, profile: PreferenceProfile): String {
+        val default = defaultProfile(context)
+        val data = generateProfileQrData(profile, default)
+        return "geotower://profile?data=$data"
+    }
+
+    fun decodeProfileFromQrData(
+        rawData: String,
+        baseValues: Map<String, PreferenceProfileValue> = emptyMap(),
+        existingNames: List<String> = emptyList()
+    ): PreferenceProfile? {
+        val jsonString = runCatching {
+            val trimmed = rawData.trim()
+            if (trimmed.startsWith("{")) {
+                trimmed
+            } else {
+                val bytes = decodeBase64Url(trimmed)
+                decompressGzip(bytes)
+            }
+        }.getOrNull() ?: return null
+
+        return runCatching {
+            val root = JSONObject(jsonString)
+            val name = root.optString("name", "Profil importé")
+            val color = root.optInt("color", 0xFF2563EB.toInt())
+            val icon = root.optString("icon", "settings")
+            val isDiff = root.optBoolean("diff", true)
+            val valuesJson = root.optJSONObject("values") ?: JSONObject()
+            val importedValues = buildMap {
+                valuesJson.keys().forEach { key ->
+                    val vJson = valuesJson.optJSONObject(key) ?: return@forEach
+                    if (isVisiblePreferenceKey(key)) {
+                        valueFromJson(vJson)?.let { put(key, it) }
+                    }
+                }
+            }
+            val finalValues = if (isDiff && baseValues.isNotEmpty()) {
+                baseValues.toMutableMap().apply {
+                    putAll(importedValues)
+                }
+            } else {
+                importedValues
+            }
+            val now = System.currentTimeMillis()
+            PreferenceProfile(
+                id = UUID.randomUUID().toString(),
+                name = uniqueName(name, existingNames),
+                colorArgb = color,
+                icon = icon,
+                createdAt = now,
+                updatedAt = now,
+                values = finalValues
+            )
+        }.getOrNull()
+    }
+
+    fun decodeProfileFromQrData(context: Context, rawData: String): PreferenceProfile? {
+        val default = defaultProfile(context)
+        val existing = ensureProfiles(context)
+        return decodeProfileFromQrData(rawData, default?.values ?: emptyMap(), existing.map { it.name })
+    }
+
+    fun parseProfileFromQrText(context: Context, qrText: String): PreferenceProfile? {
+        val trimmed = qrText.trim()
+        if (trimmed.startsWith("geotower://profile")) {
+            val uri = Uri.parse(trimmed)
+            val data = uri.getQueryParameter("data") ?: return null
+            return decodeProfileFromQrData(context, data)
+        }
+        return decodeProfileFromQrData(context, trimmed)
+    }
+
+    fun generateProfileQrBitmap(deepLink: String, size: Int = 512): Bitmap? {
+        return try {
+            val hints = java.util.EnumMap<com.google.zxing.EncodeHintType, Any>(com.google.zxing.EncodeHintType::class.java).apply {
+                put(com.google.zxing.EncodeHintType.MARGIN, 1)
+                put(com.google.zxing.EncodeHintType.ERROR_CORRECTION, com.google.zxing.qrcode.decoder.ErrorCorrectionLevel.M)
+            }
+            val bitMatrix = com.google.zxing.qrcode.QRCodeWriter().encode(
+                deepLink,
+                com.google.zxing.BarcodeFormat.QR_CODE,
+                size,
+                size,
+                hints
+            )
+            val width = bitMatrix.width
+            val height = bitMatrix.height
+            val pixels = IntArray(width * height)
+            for (y in 0 until height) {
+                val offset = y * width
+                for (x in 0 until width) {
+                    pixels[offset + x] = if (bitMatrix.get(x, y)) android.graphics.Color.BLACK else android.graphics.Color.WHITE
+                }
+            }
+            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
+            bitmap
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    fun decodeQrCodeFromBitmap(bitmap: Bitmap): String? {
+        val width = bitmap.width
+        val height = bitmap.height
+        val pixels = IntArray(width * height)
+        bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+        val source = com.google.zxing.RGBLuminanceSource(width, height, pixels)
+        val hints = mapOf(
+            com.google.zxing.DecodeHintType.TRY_HARDER to true,
+            com.google.zxing.DecodeHintType.POSSIBLE_FORMATS to listOf(com.google.zxing.BarcodeFormat.QR_CODE)
+        )
+        val reader = com.google.zxing.qrcode.QRCodeReader()
+
+        // 1. HybridBinarizer (standard)
+        try {
+            val binaryBitmap = com.google.zxing.BinaryBitmap(com.google.zxing.common.HybridBinarizer(source))
+            return reader.decode(binaryBitmap, hints).text
+        } catch (_: Exception) {}
+
+        // 2. GlobalHistogramBinarizer (robuste aux ombres et contrastes d'appareil photo)
+        try {
+            val binaryBitmap = com.google.zxing.BinaryBitmap(com.google.zxing.common.GlobalHistogramBinarizer(source))
+            return reader.decode(binaryBitmap, hints).text
+        } catch (_: Exception) {}
+
+        // 3. Luminance inversée (écran sombre / mode nuit)
+        try {
+            val inverted = source.invert()
+            val binaryBitmap = com.google.zxing.BinaryBitmap(com.google.zxing.common.HybridBinarizer(inverted))
+            return reader.decode(binaryBitmap, hints).text
+        } catch (_: Exception) {}
+
+        return null
+    }
+
+    fun decodeProfileFromImageUri(context: Context, uri: Uri): PreferenceProfile? {
+        return runCatching {
+            val boundsOptions = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            context.contentResolver.openInputStream(uri)?.use { stream ->
+                BitmapFactory.decodeStream(stream, null, boundsOptions)
+            }
+            val maxDim = maxOf(boundsOptions.outWidth, boundsOptions.outHeight)
+            var sampleSize = 1
+            while (maxDim / sampleSize > 1600) {
+                sampleSize *= 2
+            }
+            val decodeOptions = BitmapFactory.Options().apply {
+                inSampleSize = sampleSize
+                inPreferredConfig = Bitmap.Config.RGB_565
+            }
+            val bitmap = context.contentResolver.openInputStream(uri)?.use { stream ->
+                BitmapFactory.decodeStream(stream, null, decodeOptions)
+            } ?: return@runCatching null
+
+            val qrText = decodeQrCodeFromBitmap(bitmap) ?: return@runCatching null
+            parseProfileFromQrText(context, qrText)
+        }.getOrNull()
+    }
+
+    fun createQrCameraCaptureUri(context: Context): Uri {
+        val dir = File(context.cacheDir, "profile_shares").apply { mkdirs() }
+        val file = File(dir, "qr_camera_capture.jpg")
+        return FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+    }
+
+    fun createProfileQrCardBitmap(
+        context: Context,
+        profile: PreferenceProfile,
+        qrBitmap: Bitmap
+    ): Bitmap {
+        val width = 720
+        val height = 960
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+
+        canvas.drawColor(android.graphics.Color.WHITE)
+
+        val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            color = android.graphics.Color.parseColor("#E2E8F0")
+            strokeWidth = 4f
+        }
+        val cardRect = RectF(20f, 20f, width - 20f, height - 20f)
+        canvas.drawRoundRect(cardRect, 32f, 32f, borderPaint)
+
+        val brandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.parseColor("#1E293B")
+            textSize = 34f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            textAlign = Paint.Align.CENTER
+        }
+        canvas.drawText("GeoTower", width / 2f, 80f, brandPaint)
+
+        val subtitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.parseColor("#64748B")
+            textSize = 22f
+            textAlign = Paint.Align.CENTER
+        }
+        canvas.drawText("Profil de préférences", width / 2f, 115f, subtitlePaint)
+
+        val badgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = profile.colorArgb
+            style = Paint.Style.FILL
+        }
+        canvas.drawCircle(width / 2f, 175f, 36f, badgePaint)
+
+        val namePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.parseColor("#0F172A")
+            textSize = 32f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            textAlign = Paint.Align.CENTER
+        }
+        val displayName = if (profile.name.length > 28) profile.name.take(26) + "…" else profile.name
+        canvas.drawText(displayName, width / 2f, 255f, namePaint)
+
+        val diffCount = profileDifferencesCount(context, profile)
+        val countText = if (profile.isDefault) {
+            "Version de base"
+        } else if (diffCount == 0) {
+            "Identique à la version de base"
+        } else if (diffCount == 1) {
+            "1 préférence modifiée"
+        } else {
+            "$diffCount préférences modifiées"
+        }
+        val countPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.parseColor("#475569")
+            textSize = 22f
+            textAlign = Paint.Align.CENTER
+        }
+        canvas.drawText(countText, width / 2f, 290f, countPaint)
+
+        val qrSize = 460
+        val qrLeft = (width - qrSize) / 2f
+        val qrTop = 330f
+        val qrDestRect = RectF(qrLeft, qrTop, qrLeft + qrSize, qrTop + qrSize)
+        val qrBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.WHITE
+            style = Paint.Style.FILL
+        }
+        val qrBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.parseColor("#CBD5E1")
+            strokeWidth = 2f
+            style = Paint.Style.STROKE
+        }
+        canvas.drawRoundRect(RectF(qrLeft - 10f, qrTop - 10f, qrLeft + qrSize + 10f, qrTop + qrSize + 10f), 24f, 24f, qrBgPaint)
+        canvas.drawRoundRect(RectF(qrLeft - 10f, qrTop - 10f, qrLeft + qrSize + 10f, qrTop + qrSize + 10f), 24f, 24f, qrBorderPaint)
+        canvas.drawBitmap(qrBitmap, null, qrDestRect, null)
+
+        val hintPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.parseColor("#334155")
+            textSize = 22f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            textAlign = Paint.Align.CENTER
+        }
+        canvas.drawText("Scannez avec l'appareil photo ou GeoTower", width / 2f, 850f, hintPaint)
+
+        val subHintPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.parseColor("#94A3B8")
+            textSize = 18f
+            textAlign = Paint.Align.CENTER
+        }
+        canvas.drawText("pour importer ce profil", width / 2f, 885f, subHintPaint)
+
+        return bitmap
+    }
+
+    fun createProfileQrShareUri(context: Context, profile: PreferenceProfile): Uri? {
+        val deepLink = generateProfileQrDeepLink(context, profile)
+        val qrBitmap = generateProfileQrBitmap(deepLink, 512) ?: return null
+        val cardBitmap = createProfileQrCardBitmap(context, profile, qrBitmap)
+        val dir = File(context.cacheDir, "profile_shares").apply { mkdirs() }
+        val file = File(dir, "geotower_profil_${profile.name.sanitizeFileName()}_qr.png")
+        file.outputStream().use { stream ->
+            cardBitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
+        }
+        return FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+    }
+
+    fun shareProfileQr(context: Context, profile: PreferenceProfile) {
+        val deepLink = generateProfileQrDeepLink(context, profile)
+        val uri = createProfileQrShareUri(context, profile) ?: return
+        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "image/png"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(Intent.EXTRA_SUBJECT, "Profil GeoTower : ${profile.name}")
+            putExtra(Intent.EXTRA_TEXT, "Profil GeoTower : ${profile.name}\n$deepLink")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(
+            Intent.createChooser(shareIntent, profile.name).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
+        ShareHistoryStore.record(
+            context = context,
+            kind = ShareHistoryStore.KIND_SETTINGS_PROFILE,
+            destination = ShareHistoryStore.DEST_SHARE,
+            label = profile.name,
+            itemCount = 1
+        )
+    }
+
     fun refreshRuntimePreferences(context: Context) {
         val prefs = appPrefs(context)
         AppConfig.appLanguage.value = prefs.getString("app_language", AppLocale.LANGUAGE_SYSTEM)
@@ -644,8 +1086,22 @@ object PreferenceProfileManager {
         val now = System.currentTimeMillis()
         val currentValues = currentVisibleValues(prefs)
         val activeProfile = profiles.firstOrNull { it.id == activeId }
+        val baseDefaults = factoryDefaultValues()
+        val diffFromBase = diffValues(baseDefaults, currentValues)
 
-        if (activeId == DEFAULT_PROFILE_ID && activeProfile != null && activeProfile.values != currentValues) {
+        if (activeId == DEFAULT_PROFILE_ID && activeProfile != null) {
+            if (diffFromBase.isEmpty()) {
+                val updated = profiles.map { profile ->
+                    if (profile.id == activeId) {
+                        profile.copy(values = currentValues, updatedAt = now)
+                    } else {
+                        profile
+                    }
+                }
+                writeProfiles(prefs, updated)
+                return
+            }
+
             val customProfile = PreferenceProfile(
                 id = uniqueId(profiles),
                 name = uniquePersonalizedName(profiles.map { it.name }),
@@ -658,6 +1114,16 @@ object PreferenceProfileManager {
             writeProfiles(prefs, profiles + customProfile)
             prefs.edit().putString(ACTIVE_PROFILE_ID_KEY, customProfile.id).apply()
             return
+        }
+
+        if (activeProfile != null && !activeProfile.isDefault && activeProfile.name.matches(personalizedNameRegex)) {
+            if (diffFromBase.isEmpty()) {
+                activeProfile.imagePath?.let { runCatching { File(it).delete() } }
+                val remaining = profiles.filterNot { it.id == activeId }
+                writeProfiles(prefs, remaining)
+                prefs.edit().putString(ACTIVE_PROFILE_ID_KEY, DEFAULT_PROFILE_ID).apply()
+                return
+            }
         }
 
         val updated = profiles.map { profile ->
@@ -700,57 +1166,255 @@ object PreferenceProfileManager {
         }
     }
 
-    private fun diffValues(
-        oldValues: Map<String, PreferenceProfileValue>,
-        newValues: Map<String, PreferenceProfileValue>
-    ): List<PreferenceProfileChange> {
-        return (oldValues.keys + newValues.keys)
-            .distinct()
-            .filter { key -> oldValues[key] != newValues[key] }
-            .map { key ->
-                PreferenceProfileChange(
-                    key = key,
-                    section = sectionForKey(key),
-                    label = labelForKey(key),
-                    oldValue = oldValues[key].displayValue(),
-                    newValue = newValues[key].displayValue()
-                )
+    fun factoryDefaultValue(key: String): PreferenceProfileValue? {
+        return when (key) {
+            "theme_mode" -> PreferenceProfileValue(PreferenceProfileValue.TYPE_INT, 0)
+            "is_oled_mode" -> PreferenceProfileValue(PreferenceProfileValue.TYPE_BOOLEAN, true)
+            "is_blur_enabled" -> PreferenceProfileValue(PreferenceProfileValue.TYPE_BOOLEAN, true)
+            AppConfig.PREF_UI_SCALE_PERCENT -> PreferenceProfileValue(PreferenceProfileValue.TYPE_INT, 100)
+            AppConfig.PREF_COLOR_PALETTE -> PreferenceProfileValue(PreferenceProfileValue.TYPE_STRING, AppConfig.DEFAULT_COLOR_PALETTE)
+            AppConfig.PREF_UI_MODE -> PreferenceProfileValue(PreferenceProfileValue.TYPE_STRING, AppUiMode.Auto.storageKey)
+            AppLogoDrawingResources.PREF_KEY -> PreferenceProfileValue(PreferenceProfileValue.TYPE_INT, 0)
+            "map_provider" -> PreferenceProfileValue(PreferenceProfileValue.TYPE_INT, 1) // OpenStreetMap
+            "ign_style" -> PreferenceProfileValue(PreferenceProfileValue.TYPE_INT, 0)
+            AppConfig.PREF_SMOOTH_MAP_LOCATION -> PreferenceProfileValue(PreferenceProfileValue.TYPE_BOOLEAN, true)
+            AppConfig.PREF_MAP_LOCATION_ZOOM -> PreferenceProfileValue(PreferenceProfileValue.TYPE_FLOAT, 16f)
+            AppConfig.PREF_MAP_CLUSTER_STRENGTH -> PreferenceProfileValue(PreferenceProfileValue.TYPE_FLOAT, 1f)
+            AppConfig.PREF_MAP_ROTATION_ENABLED -> PreferenceProfileValue(PreferenceProfileValue.TYPE_BOOLEAN, true)
+            AppConfig.PREF_MAP_FOLLOW_ORIENTATION -> PreferenceProfileValue(PreferenceProfileValue.TYPE_BOOLEAN, false)
+            AppConfig.PREF_KEEP_AZIMUTHS_WHEN_ZOOMED_OUT -> PreferenceProfileValue(PreferenceProfileValue.TYPE_BOOLEAN, false)
+            AppConfig.PREF_SHOW_SIGNALQUEST_COVERAGE_POINTS -> PreferenceProfileValue(PreferenceProfileValue.TYPE_BOOLEAN, false)
+            AppConfig.PREF_SHOW_MAP_LOCATION_MARKER -> PreferenceProfileValue(PreferenceProfileValue.TYPE_BOOLEAN, true)
+            AppConfig.PREF_SHOW_AZIMUTH_LINES -> PreferenceProfileValue(PreferenceProfileValue.TYPE_BOOLEAN, true)
+            AppConfig.PREF_SHOW_AZIMUTH_CONES -> PreferenceProfileValue(PreferenceProfileValue.TYPE_BOOLEAN, true)
+            AppConfig.PREF_SHOW_RADIO_SITES -> PreferenceProfileValue(PreferenceProfileValue.TYPE_BOOLEAN, true)
+            "default_operator" -> PreferenceProfileValue(PreferenceProfileValue.TYPE_STRING, "Aucun")
+            "app_language" -> PreferenceProfileValue(PreferenceProfileValue.TYPE_STRING, AppLocale.LANGUAGE_SYSTEM)
+            "distance_unit" -> PreferenceProfileValue(PreferenceProfileValue.TYPE_INT, 0)
+            "speed_unit" -> PreferenceProfileValue(PreferenceProfileValue.TYPE_INT, 0)
+            "nav_mode" -> PreferenceProfileValue(PreferenceProfileValue.TYPE_INT, AppConfig.DEFAULT_NAV_MODE)
+            AppConfig.PREF_SETTINGS_SECTIONS_MODE -> PreferenceProfileValue(PreferenceProfileValue.TYPE_BOOLEAN, true)
+            "display_style" -> PreferenceProfileValue(PreferenceProfileValue.TYPE_INT, 0)
+            AppNotifications.PREF_ENABLED -> PreferenceProfileValue(PreferenceProfileValue.TYPE_BOOLEAN, true)
+            "enable_update_notifications" -> PreferenceProfileValue(PreferenceProfileValue.TYPE_BOOLEAN, true)
+            "enable_live_notifications" -> PreferenceProfileValue(PreferenceProfileValue.TYPE_BOOLEAN, true)
+            "widget_sync_freq" -> PreferenceProfileValue(PreferenceProfileValue.TYPE_INT, WidgetPrefs.DEFAULT_SYNC_MINUTES)
+            "live_tracking_location_update_interval_seconds" -> PreferenceProfileValue(PreferenceProfileValue.TYPE_INT, 5)
+            AppConfig.PREF_LOW_POWER_LEVEL -> PreferenceProfileValue(PreferenceProfileValue.TYPE_INT, 0)
+            AppConfig.PREF_LOW_POWER_FOLLOW_SYSTEM -> PreferenceProfileValue(PreferenceProfileValue.TYPE_BOOLEAN, true)
+            "startup_page" -> PreferenceProfileValue(PreferenceProfileValue.TYPE_STRING, "home")
+            AppConfig.PREF_HOME_LONG_PRESS_REORDER -> PreferenceProfileValue(PreferenceProfileValue.TYPE_BOOLEAN, true)
+            AppConfig.PREF_HOME_HELP_POSITION -> PreferenceProfileValue(PreferenceProfileValue.TYPE_INT, 0)
+            "page_site_status_voice" -> PreferenceProfileValue(PreferenceProfileValue.TYPE_BOOLEAN, true)
+            "page_site_status_data" -> PreferenceProfileValue(PreferenceProfileValue.TYPE_BOOLEAN, true)
+            "link_cartoradio" -> PreferenceProfileValue(PreferenceProfileValue.TYPE_BOOLEAN, true)
+            "link_cellularfr" -> PreferenceProfileValue(PreferenceProfileValue.TYPE_BOOLEAN, true)
+            "link_signalquest" -> PreferenceProfileValue(PreferenceProfileValue.TYPE_BOOLEAN, true)
+            "link_cellmapper" -> PreferenceProfileValue(PreferenceProfileValue.TYPE_BOOLEAN, true)
+            "link_rncmobile" -> PreferenceProfileValue(PreferenceProfileValue.TYPE_BOOLEAN, true)
+            "link_enbanalytics" -> PreferenceProfileValue(PreferenceProfileValue.TYPE_BOOLEAN, true)
+            "show_anfr" -> PreferenceProfileValue(PreferenceProfileValue.TYPE_BOOLEAN, true)
+            "home_logo_choice" -> PreferenceProfileValue(PreferenceProfileValue.TYPE_INT, 0)
+            "filter_default_show_sites_in_service", "show_sites_in_service" -> PreferenceProfileValue(PreferenceProfileValue.TYPE_BOOLEAN, true)
+            "filter_default_show_sites_out_of_service", "show_sites_out_of_service" -> PreferenceProfileValue(PreferenceProfileValue.TYPE_BOOLEAN, true)
+            "filter_default_show_project_sites", "show_project_sites" -> PreferenceProfileValue(PreferenceProfileValue.TYPE_BOOLEAN, true)
+            "filter_default_hide_underground_sites", "hide_underground_sites" -> PreferenceProfileValue(PreferenceProfileValue.TYPE_BOOLEAN, false)
+            "filter_default_show_only_zb_sites", "show_only_zb_sites" -> PreferenceProfileValue(PreferenceProfileValue.TYPE_BOOLEAN, false)
+            "filter_default_show_techno_2g", "show_techno_2g",
+            "filter_default_show_techno_3g", "show_techno_3g",
+            "filter_default_show_techno_4g", "show_techno_4g",
+            "filter_default_show_techno_5g", "show_techno_5g" -> PreferenceProfileValue(PreferenceProfileValue.TYPE_BOOLEAN, true)
+            else -> when {
+                key.startsWith("site_show_") ->
+                    PreferenceProfileValue(PreferenceProfileValue.TYPE_BOOLEAN, true)
+                key.startsWith("f2g_") || key.startsWith("f3g_") || key.startsWith("f4g_") || key.startsWith("f5g_") ->
+                    PreferenceProfileValue(PreferenceProfileValue.TYPE_BOOLEAN, true)
+                key.startsWith("show_radio_") ->
+                    PreferenceProfileValue(PreferenceProfileValue.TYPE_BOOLEAN, false)
+                else -> null
             }
-            .sortedWith(compareBy<PreferenceProfileChange> { it.section }.thenBy { it.label })
+        }
     }
 
-    private fun PreferenceProfileValue?.displayValue(): String {
-        if (this == null) return "Par défaut"
+    fun factoryDefaultValues(): Map<String, PreferenceProfileValue> {
+        val map = mutableMapOf<String, PreferenceProfileValue>()
+        explicitVisibleKeys.forEach { key ->
+            factoryDefaultValue(key)?.let { map[key] = it }
+        }
+        return map
+    }
+
+    fun effectiveValue(values: Map<String, PreferenceProfileValue>, key: String): PreferenceProfileValue? {
+        return values[key] ?: factoryDefaultValue(key)
+    }
+
+    fun diffValues(
+        oldValues: Map<String, PreferenceProfileValue>,
+        newValues: Map<String, PreferenceProfileValue>,
+        context: Context? = null
+    ): List<PreferenceProfileChange> {
+        val allKeys = (oldValues.keys + newValues.keys).distinct().filter { isVisiblePreferenceKey(it) }
+        return allKeys.mapNotNull { key ->
+            val oldVal = effectiveValue(oldValues, key)
+            val newVal = effectiveValue(newValues, key)
+            if (oldVal == newVal) return@mapNotNull null
+
+            val oldDisplay = oldVal.displayValue(key, context)
+            val newDisplay = newVal.displayValue(key, context)
+            if (oldDisplay == newDisplay) return@mapNotNull null
+
+            PreferenceProfileChange(
+                key = key,
+                section = sectionForKey(key, context),
+                label = labelForKey(key, context),
+                oldValue = oldDisplay,
+                newValue = newDisplay
+            )
+        }.sortedWith(compareBy<PreferenceProfileChange> { it.section }.thenBy { it.label })
+    }
+
+    internal fun PreferenceProfileValue?.displayValue(key: String = "", context: Context? = null): String {
+        if (this == null) {
+            val fallback = factoryDefaultValue(key)
+            if (fallback != null) {
+                return fallback.displayValue(key, context)
+            }
+            return context?.getString(R.string.preference_profiles_base_version) ?: "Par défaut"
+        }
         return when (type) {
-            PreferenceProfileValue.TYPE_BOOLEAN -> if (value as Boolean) "Activé" else "Désactivé"
+            PreferenceProfileValue.TYPE_BOOLEAN -> {
+                val b = value as Boolean
+                if (b) {
+                    context?.getString(R.string.appstrings_diagnostic_value_enabled) ?: "Activé"
+                } else {
+                    context?.getString(R.string.appstrings_diagnostic_value_disabled) ?: "Désactivé"
+                }
+            }
             PreferenceProfileValue.TYPE_STRING_SET -> (value as Set<*>).joinToString(", ")
+            PreferenceProfileValue.TYPE_INT -> formatIntDisplayValue(key, value as Int, context)
+            PreferenceProfileValue.TYPE_STRING -> formatStringDisplayValue(key, value as String, context)
             else -> value.toString()
         }
     }
 
-    private fun sectionForKey(key: String): String {
-        keySections[key]?.let { return it }
-        return when {
-            key.startsWith("share_") -> "Partage"
-            key.startsWith("page_") -> "Pages"
-            key.startsWith("site_") -> "Détails site"
-            key.startsWith("community_") -> "Données communautaires"
-            key.startsWith("throughput_") -> "Débit"
-            key.startsWith("show_") || key.startsWith("f2g_") || key.startsWith("f3g_") ||
-                key.startsWith("f4g_") || key.startsWith("f5g_") -> "Carte"
-            else -> "Général"
+    private fun formatIntDisplayValue(key: String, value: Int, context: Context? = null): String {
+        return when (key) {
+            "theme_mode" -> when (value) {
+                1 -> context?.getString(R.string.appearance_theme_light) ?: "Clair"
+                2 -> context?.getString(R.string.appearance_theme_dark) ?: "Sombre"
+                else -> context?.getString(R.string.appearance_theme_system) ?: "Système"
+            }
+            "map_provider" -> when (value) {
+                1 -> context?.getString(R.string.mapping_provider_osm) ?: "OpenStreetMap"
+                2 -> "Google Maps"
+                3 -> context?.getString(R.string.mapping_provider_ign) ?: "IGN"
+                4 -> "Mapbox"
+                5 -> "Mapsforge (hors-ligne)"
+                else -> value.toString()
+            }
+            "ign_style" -> when (value) {
+                0 -> "Plan IGN"
+                1 -> "Scan 25"
+                2 -> "Satellite"
+                3 -> "Cadastre"
+                else -> value.toString()
+            }
+            "nav_mode" -> when (value) {
+                1 -> "Panneau latéral (One UI)"
+                else -> "Onglets classiques"
+            }
+            "distance_unit" -> when (value) {
+                1 -> "Impérial (ft, mi)"
+                else -> "Métrique (m, km)"
+            }
+            "speed_unit" -> when (value) {
+                1 -> "mph"
+                else -> "km/h"
+            }
+            "display_style" -> when (value) {
+                1 -> "Compact"
+                2 -> "Aéré"
+                else -> "Standard"
+            }
+            AppConfig.PREF_UI_SCALE_PERCENT -> "$value %"
+            "widget_sync_freq" -> "$value min"
+            "live_tracking_location_update_interval_seconds" -> "$value s"
+            AppConfig.PREF_MAP_LOCATION_ZOOM -> "Zoom $value"
+            AppConfig.PREF_MAP_CLUSTER_STRENGTH -> "Niveau $value"
+            AppConfig.PREF_LOW_POWER_LEVEL -> when (value) {
+                1 -> "Économie modérée"
+                2 -> "Économie stricte"
+                else -> context?.getString(R.string.appstrings_diagnostic_value_disabled) ?: "Désactivé"
+            }
+            else -> value.toString()
         }
     }
 
-    private fun labelForKey(key: String): String {
-        keyLabels[key]?.let { return it }
-        return key
-            .removePrefix("page_")
-            .removePrefix("share_")
-            .removePrefix("site_")
-            .removePrefix("community_")
-            .replace('_', ' ')
-            .replaceFirstChar { it.uppercase() }
+    private fun formatStringDisplayValue(key: String, value: String, context: Context? = null): String {
+        return when (key) {
+            "app_language" -> when (value) {
+                "fr" -> context?.getString(R.string.language_french_name) ?: "Français"
+                "en" -> context?.getString(R.string.language_english_name) ?: "English"
+                "de" -> context?.getString(R.string.language_german_name) ?: "Deutsch"
+                "es" -> context?.getString(R.string.language_spanish_name) ?: "Español"
+                "it" -> context?.getString(R.string.language_italian_name) ?: "Italiano"
+                "pt" -> context?.getString(R.string.language_portuguese_name) ?: "Português"
+                else -> context?.getString(R.string.language_system) ?: "Système"
+            }
+            "default_operator" -> if (value == "Aucun") {
+                context?.getString(R.string.common_none) ?: "Aucun"
+            } else {
+                value
+            }
+            "startup_page" -> when (value) {
+                "nearby" -> "À proximité"
+                "map" -> "Carte"
+                "compass" -> "Boussole"
+                "stats" -> "Statistiques"
+                else -> "Accueil"
+            }
+            AppConfig.PREF_UI_MODE -> when (value) {
+                "one_ui" -> "One UI"
+                "material" -> "Material 3"
+                else -> "Automatique"
+            }
+            else -> value
+        }
+    }
+
+    fun sectionForKey(key: String, context: Context? = null): String {
+        val sectionRes = when (keySections[key]) {
+            "Apparence" -> R.string.settings_section_appearance
+            "Cartographie", "Carte", "Azimuts au dézoom" -> R.string.settings_section_mapping
+            "Général" -> R.string.settings_section_preferences
+            "Suivi et arrière-plan" -> R.string.settings_section_background
+            "Système, batterie et permissions" -> R.string.settings_section_system
+            "Pages", "Liens externes" -> R.string.settings_pages_customization_title
+            else -> when {
+                key.startsWith("show_") || key.startsWith("f2g_") || key.startsWith("f3g_") ||
+                    key.startsWith("f4g_") || key.startsWith("f5g_") -> R.string.settings_section_mapping
+                key.startsWith("page_") -> R.string.settings_pages_customization_title
+                else -> R.string.settings_section_preferences
+            }
+        }
+        return context?.getString(sectionRes) ?: keySections[key] ?: "Général"
+    }
+
+    fun labelForKey(key: String, context: Context? = null): String {
+        return when (key) {
+            "theme_mode" -> context?.getString(R.string.appearance_theme_title) ?: "Thème"
+            "default_operator" -> context?.getString(R.string.settings_default_operator) ?: "Opérateur par défaut"
+            "display_style" -> context?.getString(R.string.settings_display_style_title) ?: "Style d'affichage"
+            "nav_mode" -> context?.getString(R.string.settings_navigation_mode_title) ?: "Navigation des paramètres"
+            "distance_unit", "speed_unit" -> context?.getString(R.string.settings_units_title) ?: keyLabels[key] ?: "Unités"
+            else -> keyLabels[key] ?: key
+                .removePrefix("page_")
+                .removePrefix("share_")
+                .removePrefix("site_")
+                .removePrefix("community_")
+                .replace('_', ' ')
+                .replaceFirstChar { it.uppercase() }
+        }
     }
 
     private fun readProfiles(prefs: SharedPreferences): List<PreferenceProfile> {

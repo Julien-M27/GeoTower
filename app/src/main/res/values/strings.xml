@@ -178,6 +178,31 @@
     <string name="preference_profiles_save">Save</string>
     <string name="preference_profiles_export_saved">Export saved</string>
     <string name="preference_profiles_export_failed">Export failed</string>
+    <string name="preference_profiles_details_title">Profile details</string>
+    <string name="preference_profiles_diff_base_title">Differences from default version</string>
+    <string name="preference_profiles_diff_base_identical">All settings in this profile are identical to the default version.</string>
+    <plurals name="preference_profiles_diff_count">
+        <item quantity="one">%1$d modified setting</item>
+        <item quantity="other">%1$d modified settings</item>
+    </plurals>
+    <string name="preference_profiles_base_version">Default version</string>
+    <string name="preference_profiles_diff_from_base">Default: %1$s</string>
+    <string name="preference_profiles_diff_in_profile">Profile: %1$s</string>
+    <string name="preference_profiles_share_qr">Share via QR code</string>
+    <string name="preference_profiles_share_qr_title">Share profile via QR code</string>
+    <string name="preference_profiles_share_qr_desc">Scan this QR code with another device to import this profile instantly.</string>
+    <string name="preference_profiles_share_qr_action">Share image</string>
+    <string name="preference_profiles_copy_link">Copy link</string>
+    <string name="preference_profiles_link_copied">Link copied to clipboard</string>
+    <string name="preference_profiles_import_qr_image">Scan a QR Code</string>
+    <string name="preference_profiles_import_qr_image_desc">Scan with camera or import an image.</string>
+    <string name="preference_profiles_import_qr_image_error">No GeoTower profile QR code detected in this image.</string>
+    <string name="preference_profiles_import_qr_dialog_title">Scan a QR Code</string>
+    <string name="preference_profiles_import_qr_camera_title">Camera</string>
+    <string name="preference_profiles_import_qr_camera_desc">Take a photo of the QR code to scan</string>
+    <string name="preference_profiles_import_qr_gallery_title">Scan image</string>
+    <string name="preference_profiles_import_qr_gallery_desc">Choose a screenshot or photo from device</string>
+    <string name="preference_profiles_view_details">View details</string>
     <string name="onboarding_preferences_desc">Configure your main operator to make it easier to use the measurement tools on the map.</string>
     <string name="onboarding_mapping_desc">Which map provider do you prefer?</string>
     <string name="common_authorize">Authorize</string>
@@ -3365,4 +3390,5 @@
     <string name="appstrings_release_v2070_summary_photo_reports_customization">Display customization and scroll aids in photo report history</string>
     <string name="appstrings_release_v2071_summary_photo_reports_histories_shortcut">Access to photo reports with live counter directly from the histories hub</string>
     <string name="appstrings_release_v2072_summary_photo_reports_selection_clear">Multi-select, batch deletion and clearing of photo report history</string>
+    <string name="appstrings_release_v2073_summary_preference_profiles_qr_and_diff">Share and import preference profiles via QR code and compare with default settings</string>
 </resources>

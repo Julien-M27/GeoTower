@@ -2328,6 +2328,31 @@
     <string name="preference_profiles_save">Guardar</string>
     <string name="preference_profiles_export_saved">Exportación guardada</string>
     <string name="preference_profiles_export_failed">Error de exportación</string>
+    <string name="preference_profiles_details_title">Detalles del perfil</string>
+    <string name="preference_profiles_diff_base_title">Diferencias con la versión predeterminada</string>
+    <string name="preference_profiles_diff_base_identical">Todas las preferencias de este perfil son idénticas a la versión predeterminada.</string>
+    <plurals name="preference_profiles_diff_count">
+        <item quantity="one">%1$d preferencia modificada</item>
+        <item quantity="other">%1$d preferencias modificadas</item>
+    </plurals>
+    <string name="preference_profiles_base_version">Versión predeterminada</string>
+    <string name="preference_profiles_diff_from_base">Base: %1$s</string>
+    <string name="preference_profiles_diff_in_profile">Este perfil: %1$s</string>
+    <string name="preference_profiles_share_qr">Compartir por código QR</string>
+    <string name="preference_profiles_share_qr_title">Compartir perfil por código QR</string>
+    <string name="preference_profiles_share_qr_desc">Escanea este código QR con otro dispositivo para importar este perfil al instante.</string>
+    <string name="preference_profiles_share_qr_action">Compartir imagen</string>
+    <string name="preference_profiles_copy_link">Copiar enlace</string>
+    <string name="preference_profiles_link_copied">Enlace copiado al portapapeles</string>
+    <string name="preference_profiles_import_qr_image">Escanear código QR</string>
+    <string name="preference_profiles_import_qr_image_desc">Escanear con la cámara o importar una imagen.</string>
+    <string name="preference_profiles_import_qr_image_error">No se detectó ningún código QR de perfil GeoTower en esta imagen.</string>
+    <string name="preference_profiles_import_qr_dialog_title">Escanear código QR</string>
+    <string name="preference_profiles_import_qr_camera_title">Cámara</string>
+    <string name="preference_profiles_import_qr_camera_desc">Tomar una foto del código QR a escanear</string>
+    <string name="preference_profiles_import_qr_gallery_title">Escanear imagen</string>
+    <string name="preference_profiles_import_qr_gallery_desc">Elegir una captura o foto desde el dispositivo</string>
+    <string name="preference_profiles_view_details">Ver detalles</string>
     <string name="appstrings_release_profiles_save_restore">Añadidos perfiles de preferencias para guardar y recuperar tus ajustes</string>
     <string name="appstrings_release_profiles_create_customize">Creación de un perfil desde los ajustes actuales, con color, icono o imagen</string>
     <string name="appstrings_release_profiles_preview_before_apply">Vista previa de los cambios antes de aplicar un perfil</string>
@@ -3342,4 +3367,5 @@
     <string name="appstrings_release_v2070_summary_photo_reports_customization">Personalización de la visualización y ayudas de desplazamiento en el historial de reportes de fotos</string>
     <string name="appstrings_release_v2071_summary_photo_reports_histories_shortcut">Acceso a los reportes de fotos con contador en vivo desde el centro de historiales</string>
     <string name="appstrings_release_v2072_summary_photo_reports_selection_clear">Selección múltiple, eliminación por lotes y borrado del historial de reportes de fotos</string>
+    <string name="appstrings_release_v2073_summary_preference_profiles_qr_and_diff">Compartir e importar perfiles de preferencias mediante código QR y comparación con la versión base</string>
 </resources>

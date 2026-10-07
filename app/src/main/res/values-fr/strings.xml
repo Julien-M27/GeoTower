@@ -2358,6 +2358,31 @@
     <string name="preference_profiles_save">Enregistrer</string>
     <string name="preference_profiles_export_saved">Exportation enregistrée</string>
     <string name="preference_profiles_export_failed">Exportation impossible</string>
+    <string name="preference_profiles_details_title">Détails du profil</string>
+    <string name="preference_profiles_diff_base_title">Différences avec la version de base</string>
+    <string name="preference_profiles_diff_base_identical">Toutes les préférences de ce profil sont identiques à la version de base.</string>
+    <plurals name="preference_profiles_diff_count">
+        <item quantity="one">%1$d préférence modifiée</item>
+        <item quantity="other">%1$d préférences modifiées</item>
+    </plurals>
+    <string name="preference_profiles_base_version">Version de base</string>
+    <string name="preference_profiles_diff_from_base">Base : %1$s</string>
+    <string name="preference_profiles_diff_in_profile">Ce profil : %1$s</string>
+    <string name="preference_profiles_share_qr">Partager par QR Code</string>
+    <string name="preference_profiles_share_qr_title">Partager le profil par QR Code</string>
+    <string name="preference_profiles_share_qr_desc">Scannez ce QR Code avec un autre appareil pour importer instantanément ce profil.</string>
+    <string name="preference_profiles_share_qr_action">Partager l\'image</string>
+    <string name="preference_profiles_copy_link">Copier le lien</string>
+    <string name="preference_profiles_link_copied">Lien copié dans le presse-papiers</string>
+    <string name="preference_profiles_import_qr_image">Scanner un QR Code</string>
+    <string name="preference_profiles_import_qr_image_desc">Scanner avec l\'appareil photo ou importer une image.</string>
+    <string name="preference_profiles_import_qr_image_error">Aucun QR Code de profil GeoTower détecté dans cette image.</string>
+    <string name="preference_profiles_import_qr_dialog_title">Scanner un QR Code</string>
+    <string name="preference_profiles_import_qr_camera_title">Appareil photo</string>
+    <string name="preference_profiles_import_qr_camera_desc">Prendre une photo du QR Code à scanner</string>
+    <string name="preference_profiles_import_qr_gallery_title">Scan d\'image</string>
+    <string name="preference_profiles_import_qr_gallery_desc">Choisir une capture ou photo dans l\'appareil</string>
+    <string name="preference_profiles_view_details">Voir les détails</string>
     <string name="appstrings_release_profiles_save_restore">Ajout de profils de préférences pour sauvegarder et retrouver vos réglages</string>
     <string name="appstrings_release_profiles_create_customize">Création d’un profil à partir des réglages actuels, avec couleur, icône ou image</string>
     <string name="appstrings_release_profiles_preview_before_apply">Aperçu des changements avant application d’un profil</string>
@@ -3344,4 +3369,5 @@
     <string name="appstrings_release_v2070_summary_photo_reports_customization">Personnalisation de l\'affichage et aides au défilement dans l\'historique des signalements de photos</string>
     <string name="appstrings_release_v2071_summary_photo_reports_histories_shortcut">Accès aux signalements de photos avec compteur dédié depuis la page des historiques</string>
     <string name="appstrings_release_v2072_summary_photo_reports_selection_clear">Sélection multiple, suppression groupée et effacement de l\'historique des signalements de photos</string>
+    <string name="appstrings_release_v2073_summary_preference_profiles_qr_and_diff">Partage et importation de profils de préférences par QR Code et comparaison avec la version de base</string>
 </resources>
