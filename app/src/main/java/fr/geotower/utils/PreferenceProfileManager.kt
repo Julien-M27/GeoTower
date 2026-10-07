@@ -299,7 +299,7 @@ object PreferenceProfileManager {
         AppConfig.PREF_MAP_FOLLOW_ORIENTATION to "Carte orientée selon la boussole",
         AppConfig.PREF_KEEP_AZIMUTHS_WHEN_ZOOMED_OUT to "Azimuts visibles en dézoomant",
         AppConfig.PREF_SHOW_SIGNALQUEST_COVERAGE_POINTS to "Points de couverture SignalQuest",
-        AppConfig.PREF_SIGNALQUEST_COVERAGE_OPERATOR_KEYS to "OpÃ©rateurs couverture SignalQuest",
+        AppConfig.PREF_SIGNALQUEST_COVERAGE_OPERATOR_KEYS to "Opérateurs couverture SignalQuest",
         "default_operator" to "Opérateur par défaut",
         "app_language" to "Langue",
         "distance_unit" to "Unité de distance",
@@ -707,22 +707,100 @@ object PreferenceProfileManager {
         return out.toByteArray()
     }
 
+    private val keyToAlias = mapOf(
+        "theme_mode" to "tm",
+        "is_oled_mode" to "om",
+        "is_blur_enabled" to "be",
+        AppConfig.PREF_UI_SCALE_PERCENT to "us",
+        "app_language" to "al",
+        "map_provider" to "mp",
+        "ign_style" to "is",
+        "nav_mode" to "nm",
+        AppConfig.PREF_SETTINGS_SECTIONS_MODE to "sm",
+        "display_style" to "ds",
+        "distance_unit" to "du",
+        "speed_unit" to "su",
+        "default_operator" to "do",
+        AppNotifications.PREF_ENABLED to "ne",
+        "enable_update_notifications" to "un",
+        "enable_live_notifications" to "ln",
+        "widget_sync_freq" to "wf",
+        "live_tracking_location_update_interval_seconds" to "li",
+        AppConfig.PREF_LOW_POWER_LEVEL to "lp",
+        AppConfig.PREF_LOW_POWER_FOLLOW_SYSTEM to "ls",
+        "startup_page" to "sp",
+        "pages_order" to "po",
+        AppConfig.PREF_HOME_LONG_PRESS_REORDER to "lr",
+        AppConfig.PREF_HOME_HELP_POSITION to "hp",
+        "external_links_order" to "eo",
+        "page_site_external_links_order" to "so",
+        AppConfig.PREF_COLOR_PALETTE to "cp",
+        AppConfig.PREF_SELECTED_OPERATORS to "s_ops",
+        AppConfig.PREF_UI_MODE to "um",
+        AppConfig.PREF_SHOW_MAP_LOCATION_MARKER to "lm",
+        AppConfig.PREF_SMOOTH_MAP_LOCATION to "sml",
+        AppConfig.PREF_MAP_LOCATION_ZOOM to "lz",
+        AppConfig.PREF_MAP_CLUSTER_STRENGTH to "cs",
+        AppConfig.PREF_MAP_ROTATION_ENABLED to "re",
+        AppConfig.PREF_MAP_FOLLOW_ORIENTATION to "fo",
+        AppConfig.PREF_SHOW_AZIMUTH_LINES to "al_az",
+        AppConfig.PREF_SHOW_AZIMUTH_CONES to "ac_az",
+        AppConfig.PREF_KEEP_AZIMUTHS_WHEN_ZOOMED_OUT to "ko_az",
+        AppConfig.PREF_SHOW_RADIO_SITES to "rs_az",
+        AppConfig.PREF_SHOW_RADIO_TV to "rtv",
+        AppConfig.PREF_SHOW_RADIO_BROADCAST to "rbc",
+        AppConfig.PREF_SHOW_RADIO_PRIVATE_MOBILE to "rpm",
+        AppConfig.PREF_SHOW_RADIO_FH to "rfh",
+        AppConfig.PREF_SHOW_RADIO_OTHER to "rot",
+        AppConfig.PREF_SHOW_SIGNALQUEST_COVERAGE_POINTS to "sqp",
+        AppConfig.PREF_SIGNALQUEST_COVERAGE_OPERATOR_KEYS to "sqo",
+        AppConfig.PREF_HIDE_UNDERGROUND_SITES to "hus",
+        AppConfig.PREF_SHOW_ONLY_ZB_SITES to "szb",
+        AppConfig.PREF_SHOW_PROJECT_SITES to "sps",
+        AppConfig.PREF_MOBILE_TECHNOLOGY_ONLY to "mto",
+        AppLogoDrawingResources.PREF_KEY to "hlc",
+        "page_site_status_voice" to "psv",
+        "page_site_status_data" to "psd",
+        "link_cartoradio" to "lc",
+        "link_cellularfr" to "lcf",
+        "link_signalquest" to "lsq",
+        "link_cellmapper" to "lcm",
+        "link_rncmobile" to "lrn",
+        "link_enbanalytics" to "lea",
+        "show_anfr" to "san"
+    )
+    private val aliasToKey = keyToAlias.entries.associate { (k, v) -> v to k }
+
     fun generateProfileQrData(profile: PreferenceProfile, baseProfile: PreferenceProfile?): String {
-        val exportedValues = if (baseProfile != null && !profile.isDefault) {
-            profile.values.filter { (k, v) -> effectiveValue(baseProfile.values, k) != v }
+        val baseValues = baseProfile?.values ?: factoryDefaultValues()
+        val exportedValues = if (!profile.isDefault) {
+            profile.values.filter { (k, v) -> effectiveValue(baseValues, k) != v }
         } else {
-            profile.values
+            emptyMap()
         }
 
         val json = JSONObject().apply {
-            put("v", 1)
+            put("v", 2)
             put("diff", true)
             put("name", profile.name)
             put("color", profile.colorArgb)
             put("icon", profile.icon)
             put("values", JSONObject().also { vJson ->
                 exportedValues.toSortedMap().forEach { (k, v) ->
-                    vJson.put(k, valueToJson(v))
+                    val alias = keyToAlias[k] ?: k
+                    when (v.type) {
+                        PreferenceProfileValue.TYPE_BOOLEAN -> vJson.put(alias, v.value as Boolean)
+                        PreferenceProfileValue.TYPE_INT -> vJson.put(alias, v.value as Int)
+                        PreferenceProfileValue.TYPE_LONG -> vJson.put(alias, v.value as Long)
+                        PreferenceProfileValue.TYPE_FLOAT -> vJson.put(alias, (v.value as Float).toDouble())
+                        PreferenceProfileValue.TYPE_STRING -> vJson.put(alias, v.value as String)
+                        PreferenceProfileValue.TYPE_STRING_SET -> {
+                            val arr = JSONArray()
+                            (v.value as Set<*>).sortedBy { it.toString() }.forEach { arr.put(it) }
+                            vJson.put(alias, arr)
+                        }
+                        else -> vJson.put(alias, v.value)
+                    }
                 }
             })
         }
@@ -759,15 +837,25 @@ object PreferenceProfileManager {
             val isDiff = root.optBoolean("diff", true)
             val valuesJson = root.optJSONObject("values") ?: JSONObject()
             val importedValues = buildMap {
-                valuesJson.keys().forEach { key ->
-                    val vJson = valuesJson.optJSONObject(key) ?: return@forEach
-                    if (isVisiblePreferenceKey(key)) {
-                        valueFromJson(vJson)?.let { put(key, it) }
+                valuesJson.keys().forEach { rawKey ->
+                    val fullKey = aliasToKey[rawKey] ?: rawKey
+                    if (!isVisiblePreferenceKey(fullKey)) return@forEach
+
+                    val obj = valuesJson.optJSONObject(rawKey)
+                    val parsedVal = if (obj != null && obj.has("type") && obj.has("value")) {
+                        valueFromJson(obj)
+                    } else {
+                        val rawVal = valuesJson.opt(rawKey)
+                        preferenceValueFromAny(rawVal)
+                    }
+                    if (parsedVal != null) {
+                        put(fullKey, parsedVal)
                     }
                 }
             }
-            val finalValues = if (isDiff && baseValues.isNotEmpty()) {
-                baseValues.toMutableMap().apply {
+            val effectiveBase = if (baseValues.isNotEmpty()) baseValues else factoryDefaultValues()
+            val finalValues = if (isDiff) {
+                effectiveBase.toMutableMap().apply {
                     putAll(importedValues)
                 }
             } else {
@@ -803,33 +891,39 @@ object PreferenceProfileManager {
     }
 
     fun generateProfileQrBitmap(deepLink: String, size: Int = 512): Bitmap? {
-        return try {
-            val hints = java.util.EnumMap<com.google.zxing.EncodeHintType, Any>(com.google.zxing.EncodeHintType::class.java).apply {
-                put(com.google.zxing.EncodeHintType.MARGIN, 1)
-                put(com.google.zxing.EncodeHintType.ERROR_CORRECTION, com.google.zxing.qrcode.decoder.ErrorCorrectionLevel.M)
-            }
-            val bitMatrix = com.google.zxing.qrcode.QRCodeWriter().encode(
-                deepLink,
-                com.google.zxing.BarcodeFormat.QR_CODE,
-                size,
-                size,
-                hints
-            )
-            val width = bitMatrix.width
-            val height = bitMatrix.height
-            val pixels = IntArray(width * height)
-            for (y in 0 until height) {
-                val offset = y * width
-                for (x in 0 until width) {
-                    pixels[offset + x] = if (bitMatrix.get(x, y)) android.graphics.Color.BLACK else android.graphics.Color.WHITE
+        val levels = listOf(
+            com.google.zxing.qrcode.decoder.ErrorCorrectionLevel.M,
+            com.google.zxing.qrcode.decoder.ErrorCorrectionLevel.L
+        )
+        for (level in levels) {
+            try {
+                val hints = java.util.EnumMap<com.google.zxing.EncodeHintType, Any>(com.google.zxing.EncodeHintType::class.java).apply {
+                    put(com.google.zxing.EncodeHintType.MARGIN, 1)
+                    put(com.google.zxing.EncodeHintType.ERROR_CORRECTION, level)
+                    put(com.google.zxing.EncodeHintType.CHARACTER_SET, "ISO-8859-1")
                 }
-            }
-            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-            bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
-            bitmap
-        } catch (_: Exception) {
-            null
+                val bitMatrix = com.google.zxing.qrcode.QRCodeWriter().encode(
+                    deepLink,
+                    com.google.zxing.BarcodeFormat.QR_CODE,
+                    size,
+                    size,
+                    hints
+                )
+                val width = bitMatrix.width
+                val height = bitMatrix.height
+                val pixels = IntArray(width * height)
+                for (y in 0 until height) {
+                    val offset = y * width
+                    for (x in 0 until width) {
+                        pixels[offset + x] = if (bitMatrix.get(x, y)) android.graphics.Color.BLACK else android.graphics.Color.WHITE
+                    }
+                }
+                val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
+                return bitmap
+            } catch (_: Exception) {}
         }
+        return null
     }
 
     fun decodeQrCodeFromBitmap(bitmap: Bitmap): String? {

@@ -1,6 +1,7 @@
 @file:OptIn(ExperimentalMaterial3Api::class)
 package fr.geotower.ui.screens.settings
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
@@ -9,6 +10,9 @@ import android.provider.Settings
 import android.widget.ImageView
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
+import fr.geotower.MainActivity
+import fr.geotower.utils.PreferenceProfileManager
+import fr.geotower.utils.findActivity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
@@ -254,12 +258,15 @@ private fun resetSettingsToDefaultsAndRestart(context: Context, prefs: SharedPre
 
     SiteSpeedtestsPagePreferences.putDefaults(
         prefs.edit()
-        .clear()
-        .putBoolean("isFirstRun", false)
-        .putBoolean("is_blur_enabled", true)
+            .clear()
+            .putBoolean("isFirstRun", false)
+            .putBoolean("is_blur_enabled", true)
     ).apply()
     AppConfig.isBlurEnabled.value = true
     CommunityDataPreferences.reset(prefs)
+
+    PreferenceProfileManager.ensureProfiles(appContext)
+    PreferenceProfileManager.refreshRuntimePreferences(appContext)
 
     UpdateCheckScheduler.reconcile(appContext)
 
@@ -270,10 +277,13 @@ private fun resetSettingsToDefaultsAndRestart(context: Context, prefs: SharedPre
         WidgetUpdateScheduler.cancelPeriodicUpdateIfNoWidgetsRemain(appContext)
     }
 
-    val intent = appContext.packageManager.getLaunchIntentForPackage(appContext.packageName)
-    intent?.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
-    appContext.startActivity(intent)
-    Runtime.getRuntime().exit(0)
+    val launchIntent = appContext.packageManager.getLaunchIntentForPackage(appContext.packageName)
+        ?: Intent(appContext, MainActivity::class.java)
+    launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+    appContext.startActivity(launchIntent)
+
+    val hostActivity = context.findActivity()
+    hostActivity?.finishAffinity()
 }
 
 @Composable

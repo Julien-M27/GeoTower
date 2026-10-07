@@ -2372,6 +2372,7 @@
     <string name="preference_profiles_share_qr_title">Partager le profil par QR Code</string>
     <string name="preference_profiles_share_qr_desc">Scannez ce QR Code avec un autre appareil pour importer instantanément ce profil.</string>
     <string name="preference_profiles_share_qr_action">Partager l\'image</string>
+    <string name="preference_profiles_share_qr_too_large">Ce profil contient trop de paramètres modifiés pour être partagé en QR Code. Utilisez le partage de fichier.</string>
     <string name="preference_profiles_copy_link">Copier le lien</string>
     <string name="preference_profiles_link_copied">Lien copié dans le presse-papiers</string>
     <string name="preference_profiles_import_qr_image">Scanner un QR Code</string>
@@ -3370,4 +3371,5 @@
     <string name="appstrings_release_v2071_summary_photo_reports_histories_shortcut">Accès aux signalements de photos avec compteur dédié depuis la page des historiques</string>
     <string name="appstrings_release_v2072_summary_photo_reports_selection_clear">Sélection multiple, suppression groupée et effacement de l\'historique des signalements de photos</string>
     <string name="appstrings_release_v2073_summary_preference_profiles_qr_and_diff">Partage et importation de profils de préférences par QR Code et comparaison avec la version de base</string>
+    <string name="appstrings_release_v2074_summary_preference_profiles_qr_optimization">Optimisation de l\'encodage des QR Codes de profils et fiabilisation de la réinitialisation des paramètres</string>
 </resources>

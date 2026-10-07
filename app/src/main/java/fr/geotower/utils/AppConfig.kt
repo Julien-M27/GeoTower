@@ -771,6 +771,11 @@ object AppConfig {
         loadMapDisplayPreferences(prefs)
         statsDisplayMode.value = StatsPreferences.displayMode(prefs)
 
+        showNearbyPage.value = HomePrefs.showNearbyPage.read(prefs)
+        showMapPage.value = HomePrefs.showMapPage.read(prefs)
+        showCompassPage.value = HomePrefs.showCompassPage.read(prefs)
+        showStatsPage.value = HomePrefs.showStatsPage.read(prefs)
+
         // Accueil : ordre des éléments et déplacement par appui long sur la page.
         pagesOrder.value = HomePrefs.normalizedPageOrder(prefs)
         homeLongPressReorder.value = prefs.getBoolean(PREF_HOME_LONG_PRESS_REORDER, true)

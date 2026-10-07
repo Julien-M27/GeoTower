@@ -242,4 +242,77 @@ class PreferenceProfileManagerTest {
         val diff = PreferenceProfileManager.diffValues(baseDefaults, profileValues)
         assertEquals(2, diff.size)
     }
+
+    @Test
+    fun qrCodeGeneratesAndEncodesEvenWithManyModifiedSettings() {
+        val baseDefaults = PreferenceProfileManager.factoryDefaultValues()
+        // Invert/modify all available factory default settings
+        val modifiedValues = baseDefaults.mapValues { (key, value) ->
+            when (value.type) {
+                PreferenceProfileValue.TYPE_BOOLEAN -> PreferenceProfileValue(PreferenceProfileValue.TYPE_BOOLEAN, !(value.value as Boolean))
+                PreferenceProfileValue.TYPE_INT -> PreferenceProfileValue(PreferenceProfileValue.TYPE_INT, (value.value as Int) + 1)
+                PreferenceProfileValue.TYPE_LONG -> PreferenceProfileValue(PreferenceProfileValue.TYPE_LONG, (value.value as Long) + 100L)
+                PreferenceProfileValue.TYPE_FLOAT -> PreferenceProfileValue(PreferenceProfileValue.TYPE_FLOAT, (value.value as Float) + 0.5f)
+                PreferenceProfileValue.TYPE_STRING -> PreferenceProfileValue(PreferenceProfileValue.TYPE_STRING, "custom_${value.value}")
+                PreferenceProfileValue.TYPE_STRING_SET -> PreferenceProfileValue(PreferenceProfileValue.TYPE_STRING_SET, setOf("custom_item"))
+                else -> value
+            }
+        }
+
+        val baseProfile = PreferenceProfile(
+            id = "default",
+            name = "Par défaut",
+            colorArgb = 0xFF2563EB.toInt(),
+            icon = "star",
+            createdAt = 1000L,
+            updatedAt = 1000L,
+            values = baseDefaults
+        )
+
+        val heavyProfile = PreferenceProfile(
+            id = "heavy-custom",
+            name = "Profil Très Personnalisé",
+            colorArgb = 0xFFFF5722.toInt(),
+            icon = "flash",
+            createdAt = 2000L,
+            updatedAt = 2000L,
+            values = modifiedValues
+        )
+
+        // 1. Generate QR string
+        val qrData = PreferenceProfileManager.generateProfileQrData(heavyProfile, baseProfile)
+        assertTrue(qrData.isNotBlank())
+        // The payload must be reasonably compact (typically under 1000 characters)
+        assertTrue("QR payload length (${qrData.length}) must be compact to fit in QR Code", qrData.length < 1200)
+
+        // 2. Deep link should encode into QR matrix via ZXing without throwing DataTooBigException
+        val deepLink = "geotower://profile?data=$qrData"
+        val hints = java.util.EnumMap<com.google.zxing.EncodeHintType, Any>(com.google.zxing.EncodeHintType::class.java).apply {
+            put(com.google.zxing.EncodeHintType.MARGIN, 1)
+            put(com.google.zxing.EncodeHintType.ERROR_CORRECTION, com.google.zxing.qrcode.decoder.ErrorCorrectionLevel.M)
+            put(com.google.zxing.EncodeHintType.CHARACTER_SET, "ISO-8859-1")
+        }
+        val bitMatrix = com.google.zxing.qrcode.QRCodeWriter().encode(
+            deepLink,
+            com.google.zxing.BarcodeFormat.QR_CODE,
+            512,
+            512,
+            hints
+        )
+        assertNotNull(bitMatrix)
+        assertTrue(bitMatrix.width > 0)
+
+        // 3. Round-trip decode matches modified settings
+        val decoded = PreferenceProfileManager.decodeProfileFromQrData(
+            rawData = qrData,
+            baseValues = baseDefaults,
+            existingNames = emptyList()
+        )
+        assertNotNull(decoded)
+        assertEquals(heavyProfile.name, decoded?.name)
+        assertEquals(heavyProfile.colorArgb, decoded?.colorArgb)
+        assertEquals(heavyProfile.icon, decoded?.icon)
+        assertEquals(modifiedValues.size, decoded?.values?.size)
+    }
 }
+

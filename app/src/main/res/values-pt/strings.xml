@@ -2342,6 +2342,7 @@
     <string name="preference_profiles_share_qr_title">Partilhar perfil por código QR</string>
     <string name="preference_profiles_share_qr_desc">Leia este código QR com outro dispositivo para importar instantaneamente este perfil.</string>
     <string name="preference_profiles_share_qr_action">Partilhar imagem</string>
+    <string name="preference_profiles_share_qr_too_large">Este perfil tem demasiadas definições modificadas para ser partilhado por código QR. Utilize a partilha de ficheiros.</string>
     <string name="preference_profiles_copy_link">Copiar ligação</string>
     <string name="preference_profiles_link_copied">Ligação copiada para a área de transferência</string>
     <string name="preference_profiles_import_qr_image">Digitalizar código QR</string>
@@ -3368,4 +3369,5 @@
     <string name="appstrings_release_v2071_summary_photo_reports_histories_shortcut">Acesso aos relatos de fotos com contador em tempo real a partir do centro de históricos</string>
     <string name="appstrings_release_v2072_summary_photo_reports_selection_clear">Seleção múltipla, eliminação em lote e limpeza do histórico de relatos de fotos</string>
     <string name="appstrings_release_v2073_summary_preference_profiles_qr_and_diff">Partilha e importação de perfis de preferências por código QR e comparação com a versão base</string>
+    <string name="appstrings_release_v2074_summary_preference_profiles_qr_optimization">Otimização da codificação de códigos QR de perfis e maior fiabilidade na reposição das definições</string>
 </resources>

@@ -2342,6 +2342,7 @@
     <string name="preference_profiles_share_qr_title">Condividi profilo tramite codice QR</string>
     <string name="preference_profiles_share_qr_desc">Scansiona questo codice QR con un altro dispositivo per importare istantaneamente questo profilo.</string>
     <string name="preference_profiles_share_qr_action">Condividi immagine</string>
+    <string name="preference_profiles_share_qr_too_large">Questo profilo contiene troppe impostazioni modificate per essere condiviso tramite codice QR. Usa la condivisione file.</string>
     <string name="preference_profiles_copy_link">Copia link</string>
     <string name="preference_profiles_link_copied">Link copiato negli appunti</string>
     <string name="preference_profiles_import_qr_image">Scansiona codice QR</string>
@@ -3368,4 +3369,5 @@
     <string name="appstrings_release_v2071_summary_photo_reports_histories_shortcut">Accesso alle segnalazioni di foto con contatore in tempo reale dalla schermata cronologie</string>
     <string name="appstrings_release_v2072_summary_photo_reports_selection_clear">Selezione multipla, eliminazione di gruppo e cancellazione della cronologia delle segnalazioni di foto</string>
     <string name="appstrings_release_v2073_summary_preference_profiles_qr_and_diff">Condivisione e importazione di profili di preferenze tramite codice QR e confronto con la versione base</string>
+    <string name="appstrings_release_v2074_summary_preference_profiles_qr_optimization">Ottimizzazione della codifica dei codici QR dei profili e maggiore affidabilità nel ripristino delle impostazioni</string>
 </resources>

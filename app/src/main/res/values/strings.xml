@@ -192,6 +192,7 @@
     <string name="preference_profiles_share_qr_title">Share profile via QR code</string>
     <string name="preference_profiles_share_qr_desc">Scan this QR code with another device to import this profile instantly.</string>
     <string name="preference_profiles_share_qr_action">Share image</string>
+    <string name="preference_profiles_share_qr_too_large">This profile has too many modified settings to be shared via QR code. Use file sharing instead.</string>
     <string name="preference_profiles_copy_link">Copy link</string>
     <string name="preference_profiles_link_copied">Link copied to clipboard</string>
     <string name="preference_profiles_import_qr_image">Scan a QR Code</string>
@@ -3391,4 +3392,5 @@
     <string name="appstrings_release_v2071_summary_photo_reports_histories_shortcut">Access to photo reports with live counter directly from the histories hub</string>
     <string name="appstrings_release_v2072_summary_photo_reports_selection_clear">Multi-select, batch deletion and clearing of photo report history</string>
     <string name="appstrings_release_v2073_summary_preference_profiles_qr_and_diff">Share and import preference profiles via QR code and compare with default settings</string>
+    <string name="appstrings_release_v2074_summary_preference_profiles_qr_optimization">Optimized preference profile QR code encoding and improved settings reset reliability</string>
 </resources>

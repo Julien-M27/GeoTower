@@ -1175,7 +1175,27 @@ private fun ShareProfileQrDialog(
                                     .padding(sizing.spacing(8.dp))
                             )
                         } else {
-                            CircularProgressIndicator()
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(sizing.spacing(12.dp)),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Info,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(sizing.component(32.dp))
+                                )
+                                Spacer(Modifier.height(sizing.spacing(8.dp)))
+                                Text(
+                                    text = stringResource(R.string.preference_profiles_share_qr_too_large),
+                                    style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                                    color = MaterialTheme.colorScheme.error,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
                         }
                     }
                 }
