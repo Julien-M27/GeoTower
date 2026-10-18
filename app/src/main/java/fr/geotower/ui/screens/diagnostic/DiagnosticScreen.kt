@@ -607,15 +607,18 @@ private fun DiagnosticApiServerPingDialog(
                             onClick = if (isRunning) null else { { onServerSelected(server) } }
                         )
                         Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
-                        Text(
-                            text = "${if (server == selectedServer) ">" else " "} ${server.host}",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = if (server == selectedServer) {
-                                MaterialTheme.colorScheme.onSurface
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            }
-                        )
+                        Column {
+                            Text(
+                                text = server.host,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = if (server == selectedServer) FontWeight.Bold else FontWeight.Normal,
+                                color = if (server == selectedServer) {
+                                    MaterialTheme.colorScheme.onSurface
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                }
+                            )
+                        }
                     }
                 }
                 Text(
@@ -640,9 +643,9 @@ private fun DiagnosticApiServerPingDialog(
                         )
                         Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
                         Text(
-                            text = "${if (passes == selectedPasses) ">" else " "} " +
-                                stringResource(R.string.appstrings_diagnostic_ping_passes_option, passes),
+                            text = stringResource(R.string.appstrings_diagnostic_ping_passes_option, passes),
                             style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = if (passes == selectedPasses) FontWeight.Bold else FontWeight.Normal,
                             color = if (passes == selectedPasses) {
                                 MaterialTheme.colorScheme.onSurface
                             } else {
@@ -675,7 +678,11 @@ private fun DiagnosticApiServerPingDialog(
                             modifier = Modifier.size(sizing.component(18.dp))
                         )
                         Spacer(modifier = Modifier.width(sizing.spacing(6.dp)))
-                        Text(stringResource(R.string.appstrings_pause))
+                        Text(
+                            text = stringResource(R.string.appstrings_pause),
+                            maxLines = 1,
+                            softWrap = false
+                        )
                     }
                 }
                 isPaused -> {
@@ -686,7 +693,11 @@ private fun DiagnosticApiServerPingDialog(
                             modifier = Modifier.size(sizing.component(18.dp))
                         )
                         Spacer(modifier = Modifier.width(sizing.spacing(6.dp)))
-                        Text(stringResource(R.string.appstrings_resume))
+                        Text(
+                            text = stringResource(R.string.appstrings_resume),
+                            maxLines = 1,
+                            softWrap = false
+                        )
                     }
                 }
                 else -> {
@@ -697,7 +708,11 @@ private fun DiagnosticApiServerPingDialog(
                             modifier = Modifier.size(sizing.component(18.dp))
                         )
                         Spacer(modifier = Modifier.width(sizing.spacing(6.dp)))
-                        Text(stringResource(R.string.appstrings_diagnostic_ping_run))
+                        Text(
+                            text = stringResource(R.string.appstrings_diagnostic_ping_run),
+                            maxLines = 1,
+                            softWrap = false
+                        )
                     }
                 }
             }
@@ -715,10 +730,18 @@ private fun DiagnosticApiServerPingDialog(
                             modifier = Modifier.size(sizing.component(16.dp))
                         )
                         Spacer(modifier = Modifier.width(sizing.spacing(4.dp)))
-                        Text(stringResource(R.string.appstrings_diagnostic_ping_restart))
+                        Text(
+                            text = stringResource(R.string.appstrings_diagnostic_ping_restart),
+                            maxLines = 1,
+                            softWrap = false
+                        )
                     }
                     TextButton(onClick = onDismiss) {
-                        Text(stringResource(R.string.appstrings_close))
+                        Text(
+                            text = stringResource(R.string.appstrings_close),
+                            maxLines = 1,
+                            softWrap = false
+                        )
                     }
                 }
             } else {
@@ -728,7 +751,11 @@ private fun DiagnosticApiServerPingDialog(
                         onDismiss()
                     }
                 ) {
-                    Text(stringResource(R.string.appstrings_close))
+                    Text(
+                        text = stringResource(R.string.appstrings_close),
+                        maxLines = 1,
+                        softWrap = false
+                    )
                 }
             }
         }

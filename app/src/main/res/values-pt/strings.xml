@@ -3388,4 +3388,5 @@
     <string name="appstrings_release_v2073_summary_preference_profiles_qr_and_diff">Partilha e importação de perfis de preferências por código QR e comparação com a versão base</string>
     <string name="appstrings_release_v2074_summary_preference_profiles_qr_optimization">Otimização da codificação de códigos QR de perfis e maior fiabilidade na reposição das definições</string>
     <string name="appstrings_release_v2075_summary_diagnostics_and_clustering">Diagnóstico alargado do sistema e memória, controlo do teste de latência e ajuste do agrupamento</string>
+    <string name="appstrings_release_v2076_summary_ping_dialog_ergonomics">Melhoria do esquema e ergonomia da caixa de diálogo de teste de latência dos servidores API</string>
 </resources>

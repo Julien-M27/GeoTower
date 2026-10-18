@@ -10,6 +10,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -359,7 +360,7 @@ fun ApiServerPingDialog(
                         Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
                         Column {
                             Text(
-                                text = "${if (isSelected) "> " else "  "}${server.host}",
+                                text = server.host,
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                                 color = if (isSelected) {
@@ -404,9 +405,9 @@ fun ApiServerPingDialog(
                         )
                         Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
                         Text(
-                            text = "${if (isSelected) ">" else " "} " +
-                                stringResource(R.string.appstrings_diagnostic_ping_passes_option, passes),
+                            text = stringResource(R.string.appstrings_diagnostic_ping_passes_option, passes),
                             style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                             color = if (isSelected) {
                                 MaterialTheme.colorScheme.onSurface
                             } else {
@@ -424,9 +425,46 @@ fun ApiServerPingDialog(
             }
         },
         confirmButton = {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp)),
-                verticalAlignment = Alignment.CenterVertically
+            if (isRunning) {
+                Button(
+                    onClick = onStop,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Stop,
+                        contentDescription = null,
+                        modifier = Modifier.size(sizing.component(18.dp))
+                    )
+                    Spacer(modifier = Modifier.width(sizing.spacing(6.dp)))
+                    Text(
+                        text = stringResource(R.string.appstrings_diagnostic_ping_stop),
+                        maxLines = 1,
+                        softWrap = false
+                    )
+                }
+            } else {
+                Button(onClick = onRun) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = null,
+                        modifier = Modifier.size(sizing.component(18.dp))
+                    )
+                    Spacer(modifier = Modifier.width(sizing.spacing(6.dp)))
+                    Text(
+                        text = stringResource(R.string.appstrings_diagnostic_ping_run),
+                        maxLines = 1,
+                        softWrap = false
+                    )
+                }
+            }
+        },
+        dismissButton = {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(sizing.spacing(4.dp)),
+                verticalArrangement = Arrangement.spacedBy(sizing.spacing(4.dp))
             ) {
                 if (onApplyServer != null) {
                     TextButton(
@@ -437,46 +475,25 @@ fun ApiServerPingDialog(
                         },
                         enabled = !isRunning
                     ) {
-                        Text(stringResource(R.string.appstrings_diagnostic_action_choose_api_server))
+                        Text(
+                            text = stringResource(R.string.appstrings_diagnostic_action_choose_api_server),
+                            maxLines = 1,
+                            softWrap = false
+                        )
                     }
                 }
-                if (isRunning) {
-                    Button(
-                        onClick = onStop,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.error,
-                            contentColor = MaterialTheme.colorScheme.onError
-                        )
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Stop,
-                            contentDescription = null,
-                            modifier = Modifier.size(sizing.component(18.dp))
-                        )
-                        Spacer(modifier = Modifier.width(sizing.spacing(6.dp)))
-                        Text(stringResource(R.string.appstrings_diagnostic_ping_stop))
+                TextButton(
+                    onClick = {
+                        if (isRunning) onStop()
+                        onDismiss()
                     }
-                } else {
-                    Button(onClick = onRun) {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = null,
-                            modifier = Modifier.size(sizing.component(18.dp))
-                        )
-                        Spacer(modifier = Modifier.width(sizing.spacing(6.dp)))
-                        Text(stringResource(R.string.appstrings_diagnostic_ping_run))
-                    }
+                ) {
+                    Text(
+                        text = stringResource(R.string.appstrings_close),
+                        maxLines = 1,
+                        softWrap = false
+                    )
                 }
-            }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = {
-                    if (isRunning) onStop()
-                    onDismiss()
-                }
-            ) {
-                Text(stringResource(R.string.appstrings_close))
             }
         }
     )

@@ -3411,4 +3411,5 @@
     <string name="appstrings_release_v2073_summary_preference_profiles_qr_and_diff">Share and import preference profiles via QR code and compare with default settings</string>
     <string name="appstrings_release_v2074_summary_preference_profiles_qr_optimization">Optimized preference profile QR code encoding and improved settings reset reliability</string>
     <string name="appstrings_release_v2075_summary_diagnostics_and_clustering">Enriched system and memory diagnostics, ping test controls and antenna clustering reset marker</string>
+    <string name="appstrings_release_v2076_summary_ping_dialog_ergonomics">Improved layout and ergonomics for the API server ping latency dialog</string>
 </resources>
