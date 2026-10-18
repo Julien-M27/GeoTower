@@ -890,7 +890,49 @@ object PreferenceProfileManager {
         return decodeProfileFromQrData(context, trimmed)
     }
 
+    const val MAX_QR_DEEPLINK_LENGTH = 1200
+
+    fun canEncodeQr(deepLink: String): Boolean {
+        if (deepLink.length > MAX_QR_DEEPLINK_LENGTH) return false
+        val levels = listOf(
+            com.google.zxing.qrcode.decoder.ErrorCorrectionLevel.M,
+            com.google.zxing.qrcode.decoder.ErrorCorrectionLevel.L
+        )
+        for (level in levels) {
+            try {
+                val hints = java.util.EnumMap<com.google.zxing.EncodeHintType, Any>(com.google.zxing.EncodeHintType::class.java).apply {
+                    put(com.google.zxing.EncodeHintType.MARGIN, 1)
+                    put(com.google.zxing.EncodeHintType.ERROR_CORRECTION, level)
+                    put(com.google.zxing.EncodeHintType.CHARACTER_SET, "ISO-8859-1")
+                }
+                com.google.zxing.qrcode.QRCodeWriter().encode(
+                    deepLink,
+                    com.google.zxing.BarcodeFormat.QR_CODE,
+                    64,
+                    64,
+                    hints
+                )
+                return true
+            } catch (_: Exception) {}
+        }
+        return false
+    }
+
+    fun isProfileQrSupported(profile: PreferenceProfile, baseProfile: PreferenceProfile?): Boolean {
+        return runCatching {
+            val data = generateProfileQrData(profile, baseProfile)
+            val deepLink = "geotower://profile?data=$data"
+            canEncodeQr(deepLink)
+        }.getOrDefault(false)
+    }
+
+    fun isProfileQrSupported(context: Context, profile: PreferenceProfile): Boolean {
+        val default = defaultProfile(context)
+        return isProfileQrSupported(profile, default)
+    }
+
     fun generateProfileQrBitmap(deepLink: String, size: Int = 512): Bitmap? {
+        if (!canEncodeQr(deepLink)) return null
         val levels = listOf(
             com.google.zxing.qrcode.decoder.ErrorCorrectionLevel.M,
             com.google.zxing.qrcode.decoder.ErrorCorrectionLevel.L
@@ -1093,6 +1135,7 @@ object PreferenceProfileManager {
     }
 
     fun createProfileQrShareUri(context: Context, profile: PreferenceProfile): Uri? {
+        if (!isProfileQrSupported(context, profile)) return null
         val deepLink = generateProfileQrDeepLink(context, profile)
         val qrBitmap = generateProfileQrBitmap(deepLink, 512) ?: return null
         val cardBitmap = createProfileQrCardBitmap(context, profile, qrBitmap)
@@ -1105,6 +1148,7 @@ object PreferenceProfileManager {
     }
 
     fun shareProfileQr(context: Context, profile: PreferenceProfile) {
+        if (!isProfileQrSupported(context, profile)) return
         val deepLink = generateProfileQrDeepLink(context, profile)
         val uri = createProfileQrShareUri(context, profile) ?: return
         val shareIntent = Intent(Intent.ACTION_SEND).apply {

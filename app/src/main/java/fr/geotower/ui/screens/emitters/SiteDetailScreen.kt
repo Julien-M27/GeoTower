@@ -271,6 +271,8 @@ private const val TAG_SITE_DETAIL = "GeoTower"
 private const val TAG_SPEEDTEST = "GeoTowerUpload"
 private const val SIGNAL_QUEST_PACKAGE_NAME = "com.sfrmap.android"
 private const val SIGNAL_QUEST_PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.sfrmap.android"
+private const val CELLULAR_FR_PACKAGE_NAME = "com.luisbaker.cellularfr"
+private const val CELLULAR_FR_PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.luisbaker.cellularfr"
 private const val RNC_MOBILE_PACKAGE_NAME = "org.rncteam.rncfreemobile"
 private const val RNC_MOBILE_PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=org.rncteam.rncfreemobile"
 private const val ARCEP_ALERT_URL = "https://jalerte.arcep.fr/"
@@ -763,7 +765,7 @@ fun SiteDetailScreen(
 
     val isEnbAppInstalled = remember { isPackageInstalled(context, "fr.enb_analytics.enb4g") }
     val isSignalQuestInstalled = remember { isPackageInstalled(context, SIGNAL_QUEST_PACKAGE_NAME) }
-    val isCellularFrInstalled = remember { isPackageInstalled(context, "com.luisbaker.cellularfr") }
+    val isCellularFrInstalled = remember { isPackageInstalled(context, CELLULAR_FR_PACKAGE_NAME) }
     val isRncMobileInstalled = remember { isPackageInstalled(context, RNC_MOBILE_PACKAGE_NAME) }
 
     LaunchedEffect(antennaId, refreshPhotosTrigger, refreshTrigger, featureFlags) {
@@ -1320,31 +1322,46 @@ fun SiteDetailScreen(
                 }
             }
 
-            // CellularFR masqué — voir CellularFrApi.ENABLED
             if (showCellularFrSheet) {
                 val supportId = physique?.idSupport ?: info.idAnfr // ✅ VRAI ID
                 ModalBottomSheet(onDismissRequest = { showCellularFrSheet = false }, sheetState = sheetState, containerColor = sheetBgColor) {
-                    Column(modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(48.dp), start = sizing.spacing(24.dp), end = sizing.spacing(24.dp), top = sizing.spacing(8.dp)), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("CellularFR", style = sizing.textStyle(MaterialTheme.typography.titleLarge), fontWeight = FontWeight.Bold)
-                        Text(stringResource(R.string.appstrings_open_on), style = sizing.textStyle(MaterialTheme.typography.bodyMedium))
-                        Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(sizing.spacing(16.dp))) {
-                            CommunityCard(title = stringResource(R.string.appstrings_website), txtUnavailable = txtUnavailable, opColor = opColor, iconRes = R.drawable.logo_cellularfr, isEnabled = supportId.isNotEmpty(), modifier = Modifier.weight(1f)) {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress); showCellularFrSheet = false; openWebsiteUrl("https://cellularfr.fr/site-details.html?siteId=$supportId")
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
-                        AppLauncherButton(isInstalled = isCellularFrInstalled, appName = "CellularFR", txtOpen = txtOpen, txtInstall = txtInstallApp, useOneUi = useOneUi) {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress); showCellularFrSheet = false
-                            if (isCellularFrInstalled) {
-                                launchApp(context, "com.luisbaker.cellularfr") {
-                                    uriHandler.openUri("https://play.google.com/store/apps/details?id=com.luisbaker.cellularfr")
+                    ExternalOpenOnSheetContent(
+                        title = "CellularFR",
+                        subtitle = stringResource(R.string.appstrings_open_on),
+                        cardRow = {
+                            CommunityCard(
+                                title = if (isCellularFrInstalled) stringResource(R.string.appstrings_logo_app) else stringResource(R.string.appstrings_download),
+                                txtUnavailable = txtUnavailable,
+                                opColor = opColor,
+                                iconRes = R.drawable.logo_cellularfr,
+                                badgeVector = if (isCellularFrInstalled) Icons.AutoMirrored.Filled.Launch else Icons.Default.Download,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                showCellularFrSheet = false
+                                if (isCellularFrInstalled) {
+                                    launchApp(context, CELLULAR_FR_PACKAGE_NAME) {
+                                        uriHandler.openUri(CELLULAR_FR_PLAY_STORE_URL)
+                                    }
+                                } else {
+                                    uriHandler.openUri(CELLULAR_FR_PLAY_STORE_URL)
                                 }
-                            } else {
-                                uriHandler.openUri("https://play.google.com/store/apps/details?id=com.luisbaker.cellularfr")
+                            }
+                            CommunityCard(
+                                title = stringResource(R.string.appstrings_website),
+                                txtUnavailable = txtUnavailable,
+                                opColor = opColor,
+                                iconRes = R.drawable.logo_cellularfr,
+                                badgeVector = Icons.Default.Public,
+                                isEnabled = supportId.isNotBlank(),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                showCellularFrSheet = false
+                                openWebsiteUrl("https://cellularfr.fr/site-details.html?siteId=$supportId")
                             }
                         }
-                    }
+                    )
                 }
             }
 

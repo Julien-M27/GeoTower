@@ -55,6 +55,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.NetworkCheck
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -64,6 +65,8 @@ import androidx.compose.material.icons.filled.WifiTethering
 import androidx.compose.material.icons.outlined.Backup
 import androidx.compose.material.icons.outlined.Bookmarks
 import androidx.compose.material.icons.outlined.Dashboard
+import androidx.compose.material.icons.outlined.Dns
+import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Info
@@ -79,6 +82,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -122,6 +126,7 @@ import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -135,6 +140,8 @@ import androidx.navigation.NavController
 import fr.geotower.R
 import fr.geotower.data.AnfrRepository
 import fr.geotower.data.api.ApiEndpoints
+import fr.geotower.data.api.ApiServer
+import fr.geotower.data.api.ApiServerMode
 import fr.geotower.data.workers.DownloadNotificationCenter
 import fr.geotower.data.workers.DatabaseBulkUpdate
 import fr.geotower.data.workers.DatabaseDownloadWorker
@@ -175,6 +182,7 @@ import fr.geotower.data.community.CommunityDataPreferences
 import fr.geotower.ui.navigation.ROOT_FALLBACK_ROUTE
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.ui.components.ApiServerModeDialog
+import fr.geotower.ui.components.ApiServerPingDialog
 import fr.geotower.ui.components.apiServerModeLabelRes
 import fr.geotower.ui.components.applyApiServerMode
 import fr.geotower.ui.components.GeoTowerBackTopBar
@@ -201,6 +209,7 @@ import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.ui.components.settingsPopupFadingEdge
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.services.LiveTrackingController
+import fr.geotower.utils.AppDistribution
 import fr.geotower.utils.OperatorLogos
 import fr.geotower.utils.SharePrefs
 import fr.geotower.utils.SitePagePrefs
@@ -232,12 +241,16 @@ private const val ANCHOR_DB_RADIO = "db_radio"
 private const val ANCHOR_DB_ENB = "db_enb"
 private const val ANCHOR_DB_OUTAGES = "db_outages"
 private const val ANCHOR_DB_LOCAL_BUILD = "db_local_build"
+private const val ANCHOR_DB_APP_UPDATE = "app_update"
+private const val ANCHOR_DB_APP_UPDATE_ALT = "db_app_update"
 private val DATABASE_CARD_ANCHORS = listOf(
     ANCHOR_DB_MOBILE,
     ANCHOR_DB_RADIO,
     ANCHOR_DB_ENB,
     ANCHOR_DB_OUTAGES,
-    ANCHOR_DB_LOCAL_BUILD
+    ANCHOR_DB_LOCAL_BUILD,
+    ANCHOR_DB_APP_UPDATE,
+    ANCHOR_DB_APP_UPDATE_ALT
 )
 
 private data class SettingsSectionBounds(
@@ -284,6 +297,20 @@ private fun resetSettingsToDefaultsAndRestart(context: Context, prefs: SharedPre
 
     val hostActivity = context.findActivity()
     hostActivity?.finishAffinity()
+}
+
+private fun isBackgroundLocationGranted(context: Context): Boolean {
+    return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+        androidx.core.content.ContextCompat.checkSelfPermission(
+            context,
+            android.Manifest.permission.ACCESS_BACKGROUND_LOCATION
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+    } else {
+        androidx.core.content.ContextCompat.checkSelfPermission(
+            context,
+            android.Manifest.permission.ACCESS_FINE_LOCATION
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+    }
 }
 
 @Composable
@@ -383,10 +410,20 @@ fun SettingsScreen(
     // Section « active » de la barre latérale en défilement continu (nav_mode = 0) : elle suit le
     // défilement, alors qu'en accueil par sections c'est `openedSection` qui fait foi.
     var activeSectionIndex by rememberSaveable { mutableIntStateOf(0) }
+    var pendingWidgetAddAfterBgLocation by rememberSaveable { mutableStateOf(false) }
+    var triggerBgDisclosure by remember { mutableStateOf(false) }
+    var showWidgetPickerSheet by remember { mutableStateOf(false) }
+    var isBgLocationGranted by remember {
+        mutableStateOf(isBackgroundLocationGranted(context))
+    }
 
     fun openSection(section: Int?) {
         openedSection = section
         if (section != null) activeSectionIndex = section
+        if (section != SECTION_SYSTEM && section != SECTION_BACKGROUND) {
+            pendingWidgetAddAfterBgLocation = false
+            triggerBgDisclosure = false
+        }
         scope.launch { scrollState.scrollTo(0) }
     }
 
@@ -863,6 +900,59 @@ fun SettingsScreen(
         }
     }
 
+    val handleBgLocationGranted: () -> Unit = {
+        isBgLocationGranted = true
+        if (pendingWidgetAddAfterBgLocation) {
+            pendingWidgetAddAfterBgLocation = false
+            triggerBgDisclosure = false
+            if (useSectionsHome) {
+                openSection(SECTION_BACKGROUND)
+            } else {
+                activeSectionIndex = SECTION_BACKGROUND
+                scope.launch {
+                    sectionBringIntoViewRequesters[SECTION_BACKGROUND].bringIntoView()
+                    kotlinx.coroutines.delay(80)
+                    alignAnchorToViewportTop(sectionRootPositions[SECTION_BACKGROUND])
+                }
+            }
+            showWidgetPickerSheet = true
+        }
+    }
+
+    val onAddWidgetClick: () -> Unit = {
+        if (isBackgroundLocationGranted(context)) {
+            showWidgetPickerSheet = true
+        } else {
+            pendingWidgetAddAfterBgLocation = true
+            triggerBgDisclosure = true
+            if (useSectionsHome) {
+                openSection(SECTION_SYSTEM)
+            } else {
+                activeSectionIndex = SECTION_SYSTEM
+                scope.launch {
+                    sectionBringIntoViewRequesters[SECTION_SYSTEM].bringIntoView()
+                    kotlinx.coroutines.delay(80)
+                    alignAnchorToViewportTop(sectionRootPositions[SECTION_SYSTEM])
+                }
+            }
+        }
+    }
+
+    val settingsLifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(settingsLifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                val granted = isBackgroundLocationGranted(context)
+                isBgLocationGranted = granted
+                if (granted && pendingWidgetAddAfterBgLocation) {
+                    handleBgLocationGranted()
+                }
+            }
+        }
+        settingsLifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { settingsLifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     // ⚠️ Cette liste est INDEXÉE par le numéro de section (`menuItems[section]` plus bas) : son
     // ordre doit rester celui des constantes SECTION_*. Une section fermée par un drapeau distant
     // y reste donc présente — c'est `visibleMenuItems` qui la retire de l'affichage.
@@ -979,6 +1069,7 @@ fun SettingsScreen(
             entry(context.getString(R.string.mapping_style_title), "style carte clair sombre satellite couleur", SECTION_MAPPING)
             entry(context.getString(R.string.appstrings_map_smooth_location_option), "repere position gps fluide glissement lissage", SECTION_MAPPING)
             entry(context.getString(R.string.settings_map_location_zoom_title), "zoom niveau localisation position recentrage bouton gps echelle", SECTION_MAPPING)
+            entry(context.getString(R.string.map_clustering_strength_title), "cluster clustering densite regroupement antennes marqueurs force puissance intensite", SECTION_MAPPING)
             entry(context.getString(R.string.appstrings_offline_maps_title), "cartes hors ligne offline maps telechargement tuiles mapsforge", SECTION_MAPPING)
 
             // --- Préférences ---
@@ -1071,6 +1162,11 @@ fun SettingsScreen(
 
             // --- Base de données ---
             entry(context.getString(R.string.settings_section_database), "base de donnees database telechargement anfr support antenne", SECTION_DATABASE)
+            entry(
+                context.getString(R.string.appstrings_about_download_app_title),
+                "mettre a jour application play store telecharger version mise a jour app store",
+                SECTION_DATABASE
+            )
             entry(context.getString(R.string.appstrings_radio_data_title), "radio donnees frequences base anfr", SECTION_DATABASE)
             // Pannes : la carte de la section télécharge le fichier serveur, ou lance la génération
             // locale selon le niveau de traitement local — les deux vocabulaires mènent donc ici.
@@ -1629,9 +1725,20 @@ fun SettingsScreen(
                                     onBackup = { navController.navigate("backup") },
                                     onHiddenSites = { navController.navigate("hidden_sites") },
                                     onLocalMode = { navController.navigate("local_mode") },
+                                    onOpenDatabaseViewer = { navController.navigate("database_viewer") },
                                     databaseCardModifiers = databaseCardAnchorModifiers,
                                     databaseRefreshState = databaseRefreshState,
-                                    initialOpenDisclosure = initialSection == "background_disclosure"
+                                    initialOpenDisclosure = initialSection == "background_disclosure",
+                                    openDisclosure = triggerBgDisclosure,
+                                    onDisclosureDismissed = {
+                                        triggerBgDisclosure = false
+                                        pendingWidgetAddAfterBgLocation = false
+                                    },
+                                    onDisclosureAccepted = {
+                                        triggerBgDisclosure = false
+                                    },
+                                    onBgLocationGranted = handleBgLocationGranted,
+                                    onAddWidgetClick = onAddWidgetClick
                                 )
                                 run {
                                     // Passage à l'accueil par sections : pendant du bouton de la
@@ -1730,7 +1837,8 @@ fun SettingsScreen(
                                         cardBorder,
                                         bubbleBaseColor,
                                         useOneUi,
-                                        safeClick
+                                        safeClick,
+                                        onAddWidgetClick = onAddWidgetClick
                                     )
                                     SECTION_SYSTEM -> SectionSysteme(
                                         context,
@@ -1740,7 +1848,16 @@ fun SettingsScreen(
                                         useOneUi = useOneUi,
                                         safeClick = safeClick,
                                         onOpenDiagnostic = { navController.navigate("diagnostic") },
-                                        initialOpenDisclosure = initialSection == "background_disclosure"
+                                        initialOpenDisclosure = initialSection == "background_disclosure",
+                                        openDisclosure = triggerBgDisclosure,
+                                        onDisclosureDismissed = {
+                                            triggerBgDisclosure = false
+                                            pendingWidgetAddAfterBgLocation = false
+                                        },
+                                        onDisclosureAccepted = {
+                                            triggerBgDisclosure = false
+                                        },
+                                        onBgLocationGranted = handleBgLocationGranted
                                     )
                                     SECTION_DATABASE -> SectionDatabase(
                                         cardShape,
@@ -2738,6 +2855,17 @@ fun SettingsScreen(
             }
         )
     }
+
+    if (showWidgetPickerSheet) {
+        WidgetFormatPickerSheet(
+            useOneUi = useOneUi,
+            onPick = { receiver ->
+                fr.geotower.widget.WidgetUpdateScheduler.requestPinWidget(context, receiver)
+                showWidgetPickerSheet = false
+            },
+            onDismiss = { showWidgetPickerSheet = false }
+        )
+    }
 }
 
 // ============================================================
@@ -2800,9 +2928,15 @@ fun AllSettingsContent(
     onBackup: () -> Unit = {},
     onHiddenSites: () -> Unit = {},
     onLocalMode: () -> Unit = {},
+    onOpenDatabaseViewer: () -> Unit = {},
     databaseCardModifiers: Map<String, Modifier> = emptyMap(),
     databaseRefreshState: DatabaseRefreshState? = null,
-    initialOpenDisclosure: Boolean = false
+    initialOpenDisclosure: Boolean = false,
+    openDisclosure: Boolean = false,
+    onDisclosureDismissed: () -> Unit = {},
+    onDisclosureAccepted: () -> Unit = {},
+    onBgLocationGranted: () -> Unit = {},
+    onAddWidgetClick: () -> Unit = {}
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
     Column(modifier = appearanceSectionModifier.fillMaxWidth()) {
@@ -2833,13 +2967,17 @@ fun AllSettingsContent(
         Spacer(Modifier.height(sizing.spacing(32.dp)))
     }
     Column(modifier = backgroundSectionModifier.fillMaxWidth()) {
-        SectionNotifications(op, shape, border, bubbleColor, useOneUi, safeClick)
+        SectionNotifications(op, shape, border, bubbleColor, useOneUi, safeClick, onAddWidgetClick = onAddWidgetClick)
     }
     Spacer(Modifier.height(sizing.spacing(32.dp)))
     Column(modifier = systemSectionModifier.fillMaxWidth()) {
         SectionSysteme(
             ctx, shape, border, bubbleColor, useOneUi, safeClick, onOpenDiagnostic,
-            initialOpenDisclosure = initialOpenDisclosure
+            initialOpenDisclosure = initialOpenDisclosure,
+            openDisclosure = openDisclosure,
+            onDisclosureDismissed = onDisclosureDismissed,
+            onDisclosureAccepted = onDisclosureAccepted,
+            onBgLocationGranted = onBgLocationGranted
         )
     }
     Spacer(Modifier.height(sizing.spacing(32.dp)))
@@ -2852,6 +2990,7 @@ fun AllSettingsContent(
         ctx,
         databaseSectionModifier,
         onLocalMode = onLocalMode,
+        onOpenDatabaseViewer = onOpenDatabaseViewer,
         safeClick = safeClick,
         databaseCardModifiers = databaseCardModifiers,
         refreshState = databaseRefreshState,
@@ -3067,6 +3206,15 @@ fun SectionCartographie(
         useOneUi = useOneUi
     )
 
+    // Densité de regroupement des antennes (clustering)
+    Spacer(Modifier.height(sizing.spacing(16.dp)))
+    fr.geotower.ui.components.MapClusterStrengthCard(
+        shape = shape,
+        border = border,
+        bubbleColor = bubbleColor,
+        useOneUi = useOneUi
+    )
+
     // Les cartes hors ligne sont un fond de carte téléchargé : elles vivent ici, pas dans la
     // section base de données (qui parle des antennes ANFR).
     Spacer(Modifier.height(sizing.spacing(16.dp)))
@@ -3155,7 +3303,8 @@ fun SectionPreferences(
 @Composable
 fun SectionNotifications(
     op: String,
-    shape: Shape, border: BorderStroke?, bubbleColor: Color, useOneUi: Boolean, safeClick: SafeClick
+    shape: Shape, border: BorderStroke?, bubbleColor: Color, useOneUi: Boolean, safeClick: SafeClick,
+    onAddWidgetClick: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val prefs = context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
@@ -3186,7 +3335,6 @@ fun SectionNotifications(
         widgetLifecycleOwner.lifecycle.addObserver(observer)
         onDispose { widgetLifecycleOwner.lifecycle.removeObserver(observer) }
     }
-    var showWidgetPickerSheet by remember { mutableStateOf(false) }
 
     // Demande de POST_NOTIFICATIONS par un launcher et non par un cast de LocalContext en Activity :
     // GeoTowerLocaleProvider remplace LocalContext par un contexte localisé, le cast serait null et
@@ -3394,24 +3542,13 @@ fun SectionNotifications(
         PreferenceActionCard(
             title = stringResource(R.string.appstrings_widget_add_button_title),
             desc = stringResource(R.string.appstrings_widget_add_button_desc),
-            onClick = { showWidgetPickerSheet = true },
+            onClick = onAddWidgetClick,
             shape = shape,
             border = border,
             bubbleColor = bubbleColor,
             useOneUi = useOneUi,
             safeClick = safeClick,
             icon = Icons.Default.Add
-        )
-    }
-
-    if (showWidgetPickerSheet) {
-        WidgetFormatPickerSheet(
-            useOneUi = useOneUi,
-            onPick = { receiver ->
-                fr.geotower.widget.WidgetUpdateScheduler.requestPinWidget(context, receiver)
-                showWidgetPickerSheet = false
-            },
-            onDismiss = { showWidgetPickerSheet = false }
         )
     }
 }
@@ -3579,7 +3716,11 @@ fun SectionSysteme(
     useOneUi: Boolean,
     safeClick: SafeClick,
     onOpenDiagnostic: () -> Unit = {},
-    initialOpenDisclosure: Boolean = false
+    initialOpenDisclosure: Boolean = false,
+    openDisclosure: Boolean = false,
+    onDisclosureDismissed: () -> Unit = {},
+    onDisclosureAccepted: () -> Unit = {},
+    onBgLocationGranted: () -> Unit = {}
 ) {
     SectionTitle(stringResource(R.string.settings_section_system));
     val sizing = LocalGeoTowerUiStyle.current.sizing
@@ -3602,15 +3743,6 @@ fun SectionSysteme(
     // l'autorisation manque encore, et disparaît en douceur dès qu'elle est accordée.
     if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
         val prefs = ctx.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
-        val bgLocationLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
-            contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
-            onResult = { /* L'interface de Jetpack Compose se mettra à jour toute seule */ }
-        )
-        val backgroundPermissionLabel = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-            runCatching { ctx.packageManager.backgroundPermissionOptionLabel.toString() }.getOrNull()
-        } else {
-            null
-        }
 
         // L'état qui permet à l'interface de se mettre à jour toute seule
         var isBgLocationGranted by remember {
@@ -3619,10 +3751,28 @@ fun SectionSysteme(
             )
         }
 
+        val bgLocationLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+            contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+            onResult = { isGranted ->
+                isBgLocationGranted = isGranted
+                if (isGranted) {
+                    onBgLocationGranted()
+                }
+            }
+        )
+        val backgroundPermissionLabel = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            runCatching { ctx.packageManager.backgroundPermissionOptionLabel.toString() }.getOrNull()
+        } else {
+            null
+        }
+
         // Divulgation « bien visible » exigée par Google Play : elle doit précéder TOUTE demande de
         // localisation en arrière-plan, et n'être franchie que par une action explicite. La carte
         // ne déclenche donc plus la demande directement, elle ouvre ce dialogue.
-        var showBgDisclosure by remember { mutableStateOf(initialOpenDisclosure) }
+        var showBgDisclosure by remember { mutableStateOf(initialOpenDisclosure || openDisclosure) }
+        LaunchedEffect(openDisclosure) {
+            if (openDisclosure) showBgDisclosure = true
+        }
 
         fun requestBackgroundLocation() {
             // Trouver la VRAIE activité (on déballe le contexte de Compose pour réparer
@@ -3684,7 +3834,10 @@ fun SectionSysteme(
 
         if (showBgDisclosure) {
             AlertDialog(
-                onDismissRequest = { showBgDisclosure = false },
+                onDismissRequest = {
+                    showBgDisclosure = false
+                    onDisclosureDismissed()
+                },
                 properties = androidx.compose.ui.window.DialogProperties(dismissOnClickOutside = false),
                 icon = { Icon(Icons.Default.Place, contentDescription = null) },
                 title = { Text(stringResource(R.string.bg_location_disclosure_title)) },
@@ -3707,11 +3860,15 @@ fun SectionSysteme(
                 confirmButton = {
                     TextButton(onClick = {
                         showBgDisclosure = false
+                        onDisclosureAccepted()
                         requestBackgroundLocation()
                     }) { Text(stringResource(R.string.bg_location_disclosure_accept)) }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showBgDisclosure = false }) {
+                    TextButton(onClick = {
+                        showBgDisclosure = false
+                        onDisclosureDismissed()
+                    }) {
                         Text(stringResource(R.string.bg_location_disclosure_deny))
                     }
                 }
@@ -3723,7 +3880,11 @@ fun SectionSysteme(
         androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
             val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
                 if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                    val wasGranted = isBgLocationGranted
                     isBgLocationGranted = androidx.core.content.ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.ACCESS_BACKGROUND_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                    if (!wasGranted && isBgLocationGranted) {
+                        onBgLocationGranted()
+                    }
                 }
             }
             lifecycleOwner.lifecycle.addObserver(observer)
@@ -3736,6 +3897,8 @@ fun SectionSysteme(
             exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.shrinkVertically()
         ) {
             Column {
+                val errorContainerColor = MaterialTheme.colorScheme.errorContainer
+                val onErrorContainerColor = MaterialTheme.colorScheme.onErrorContainer
                 PreferenceActionCard(
                     title = stringResource(R.string.appstrings_bg_location_perm_title),
                     desc = buildString {
@@ -3747,7 +3910,13 @@ fun SectionSysteme(
                     },
                     // La divulgation passe d'abord : c'est elle qui déclenche la demande système.
                     onClick = { showBgDisclosure = true },
-                    shape = shape, border = border, bubbleColor = MaterialTheme.colorScheme.errorContainer, useOneUi = useOneUi, safeClick = safeClick,
+                    shape = shape,
+                    border = border,
+                    bubbleColor = errorContainerColor,
+                    containerColor = errorContainerColor,
+                    contentColor = onErrorContainerColor,
+                    useOneUi = useOneUi,
+                    safeClick = safeClick,
                     icon = Icons.Default.Place
                 )
                 Spacer(Modifier.height(sizing.spacing(12.dp)))
@@ -3796,6 +3965,7 @@ fun SectionDatabase(
     showRefreshButton: Boolean = false
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
+    val uriHandler = LocalUriHandler.current
     fun cardAnchor(anchor: String): Modifier = databaseCardModifiers[anchor] ?: Modifier
 
     // On génère la bordure si on n'est pas en OneUI
@@ -4019,6 +4189,7 @@ fun SectionDatabase(
         val apiServerMode = ApiEndpoints.mode.value
         val apiServerActive = ApiEndpoints.activeServer.value
         var showApiServerDialog by remember { mutableStateOf(false) }
+        var showApiServerPingDialog by remember { mutableStateOf(false) }
         Surface(
             onClick = { safeClick("data_api_server") { showApiServerDialog = true } },
             shape = shape,
@@ -4026,16 +4197,52 @@ fun SectionDatabase(
             color = if (useOneUi) bubbleColor else Color.Transparent,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Row(modifier = Modifier.padding(sizing.spacing(16.dp)), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Outlined.VisibilityOff, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(sizing.component(24.dp)))
+            Row(
+                modifier = Modifier.padding(sizing.spacing(16.dp)),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Outlined.Dns,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(sizing.component(24.dp))
+                )
                 Spacer(Modifier.width(sizing.spacing(16.dp)))
-                Column {
-                    Text(stringResource(R.string.appstrings_diagnostic_api_dialog_title), style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.Bold)
-                    Text(stringResource(R.string.settings_api_server_desc), style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        stringResource(R.string.appstrings_diagnostic_api_dialog_title),
+                        style = sizing.textStyle(MaterialTheme.typography.titleMedium),
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        stringResource(R.string.settings_api_server_desc),
+                        style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                     Text(
                         text = "${stringResource(apiServerModeLabelRes(apiServerMode))} · ${apiServerActive.host}",
                         style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                         color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                Spacer(Modifier.width(sizing.spacing(8.dp)))
+                FilledTonalButton(
+                    onClick = { safeClick("data_api_server_ping") { showApiServerPingDialog = true } },
+                    shape = RoundedCornerShape(sizing.component(10.dp)),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                        horizontal = sizing.spacing(12.dp),
+                        vertical = sizing.spacing(6.dp)
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.NetworkCheck,
+                        contentDescription = null,
+                        modifier = Modifier.size(sizing.component(16.dp))
+                    )
+                    Spacer(modifier = Modifier.width(sizing.spacing(4.dp)))
+                    Text(
+                        text = stringResource(R.string.appstrings_diagnostic_action_ping_api_server),
+                        style = sizing.textStyle(MaterialTheme.typography.labelMedium)
                     )
                 }
             }
@@ -4048,6 +4255,24 @@ fun SectionDatabase(
                 onSelect = { selectedMode ->
                     showApiServerDialog = false
                     applyApiServerMode(context, scope, selectedMode)
+                },
+                onOpenPing = {
+                    showApiServerDialog = false
+                    showApiServerPingDialog = true
+                }
+            )
+        }
+
+        if (showApiServerPingDialog) {
+            ApiServerPingDialog(
+                initialServer = apiServerActive,
+                onDismiss = { showApiServerPingDialog = false },
+                onApplyServer = { server ->
+                    val targetMode = when (server) {
+                        ApiServer.PRIMARY -> ApiServerMode.FORCE_PRIMARY
+                        ApiServer.MIRROR -> ApiServerMode.FORCE_MIRROR
+                    }
+                    applyApiServerMode(context, scope, targetMode)
                 }
             )
         }
@@ -4069,6 +4294,25 @@ fun SectionDatabase(
             useOneUi = useOneUi,
             safeClick = safeClick
         )
+
+        Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+
+        val appUpdateAnchor = databaseCardModifiers[ANCHOR_DB_APP_UPDATE]
+            ?: databaseCardModifiers[ANCHOR_DB_APP_UPDATE_ALT]
+            ?: Modifier
+        Box(modifier = appUpdateAnchor.fillMaxWidth()) {
+            PreferenceActionCard(
+                title = stringResource(R.string.appstrings_about_download_app_title),
+                desc = stringResource(R.string.appstrings_about_download_app_desc),
+                onClick = { AppDistribution.openPlayStore(context, uriHandler) },
+                shape = shape,
+                border = border,
+                bubbleColor = bubbleColor,
+                useOneUi = useOneUi,
+                safeClick = safeClick,
+                icon = Icons.Outlined.Download
+            )
+        }
 
         Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
 
@@ -4447,18 +4691,32 @@ fun PreferenceActionCard(
     bubbleColor: Color,
     useOneUi: Boolean,
     safeClick: SafeClick,
-    icon: ImageVector? = null // ✅ Garde le paramètre d'icône (si pas déjà fait)
+    icon: ImageVector? = null,
+    containerColor: Color? = null,
+    contentColor: Color? = null
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
-    val cardBg = if (useOneUi) bubbleColor else Color.Transparent
+    val cardBg = containerColor ?: if (useOneUi) bubbleColor else Color.Transparent
+    val defaultTextColor = contentColor ?: Color.Unspecified
+    val secondaryTextColor = contentColor?.copy(alpha = 0.85f) ?: MaterialTheme.colorScheme.onSurfaceVariant
+    val iconTint = contentColor ?: MaterialTheme.colorScheme.onSurfaceVariant
     Surface(onClick = { safeClick("preference_action_$title") { onClick() } }, shape = shape, border = border, color = cardBg, modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.padding(sizing.spacing(16.dp)), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
 
             // ✅ LE TEXTE RESTE À GAUCHE (Prend toute la place dispo grâce au weight)
             Column(Modifier.weight(1f)) {
-                Text(title, style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.Bold)
+                Text(
+                    text = title,
+                    style = sizing.textStyle(MaterialTheme.typography.titleMedium),
+                    fontWeight = FontWeight.Bold,
+                    color = defaultTextColor
+                )
                 if (desc.isNotEmpty()) {
-                    Text(desc, style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        text = desc,
+                        style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                        color = secondaryTextColor
+                    )
                 }
             }
 
@@ -4468,14 +4726,14 @@ fun PreferenceActionCard(
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = iconTint,
                     modifier = Modifier.size(sizing.component(22.dp)) // Légèrement plus petite pour l'équilibre
                 )
             }
 
             // ✅ LA FLÈCHE RESTE TOUT À DROITE
             Spacer(modifier = Modifier.width(sizing.spacing(8.dp))) // Espace avec l'icône
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(sizing.component(24.dp)))
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = iconTint, modifier = Modifier.size(sizing.component(24.dp)))
         }
     }
 }

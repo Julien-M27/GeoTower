@@ -104,6 +104,7 @@ import fr.geotower.ui.components.rememberDatabaseRefreshState
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AboutPagePrefs
 import fr.geotower.utils.AppConfig
+import fr.geotower.utils.AppDistribution
 import fr.geotower.utils.AppIconManager
 import fr.geotower.utils.AppLogoDrawingResources
 import fr.geotower.utils.AppLogger
@@ -1624,30 +1625,13 @@ private fun EnbDatabaseVersionsCard(
     }
 }
 
-private const val GEOTOWER_PLAY_STORE_WEB_URL =
-    "https://play.google.com/store/apps/details?id=fr.geotower"
-private const val GEOTOWER_PLAY_STORE_MARKET_URI =
-    "market://details?id=fr.geotower"
 private const val GEOTOWER_GITHUB_URL =
     "https://github.com/Julien-M27/GeoTower"
 private const val ENB_ANALYTICS_URL =
     "https://enb-analytics.fr/"
 
 private fun openPlayStore(context: Context, uriHandler: UriHandler) {
-    val packageName = context.packageName
-    val marketUri = Uri.parse("market://details?id=$packageName")
-    val intent = Intent(Intent.ACTION_VIEW, marketUri).apply {
-        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    }
-    try {
-        context.startActivity(intent)
-    } catch (e: Exception) {
-        try {
-            uriHandler.openUri(GEOTOWER_PLAY_STORE_WEB_URL)
-        } catch (e2: Exception) {
-            AppLogger.w(TAG_ABOUT, "Failed to open Play Store URL", e2)
-        }
-    }
+    AppDistribution.openPlayStore(context, uriHandler)
 }
 
 private fun readQuarterlyDataVersion(db: SQLiteDatabase): String {

@@ -279,11 +279,16 @@ fun PreferenceProfilesSheet(
                 modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(20.dp))
             )
 
+            val defaultProfile = remember(profiles) { profiles.firstOrNull { it.isDefault } }
             profiles.forEach { profile ->
+                val isQrSupported = remember(profile.id, profile.updatedAt, defaultProfile) {
+                    PreferenceProfileManager.isProfileQrSupported(profile, defaultProfile)
+                }
                 PreferenceProfileRow(
                     profile = profile,
                     active = profile.id == activeProfileId,
                     useOneUi = useOneUi,
+                    isQrSupported = isQrSupported,
                     onClick = {
                         if (profile.id != activeProfileId) {
                             profileToApply = profile
@@ -438,15 +443,25 @@ fun PreferenceProfilesSheet(
         val changesFromBase = remember(profile.id, profiles) {
             PreferenceProfileManager.profileDifferencesFromDefault(context, profile)
         }
+        val defaultProfile = remember(profiles) { profiles.firstOrNull { it.isDefault } }
+        val isQrSupported = remember(profile.id, profile.updatedAt, defaultProfile) {
+            PreferenceProfileManager.isProfileQrSupported(profile, defaultProfile)
+        }
         ProfileDetailsDialog(
             profile = profile,
             active = profile.id == activeProfileId,
             changes = changesFromBase,
+            isQrSupported = isQrSupported,
             onDismiss = { profileToShowDetails = null },
             onShareQr = {
                 val p = profile
                 profileToShowDetails = null
                 profileToShareQr = p
+            },
+            onExportFile = {
+                val p = profile
+                profileToShowDetails = null
+                exportIds = setOf(p.id)
             },
             onApply = {
                 PreferenceProfileManager.applyProfile(context, profile.id)
@@ -463,6 +478,11 @@ fun PreferenceProfilesSheet(
             onDismiss = { profileToShareQr = null },
             onShare = {
                 PreferenceProfileManager.shareProfileQr(context, profile)
+            },
+            onExportFile = {
+                val p = profile
+                profileToShareQr = null
+                exportIds = setOf(p.id)
             }
         )
     }
@@ -565,6 +585,7 @@ private fun PreferenceProfileRow(
     profile: PreferenceProfile,
     active: Boolean,
     useOneUi: Boolean,
+    isQrSupported: Boolean,
     onClick: () -> Unit,
     onShowDetails: () -> Unit,
     onShareQr: () -> Unit,
@@ -638,13 +659,15 @@ private fun PreferenceProfileRow(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            Spacer(Modifier.width(sizing.spacing(2.dp)))
-            IconButton(onClick = onShareQr) {
-                Icon(
-                    Icons.Default.QrCode,
-                    contentDescription = stringResource(R.string.preference_profiles_share_qr),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            if (isQrSupported) {
+                Spacer(Modifier.width(sizing.spacing(2.dp)))
+                IconButton(onClick = onShareQr) {
+                    Icon(
+                        Icons.Default.QrCode,
+                        contentDescription = stringResource(R.string.preference_profiles_share_qr),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
             if (!profile.isDefault) {
                 var showMenu by remember { mutableStateOf(false) }
@@ -980,8 +1003,10 @@ private fun ProfileDetailsDialog(
     profile: PreferenceProfile,
     active: Boolean,
     changes: List<PreferenceProfileChange>,
+    isQrSupported: Boolean,
     onDismiss: () -> Unit,
     onShareQr: () -> Unit,
+    onExportFile: () -> Unit,
     onApply: () -> Unit
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
@@ -1075,18 +1100,56 @@ private fun ProfileDetailsDialog(
                         }
                     }
                 }
+                if (!isQrSupported) {
+                    Spacer(Modifier.height(sizing.spacing(12.dp)))
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(sizing.component(10.dp)),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(sizing.spacing(10.dp)),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.Info,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(sizing.component(18.dp))
+                            )
+                            Spacer(Modifier.width(sizing.spacing(8.dp)))
+                            Text(
+                                text = stringResource(R.string.preference_profiles_share_qr_too_large),
+                                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
             Row(horizontalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))) {
-                TextButton(onClick = onShareQr) {
-                    Icon(
-                        Icons.Default.QrCode,
-                        contentDescription = null,
-                        modifier = Modifier.size(sizing.component(18.dp))
-                    )
-                    Spacer(Modifier.width(sizing.spacing(6.dp)))
-                    Text(stringResource(R.string.preference_profiles_share_qr))
+                if (isQrSupported) {
+                    TextButton(onClick = onShareQr) {
+                        Icon(
+                            Icons.Default.QrCode,
+                            contentDescription = null,
+                            modifier = Modifier.size(sizing.component(18.dp))
+                        )
+                        Spacer(Modifier.width(sizing.spacing(6.dp)))
+                        Text(stringResource(R.string.preference_profiles_share_qr))
+                    }
+                } else {
+                    TextButton(onClick = onExportFile) {
+                        Icon(
+                            Icons.Default.FileDownload,
+                            contentDescription = null,
+                            modifier = Modifier.size(sizing.component(18.dp))
+                        )
+                        Spacer(Modifier.width(sizing.spacing(6.dp)))
+                        Text(stringResource(R.string.preference_profiles_export_file_action))
+                    }
                 }
                 if (!active) {
                     Button(onClick = onApply) {
@@ -1107,7 +1170,8 @@ private fun ProfileDetailsDialog(
 private fun ShareProfileQrDialog(
     profile: PreferenceProfile,
     onDismiss: () -> Unit,
-    onShare: () -> Unit
+    onShare: () -> Unit,
+    onExportFile: () -> Unit
 ) {
     val context = LocalContext.current
     val sizing = LocalGeoTowerUiStyle.current.sizing
@@ -1130,7 +1194,11 @@ private fun ShareProfileQrDialog(
                 Spacer(Modifier.width(sizing.spacing(12.dp)))
                 Column {
                     Text(
-                        text = stringResource(R.string.preference_profiles_share_qr_title),
+                        text = if (qrBitmap != null) {
+                            stringResource(R.string.preference_profiles_share_qr_title)
+                        } else {
+                            stringResource(R.string.preference_profiles_details_title)
+                        },
                         style = sizing.textStyle(MaterialTheme.typography.titleMedium),
                         fontWeight = FontWeight.Bold
                     )
@@ -1149,24 +1217,24 @@ private fun ShareProfileQrDialog(
                     .verticalScroll(scrollState),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(
-                    text = stringResource(R.string.preference_profiles_share_qr_desc),
-                    style = sizing.textStyle(MaterialTheme.typography.bodySmall),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(bottom = sizing.spacing(12.dp))
-                )
+                if (qrBitmap != null) {
+                    Text(
+                        text = stringResource(R.string.preference_profiles_share_qr_desc),
+                        style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(bottom = sizing.spacing(12.dp))
+                    )
 
-                Surface(
-                    shape = RoundedCornerShape(sizing.component(16.dp)),
-                    color = Color.White,
-                    border = BorderStroke(sizing.component(1.dp), MaterialTheme.colorScheme.outlineVariant),
-                    modifier = Modifier
-                        .size(sizing.component(240.dp))
-                        .padding(sizing.spacing(8.dp))
-                ) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        if (qrBitmap != null) {
+                    Surface(
+                        shape = RoundedCornerShape(sizing.component(16.dp)),
+                        color = Color.White,
+                        border = BorderStroke(sizing.component(1.dp), MaterialTheme.colorScheme.outlineVariant),
+                        modifier = Modifier
+                            .size(sizing.component(240.dp))
+                            .padding(sizing.spacing(8.dp))
+                    ) {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Image(
                                 bitmap = qrBitmap.asImageBitmap(),
                                 contentDescription = "QR Code",
@@ -1174,28 +1242,32 @@ private fun ShareProfileQrDialog(
                                     .fillMaxSize()
                                     .padding(sizing.spacing(8.dp))
                             )
-                        } else {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(sizing.spacing(12.dp)),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Info,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.error,
-                                    modifier = Modifier.size(sizing.component(32.dp))
-                                )
-                                Spacer(Modifier.height(sizing.spacing(8.dp)))
-                                Text(
-                                    text = stringResource(R.string.preference_profiles_share_qr_too_large),
-                                    style = sizing.textStyle(MaterialTheme.typography.bodySmall),
-                                    color = MaterialTheme.colorScheme.error,
-                                    textAlign = TextAlign.Center
-                                )
-                            }
+                        }
+                    }
+                } else {
+                    Surface(
+                        shape = RoundedCornerShape(sizing.component(12.dp)),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = sizing.spacing(12.dp))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(sizing.spacing(12.dp)),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(sizing.component(24.dp))
+                            )
+                            Spacer(Modifier.width(sizing.spacing(10.dp)))
+                            Text(
+                                text = stringResource(R.string.preference_profiles_share_qr_too_large),
+                                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
                 }
@@ -1219,31 +1291,43 @@ private fun ShareProfileQrDialog(
             }
         },
         confirmButton = {
-            Row(horizontalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))) {
-                TextButton(
-                    onClick = {
-                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                        val clip = android.content.ClipData.newPlainText("Profil GeoTower", deepLink)
-                        clipboard.setPrimaryClip(clip)
-                        Toast.makeText(context, R.string.preference_profiles_link_copied, Toast.LENGTH_SHORT).show()
+            if (qrBitmap != null) {
+                Row(horizontalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))) {
+                    TextButton(
+                        onClick = {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                            val clip = android.content.ClipData.newPlainText("Profil GeoTower", deepLink)
+                            clipboard.setPrimaryClip(clip)
+                            Toast.makeText(context, R.string.preference_profiles_link_copied, Toast.LENGTH_SHORT).show()
+                        }
+                    ) {
+                        Icon(
+                            Icons.Default.ContentCopy,
+                            contentDescription = null,
+                            modifier = Modifier.size(sizing.component(18.dp))
+                        )
+                        Spacer(Modifier.width(sizing.spacing(4.dp)))
+                        Text(stringResource(R.string.preference_profiles_copy_link))
                     }
-                ) {
-                    Icon(
-                        Icons.Default.ContentCopy,
-                        contentDescription = null,
-                        modifier = Modifier.size(sizing.component(18.dp))
-                    )
-                    Spacer(Modifier.width(sizing.spacing(4.dp)))
-                    Text(stringResource(R.string.preference_profiles_copy_link))
+                    Button(onClick = onShare) {
+                        Icon(
+                            Icons.Default.Share,
+                            contentDescription = null,
+                            modifier = Modifier.size(sizing.component(18.dp))
+                        )
+                        Spacer(Modifier.width(sizing.spacing(4.dp)))
+                        Text(stringResource(R.string.preference_profiles_share_qr_action))
+                    }
                 }
-                Button(onClick = onShare) {
+            } else {
+                Button(onClick = onExportFile) {
                     Icon(
-                        Icons.Default.Share,
+                        Icons.Default.FileDownload,
                         contentDescription = null,
                         modifier = Modifier.size(sizing.component(18.dp))
                     )
                     Spacer(Modifier.width(sizing.spacing(4.dp)))
-                    Text(stringResource(R.string.preference_profiles_share_qr_action))
+                    Text(stringResource(R.string.preference_profiles_export_file_action))
                 }
             }
         },

@@ -1,4 +1,4 @@
-package fr.geotower.utils
+﻿package fr.geotower.utils
 
 import kotlin.math.roundToInt
 
@@ -17,8 +17,8 @@ internal object MapClusterStrengthProfile {
     }
 
     fun aggregationZoom(mapZoom: Double, strength: Int): Double {
-        if (mapZoom >= 13.0) return mapZoom
-        val finestZoom = minOf(12.5, mapZoom + 2.5)
+        if (mapZoom >= 14.0) return mapZoom
+        val finestZoom = minOf(13.5, mapZoom + 2.5)
         val finerLevelFraction = (100 - normalize(strength)) / 100.0
         return mapZoom + (finestZoom - mapZoom) * finerLevelFraction
     }

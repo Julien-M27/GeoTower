@@ -1,6 +1,7 @@
 package fr.geotower.ui.components
 
 import android.content.Context
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -14,9 +15,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -27,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -81,12 +88,33 @@ fun MapClusterStrengthSlider(
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f)
             )
-            Text(
-                text = "$displayedStrength%",
-                style = sizing.textStyle(MaterialTheme.typography.titleMedium),
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(sizing.spacing(4.dp))
+            ) {
+                if (displayedStrength != AppConfig.DEFAULT_MAP_CLUSTER_STRENGTH) {
+                    IconButton(
+                        onClick = {
+                            updateStrength(AppConfig.DEFAULT_MAP_CLUSTER_STRENGTH.toFloat())
+                            persistStrength()
+                        },
+                        modifier = Modifier.size(sizing.component(28.dp))
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = stringResource(R.string.appstrings_reset_to_default),
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(sizing.component(18.dp))
+                        )
+                    }
+                }
+                Text(
+                    text = "$displayedStrength%",
+                    style = sizing.textStyle(MaterialTheme.typography.titleMedium),
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
         }
 
         if (showDescription) {
@@ -132,6 +160,13 @@ fun MapClusterStrengthSlider(
                             strokeWidth = sizing.component(14.dp).toPx(),
                             cap = StrokeCap.Round
                         )
+                        // Repère du réglage d'usine (100 %)
+                        val defaultRatio = AppConfig.DEFAULT_MAP_CLUSTER_STRENGTH / 100f
+                        drawCircle(
+                            color = Color.Gray.copy(alpha = 0.6f),
+                            radius = sizing.component(4.dp).toPx(),
+                            center = Offset(size.width * defaultRatio, size.height / 2)
+                        )
                     }
                 }
             )
@@ -161,5 +196,34 @@ fun MapClusterStrengthSlider(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+    }
+}
+
+/**
+ * Carte de réglage de la densité de clustering (section Cartographie).
+ */
+@Composable
+fun MapClusterStrengthCard(
+    shape: Shape,
+    border: BorderStroke?,
+    bubbleColor: Color,
+    useOneUi: Boolean,
+    modifier: Modifier = Modifier,
+    showDescription: Boolean = true
+) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    val cardBg = if (useOneUi) bubbleColor else Color.Transparent
+
+    Surface(
+        shape = shape,
+        border = border,
+        color = cardBg,
+        modifier = modifier.fillMaxWidth()
+    ) {
+        MapClusterStrengthSlider(
+            useOneUi = useOneUi,
+            showDescription = showDescription,
+            modifier = Modifier.padding(sizing.spacing(16.dp))
+        )
     }
 }

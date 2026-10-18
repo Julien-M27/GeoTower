@@ -314,5 +314,61 @@ class PreferenceProfileManagerTest {
         assertEquals(heavyProfile.icon, decoded?.icon)
         assertEquals(modifiedValues.size, decoded?.values?.size)
     }
+
+    @Test
+    fun isProfileQrSupportedReturnsTrueForStandardProfile() {
+        val baseProfile = PreferenceProfile(
+            id = "default",
+            name = "Par défaut",
+            colorArgb = 0xFF2563EB.toInt(),
+            icon = "star",
+            createdAt = 1000L,
+            updatedAt = 1000L,
+            values = mapOf("theme_mode" to PreferenceProfileValue(PreferenceProfileValue.TYPE_INT, 0))
+        )
+        val customProfile = PreferenceProfile(
+            id = "custom",
+            name = "Nuit",
+            colorArgb = 0xFF10B981.toInt(),
+            icon = "palette",
+            createdAt = 2000L,
+            updatedAt = 2000L,
+            values = mapOf("theme_mode" to PreferenceProfileValue(PreferenceProfileValue.TYPE_INT, 2))
+        )
+        assertTrue(PreferenceProfileManager.isProfileQrSupported(customProfile, baseProfile))
+    }
+
+    @Test
+    fun isProfileQrSupportedReturnsFalseForExcessivelyLargeProfiles() {
+        val baseProfile = PreferenceProfile(
+            id = "default",
+            name = "Par défaut",
+            colorArgb = 0xFF2563EB.toInt(),
+            icon = "star",
+            createdAt = 1000L,
+            updatedAt = 1000L,
+            values = emptyMap()
+        )
+        // Construct a profile with incompressible random content exceeding QR limits (1200 chars)
+        val random = java.util.Random(42)
+        val randomBytes = ByteArray(1500).apply { random.nextBytes(this) }
+        val randomString = randomBytes.joinToString("") { "%02x".format(it) }
+        val oversizedProfile = PreferenceProfile(
+            id = "oversized",
+            name = "Profil Trop Gros",
+            colorArgb = 0xFFFF0000.toInt(),
+            icon = "settings",
+            createdAt = 2000L,
+            updatedAt = 2000L,
+            values = mapOf(
+                "link_cartoradio" to PreferenceProfileValue(PreferenceProfileValue.TYPE_STRING, randomString)
+            )
+        )
+        org.junit.Assert.assertFalse(
+            "An oversized profile must not be supported for QR code sharing",
+            PreferenceProfileManager.isProfileQrSupported(oversizedProfile, baseProfile)
+        )
+    }
 }
+
 

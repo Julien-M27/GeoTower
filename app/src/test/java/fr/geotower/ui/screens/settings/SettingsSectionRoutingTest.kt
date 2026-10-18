@@ -22,6 +22,8 @@ class SettingsSectionRoutingTest {
         assertEquals(SettingsSectionIds.DATA, SettingsSectionIds.forDeepLink("database"))
         assertEquals(SettingsSectionIds.DATA, SettingsSectionIds.forDeepLink("db_mobile"))
         assertEquals(SettingsSectionIds.DATA, SettingsSectionIds.forDeepLink("db_local_build"))
+        assertEquals(SettingsSectionIds.DATA, SettingsSectionIds.forDeepLink("app_update"))
+        assertEquals(SettingsSectionIds.DATA, SettingsSectionIds.forDeepLink("db_app_update"))
         assertEquals(SettingsSectionIds.MAPPING, SettingsSectionIds.forDeepLink("offline_maps"))
         assertEquals(SettingsSectionIds.SYSTEM, SettingsSectionIds.forDeepLink("background_disclosure"))
         assertNull(SettingsSectionIds.forDeepLink("unknown"))

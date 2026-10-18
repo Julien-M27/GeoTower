@@ -5,6 +5,7 @@ import androidx.compose.ui.res.stringResource
 import fr.geotower.R
 import fr.geotower.data.api.ApiServer
 import fr.geotower.data.api.CellularFrApi
+import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.outages.OperatorOutageSource
 
 /**
@@ -233,11 +234,10 @@ fun aboutSourceGroups(): List<AboutSourceGroup> {
                 description = stringResource(R.string.appstrings_src_partners_desc),
                 links = buildList {
                     add(AboutSourceLink(label = "Cartoradio", host = "cartoradio.fr", url = "https://cartoradio.fr/"))
-                    // CellularFR masqué — voir CellularFrApi.ENABLED
-                    if (CellularFrApi.isEnabled) {
+                    add(AboutSourceLink(label = "Signal Quest", host = "signalquest.fr", url = "https://signalquest.fr/"))
+                    if (CellularFrApi.isEnabled || RemoteFeatureFlags.config.value.isSiteExternalLinkEnabled("cellularfr")) {
                         add(AboutSourceLink(label = "CellularFR", host = "cellularfr.fr", url = "https://cellularfr.fr/"))
                     }
-                    add(AboutSourceLink(label = "Signal Quest", host = "signalquest.fr", url = "https://signalquest.fr/"))
                     add(AboutSourceLink(label = "CellMapper", host = "www.cellmapper.net", url = "https://www.cellmapper.net/"))
                     add(AboutSourceLink(label = "RNC Mobile", host = "rncmobile.net", url = "https://rncmobile.net/"))
                     add(AboutSourceLink(label = "eNB-Analytics", host = "enb-analytics.fr", url = "https://enb-analytics.fr/"))

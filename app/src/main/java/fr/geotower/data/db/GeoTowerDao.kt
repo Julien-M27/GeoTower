@@ -164,6 +164,36 @@ interface GeoTowerDao {
         maxLon: Double
     ): List<LocalisationEntity>
 
+    @Query("""
+        SELECT
+            l.id_anfr,
+            o.libelle AS operateur,
+            l.latitude,
+            l.longitude,
+            l.azimuts,
+            l.code_insee,
+            l.azimuts_fh,
+            l.tech_mask,
+            l.band_mask,
+            l.is_zb,
+            COALESCE(st.libelle, '') AS statut,
+            COALESCE(t.has_active, 1) AS has_active,
+            COALESCE(NULLIF(t.date_service, ''), NULLIF(t.date_implantation, '')) AS date_service,
+            0 AS has_underground_support
+        FROM localisation l
+        LEFT JOIN ref_operateur o ON l.operateur_id = o.id
+        LEFT JOIN technique t ON l.id_anfr = t.id_anfr
+        LEFT JOIN ref_statut st ON t.statut_id = st.id
+        WHERE l.latitude BETWEEN :minLat AND :maxLat
+        AND l.longitude BETWEEN :minLon AND :maxLon
+    """)
+    suspend fun getLocalisationsInBoxFast(
+        minLat: Double,
+        maxLat: Double,
+        minLon: Double,
+        maxLon: Double
+    ): List<LocalisationEntity>
+
     /**
      * Emprise d'un département, pour cadrer la carte sur une recherche « 35 » / « Ille-et-Vilaine ».
      *
@@ -384,6 +414,45 @@ interface GeoTowerDao {
         )
     """)
     suspend fun getLocalisationsInBoxForRadioFilter(
+        minLat: Double,
+        maxLat: Double,
+        minLon: Double,
+        maxLon: Double,
+        selectedBandMask: Int,
+        detailBackedBandMask: Int,
+        includeFh: Boolean
+    ): List<LocalisationEntity>
+
+    @Query("""
+        SELECT
+            l.id_anfr,
+            COALESCE(o.libelle, 'Inconnu') AS operateur,
+            l.latitude,
+            l.longitude,
+            l.azimuts,
+            l.code_insee,
+            l.azimuts_fh,
+            l.tech_mask,
+            l.band_mask,
+            l.arcep_nidt,
+            l.is_zb,
+            COALESCE(st.libelle, '') AS statut,
+            COALESCE(t.has_active, 0) AS has_active,
+            COALESCE(NULLIF(t.date_service, ''), NULLIF(t.date_implantation, '')) AS date_service,
+            0 AS has_underground_support
+        FROM localisation l
+        LEFT JOIN ref_operateur o ON l.operateur_id = o.id
+        LEFT JOIN technique t ON l.id_anfr = t.id_anfr
+        LEFT JOIN ref_statut st ON t.statut_id = st.id
+        WHERE l.latitude BETWEEN :minLat AND :maxLat
+        AND l.longitude BETWEEN :minLon AND :maxLon
+        AND (
+            (:selectedBandMask != 0 AND (l.band_mask & :selectedBandMask) != 0)
+            OR (:detailBackedBandMask != 0 AND (l.tech_mask & 8) != 0)
+            OR (:includeFh = 1 AND ((l.band_mask & 16384) != 0 OR COALESCE(l.azimuts_fh, '') != ''))
+        )
+    """)
+    suspend fun getLocalisationsInBoxForRadioFilterFast(
         minLat: Double,
         maxLat: Double,
         minLon: Double,
@@ -1152,6 +1221,111 @@ interface GeoTowerDao {
         GROUP BY ROUND(l.latitude / 0.02), ROUND(l.longitude / 0.025)
     """)
     suspend fun getL7Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double, hideUndergroundSites: Boolean, showOnlyZbSites: Boolean): List<DbCluster>
+
+    @Query("""
+        SELECT
+            AVG(l.latitude) AS centerLat,
+            AVG(l.longitude) AS centerLon,
+            COUNT(l.id_anfr) AS count,
+            GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators,
+            MIN(l.id_anfr) AS singleIdAnfr
+        FROM localisation l
+        LEFT JOIN ref_operateur o ON l.operateur_id = o.id
+        WHERE l.latitude BETWEEN :minLat AND :maxLat
+        AND l.longitude BETWEEN :minLon AND :maxLon
+        GROUP BY ROUND(l.latitude / 2.5), ROUND(l.longitude / 3.0)
+    """)
+    suspend fun getFastL1Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double): List<DbCluster>
+
+    @Query("""
+        SELECT
+            AVG(l.latitude) AS centerLat,
+            AVG(l.longitude) AS centerLon,
+            COUNT(l.id_anfr) AS count,
+            GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators,
+            MIN(l.id_anfr) AS singleIdAnfr
+        FROM localisation l
+        LEFT JOIN ref_operateur o ON l.operateur_id = o.id
+        WHERE l.latitude BETWEEN :minLat AND :maxLat
+        AND l.longitude BETWEEN :minLon AND :maxLon
+        GROUP BY ROUND(l.latitude / 1.0), ROUND(l.longitude / 1.2)
+    """)
+    suspend fun getFastL2Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double): List<DbCluster>
+
+    @Query("""
+        SELECT
+            AVG(l.latitude) AS centerLat,
+            AVG(l.longitude) AS centerLon,
+            COUNT(l.id_anfr) AS count,
+            GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators,
+            MIN(l.id_anfr) AS singleIdAnfr
+        FROM localisation l
+        LEFT JOIN ref_operateur o ON l.operateur_id = o.id
+        WHERE l.latitude BETWEEN :minLat AND :maxLat
+        AND l.longitude BETWEEN :minLon AND :maxLon
+        GROUP BY ROUND(l.latitude / 0.4), ROUND(l.longitude / 0.5)
+    """)
+    suspend fun getFastL3Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double): List<DbCluster>
+
+    @Query("""
+        SELECT
+            AVG(l.latitude) AS centerLat,
+            AVG(l.longitude) AS centerLon,
+            COUNT(l.id_anfr) AS count,
+            GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators,
+            MIN(l.id_anfr) AS singleIdAnfr
+        FROM localisation l
+        LEFT JOIN ref_operateur o ON l.operateur_id = o.id
+        WHERE l.latitude BETWEEN :minLat AND :maxLat
+        AND l.longitude BETWEEN :minLon AND :maxLon
+        GROUP BY ROUND(l.latitude / 0.15), ROUND(l.longitude / 0.2)
+    """)
+    suspend fun getFastL4Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double): List<DbCluster>
+
+    @Query("""
+        SELECT
+            AVG(l.latitude) AS centerLat,
+            AVG(l.longitude) AS centerLon,
+            COUNT(l.id_anfr) AS count,
+            GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators,
+            MIN(l.id_anfr) AS singleIdAnfr
+        FROM localisation l
+        LEFT JOIN ref_operateur o ON l.operateur_id = o.id
+        WHERE l.latitude BETWEEN :minLat AND :maxLat
+        AND l.longitude BETWEEN :minLon AND :maxLon
+        GROUP BY ROUND(l.latitude, 1), ROUND(l.longitude, 1)
+    """)
+    suspend fun getFastL5Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double): List<DbCluster>
+
+    @Query("""
+        SELECT
+            AVG(l.latitude) AS centerLat,
+            AVG(l.longitude) AS centerLon,
+            COUNT(l.id_anfr) AS count,
+            GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators,
+            MIN(l.id_anfr) AS singleIdAnfr
+        FROM localisation l
+        LEFT JOIN ref_operateur o ON l.operateur_id = o.id
+        WHERE l.latitude BETWEEN :minLat AND :maxLat
+        AND l.longitude BETWEEN :minLon AND :maxLon
+        GROUP BY ROUND(l.latitude / 0.05), ROUND(l.longitude / 0.06)
+    """)
+    suspend fun getFastL6Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double): List<DbCluster>
+
+    @Query("""
+        SELECT
+            AVG(l.latitude) AS centerLat,
+            AVG(l.longitude) AS centerLon,
+            COUNT(l.id_anfr) AS count,
+            GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators,
+            MIN(l.id_anfr) AS singleIdAnfr
+        FROM localisation l
+        LEFT JOIN ref_operateur o ON l.operateur_id = o.id
+        WHERE l.latitude BETWEEN :minLat AND :maxLat
+        AND l.longitude BETWEEN :minLon AND :maxLon
+        GROUP BY ROUND(l.latitude / 0.02), ROUND(l.longitude / 0.025)
+    """)
+    suspend fun getFastL7Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double): List<DbCluster>
 
     @Query("""
         SELECT

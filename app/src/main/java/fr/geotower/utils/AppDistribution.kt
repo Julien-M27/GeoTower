@@ -1,8 +1,11 @@
 package fr.geotower.utils
 
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
+import androidx.compose.ui.platform.UriHandler
 
 /**
  * D'où vient l'installation courante de GeoTower.
@@ -18,6 +21,8 @@ import android.os.Build
  * un chemin d'UI.
  */
 object AppDistribution {
+
+    const val PLAY_STORE_WEB_URL = "https://play.google.com/store/apps/details?id=fr.geotower"
 
     /** Installateurs considérés comme « c'est le Play Store qui gère les mises à jour ». */
     private val PLAY_INSTALLERS = setOf(
@@ -41,6 +46,30 @@ object AppDistribution {
         if (installed) return
         installed = true
         isPlayInstall = resolveInstallerPackage(context.applicationContext) in PLAY_INSTALLERS
+    }
+
+    fun openPlayStore(context: Context, uriHandler: UriHandler? = null) {
+        val packageName = context.packageName
+        val marketUri = Uri.parse("market://details?id=$packageName")
+        val intent = Intent(Intent.ACTION_VIEW, marketUri).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        try {
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            try {
+                if (uriHandler != null) {
+                    uriHandler.openUri(PLAY_STORE_WEB_URL)
+                } else {
+                    val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse(PLAY_STORE_WEB_URL)).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(webIntent)
+                }
+            } catch (e2: Exception) {
+                AppLogger.w("GeoTower", "Failed to open Play Store URL", e2)
+            }
+        }
     }
 
     private fun resolveInstallerPackage(context: Context): String? {

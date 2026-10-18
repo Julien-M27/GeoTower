@@ -1,5 +1,6 @@
 ﻿package fr.geotower.data
 
+import kotlin.math.roundToInt
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
@@ -72,6 +73,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
@@ -460,6 +463,7 @@ class AnfrRepository(
     }
 
     private suspend fun <T> queryLocalDatabase(defaultValue: T, block: suspend GeoTowerDao.() -> T): T {
+        currentCoroutineContext().ensureActive()
         return try {
             dao.block()
         } catch (e: CancellationException) {
@@ -846,6 +850,17 @@ class AnfrRepository(
         hideUndergroundSites: Boolean,
         showOnlyZbSites: Boolean
     ): List<DbCluster> {
+        if (!hideUndergroundSites && !showOnlyZbSites) {
+            return when {
+                zoom < 6.5 -> getFastL1Clusters(minLat = minLat, maxLat = maxLat, minLon = minLon, maxLon = maxLon)
+                zoom < 8.0 -> getFastL2Clusters(minLat = minLat, maxLat = maxLat, minLon = minLon, maxLon = maxLon)
+                zoom < 9.5 -> getFastL3Clusters(minLat = minLat, maxLat = maxLat, minLon = minLon, maxLon = maxLon)
+                zoom < 10.5 -> getFastL4Clusters(minLat = minLat, maxLat = maxLat, minLon = minLon, maxLon = maxLon)
+                zoom < 11.5 -> getFastL5Clusters(minLat = minLat, maxLat = maxLat, minLon = minLon, maxLon = maxLon)
+                zoom < 12.5 -> getFastL6Clusters(minLat = minLat, maxLat = maxLat, minLon = minLon, maxLon = maxLon)
+                else -> getFastL7Clusters(minLat = minLat, maxLat = maxLat, minLon = minLon, maxLon = maxLon)
+            }
+        }
         return when {
             zoom < 6.5 -> getL1Clusters(minLat = minLat, maxLat = maxLat, minLon = minLon, maxLon = maxLon, hideUndergroundSites = hideUndergroundSites, showOnlyZbSites = showOnlyZbSites)
             zoom < 8.0 -> getL2Clusters(minLat = minLat, maxLat = maxLat, minLon = minLon, maxLon = maxLon, hideUndergroundSites = hideUndergroundSites, showOnlyZbSites = showOnlyZbSites)
@@ -926,16 +941,28 @@ class AnfrRepository(
             return hideHiddenSites(getLiveSitesInBox(latNorth, lonEast, latSouth, lonWest))
         }
 
+        val hideUnderground = AppConfig.hideUndergroundSites.value
         val bounds = mapQueryBounds(latNorth, lonEast, latSouth, lonWest)
         val localisations = queryLocalDatabase(emptyList()) {
             bounds.longitudeRanges
                 .flatMap { range ->
-                    getLocalisationsInBox(
-                        minLat = bounds.minLat,
-                        maxLat = bounds.maxLat,
-                        minLon = range.min,
-                        maxLon = range.max
-                    )
+                    if (hideUnderground) {
+                        getLocalisationsInBox(
+                            minLat = bounds.minLat,
+                            maxLat = bounds.maxLat,
+                            minLon = range.min,
+                            maxLon = range.max
+                        )
+                    } else {
+                        getLocalisationsInBoxFast(
+                            minLat = bounds.minLat,
+                            maxLat = bounds.maxLat,
+                            minLon = range.min,
+                            maxLon = range.max
+                        )
+                    }
+
+
                 }
                 .distinctBy { it.idAnfr }
         }
@@ -1120,19 +1147,34 @@ class AnfrRepository(
             return emptyList()
         }
 
+        val hideUnderground = AppConfig.hideUndergroundSites.value
         val bounds = mapQueryBounds(latNorth, lonEast, latSouth, lonWest)
         val localisations = queryLocalDatabase(emptyList()) {
             bounds.longitudeRanges
                 .flatMap { range ->
-                    getLocalisationsInBoxForRadioFilter(
-                        minLat = bounds.minLat,
-                        maxLat = bounds.maxLat,
-                        minLon = range.min,
-                        maxLon = range.max,
-                        selectedBandMask = selectedBandMask,
-                        detailBackedBandMask = detailBackedBandMask,
-                        includeFh = includeFh
-                    )
+                    if (hideUnderground) {
+                        getLocalisationsInBoxForRadioFilter(
+                            minLat = bounds.minLat,
+                            maxLat = bounds.maxLat,
+                            minLon = range.min,
+                            maxLon = range.max,
+                            selectedBandMask = selectedBandMask,
+                            detailBackedBandMask = detailBackedBandMask,
+                            includeFh = includeFh
+                        )
+                    } else {
+                        getLocalisationsInBoxForRadioFilterFast(
+                            minLat = bounds.minLat,
+                            maxLat = bounds.maxLat,
+                            minLon = range.min,
+                            maxLon = range.max,
+                            selectedBandMask = selectedBandMask,
+                            detailBackedBandMask = detailBackedBandMask,
+                            includeFh = includeFh
+                        )
+                    }
+
+
                 }
                 .distinctBy { it.idAnfr }
         }
@@ -1239,6 +1281,12 @@ class AnfrRepository(
     // =================================================================
     // 1.5 POUR LA CARTE (Mode Macro : Clustering progressif à 5 niveaux)
     // =================================================================
+    private val macroClusterCache = android.util.LruCache<String, List<DbCluster>>(64)
+
+    fun clearMacroClusterCache() {
+        macroClusterCache.evictAll()
+    }
+
     suspend fun getClusteredAntennas(zoom: Double, latNorth: Double, lonEast: Double, latSouth: Double, lonWest: Double): List<DbCluster> {
         if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_BBOX)) {
             val liveSites = getLiveSitesInBox(latNorth, lonEast, latSouth, lonWest)
@@ -1250,20 +1298,33 @@ class AnfrRepository(
         }
 
         val bounds = mapQueryBounds(latNorth, lonEast, latSouth, lonWest)
-        return queryLocalDatabase(emptyList()) {
+        val hideUnderground = AppConfig.hideUndergroundSites.value
+        val onlyZb = AppConfig.showOnlyZbSites.value
+        val cacheKey = "${(zoom * 2).roundToInt() / 2.0}_" +
+            "${(bounds.minLat * 100).roundToInt()}_${(bounds.maxLat * 100).roundToInt()}_" +
+            "${bounds.longitudeRanges.joinToString(";") { "${(it.min * 100).roundToInt()}-${(it.max * 100).roundToInt()}" }}_" +
+            "${hideUnderground}_${onlyZb}"
+        macroClusterCache.get(cacheKey)?.let { return it }
+        val result = queryLocalDatabase(emptyList()) {
             val clusters = bounds.longitudeRanges.flatMap { range ->
+                currentCoroutineContext().ensureActive()
                 getClustersForZoom(
                     zoom = zoom,
                     minLat = bounds.minLat,
                     maxLat = bounds.maxLat,
                     minLon = range.min,
                     maxLon = range.max,
-                    hideUndergroundSites = AppConfig.hideUndergroundSites.value,
-                    showOnlyZbSites = AppConfig.showOnlyZbSites.value
+                    hideUndergroundSites = hideUnderground,
+                    showOnlyZbSites = onlyZb
                 )
             }
+            currentCoroutineContext().ensureActive()
             MacroClusterGrouper.mergeTargetedTerritories(clusters, zoom)
         }
+        if (result.isNotEmpty()) {
+            macroClusterCache.put(cacheKey, result)
+        }
+        return result
     }
 
     // =================================================================

@@ -8,13 +8,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okhttp3.CacheControl
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.io.IOException
 import java.util.concurrent.TimeUnit
+import kotlin.coroutines.resume
 
 /** Verdict de la sonde serveur GeoTower. */
 enum class ServerStatus {
@@ -120,6 +123,7 @@ object ServerReachability {
     suspend fun runPing(
         server: ApiServer,
         passes: Int,
+        initialSamples: List<ServerPingSample> = emptyList(),
         onPassCompleted: suspend (ServerPingSample) -> Unit = {}
     ): ServerPingResult {
         require(passes == DEFAULT_PING_PASSES || passes == EXTENDED_PING_PASSES) {
@@ -127,15 +131,16 @@ object ServerReachability {
         }
 
         val samples = withContext(Dispatchers.IO) {
-            buildList {
-                repeat(passes) { index ->
-                    currentCoroutineContext().ensureActive()
-                    if (index > 0) delay(PING_INTERVAL_MS)
-                    val sample = pingOnce(server, index + 1)
-                    add(sample)
-                    withContext(Dispatchers.Main) { onPassCompleted(sample) }
-                }
+            val list = initialSamples.toMutableList()
+            val startAttempt = list.size + 1
+            for (attempt in startAttempt..passes) {
+                currentCoroutineContext().ensureActive()
+                if (attempt > startAttempt) delay(PING_INTERVAL_MS)
+                val sample = pingOnce(server, attempt)
+                list.add(sample)
+                withContext(Dispatchers.Main) { onPassCompleted(sample) }
             }
+            list
         }
         return ServerPingResult(server = server, requestedPasses = passes, samples = samples)
     }
@@ -204,30 +209,43 @@ object ServerReachability {
         }
     }
 
-    private fun pingOnce(server: ApiServer, attempt: Int): ServerPingSample {
-        val request = Request.Builder()
-            .url("${server.baseUrl}$PROBE_PATH")
-            .cacheControl(CacheControl.FORCE_NETWORK)
-            .header("Accept", "application/json")
-            .header(ApiEndpoints.PIN_HOST_HEADER, server.host)
-            .build()
-        val startedAt = SystemClock.elapsedRealtime()
+    private suspend fun pingOnce(server: ApiServer, attempt: Int): ServerPingSample =
+        suspendCancellableCoroutine { continuation ->
+            val request = Request.Builder()
+                .url("${server.baseUrl}$PROBE_PATH")
+                .cacheControl(CacheControl.FORCE_NETWORK)
+                .header("Accept", "application/json")
+                .header(ApiEndpoints.PIN_HOST_HEADER, server.host)
+                .build()
+            val startedAt = SystemClock.elapsedRealtime()
+            val call = pingClient.newCall(request)
 
-        return try {
-            val responseCode = pingClient.newCall(request).execute().use { response ->
-                response.code
+            continuation.invokeOnCancellation {
+                call.cancel()
             }
-            val latencyMs = (SystemClock.elapsedRealtime() - startedAt).coerceAtLeast(0L)
-            ServerPingSample(
-                attempt = attempt,
-                latencyMs = latencyMs.takeIf { responseCode < 500 },
-                responseCode = responseCode
-            )
-        } catch (e: Exception) {
-            AppLogger.w(TAG, "Server ping failed on ${server.host} (pass $attempt)", e)
-            ServerPingSample(attempt = attempt, latencyMs = null)
+
+            call.enqueue(object : okhttp3.Callback {
+                override fun onFailure(call: okhttp3.Call, e: IOException) {
+                    if (continuation.isCancelled) return
+                    AppLogger.w(TAG, "Server ping failed on ${server.host} (pass $attempt)", e)
+                    continuation.resume(ServerPingSample(attempt = attempt, latencyMs = null))
+                }
+
+                override fun onResponse(call: okhttp3.Call, response: okhttp3.Response) {
+                    val latencyMs = (SystemClock.elapsedRealtime() - startedAt).coerceAtLeast(0L)
+                    val responseCode = response.code
+                    response.close()
+                    if (continuation.isCancelled) return
+                    continuation.resume(
+                        ServerPingSample(
+                            attempt = attempt,
+                            latencyMs = latencyMs.takeIf { responseCode < 500 },
+                            responseCode = responseCode
+                        )
+                    )
+                }
+            })
         }
-    }
 
     private fun isThrottled(): Boolean {
         return statusState.value != ServerStatus.UNKNOWN &&

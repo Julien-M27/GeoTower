@@ -1,6 +1,7 @@
 package fr.geotower.ui.screens.diagnostic
 
 import android.Manifest
+import android.app.ActivityManager
 import android.app.NotificationManager
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -11,6 +12,7 @@ import android.content.pm.PackageManager
 import android.database.sqlite.SQLiteDatabase
 import android.net.Uri
 import android.os.Build
+import android.os.PowerManager
 import android.os.StatFs
 import android.os.SystemClock
 import android.provider.Settings
@@ -56,11 +58,14 @@ import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -113,6 +118,7 @@ import fr.geotower.ui.theme.LocalGeoTowerUiSizing
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
+import fr.geotower.BuildConfig
 import fr.geotower.R
 import fr.geotower.data.api.ApiEndpoints
 import fr.geotower.data.api.ApiServer
@@ -141,6 +147,7 @@ import fr.geotower.utils.LiveTrackingPrefs
 import fr.geotower.utils.PowerProfile
 import fr.geotower.utils.PreferenceStores
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -149,6 +156,7 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 
 private const val SETTINGS_DATABASE_ROUTE = "settings?section=database"
 private const val SETTINGS_OFFLINE_MAPS_ROUTE = "settings?section=offline_maps"
@@ -175,6 +183,75 @@ fun DiagnosticScreen(navController: NavController) {
     var pingServer by remember { mutableStateOf(ApiEndpoints.active()) }
     var pingPasses by remember { mutableStateOf(ServerReachability.DEFAULT_PING_PASSES) }
     var pingState by remember { mutableStateOf<DiagnosticPingState>(DiagnosticPingState.Idle) }
+    var pingJob by remember { mutableStateOf<Job?>(null) }
+
+    fun pausePing() {
+        val currentJob = pingJob
+        val currentState = pingState
+        pingJob = null
+        currentJob?.cancel()
+        if (currentState is DiagnosticPingState.Running) {
+            pingState = if (currentState.samples.isNotEmpty()) {
+                DiagnosticPingState.Paused(
+                    server = currentState.server,
+                    passes = currentState.passes,
+                    completedPasses = currentState.completedPasses,
+                    samples = currentState.samples
+                )
+            } else {
+                DiagnosticPingState.Idle
+            }
+        }
+    }
+
+    fun startPing(resume: Boolean = false) {
+        val currentJob = pingJob
+        pingJob = null
+        currentJob?.cancel()
+
+        val initialSamples = if (resume && pingState is DiagnosticPingState.Paused) {
+            (pingState as DiagnosticPingState.Paused).samples
+        } else {
+            emptyList()
+        }
+
+        val targetServer = pingServer
+        val targetPasses = pingPasses
+
+        val job = scope.launch {
+            pingState = DiagnosticPingState.Running(
+                server = targetServer,
+                passes = targetPasses,
+                completedPasses = initialSamples.size,
+                samples = initialSamples
+            )
+            runCatching {
+                ServerReachability.runPing(
+                    server = targetServer,
+                    passes = targetPasses,
+                    initialSamples = initialSamples
+                ) { sample ->
+                    val previousSamples = (pingState as? DiagnosticPingState.Running)
+                        ?.samples
+                        .orEmpty()
+                    pingState = DiagnosticPingState.Running(
+                        server = targetServer,
+                        passes = targetPasses,
+                        completedPasses = sample.attempt,
+                        samples = previousSamples + sample
+                    )
+                }
+            }.onSuccess { result ->
+                pingState = DiagnosticPingState.Completed(result)
+            }.onFailure { error ->
+                if (error is kotlinx.coroutines.CancellationException) throw error
+                pingState = DiagnosticPingState.Failed
+            }.also {
+                pingJob = null
+            }
+        }
+        pingJob = job
+    }
     var pendingScrollTargetId by remember { mutableStateOf<String?>(null) }
     val scrollState = rememberScrollState()
     val uiStyle = LocalGeoTowerUiStyle.current
@@ -427,39 +504,24 @@ fun DiagnosticScreen(navController: NavController) {
             selectedServer = pingServer,
             selectedPasses = pingPasses,
             state = pingState,
-            onServerSelected = { pingServer = it },
-            onPassesSelected = { pingPasses = it },
-            onRun = {
-                if (pingState !is DiagnosticPingState.Running) {
-                    scope.launch {
-                        pingState = DiagnosticPingState.Running(
-                            server = pingServer,
-                            passes = pingPasses,
-                            completedPasses = 0,
-                            samples = emptyList()
-                        )
-                        runCatching {
-                            ServerReachability.runPing(pingServer, pingPasses) { sample ->
-                                val previousSamples = (pingState as? DiagnosticPingState.Running)
-                                    ?.samples
-                                    .orEmpty()
-                                pingState = DiagnosticPingState.Running(
-                                    server = pingServer,
-                                    passes = pingPasses,
-                                    completedPasses = sample.attempt,
-                                    samples = previousSamples + sample
-                                )
-                            }
-                        }.onSuccess { result ->
-                            pingState = DiagnosticPingState.Completed(result)
-                        }.onFailure { error ->
-                            if (error is kotlinx.coroutines.CancellationException) throw error
-                            pingState = DiagnosticPingState.Failed
-                        }
-                    }
-                }
+            onServerSelected = { server ->
+                pausePing()
+                pingServer = server
+                pingState = DiagnosticPingState.Idle
             },
-            onDismiss = { showApiServerPingDialog = false }
+            onPassesSelected = { passes ->
+                pausePing()
+                pingPasses = passes
+                pingState = DiagnosticPingState.Idle
+            },
+            onRun = { startPing(resume = false) },
+            onPause = { pausePing() },
+            onResume = { startPing(resume = true) },
+            onRestart = { startPing(resume = false) },
+            onDismiss = {
+                pausePing()
+                showApiServerPingDialog = false
+            }
         )
     }
 }
@@ -467,6 +529,12 @@ fun DiagnosticScreen(navController: NavController) {
 private sealed interface DiagnosticPingState {
     object Idle : DiagnosticPingState
     data class Running(
+        val server: ApiServer,
+        val passes: Int,
+        val completedPasses: Int,
+        val samples: List<ServerPingSample>
+    ) : DiagnosticPingState
+    data class Paused(
         val server: ApiServer,
         val passes: Int,
         val completedPasses: Int,
@@ -485,13 +553,20 @@ private fun DiagnosticApiServerPingDialog(
     onServerSelected: (ApiServer) -> Unit,
     onPassesSelected: (Int) -> Unit,
     onRun: () -> Unit,
+    onPause: () -> Unit,
+    onResume: () -> Unit,
+    onRestart: () -> Unit,
     onDismiss: () -> Unit
 ) {
     val sizing = LocalGeoTowerUiSizing.current
     val isRunning = state is DiagnosticPingState.Running
+    val isPaused = state is DiagnosticPingState.Paused
 
     AlertDialog(
-        onDismissRequest = { if (!isRunning) onDismiss() },
+        onDismissRequest = {
+            if (isRunning) onPause()
+            onDismiss()
+        },
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         titleContentColor = MaterialTheme.colorScheme.onSurface,
         textContentColor = MaterialTheme.colorScheme.onSurface,
@@ -585,22 +660,76 @@ private fun DiagnosticApiServerPingDialog(
             }
         },
         confirmButton = {
-            Button(onClick = onRun, enabled = !isRunning) {
-                if (isRunning) {
-                    LoadingIndicator(
-                        modifier = Modifier.size(sizing.component(18.dp)),
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                } else {
-                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(sizing.component(18.dp)))
+            when {
+                isRunning -> {
+                    Button(
+                        onClick = onPause,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.tertiary,
+                            contentColor = MaterialTheme.colorScheme.onTertiary
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Pause,
+                            contentDescription = null,
+                            modifier = Modifier.size(sizing.component(18.dp))
+                        )
+                        Spacer(modifier = Modifier.width(sizing.spacing(6.dp)))
+                        Text(stringResource(R.string.appstrings_pause))
+                    }
                 }
-                Spacer(modifier = Modifier.width(sizing.spacing(6.dp)))
-                Text(stringResource(R.string.appstrings_diagnostic_ping_run))
+                isPaused -> {
+                    Button(onClick = onResume) {
+                        Icon(
+                            imageVector = Icons.Default.PlayArrow,
+                            contentDescription = null,
+                            modifier = Modifier.size(sizing.component(18.dp))
+                        )
+                        Spacer(modifier = Modifier.width(sizing.spacing(6.dp)))
+                        Text(stringResource(R.string.appstrings_resume))
+                    }
+                }
+                else -> {
+                    Button(onClick = onRun) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = null,
+                            modifier = Modifier.size(sizing.component(18.dp))
+                        )
+                        Spacer(modifier = Modifier.width(sizing.spacing(6.dp)))
+                        Text(stringResource(R.string.appstrings_diagnostic_ping_run))
+                    }
+                }
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !isRunning) {
-                Text(stringResource(R.string.appstrings_close))
+            if (isPaused) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(sizing.spacing(4.dp)),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(onClick = onRestart) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = null,
+                            modifier = Modifier.size(sizing.component(16.dp))
+                        )
+                        Spacer(modifier = Modifier.width(sizing.spacing(4.dp)))
+                        Text(stringResource(R.string.appstrings_diagnostic_ping_restart))
+                    }
+                    TextButton(onClick = onDismiss) {
+                        Text(stringResource(R.string.appstrings_close))
+                    }
+                }
+            } else {
+                TextButton(
+                    onClick = {
+                        if (isRunning) onPause()
+                        onDismiss()
+                    }
+                ) {
+                    Text(stringResource(R.string.appstrings_close))
+                }
             }
         }
     )
@@ -622,6 +751,7 @@ private fun DiagnosticPingTerminal(
     val progressTarget = when (state) {
         DiagnosticPingState.Idle -> 0f
         is DiagnosticPingState.Running -> state.completedPasses.toFloat() / state.passes
+        is DiagnosticPingState.Paused -> state.completedPasses.toFloat() / state.passes
         is DiagnosticPingState.Completed -> 1f
         DiagnosticPingState.Failed -> 0f
     }.coerceIn(0f, 1f)
@@ -651,11 +781,19 @@ private fun DiagnosticPingTerminal(
             )
             Spacer(modifier = Modifier.height(8.dp))
 
-            if (state is DiagnosticPingState.Running || state is DiagnosticPingState.Completed) {
+            if (state is DiagnosticPingState.Running) {
                 LinearWavyProgressIndicator(
                     progress = { animatedProgress },
                     modifier = Modifier.fillMaxWidth().height(6.dp),
                     color = terminalAccent,
+                    trackColor = terminalMuted.copy(alpha = 0.22f)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            } else if (state is DiagnosticPingState.Paused || state is DiagnosticPingState.Completed) {
+                LinearProgressIndicator(
+                    progress = { animatedProgress },
+                    modifier = Modifier.fillMaxWidth().height(6.dp),
+                    color = if (state is DiagnosticPingState.Paused) terminalMuted else terminalAccent,
                     trackColor = terminalMuted.copy(alpha = 0.22f)
                 )
                 Spacer(modifier = Modifier.height(8.dp))
@@ -680,6 +818,52 @@ private fun DiagnosticPingTerminal(
                             state.passes
                         )
                     )
+                }
+                is DiagnosticPingState.Paused -> {
+                    state.samples.forEach { sample ->
+                        key(sample.attempt) {
+                            AnimatedVisibility(visible = true) {
+                                DiagnosticPingTerminalLine(sample)
+                            }
+                        }
+                    }
+                    AnimatedVisibility(visible = true) {
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            TerminalPrompt(
+                                text = stringResource(
+                                    R.string.appstrings_diagnostic_ping_paused_summary,
+                                    state.completedPasses,
+                                    state.passes
+                                ),
+                                color = terminalMuted
+                            )
+                            val successfulSamples = state.samples.mapNotNull { it.latencyMs }
+                            if (successfulSamples.isNotEmpty()) {
+                                val average = successfulSamples.average().toLong()
+                                Text(
+                                    text = stringResource(
+                                        R.string.appstrings_diagnostic_ping_result_stats,
+                                        average,
+                                        successfulSamples.minOrNull() ?: average,
+                                        successfulSamples.maxOrNull() ?: average
+                                    ),
+                                    style = terminalTextStyle,
+                                    color = terminalAccent
+                                )
+                            }
+                            val failedCount = state.samples.count { it.latencyMs == null }
+                            if (failedCount > 0) {
+                                Text(
+                                    text = stringResource(
+                                        R.string.appstrings_diagnostic_ping_result_failures,
+                                        failedCount
+                                    ),
+                                    style = terminalTextStyle,
+                                    color = terminalError
+                                )
+                            }
+                        }
+                    }
                 }
                 is DiagnosticPingState.Completed -> {
                     state.result.samples.forEach { sample ->
@@ -1558,6 +1742,8 @@ private fun buildNotificationsItem(context: Context, prefs: android.content.Shar
 }
 
 private fun buildStorageItem(context: Context): DiagnosticItem {
+    val appInfo = context.applicationInfo
+    val appSize = calculateApkFilesSize(appInfo?.sourceDir, appInfo?.splitSourceDirs)
     val antennaDb = context.getDatabasePath(GeoTowerDatabaseValidator.DB_NAME)
     val radioDb = context.getDatabasePath(RadioDatabaseValidator.DB_NAME)
     val enbDb = context.getDatabasePath(fr.geotower.data.db.EnbDatabaseValidator.DB_NAME)
@@ -1574,9 +1760,10 @@ private fun buildStorageItem(context: Context): DiagnosticItem {
         val stat = StatFs(context.filesDir.path)
         stat.availableBytes
     }.getOrDefault(0L)
-    val knownSize = antennaDb.lengthOrZero() + radioDb.lengthOrZero() + enbDb.lengthOrZero() +
+    val knownSize = appSize + antennaDb.lengthOrZero() + radioDb.lengthOrZero() + enbDb.lengthOrZero() +
         outagesSize + mapsSize + cacheSize
     val details = listOf(
+        context.getString(R.string.appstrings_diagnostic_detail_storage_app_size, formatBytes(context, appSize)),
         context.getString(R.string.appstrings_diagnostic_detail_storage_db_antennas, formatBytes(context, antennaDb.lengthOrZero())),
         context.getString(R.string.appstrings_diagnostic_detail_storage_db_radio, formatBytes(context, radioDb.lengthOrZero())),
         context.getString(R.string.appstrings_diagnostic_detail_storage_db_enb, formatBytes(context, enbDb.lengthOrZero())),
@@ -1662,30 +1849,135 @@ private fun buildApiServerItem(context: Context): DiagnosticItem {
     )
 }
 
+internal fun formatDeviceLabel(
+    manufacturer: String,
+    brand: String,
+    model: String,
+    fallbackUnknown: String = "Inconnu"
+): String {
+    val brandPrefix = if (brand.isNotBlank() && !brand.equals(manufacturer, ignoreCase = true)) {
+        "$manufacturer ($brand)"
+    } else {
+        manufacturer
+    }
+    return listOf(brandPrefix, model)
+        .filter { it.isNotBlank() }
+        .joinToString(" ")
+        .trim()
+        .ifBlank { fallbackUnknown }
+}
+
+internal fun formatCpuArchitecture(socModel: String?, supportedAbis: Array<String>?): String {
+    val abis = supportedAbis?.filter { it.isNotBlank() }?.joinToString(", ")?.takeIf { it.isNotBlank() }
+    val soc = socModel?.takeIf { it.isNotBlank() && !it.equals("unknown", ignoreCase = true) }
+    return listOfNotNull(soc, abis).joinToString(" · ")
+}
+
+internal fun calculateApkFilesSize(baseSourceDir: String?, splitSourceDirs: Array<String>?): Long {
+    val baseSize = baseSourceDir?.let { File(it) }?.takeIf { it.isFile }?.length()?.coerceAtLeast(0L) ?: 0L
+    val splitsSize = splitSourceDirs?.sumOf { path ->
+        File(path).takeIf { it.isFile }?.length()?.coerceAtLeast(0L) ?: 0L
+    } ?: 0L
+    return baseSize + splitsSize
+}
+
 private fun buildEnvironmentItem(context: Context, generatedAt: String): DiagnosticItem {
     val packageInfo = packageInfo(context)
     val versionName = packageInfo?.versionName ?: context.getString(R.string.appstrings_diagnostic_value_unknown)
     val versionCode = packageInfo?.let(::versionCodeCompat)?.toString()
         ?: context.getString(R.string.appstrings_diagnostic_value_unknown)
     val androidVersion = "${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})"
-    val device = listOf(Build.MANUFACTURER, Build.MODEL)
-        .joinToString(" ")
-        .trim()
-        .ifBlank { context.getString(R.string.appstrings_diagnostic_value_unknown) }
-    val language = Locale.getDefault().toLanguageTag()
-    val details = listOf(
-        context.getString(R.string.appstrings_diagnostic_detail_app_version, versionName),
-        context.getString(R.string.appstrings_diagnostic_detail_app_code, versionCode),
-        context.getString(R.string.appstrings_diagnostic_detail_android, androidVersion),
-        context.getString(R.string.appstrings_diagnostic_detail_device, device),
-        context.getString(R.string.appstrings_diagnostic_detail_language, language),
-        context.getString(R.string.appstrings_diagnostic_detail_generated_at, generatedAt)
+    val device = formatDeviceLabel(
+        manufacturer = Build.MANUFACTURER,
+        brand = Build.BRAND,
+        model = Build.MODEL,
+        fallbackUnknown = context.getString(R.string.appstrings_diagnostic_value_unknown)
     )
+    val language = Locale.getDefault().toLanguageTag()
+
+    val installTime = packageInfo?.firstInstallTime?.takeIf { it > 0L }?.let { formatDateTime(it) }
+    val updateTime = packageInfo?.lastUpdateTime?.takeIf { it > 0L }?.let { formatDateTime(it) }
+
+    val runtime = Runtime.getRuntime()
+    val heapUsedBytes = (runtime.totalMemory() - runtime.freeMemory()).coerceAtLeast(0L)
+    val heapMaxBytes = runtime.maxMemory().coerceAtLeast(0L)
+
+    val powerProfileLabel = when (PowerProfile.level) {
+        PowerProfile.LEVEL_ECO_PLUS -> context.getString(R.string.appstrings_low_power_level_ecoplus)
+        PowerProfile.LEVEL_ECO -> context.getString(R.string.appstrings_low_power_level_eco)
+        else -> context.getString(R.string.appstrings_low_power_level_normal)
+    }
+
+    val securityPatch = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+        Build.VERSION.SECURITY_PATCH.takeIf { it.isNotBlank() }
+    } else {
+        null
+    }
+
+    val osBuild = Build.DISPLAY.ifBlank { Build.ID }.takeIf { it.isNotBlank() }
+
+    val socModel = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        Build.SOC_MODEL
+    } else {
+        null
+    }
+    val cpuArchitecture = formatCpuArchitecture(socModel, Build.SUPPORTED_ABIS)
+
+    val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+    val memoryInfo = ActivityManager.MemoryInfo().also { activityManager?.getMemoryInfo(it) }
+    val totalRam = memoryInfo.totalMem
+    val availRam = memoryInfo.availMem
+
+    val displayMetrics = context.resources.displayMetrics
+    val screenResolution = "${displayMetrics.widthPixels} × ${displayMetrics.heightPixels} px"
+    val screenDensityDpi = displayMetrics.densityDpi
+
+    val powerManager = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+    val isPowerSaveMode = powerManager?.isPowerSaveMode == true
+
+    val timeZone = TimeZone.getDefault().id
+
+    val details = buildList {
+        add(context.getString(R.string.appstrings_diagnostic_detail_app_version, versionName))
+        add(context.getString(R.string.appstrings_diagnostic_detail_app_code, versionCode))
+        add(context.getString(R.string.appstrings_diagnostic_detail_app_package, context.packageName))
+        add(context.getString(R.string.appstrings_diagnostic_detail_app_build_type, BuildConfig.BUILD_TYPE))
+        installTime?.let { add(context.getString(R.string.appstrings_diagnostic_detail_app_installed_at, it)) }
+        updateTime?.let { add(context.getString(R.string.appstrings_diagnostic_detail_app_updated_at, it)) }
+        add(
+            context.getString(
+                R.string.appstrings_diagnostic_detail_app_heap,
+                formatBytes(context, heapUsedBytes),
+                formatBytes(context, heapMaxBytes)
+            )
+        )
+        add(context.getString(R.string.appstrings_diagnostic_detail_power_profile, powerProfileLabel))
+
+        add(context.getString(R.string.appstrings_diagnostic_detail_device, device))
+        add(context.getString(R.string.appstrings_diagnostic_detail_android, androidVersion))
+        securityPatch?.let { add(context.getString(R.string.appstrings_diagnostic_detail_security_patch, it)) }
+        osBuild?.let { add(context.getString(R.string.appstrings_diagnostic_detail_build_id, it)) }
+        if (cpuArchitecture.isNotBlank()) {
+            add(context.getString(R.string.appstrings_diagnostic_detail_cpu_abi, cpuArchitecture))
+        }
+        add(
+            context.getString(
+                R.string.appstrings_diagnostic_detail_ram_usage,
+                formatBytes(context, totalRam),
+                formatBytes(context, availRam)
+            )
+        )
+        add(context.getString(R.string.appstrings_diagnostic_detail_display, screenResolution, screenDensityDpi))
+        add(context.getString(R.string.appstrings_diagnostic_detail_system_battery_saver, enabledDisabled(context, isPowerSaveMode)))
+        add(context.getString(R.string.appstrings_diagnostic_detail_language, language))
+        timeZone?.let { add(context.getString(R.string.appstrings_diagnostic_detail_timezone, it)) }
+        add(context.getString(R.string.appstrings_diagnostic_detail_generated_at, generatedAt))
+    }
     return DiagnosticItem(
         id = "environment",
         title = context.getString(R.string.appstrings_diagnostic_section_environment),
         summary = context.getString(R.string.appstrings_diagnostic_summary_environment, versionName, androidVersion),
-        severity = DiagnosticSeverity.Info,
+        severity = if (memoryInfo.lowMemory) DiagnosticSeverity.Warning else DiagnosticSeverity.Info,
         details = details
     )
 }

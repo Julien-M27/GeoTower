@@ -17,9 +17,9 @@ data class SiteExternalLinkDefinition(
 
 val SiteExternalLinkDefinitions = listOf(
     SiteExternalLinkDefinition("cartoradio", "Cartoradio", R.drawable.logo_cartoradio, "link_cartoradio"),
+    SiteExternalLinkDefinition("signalquest", "Signal Quest", R.drawable.logo_signalquest, "link_signalquest"),
     // CellularFR masqué — voir CellularFrApi.ENABLED
     SiteExternalLinkDefinition("cellularfr", "CellularFR", R.drawable.logo_cellularfr, "link_cellularfr"),
-    SiteExternalLinkDefinition("signalquest", "Signal Quest", R.drawable.logo_signalquest, "link_signalquest"),
     SiteExternalLinkDefinition("cellmapper", "CellMapper", R.drawable.logo_cellmapper, "link_cellmapper"),
     SiteExternalLinkDefinition("rncmobile", "RNC Mobile", R.drawable.logo_rncmobile, "link_rncmobile"),
     SiteExternalLinkDefinition("enbanalytics", "eNB-Analytics", R.drawable.logo_enbanalytics, "link_enbanalytics"),

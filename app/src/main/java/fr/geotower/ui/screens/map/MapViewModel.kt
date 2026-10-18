@@ -1,4 +1,4 @@
-package fr.geotower.ui.screens.map
+﻿package fr.geotower.ui.screens.map
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -302,7 +302,7 @@ class MapViewModel(
                 // Les clusters sont pré-agrégés et ne peuvent pas soustraire les masquages locaux
                 // opérateur par opérateur. Dès qu'il existe une préférence de masquage, on charge
                 // les lignes détaillées afin que la carte reste cohérente avec tous les autres écrans.
-                if (zoom < 13.0 && !keepDetailedAzimuths && cityPolygons == null && !hasSiteDisplayFilter && !hasFrequencyFilter &&
+                if (zoom < 14.0 && !keepDetailedAzimuths && cityPolygons == null && !hasSiteDisplayFilter && !hasFrequencyFilter &&
                     !AppConfig.timeSliderActive.value && !repository.hasHiddenSites()
                 ) {
                     val aggregationZoom = MapClusterStrengthProfile.aggregationZoom(
@@ -392,7 +392,7 @@ class MapViewModel(
                     // ✅ 3. SI UNE VILLE EST CIBLÉE, ON LA GARDE STRICTEMENT FILTRÉE !
                     if (cityPolygons != null) {
                         _antennas.value = areaAntennas.filter { isPointInPolygon(it.latitude, it.longitude, cityPolygons!!) }
-                    } else if (zoom < 13.0 && !keepDetailedAzimuths && areaAntennas.size > 200) {
+                    } else if (zoom < 14.0 && !keepDetailedAzimuths && areaAntennas.size > 200) {
                         // En dézoom avec filtres actifs, agréger en arrière-plan pour éviter de figer le thread UI avec des milliers de marqueurs
                         val aggregationZoom = MapClusterStrengthProfile.aggregationZoom(
                             mapZoom = zoom,

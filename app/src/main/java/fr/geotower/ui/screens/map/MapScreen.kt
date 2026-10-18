@@ -1,4 +1,4 @@
-package fr.geotower.ui.screens.map
+﻿package fr.geotower.ui.screens.map
 
 import android.Manifest
 import android.content.Context
@@ -4732,7 +4732,7 @@ fun MapScreen(
         val previouslyLoadedWithAzimuthDetails = previousMode.first && previousMode.second
         val shouldLoadWithAzimuthDetails = currentMode.first && currentMode.second
         if (
-            map.zoomLevelDouble < 13.0 &&
+            map.zoomLevelDouble < 14.0 &&
             previouslyLoadedWithAzimuthDetails != shouldLoadWithAzimuthDetails
         ) {
             delay(PowerProfile.mapReloadDebounceMs)
@@ -5355,13 +5355,14 @@ fun MapScreen(
                             updateInfo()
                             return true
                         }
-                        override fun onZoom(event: ZoomEvent?): Boolean { updateInfo(); return true }
-                        private fun updateInfo() {
+                        override fun onZoom(event: ZoomEvent?): Boolean { updateInfo(isZoom = true); return true }
+                        private fun updateInfo(isZoom: Boolean = false) {
                             // ✅ 1. MISE À JOUR INSTANTANÉE POUR L'ÉCHELLE (Avant le delay !)
                             // ✅ 2. LE RESTE DU CALCUL AVEC SON PETIT DÉLAI ANTI-LAG
                             searchJob?.cancel()
                             searchJob = scope.launch {
-                                delay(PowerProfile.mapReloadDebounceMs)
+                                val debounceMs = if (isZoom) 240L.coerceAtLeast(PowerProfile.mapReloadDebounceMs) else PowerProfile.mapReloadDebounceMs
+                                delay(debounceMs)
 
                                 val snapshot = visibleViewportSnapshot()
                                 currentZoom = snapshot.zoom

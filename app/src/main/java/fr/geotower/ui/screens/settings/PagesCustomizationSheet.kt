@@ -1810,18 +1810,12 @@ fun MapSettingsSheet(
                 }
 
                 Spacer(modifier = Modifier.height(sizing.spacing(20.dp)))
-                Surface(
+                fr.geotower.ui.components.MapClusterStrengthCard(
                     shape = shape,
                     border = border,
-                    color = if (useOneUi) bubbleColor else Color.Transparent,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    fr.geotower.ui.components.MapClusterStrengthSlider(
-                        useOneUi = useOneUi,
-                        showDescription = true,
-                        modifier = Modifier.padding(sizing.spacing(16.dp))
-                    )
-                }
+                    bubbleColor = bubbleColor,
+                    useOneUi = useOneUi
+                )
 
                 // --- OUTIL DE MESURE : comportement à la suppression d'un trait ---
                 Spacer(modifier = Modifier.height(sizing.spacing(20.dp)))

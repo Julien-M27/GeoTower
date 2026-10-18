@@ -1441,9 +1441,7 @@
     <string name="appstrings_src_ign_desc">© IGN - Instituto Nacional de Información Geográfica y Forestal.</string>
     <string name="appstrings_src_ign_services">Mapas base, altitud del terreno (RGE ALTI), edificios y rutas (BD TOPO) a través de la Géoplateforme.</string>
     <string name="appstrings_src_inspo">Inspiración y fuentes externas</string>
-    <!-- CellularFR masqué — voir CellularFrApi.ENABLED. Valeur originale :
-         "• © CellularFR desarrollado por Luis Baker\n• © Signal Quest desarrollado por Alexandre Germain\n• © RNC Mobile desarrollado por Cédric\n• © eNB-Analytics desarrollado por Tristan\n• © GeoRadio - El icono alternativo proviene de la aplicación GéoRadio para iOS desarrollada por Hugo Martin.\n• Concepto original basado en la aplicación GéoRadio\n• Icono fun diseñado por Johan" -->
-    <string name="appstrings_src_inspo_desc">• © Signal Quest desarrollado por Alexandre Germain\n• © RNC Mobile desarrollado por Cédric\n• © eNB-Analytics desarrollado por Tristan\n• © GeoRadio - El icono alternativo proviene de la aplicación GéoRadio para iOS desarrollada por Hugo Martin.\n• Concepto original basado en la aplicación GéoRadio\n• Icono fun diseñado por Johan</string>
+    <string name="appstrings_src_inspo_desc">• © CellularFR desarrollado por Luis Baker\n• © Signal Quest desarrollado por Alexandre Germain\n• © RNC Mobile desarrollado por Cédric\n• © eNB-Analytics desarrollado por Tristan\n• © GeoRadio - El icono alternativo proviene de la aplicación GéoRadio para iOS desarrollada por Hugo Martin.\n• Concepto original basado en la aplicación GéoRadio\n• Icono fun diseñado por Johan</string>
     <string name="appstrings_src_offline_maps_label">Descarga de mapas</string>
     <string name="appstrings_src_osm">Mapa base OSM</string>
     <string name="appstrings_src_osm_desc">© colaboradores de OpenStreetMap.</string>
@@ -2343,6 +2341,7 @@
     <string name="preference_profiles_share_qr_desc">Escanea este código QR con otro dispositivo para importar este perfil al instante.</string>
     <string name="preference_profiles_share_qr_action">Compartir imagen</string>
     <string name="preference_profiles_share_qr_too_large">Este perfil tiene demasiados ajustes modificados para compartirse por código QR. Utiliza el uso compartido de archivos.</string>
+    <string name="preference_profiles_export_file_action">Exportar archivo</string>
     <string name="preference_profiles_copy_link">Copiar enlace</string>
     <string name="preference_profiles_link_copied">Enlace copiado al portapapeles</string>
     <string name="preference_profiles_import_qr_image">Escanear código QR</string>
@@ -2424,6 +2423,10 @@
     <string name="appstrings_diagnostic_ping_passes_option">%1$d pasadas</string>
     <string name="appstrings_diagnostic_ping_running">En curso… %1$d/%2$d</string>
     <string name="appstrings_diagnostic_ping_run">Probar</string>
+    <string name="appstrings_diagnostic_ping_stop">Detener</string>
+    <string name="appstrings_diagnostic_ping_stopped_summary">Prueba detenida (%1$d/%2$d)</string>
+    <string name="appstrings_diagnostic_ping_paused_summary">Prueba pausada (%1$d/%2$d)</string>
+    <string name="appstrings_diagnostic_ping_restart">Reiniciar</string>
     <string name="appstrings_diagnostic_ping_result_summary">%1$d/%2$d respuestas</string>
     <string name="appstrings_diagnostic_ping_result_stats">Media %1$d ms · mín. %2$d · máx. %3$d</string>
     <string name="appstrings_diagnostic_ping_result_failures">%1$d fallos</string>
@@ -2491,6 +2494,7 @@
     <string name="appstrings_diagnostic_detail_notifications_live">Notificación live: %1$s</string>
     <string name="appstrings_diagnostic_detail_notifications_live_interval">Intervalo live: %1$d s</string>
     <string name="appstrings_diagnostic_detail_notifications_channels_blocked">Canales bloqueados: %1$s</string>
+    <string name="appstrings_diagnostic_detail_storage_app_size">Tamaño de la aplicación: %1$s</string>
     <string name="appstrings_diagnostic_detail_storage_db_antennas">Base de antenas: %1$s</string>
     <string name="appstrings_diagnostic_detail_storage_db_radio">Base de radio: %1$s</string>
     <string name="appstrings_diagnostic_detail_storage_db_enb">Base eNB / gNB: %1$s</string>
@@ -2500,9 +2504,22 @@
     <string name="appstrings_diagnostic_detail_storage_available">Almacenamiento disponible para la aplicación: %1$s</string>
     <string name="appstrings_diagnostic_detail_app_version">Versión aplicación: %1$s</string>
     <string name="appstrings_diagnostic_detail_app_code">Código de versión: %1$s</string>
-    <string name="appstrings_diagnostic_detail_android">Android: %1$s</string>
+    <string name="appstrings_diagnostic_detail_app_package">ID del paquete: %1$s</string>
+    <string name="appstrings_diagnostic_detail_app_build_type">Tipo de compilación: %1$s</string>
+    <string name="appstrings_diagnostic_detail_app_installed_at">Primera instalación: %1$s</string>
+    <string name="appstrings_diagnostic_detail_app_updated_at">Última actualización: %1$s</string>
+    <string name="appstrings_diagnostic_detail_app_heap">Memoria heap JVM: %1$s usada / %2$s máx.</string>
+    <string name="appstrings_diagnostic_detail_power_profile">Perfil de energía de GeoTower: %1$s</string>
     <string name="appstrings_diagnostic_detail_device">Dispositivo: %1$s</string>
+    <string name="appstrings_diagnostic_detail_android">Android: %1$s</string>
+    <string name="appstrings_diagnostic_detail_security_patch">Parche de seguridad: %1$s</string>
+    <string name="appstrings_diagnostic_detail_build_id">Compilación del SO: %1$s</string>
+    <string name="appstrings_diagnostic_detail_cpu_abi">Arquitectura de CPU: %1$s</string>
+    <string name="appstrings_diagnostic_detail_ram_usage">RAM del dispositivo: %1$s total (%2$s disponible)</string>
+    <string name="appstrings_diagnostic_detail_display">Pantalla: %1$s (%2$d dpi)</string>
+    <string name="appstrings_diagnostic_detail_system_battery_saver">Ahorro de batería de Android: %1$s</string>
     <string name="appstrings_diagnostic_detail_language">Idioma: %1$s</string>
+    <string name="appstrings_diagnostic_detail_timezone">Zona horaria: %1$s</string>
     <string name="appstrings_diagnostic_detail_generated_at">Generado el: %1$s</string>
     <string name="appstrings_diagnostic_value_yes">Sí</string>
     <string name="appstrings_diagnostic_value_no">No</string>
@@ -3370,4 +3387,5 @@
     <string name="appstrings_release_v2072_summary_photo_reports_selection_clear">Selección múltiple, eliminación por lotes y borrado del historial de reportes de fotos</string>
     <string name="appstrings_release_v2073_summary_preference_profiles_qr_and_diff">Compartir e importar perfiles de preferencias mediante código QR y comparación con la versión base</string>
     <string name="appstrings_release_v2074_summary_preference_profiles_qr_optimization">Optimización de la codificación de códigos QR de perfiles y mayor fiabilidad al restablecer ajustes</string>
+    <string name="appstrings_release_v2075_summary_diagnostics_and_clustering">Diagnóstico ampliado de sistema y memoria, control de prueba de latencia y ajuste de agrupación</string>
 </resources>
