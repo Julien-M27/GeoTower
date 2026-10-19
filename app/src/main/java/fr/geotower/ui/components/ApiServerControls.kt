@@ -22,14 +22,15 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.NetworkCheck
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
@@ -111,8 +112,7 @@ fun applyApiServerMode(
 fun ApiServerModeDialog(
     currentMode: ApiServerMode,
     onDismiss: () -> Unit,
-    onSelect: (ApiServerMode) -> Unit,
-    onOpenPing: (() -> Unit)? = null
+    onSelect: (ApiServerMode) -> Unit
 ) {
     val sizing = LocalGeoTowerUiSizing.current
     AlertDialog(
@@ -152,19 +152,6 @@ fun ApiServerModeDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.appstrings_close)) }
-        },
-        dismissButton = onOpenPing?.let { openPing ->
-            {
-                TextButton(onClick = openPing) {
-                    Icon(
-                        imageVector = Icons.Default.NetworkCheck,
-                        contentDescription = null,
-                        modifier = Modifier.size(sizing.component(18.dp))
-                    )
-                    Spacer(modifier = Modifier.width(sizing.spacing(4.dp)))
-                    Text(stringResource(R.string.appstrings_diagnostic_action_ping_api_server))
-                }
-            }
         }
     )
 }
@@ -178,13 +165,13 @@ sealed interface ApiServerPingState {
         val completedPasses: Int,
         val samples: List<ServerPingSample>
     ) : ApiServerPingState
-    data class Completed(val result: ServerPingResult) : ApiServerPingState
-    data class Stopped(
+    data class Paused(
         val server: ApiServer,
         val passes: Int,
         val completedPasses: Int,
         val samples: List<ServerPingSample>
     ) : ApiServerPingState
+    data class Completed(val result: ServerPingResult) : ApiServerPingState
     object Failed : ApiServerPingState
 }
 
@@ -197,8 +184,7 @@ typealias DiagnosticPingState = ApiServerPingState
 @Composable
 fun ApiServerPingDialog(
     initialServer: ApiServer = ApiEndpoints.active(),
-    onDismiss: () -> Unit,
-    onApplyServer: ((ApiServer) -> Unit)? = null
+    onDismiss: () -> Unit
 ) {
     var selectedServer by remember(initialServer) { mutableStateOf(initialServer) }
     var selectedPasses by remember { mutableIntStateOf(ServerReachability.DEFAULT_PING_PASSES) }
@@ -206,33 +192,52 @@ fun ApiServerPingDialog(
     var pingJob by remember { mutableStateOf<Job?>(null) }
     val scope = rememberCoroutineScope()
 
-    fun stopPing() {
-        val current = state
-        pingJob?.cancel()
+    fun pausePing() {
+        val currentJob = pingJob
         pingJob = null
+        currentJob?.cancel()
+        val current = state
         if (current is ApiServerPingState.Running) {
-            state = ApiServerPingState.Stopped(
-                server = current.server,
-                passes = current.passes,
-                completedPasses = current.completedPasses,
-                samples = current.samples
-            )
+            state = if (current.samples.isNotEmpty()) {
+                ApiServerPingState.Paused(
+                    server = current.server,
+                    passes = current.passes,
+                    completedPasses = current.completedPasses,
+                    samples = current.samples
+                )
+            } else {
+                ApiServerPingState.Idle
+            }
         }
     }
 
-    fun runPing() {
-        if (state is ApiServerPingState.Running) return
+    fun startPing(resume: Boolean = false) {
+        val currentJob = pingJob
+        pingJob = null
+        currentJob?.cancel()
+
+        val initialSamples = if (resume && state is ApiServerPingState.Paused) {
+            (state as ApiServerPingState.Paused).samples
+        } else {
+            emptyList()
+        }
+
         val server = selectedServer
         val passes = selectedPasses
+
         val job = scope.launch {
             state = ApiServerPingState.Running(
                 server = server,
                 passes = passes,
-                completedPasses = 0,
-                samples = emptyList()
+                completedPasses = initialSamples.size,
+                samples = initialSamples
             )
-            try {
-                val result = ServerReachability.runPing(server, passes) { sample ->
+            runCatching {
+                ServerReachability.runPing(
+                    server = server,
+                    passes = passes,
+                    initialSamples = initialSamples
+                ) { sample ->
                     val currentRunning = state as? ApiServerPingState.Running
                     if (currentRunning != null) {
                         state = currentRunning.copy(
@@ -241,21 +246,12 @@ fun ApiServerPingDialog(
                         )
                     }
                 }
+            }.onSuccess { result ->
                 state = ApiServerPingState.Completed(result)
-            } catch (e: CancellationException) {
-                val currentRunning = state as? ApiServerPingState.Running
-                if (currentRunning != null) {
-                    state = ApiServerPingState.Stopped(
-                        server = currentRunning.server,
-                        passes = currentRunning.passes,
-                        completedPasses = currentRunning.completedPasses,
-                        samples = currentRunning.samples
-                    )
-                }
-                throw e
-            } catch (e: Exception) {
+            }.onFailure { error ->
+                if (error is CancellationException) throw error
                 state = ApiServerPingState.Failed
-            } finally {
+            }.also {
                 if (pingJob == coroutineContext[Job]) {
                     pingJob = null
                 }
@@ -270,25 +266,26 @@ fun ApiServerPingDialog(
         state = state,
         onServerSelected = { server ->
             if (selectedServer != server) {
-                stopPing()
+                pausePing()
                 selectedServer = server
                 state = ApiServerPingState.Idle
             }
         },
         onPassesSelected = { passes ->
             if (selectedPasses != passes) {
-                stopPing()
+                pausePing()
                 selectedPasses = passes
                 state = ApiServerPingState.Idle
             }
         },
-        onRun = { runPing() },
-        onStop = { stopPing() },
+        onRun = { startPing(resume = false) },
+        onPause = { pausePing() },
+        onResume = { startPing(resume = true) },
+        onRestart = { startPing(resume = false) },
         onDismiss = {
-            stopPing()
+            pausePing()
             onDismiss()
-        },
-        onApplyServer = onApplyServer
+        }
     )
 }
 
@@ -304,16 +301,18 @@ fun ApiServerPingDialog(
     onServerSelected: (ApiServer) -> Unit,
     onPassesSelected: (Int) -> Unit,
     onRun: () -> Unit,
-    onStop: () -> Unit,
-    onDismiss: () -> Unit,
-    onApplyServer: ((ApiServer) -> Unit)? = null
+    onPause: () -> Unit,
+    onResume: () -> Unit,
+    onRestart: () -> Unit,
+    onDismiss: () -> Unit
 ) {
     val sizing = LocalGeoTowerUiSizing.current
     val isRunning = state is ApiServerPingState.Running
+    val isPaused = state is ApiServerPingState.Paused
 
     AlertDialog(
         onDismissRequest = {
-            if (isRunning) onStop()
+            if (isRunning) onPause()
             onDismiss()
         },
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -369,16 +368,6 @@ fun ApiServerPingDialog(
                                     MaterialTheme.colorScheme.onSurfaceVariant
                                 }
                             )
-                            Text(
-                                text = stringResource(
-                                    when (server) {
-                                        ApiServer.PRIMARY -> R.string.appstrings_diagnostic_api_mode_primary
-                                        ApiServer.MIRROR -> R.string.appstrings_diagnostic_api_mode_mirror
-                                    }
-                                ),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
                         }
                     }
                 }
@@ -425,66 +414,91 @@ fun ApiServerPingDialog(
             }
         },
         confirmButton = {
-            if (isRunning) {
-                Button(
-                    onClick = onStop,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.error,
-                        contentColor = MaterialTheme.colorScheme.onError
-                    )
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Stop,
-                        contentDescription = null,
-                        modifier = Modifier.size(sizing.component(18.dp))
-                    )
-                    Spacer(modifier = Modifier.width(sizing.spacing(6.dp)))
-                    Text(
-                        text = stringResource(R.string.appstrings_diagnostic_ping_stop),
-                        maxLines = 1,
-                        softWrap = false
-                    )
-                }
-            } else {
-                Button(onClick = onRun) {
-                    Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = null,
-                        modifier = Modifier.size(sizing.component(18.dp))
-                    )
-                    Spacer(modifier = Modifier.width(sizing.spacing(6.dp)))
-                    Text(
-                        text = stringResource(R.string.appstrings_diagnostic_ping_run),
-                        maxLines = 1,
-                        softWrap = false
-                    )
-                }
-            }
-        },
-        dismissButton = {
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(sizing.spacing(4.dp)),
-                verticalArrangement = Arrangement.spacedBy(sizing.spacing(4.dp))
-            ) {
-                if (onApplyServer != null) {
-                    TextButton(
-                        onClick = {
-                            if (isRunning) onStop()
-                            onApplyServer(selectedServer)
-                            onDismiss()
-                        },
-                        enabled = !isRunning
+            when {
+                isRunning -> {
+                    Button(
+                        onClick = onPause,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.tertiary,
+                            contentColor = MaterialTheme.colorScheme.onTertiary
+                        )
                     ) {
+                        Icon(
+                            imageVector = Icons.Default.Pause,
+                            contentDescription = null,
+                            modifier = Modifier.size(sizing.component(18.dp))
+                        )
+                        Spacer(modifier = Modifier.width(sizing.spacing(6.dp)))
                         Text(
-                            text = stringResource(R.string.appstrings_diagnostic_action_choose_api_server),
+                            text = stringResource(R.string.appstrings_pause),
                             maxLines = 1,
                             softWrap = false
                         )
                     }
                 }
+                isPaused -> {
+                    Button(onClick = onResume) {
+                        Icon(
+                            imageVector = Icons.Default.PlayArrow,
+                            contentDescription = null,
+                            modifier = Modifier.size(sizing.component(18.dp))
+                        )
+                        Spacer(modifier = Modifier.width(sizing.spacing(6.dp)))
+                        Text(
+                            text = stringResource(R.string.appstrings_resume),
+                            maxLines = 1,
+                            softWrap = false
+                        )
+                    }
+                }
+                else -> {
+                    Button(onClick = onRun) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = null,
+                            modifier = Modifier.size(sizing.component(18.dp))
+                        )
+                        Spacer(modifier = Modifier.width(sizing.spacing(6.dp)))
+                        Text(
+                            text = stringResource(R.string.appstrings_diagnostic_ping_run),
+                            maxLines = 1,
+                            softWrap = false
+                        )
+                    }
+                }
+            }
+        },
+        dismissButton = {
+            if (isPaused) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(sizing.spacing(4.dp)),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(onClick = onRestart) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = null,
+                            modifier = Modifier.size(sizing.component(16.dp))
+                        )
+                        Spacer(modifier = Modifier.width(sizing.spacing(4.dp)))
+                        Text(
+                            text = stringResource(R.string.appstrings_diagnostic_ping_restart),
+                            maxLines = 1,
+                            softWrap = false
+                        )
+                    }
+                    TextButton(onClick = onDismiss) {
+                        Text(
+                            text = stringResource(R.string.appstrings_close),
+                            maxLines = 1,
+                            softWrap = false
+                        )
+                    }
+                }
+            } else {
                 TextButton(
                     onClick = {
-                        if (isRunning) onStop()
+                        if (isRunning) onPause()
                         onDismiss()
                     }
                 ) {
@@ -515,8 +529,8 @@ fun ApiPingTerminal(
     val progressTarget = when (state) {
         ApiServerPingState.Idle -> 0f
         is ApiServerPingState.Running -> state.completedPasses.toFloat() / state.passes
+        is ApiServerPingState.Paused -> state.completedPasses.toFloat() / state.passes
         is ApiServerPingState.Completed -> 1f
-        is ApiServerPingState.Stopped -> state.completedPasses.toFloat() / state.passes
         ApiServerPingState.Failed -> 0f
     }.coerceIn(0f, 1f)
     val animatedProgress by animateFloatAsState(
@@ -545,11 +559,19 @@ fun ApiPingTerminal(
             )
             Spacer(modifier = Modifier.height(8.dp))
 
-            if (state is ApiServerPingState.Running || state is ApiServerPingState.Completed || state is ApiServerPingState.Stopped) {
+            if (state is ApiServerPingState.Running) {
                 LinearWavyProgressIndicator(
                     progress = { animatedProgress },
                     modifier = Modifier.fillMaxWidth().height(6.dp),
-                    color = if (state is ApiServerPingState.Stopped) terminalMuted else terminalAccent,
+                    color = terminalAccent,
+                    trackColor = terminalMuted.copy(alpha = 0.22f)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            } else if (state is ApiServerPingState.Paused || state is ApiServerPingState.Completed) {
+                LinearProgressIndicator(
+                    progress = { animatedProgress },
+                    modifier = Modifier.fillMaxWidth().height(6.dp),
+                    color = if (state is ApiServerPingState.Paused) terminalMuted else terminalAccent,
                     trackColor = terminalMuted.copy(alpha = 0.22f)
                 )
                 Spacer(modifier = Modifier.height(8.dp))
@@ -574,6 +596,52 @@ fun ApiPingTerminal(
                             state.passes
                         )
                     )
+                }
+                is ApiServerPingState.Paused -> {
+                    state.samples.forEach { sample ->
+                        key(sample.attempt) {
+                            AnimatedVisibility(visible = true) {
+                                ApiPingTerminalLine(sample)
+                            }
+                        }
+                    }
+                    AnimatedVisibility(visible = true) {
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            TerminalPrompt(
+                                text = stringResource(
+                                    R.string.appstrings_diagnostic_ping_paused_summary,
+                                    state.completedPasses,
+                                    state.passes
+                                ),
+                                color = terminalMuted
+                            )
+                            val successfulSamples = state.samples.mapNotNull { it.latencyMs }
+                            if (successfulSamples.isNotEmpty()) {
+                                val average = successfulSamples.average().toLong()
+                                Text(
+                                    text = stringResource(
+                                        R.string.appstrings_diagnostic_ping_result_stats,
+                                        average,
+                                        successfulSamples.minOrNull() ?: average,
+                                        successfulSamples.maxOrNull() ?: average
+                                    ),
+                                    style = terminalTextStyle,
+                                    color = terminalAccent
+                                )
+                            }
+                            val failedCount = state.samples.count { it.latencyMs == null }
+                            if (failedCount > 0) {
+                                Text(
+                                    text = stringResource(
+                                        R.string.appstrings_diagnostic_ping_result_failures,
+                                        failedCount
+                                    ),
+                                    style = terminalTextStyle,
+                                    color = terminalError
+                                )
+                            }
+                        }
+                    }
                 }
                 is ApiServerPingState.Completed -> {
                     state.result.samples.forEach { sample ->
@@ -612,52 +680,6 @@ fun ApiPingTerminal(
                                     text = stringResource(
                                         R.string.appstrings_diagnostic_ping_result_failures,
                                         state.result.failedPasses
-                                    ),
-                                    style = terminalTextStyle,
-                                    color = terminalError
-                                )
-                            }
-                        }
-                    }
-                }
-                is ApiServerPingState.Stopped -> {
-                    state.samples.forEach { sample ->
-                        key(sample.attempt) {
-                            AnimatedVisibility(visible = true) {
-                                ApiPingTerminalLine(sample)
-                            }
-                        }
-                    }
-                    AnimatedVisibility(visible = true) {
-                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            TerminalPrompt(
-                                text = stringResource(
-                                    R.string.appstrings_diagnostic_ping_stopped_summary,
-                                    state.completedPasses,
-                                    state.passes
-                                ),
-                                color = terminalMuted
-                            )
-                            val successfulSamples = state.samples.mapNotNull { it.latencyMs }
-                            if (successfulSamples.isNotEmpty()) {
-                                val average = successfulSamples.average().toLong()
-                                Text(
-                                    text = stringResource(
-                                        R.string.appstrings_diagnostic_ping_result_stats,
-                                        average,
-                                        successfulSamples.minOrNull() ?: average,
-                                        successfulSamples.maxOrNull() ?: average
-                                    ),
-                                    style = terminalTextStyle,
-                                    color = terminalAccent
-                                )
-                            }
-                            val failedCount = state.samples.count { it.latencyMs == null }
-                            if (failedCount > 0) {
-                                Text(
-                                    text = stringResource(
-                                        R.string.appstrings_diagnostic_ping_result_failures,
-                                        failedCount
                                     ),
                                     style = terminalTextStyle,
                                     color = terminalError

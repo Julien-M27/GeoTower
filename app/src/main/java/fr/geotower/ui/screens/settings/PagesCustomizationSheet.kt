@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.NearMe
 import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.Refresh
@@ -129,6 +130,7 @@ import fr.geotower.ui.screens.emitters.FrequencyReferenceTechnology
 import fr.geotower.utils.AboutPagePrefs
 import fr.geotower.utils.DepartmentStatsPreferences
 import fr.geotower.utils.HomePrefs
+import fr.geotower.utils.SimpleDrawerPrefs
 import fr.geotower.utils.PageScrollPrefs
 import fr.geotower.utils.PreferenceStores
 import fr.geotower.utils.StatsDisplayMode
@@ -604,6 +606,7 @@ fun FrequencyReferenceSettingsSheet(
 class PagesSectionActions(
     val onStartupPage: () -> Unit = {},
     val onHome: () -> Unit = {},
+    val onSimpleDrawer: () -> Unit = {},
     val onNearby: () -> Unit = {},
     val onMap: () -> Unit = {},
     val onCompass: () -> Unit = {},
@@ -723,6 +726,14 @@ fun SectionPages(
                 desc = stringResource(R.string.settings_page_home_desc),
                 icon = Icons.Default.Home,
                 onClick = actions.onHome,
+                shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi, safeClick = safeClick
+            )
+        } else {
+            PageSettingsCard(
+                title = stringResource(R.string.settings_page_simple_drawer_title),
+                desc = stringResource(R.string.settings_page_simple_drawer_desc),
+                icon = Icons.Default.Menu,
+                onClick = actions.onSimpleDrawer,
                 shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi, safeClick = safeClick
             )
         }
@@ -1012,6 +1023,7 @@ fun HomeSettingsSheet(
     var showHelpButton by remember { mutableStateOf(prefs.getBoolean("show_home_help", true)) }
     var showAboutLink by remember { mutableStateOf(HomePrefs.showAboutLink.read(prefs)) }
     var showTripsPage by remember { mutableStateOf(HomePrefs.showTripsPage.read(prefs)) }
+    var showQuitButton by remember { mutableStateOf(HomePrefs.showQuitButton.read(prefs)) }
     val longPressReorder by AppConfig.homeLongPressReorder
     // Partagé avec l'accueil, qui déplace aussi ce bouton par appui long : l'un doit voir l'autre.
     val helpButtonPosition by AppConfig.homeHelpPosition
@@ -1201,6 +1213,18 @@ fun HomeSettingsSheet(
                         bubbleColor = bubbleColor,
                         useOneUi = useOneUi
                     )
+                    SimpleSwitchCard(
+                        title = stringResource(R.string.appstrings_home_quit_app),
+                        showMapLocation = showQuitButton,
+                        onLocationChange = {
+                            showQuitButton = it
+                            AppConfig.setHomeShowQuitButton(prefs, it)
+                        },
+                        shape = shape,
+                        border = border,
+                        bubbleColor = bubbleColor,
+                        useOneUi = useOneUi
+                    )
                     PageScrollAidsCards(PageScrollPrefs.HOME, shape, border, bubbleColor, useOneUi, spacing = 0.dp)
             }
 
@@ -1221,9 +1245,11 @@ fun HomeSettingsSheet(
                 // Réinitialise le logo
                 showLogo = true
                 showHelpButton = true
+                showQuitButton = true
                 showAboutLink = HomePrefs.showAboutLink.defaultValue
                 AppConfig.setHomeLongPressReorder(prefs, true)
                 AppConfig.setHomeHelpPosition(prefs, AppConfig.DEFAULT_HOME_HELP_POSITION)
+                AppConfig.setHomeShowQuitButton(prefs, true)
                 HomePrefs.showAboutLink.write(
                     prefs.edit()
                         .putBoolean("show_home_logo", true)
@@ -1240,6 +1266,159 @@ fun HomeSettingsSheet(
         }
     }
 }
+}
+
+// === LE SOUS-MENU POUR LE VOLET LATÉRAL (MODE SIMPLIFIÉ) ===
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SimpleDrawerSettingsSheet(
+    drawerOrder: List<String>,
+    onOrderChange: (List<String>) -> Unit,
+    onDismiss: () -> Unit,
+    onBack: () -> Unit,
+    sheetState: SheetState,
+    useOneUi: Boolean,
+    bubbleColor: Color
+) {
+    val context = LocalContext.current
+    val prefs = context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
+    val longPressReorder by AppConfig.simpleDrawerLongPressReorder
+    val featureFlags by RemoteFeatureFlags.config
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+
+    val safeOrder = remember(drawerOrder, featureFlags) {
+        SimpleDrawerPrefs.normalizeOrder(drawerOrder).filter { id ->
+            when (id) {
+                "emitters" -> featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.NEARBY)
+                "map" -> featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.MAP)
+                "trips" -> featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.TRIPS)
+                "stats" -> featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.STATS)
+                "settings" -> featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.SETTINGS)
+                "help" -> featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.HELP)
+                "simple_mode_disable" -> true
+                "quit" -> true
+                else -> true
+            }
+        }
+    }
+
+    val currentOrder by rememberUpdatedState(safeOrder)
+
+    val themeMode by AppConfig.themeMode
+    val isOledMode by AppConfig.isOledMode
+    val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
+    val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
+    val scrollState = rememberScrollState()
+
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
+        BackHandler { onBack() }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .settingsPopupFadingEdge(scrollState)
+                .verticalScroll(scrollState)
+                .padding(bottom = sizing.spacing(48.dp), start = sizing.spacing(24.dp), end = sizing.spacing(24.dp)),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Row(modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(4.dp)), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
+                Text(
+                    stringResource(R.string.appstrings_page_simple_drawer_settings),
+                    style = sizing.textStyle(MaterialTheme.typography.titleLarge),
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center
+                )
+                Spacer(Modifier.width(sizing.spacing(48.dp)))
+            }
+            Text(
+                stringResource(R.string.appstrings_drag_to_reorder_hint),
+                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = sizing.spacing(24.dp)),
+                textAlign = TextAlign.Center
+            )
+
+            val cardHeight = sizing.component(64.dp)
+            val spacing = sizing.spacing(12.dp)
+            val reorderState = rememberReorderableDragState(currentOrder, cardHeight, spacing, onOrderChange)
+
+            val shape = oneUiActionButtonShape(useOneUi)
+            val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
+
+            Column(verticalArrangement = Arrangement.spacedBy(spacing)) {
+                currentOrder.forEach { itemId ->
+                    key(itemId) {
+                        val isDragged = reorderState.isDragged(itemId)
+                        val dragModifier = reorderState.dragModifier(itemId)
+                        val dragOffset = reorderState.offsetFor(itemId)
+
+                        val title = when (itemId) {
+                            "emitters" -> stringResource(R.string.nav_near_antennas)
+                            "map" -> stringResource(R.string.nav_map)
+                            "trips" -> stringResource(R.string.trips_title)
+                            "stats" -> stringResource(R.string.nav_statistics)
+                            "settings" -> stringResource(R.string.nav_settings)
+                            "help" -> stringResource(R.string.nav_help)
+                            "simple_mode_disable" -> stringResource(R.string.simple_mode_disable)
+                            "quit" -> stringResource(R.string.appstrings_home_quit_app)
+                            else -> itemId
+                        }
+
+                        val isIndispensable = itemId in SimpleDrawerPrefs.indispensableElements
+                        val checked = if (isIndispensable) true else AppConfig.simpleDrawerElementEnabled(itemId)
+                        val onCheckedChange: (Boolean) -> Unit = if (isIndispensable) {
+                            {}
+                        } else {
+                            { AppConfig.setSimpleDrawerElementEnabled(prefs, itemId, it) }
+                        }
+
+                        DraggableSwitchCard(
+                            title = title,
+                            checked = checked,
+                            onCheckedChange = onCheckedChange,
+                            shape = shape,
+                            border = border,
+                            bubbleColor = bubbleColor,
+                            useOneUi = useOneUi,
+                            dragModifier = dragModifier,
+                            isDragged = isDragged,
+                            dragOffset = dragOffset,
+                            height = cardHeight,
+                            hideSwitch = isIndispensable
+                        )
+                    }
+                }
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = sizing.spacing(8.dp)), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+
+                SimpleSwitchCard(
+                    title = stringResource(R.string.appstrings_home_long_press_reorder),
+                    showMapLocation = longPressReorder,
+                    onLocationChange = { AppConfig.setSimpleDrawerLongPressReorder(prefs, it) },
+                    shape = shape,
+                    border = border,
+                    bubbleColor = bubbleColor,
+                    useOneUi = useOneUi
+                )
+            }
+
+            Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
+            TextButton(onClick = {
+                val defaultOrder = SimpleDrawerPrefs.defaultDrawerOrder()
+                onOrderChange(defaultOrder)
+                AppConfig.setSimpleDrawerLongPressReorder(prefs, true)
+                listOf("emitters", "map", "trips", "stats", "help", "quit").forEach {
+                    AppConfig.setSimpleDrawerElementEnabled(prefs, it, true)
+                }
+            }) {
+                Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(sizing.spacing(8.dp)))
+                Text(stringResource(R.string.appstrings_reset_to_default), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            }
+            Spacer(modifier = Modifier.height(sizing.spacing(32.dp)).navigationBarsPadding())
+        }
+    }
 }
 
 // === LE SOUS-MENU POUR LA PAGE À PROPOS ===

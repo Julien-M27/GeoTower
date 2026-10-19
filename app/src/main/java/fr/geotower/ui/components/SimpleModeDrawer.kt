@@ -22,10 +22,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.filled.BarChart
-import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SystemUpdateAlt
 import androidx.compose.material.icons.filled.ToggleOff
@@ -39,16 +39,20 @@ import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import android.content.Context
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -66,10 +70,14 @@ import fr.geotower.R
 import fr.geotower.data.api.AppUpdateState
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.services.LiveTrackingController
+import fr.geotower.ui.screens.home.HomeMenuSlot
+import fr.geotower.ui.screens.home.rememberHomeMenuReorderState
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppIconManager
 import fr.geotower.utils.AppLogoDrawingResources
+import fr.geotower.utils.PreferenceStores
+import fr.geotower.utils.SimpleDrawerPrefs
 import kotlinx.coroutines.launch
 
 /**
@@ -122,6 +130,8 @@ fun SimpleModeDrawer(
         }
     }
 
+    val drawerOvershootGuardWidth = 32.dp
+
     ModalNavigationDrawer(
         drawerState = drawerState,
         // Fermé : aucun geste, un balayage depuis le bord entrerait en conflit avec le déplacement
@@ -131,7 +141,22 @@ fun SimpleModeDrawer(
         drawerContent = {
             ModalDrawerSheet(
                 drawerContainerColor = sheetColor,
-                modifier = Modifier.width(rememberSimpleModeDrawerWidth())
+                modifier = Modifier
+                    .width(rememberSimpleModeDrawerWidth())
+                    // Avec MotionScheme.expressive(), l'ouverture du tiroir utilise un ressort
+                    // qui dépasse légèrement vers la droite (overshoot) avant de se caler.
+                    // Sans extension vers la gauche, ce rebond décolle le tiroir du bord de l'écran
+                    // et crée un jour/interstice visible. En prolongeant le fond de 32dp vers la
+                    // gauche hors des limites du composant (sans clipping), le bord reste opaque.
+                    .graphicsLayer { clip = false }
+                    .drawBehind {
+                        val guardPx = drawerOvershootGuardWidth.toPx()
+                        drawRect(
+                            color = sheetColor,
+                            topLeft = androidx.compose.ui.geometry.Offset(-guardPx, 0f),
+                            size = androidx.compose.ui.geometry.Size(guardPx, size.height)
+                        )
+                    }
             ) {
                 SimpleModeDrawerContent(
                     navController = navController,
@@ -154,7 +179,6 @@ private fun SimpleModeDrawerContent(
     val scrollState = rememberScrollState()
     val safeClick = rememberSafeClick()
 
-    val hasCompass by AppConfig.hasCompass
     val newerRelease by AppUpdateState.newerRelease
 
     // Quitter : on coupe le suivi en direct (donc la notification live) avant de fermer l'app.
@@ -167,19 +191,220 @@ private fun SimpleModeDrawerContent(
         activity?.finishAndRemoveTask()
     }
 
-    val entries = remember(hasCompass) {
-        buildList {
-            add(DrawerEntry("emitters", RemoteFeatureFlags.Screens.NEARBY, Icons.Default.MyLocation, R.string.nav_near_antennas))
-            add(DrawerEntry("map", RemoteFeatureFlags.Screens.MAP, Icons.Default.Map, R.string.nav_map))
-            if (hasCompass) {
-                add(DrawerEntry("compass", RemoteFeatureFlags.Screens.COMPASS, Icons.Default.Explore, R.string.nav_compass))
+    val prefs = remember(context) { context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE) }
+    val simpleDrawerOrder by AppConfig.simpleDrawerOrder
+    val longPressReorder by AppConfig.simpleDrawerLongPressReorder
+    val showEmitters by AppConfig.simpleDrawerShowEmitters
+    val showMap by AppConfig.simpleDrawerShowMap
+    val showTrips by AppConfig.simpleDrawerShowTrips
+    val showStats by AppConfig.simpleDrawerShowStats
+    val showHelp by AppConfig.simpleDrawerShowHelp
+    val showQuit by AppConfig.simpleDrawerShowQuit
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
+
+    val buttons = remember(
+        simpleDrawerOrder,
+        showEmitters,
+        showMap,
+        showTrips,
+        showStats,
+        showHelp,
+        showQuit,
+        currentRoute
+    ) {
+        val list = mutableListOf<SimpleDrawerButtonEntry>()
+        simpleDrawerOrder.forEach { itemId ->
+            when (itemId) {
+                "emitters" -> {
+                    if (showEmitters && RemoteFeatureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.NEARBY)) {
+                        val isCurrent = currentRoute?.startsWith("emitters") == true
+                        list.add(SimpleDrawerButtonEntry("emitters") {
+                            NavigationDrawerItem(
+                                icon = { Icon(Icons.Default.MyLocation, contentDescription = null) },
+                                label = { Text(stringResource(R.string.nav_near_antennas)) },
+                                selected = isCurrent,
+                                onClick = {
+                                    safeClick {
+                                        onCloseDrawer()
+                                        if (!isCurrent) {
+                                            navController.navigate("emitters") { launchSingleTop = true }
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                            )
+                        })
+                    }
+                }
+                "map" -> {
+                    if (showMap && RemoteFeatureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.MAP)) {
+                        val isCurrent = currentRoute?.startsWith("map") == true || currentRoute == null
+                        list.add(SimpleDrawerButtonEntry("map") {
+                            NavigationDrawerItem(
+                                icon = { Icon(Icons.Default.Map, contentDescription = null) },
+                                label = { Text(stringResource(R.string.nav_map)) },
+                                selected = isCurrent,
+                                onClick = {
+                                    safeClick {
+                                        onCloseDrawer()
+                                        if (!isCurrent) {
+                                            navController.navigate("map") { launchSingleTop = true }
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                            )
+                        })
+                    }
+                }
+                "trips" -> {
+                    if (showTrips && RemoteFeatureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.TRIPS)) {
+                        val isCurrent = currentRoute?.startsWith("trips") == true
+                        list.add(SimpleDrawerButtonEntry("trips") {
+                            NavigationDrawerItem(
+                                icon = { Icon(Icons.Default.Route, contentDescription = null) },
+                                label = { Text(stringResource(R.string.trips_title)) },
+                                selected = isCurrent,
+                                onClick = {
+                                    safeClick {
+                                        onCloseDrawer()
+                                        if (!isCurrent) {
+                                            navController.navigate("trips") { launchSingleTop = true }
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                            )
+                        })
+                    }
+                }
+                "stats" -> {
+                    if (showStats && RemoteFeatureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.STATS)) {
+                        val isCurrent = currentRoute?.startsWith("stats") == true
+                        list.add(SimpleDrawerButtonEntry("stats") {
+                            NavigationDrawerItem(
+                                icon = { Icon(Icons.Default.BarChart, contentDescription = null) },
+                                label = { Text(stringResource(R.string.nav_statistics)) },
+                                selected = isCurrent,
+                                onClick = {
+                                    safeClick {
+                                        onCloseDrawer()
+                                        if (!isCurrent) {
+                                            navController.navigate("stats") { launchSingleTop = true }
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                            )
+                        })
+                    }
+                }
+                "settings" -> {
+                    if (RemoteFeatureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.SETTINGS)) {
+                        val isCurrent = currentRoute?.startsWith("settings") == true
+                        list.add(SimpleDrawerButtonEntry("settings") {
+                            NavigationDrawerItem(
+                                icon = { Icon(Icons.Default.Settings, contentDescription = null) },
+                                label = { Text(stringResource(R.string.nav_settings)) },
+                                selected = isCurrent,
+                                onClick = {
+                                    safeClick {
+                                        onCloseDrawer()
+                                        if (!isCurrent) {
+                                            navController.navigate("settings") { launchSingleTop = true }
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                            )
+                        })
+                    }
+                }
+                "help" -> {
+                    if (showHelp && RemoteFeatureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.HELP)) {
+                        val isCurrent = currentRoute?.startsWith("help") == true
+                        list.add(SimpleDrawerButtonEntry("help") {
+                            NavigationDrawerItem(
+                                icon = { Icon(Icons.AutoMirrored.Filled.Help, contentDescription = null) },
+                                label = { Text(stringResource(R.string.nav_help)) },
+                                selected = isCurrent,
+                                onClick = {
+                                    safeClick {
+                                        onCloseDrawer()
+                                        if (!isCurrent) {
+                                            navController.navigate("help") { launchSingleTop = true }
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                            )
+                        })
+                    }
+                }
+                "simple_mode_disable" -> {
+                    list.add(SimpleDrawerButtonEntry("simple_mode_disable") {
+                        NavigationDrawerItem(
+                            icon = {
+                                Icon(
+                                    Icons.Default.ToggleOff,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            },
+                            label = {
+                                Text(
+                                    text = stringResource(R.string.simple_mode_disable),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            },
+                            selected = false,
+                            onClick = {
+                                safeClick {
+                                    AppConfig.setSimpleMode(context, false)
+                                    onCloseDrawer()
+                                    navController.navigate(AppConfig.homeRoute()) {
+                                        launchSingleTop = true
+                                        popUpTo(navController.graph.id) { inclusive = true }
+                                    }
+                                }
+                            },
+                            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                        )
+                    })
+                }
+                "quit" -> {
+                    if (showQuit) {
+                        list.add(SimpleDrawerButtonEntry("quit") {
+                            NavigationDrawerItem(
+                                icon = {
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.ExitToApp,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                },
+                                label = {
+                                    Text(
+                                        text = stringResource(R.string.appstrings_home_quit_app),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                },
+                                selected = false,
+                                onClick = { safeClick { onQuit() } },
+                                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                            )
+                        })
+                    }
+                }
             }
-            add(DrawerEntry("stats", RemoteFeatureFlags.Screens.STATS, Icons.Default.BarChart, R.string.nav_statistics))
-            add(DrawerEntry("settings", RemoteFeatureFlags.Screens.SETTINGS, Icons.Default.Settings, R.string.nav_settings))
-            // « À propos » n'est pas dans cette liste : comme sur l'accueil, il vit dans le pied,
-            // entre le logo et la version.
-            add(DrawerEntry("help", RemoteFeatureFlags.Screens.HELP, Icons.AutoMirrored.Filled.Help, R.string.nav_help))
         }
+        list
+    }
+
+    val reorderEnabled = longPressReorder && buttons.size > 1
+    val reorderState = rememberHomeMenuReorderState(buttons.map { it.id }) { visibleOrder ->
+        AppConfig.setSimpleDrawerOrder(prefs, SimpleDrawerPrefs.reorderVisible(simpleDrawerOrder, visibleOrder))
     }
 
     // Trois zones franches : en-tête fixe en haut, pages centrées dans l'espace restant, pied
@@ -265,79 +490,18 @@ private fun SimpleModeDrawerContent(
                 .verticalScroll(scrollState),
             verticalArrangement = Arrangement.Center
         ) {
-            val navBackStackEntry by navController.currentBackStackEntryAsState()
-            val currentRoute = navBackStackEntry?.destination?.route
-            entries.forEach { entry ->
-                if (!RemoteFeatureFlags.isScreenEnabled(entry.screenId)) return@forEach
-                // La carte est la page courante : l'entrée sert de repère, elle referme simplement.
-                val isCurrent = entry.route == "map" || currentRoute?.startsWith(entry.route) == true
-                NavigationDrawerItem(
-                    icon = { Icon(entry.icon, contentDescription = null) },
-                    label = { Text(stringResource(entry.labelRes)) },
-                    selected = isCurrent,
-                    onClick = {
-                        safeClick {
-                            onCloseDrawer()
-                            if (!isCurrent) {
-                                navController.navigate(entry.route) { launchSingleTop = true }
-                            }
-                        }
-                    },
-                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
-                )
-            }
-
-            // Le mode simplifié change la racine de navigation : on reconstruit la pile après
-            // sa désactivation pour ramener l'utilisateur sur l'accueil du mode complet.
-            NavigationDrawerItem(
-                icon = {
-                    Icon(
-                        Icons.Default.ToggleOff,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                },
-                label = {
-                    Text(
-                        text = stringResource(R.string.simple_mode_disable),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                },
-                selected = false,
-                onClick = {
-                    safeClick {
-                        AppConfig.setSimpleMode(context, false)
-                        onCloseDrawer()
-                        navController.navigate(AppConfig.homeRoute()) {
-                            launchSingleTop = true
-                            popUpTo(navController.graph.id) { inclusive = true }
-                        }
+            buttons.forEach { entry ->
+                key(entry.id) {
+                    HomeMenuSlot(
+                        state = reorderState,
+                        id = entry.id,
+                        enabled = reorderEnabled,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        entry.content()
                     }
-                },
-                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
-            )
-
-            // --- Quitter : le tiroir remplace l'accueil, il doit reprendre son bouton de sortie.
-            // Détaché de la liste, ce n'est pas une page.
-            Spacer(Modifier.height(sizing.spacing(12.dp)))
-            NavigationDrawerItem(
-                icon = {
-                    Icon(
-                        Icons.AutoMirrored.Filled.ExitToApp,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                },
-                label = {
-                    Text(
-                        text = stringResource(R.string.appstrings_home_quit_app),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                },
-                selected = false,
-                onClick = { safeClick { onQuit() } },
-                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
-            )
+                }
+            }
         }
     }
 
@@ -420,9 +584,7 @@ private fun SimpleModeDrawerContent(
     }
 }
 
-private data class DrawerEntry(
-    val route: String,
-    val screenId: String,
-    val icon: ImageVector,
-    val labelRes: Int
+private data class SimpleDrawerButtonEntry(
+    val id: String,
+    val content: @Composable () -> Unit
 )

@@ -739,13 +739,16 @@ fun HomeScreen(navController: NavController) {
                     val foldScrollState = rememberScrollState()
                     val phoneScrollState = rememberScrollState()
 
-                    HomeQuitButton(
-                        onClick = onQuit,
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(top = sizing.spacing(12.dp), end = sizing.spacing(12.dp))
-                            .zIndex(3f)
-                    )
+                    val showQuitButton by AppConfig.homeShowQuitButton
+                    if (showQuitButton) {
+                        HomeQuitButton(
+                            onClick = onQuit,
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(top = sizing.spacing(12.dp), end = sizing.spacing(12.dp))
+                                .zIndex(3f)
+                        )
+                    }
 
                     // Symétrique du bouton « Quitter », dans le coin opposé.
                     HomeNotificationsButton(

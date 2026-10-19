@@ -44,10 +44,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -58,10 +61,12 @@ import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -78,6 +83,7 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -104,10 +110,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
@@ -131,6 +139,8 @@ import fr.geotower.data.db.LocalDbBuildStatus
 import fr.geotower.data.db.RadioDatabaseValidator
 import fr.geotower.data.workers.OfflineMapDownloadValidator
 import fr.geotower.ui.components.ApiServerModeDialog
+import fr.geotower.ui.components.ApiServerPingDialog
+import fr.geotower.ui.components.ApiServerPingState
 import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.components.GeoTowerLoadingMessage
 import fr.geotower.ui.components.PageScrollEdgeButtons
@@ -180,9 +190,10 @@ fun DiagnosticScreen(navController: NavController) {
     var isRefreshing by remember { mutableStateOf(false) }
     var showApiServerDialog by remember { mutableStateOf(false) }
     var showApiServerPingDialog by remember { mutableStateOf(false) }
+    var showLogViewerDialog by remember { mutableStateOf(false) }
     var pingServer by remember { mutableStateOf(ApiEndpoints.active()) }
     var pingPasses by remember { mutableStateOf(ServerReachability.DEFAULT_PING_PASSES) }
-    var pingState by remember { mutableStateOf<DiagnosticPingState>(DiagnosticPingState.Idle) }
+    var pingState by remember { mutableStateOf<ApiServerPingState>(ApiServerPingState.Idle) }
     var pingJob by remember { mutableStateOf<Job?>(null) }
 
     fun pausePing() {
@@ -190,16 +201,16 @@ fun DiagnosticScreen(navController: NavController) {
         val currentState = pingState
         pingJob = null
         currentJob?.cancel()
-        if (currentState is DiagnosticPingState.Running) {
+        if (currentState is ApiServerPingState.Running) {
             pingState = if (currentState.samples.isNotEmpty()) {
-                DiagnosticPingState.Paused(
+                ApiServerPingState.Paused(
                     server = currentState.server,
                     passes = currentState.passes,
                     completedPasses = currentState.completedPasses,
                     samples = currentState.samples
                 )
             } else {
-                DiagnosticPingState.Idle
+                ApiServerPingState.Idle
             }
         }
     }
@@ -209,8 +220,8 @@ fun DiagnosticScreen(navController: NavController) {
         pingJob = null
         currentJob?.cancel()
 
-        val initialSamples = if (resume && pingState is DiagnosticPingState.Paused) {
-            (pingState as DiagnosticPingState.Paused).samples
+        val initialSamples = if (resume && pingState is ApiServerPingState.Paused) {
+            (pingState as ApiServerPingState.Paused).samples
         } else {
             emptyList()
         }
@@ -219,7 +230,7 @@ fun DiagnosticScreen(navController: NavController) {
         val targetPasses = pingPasses
 
         val job = scope.launch {
-            pingState = DiagnosticPingState.Running(
+            pingState = ApiServerPingState.Running(
                 server = targetServer,
                 passes = targetPasses,
                 completedPasses = initialSamples.size,
@@ -231,10 +242,10 @@ fun DiagnosticScreen(navController: NavController) {
                     passes = targetPasses,
                     initialSamples = initialSamples
                 ) { sample ->
-                    val previousSamples = (pingState as? DiagnosticPingState.Running)
+                    val previousSamples = (pingState as? ApiServerPingState.Running)
                         ?.samples
                         .orEmpty()
-                    pingState = DiagnosticPingState.Running(
+                    pingState = ApiServerPingState.Running(
                         server = targetServer,
                         passes = targetPasses,
                         completedPasses = sample.attempt,
@@ -242,10 +253,10 @@ fun DiagnosticScreen(navController: NavController) {
                     )
                 }
             }.onSuccess { result ->
-                pingState = DiagnosticPingState.Completed(result)
+                pingState = ApiServerPingState.Completed(result)
             }.onFailure { error ->
                 if (error is kotlinx.coroutines.CancellationException) throw error
-                pingState = DiagnosticPingState.Failed
+                pingState = ApiServerPingState.Failed
             }.also {
                 pingJob = null
             }
@@ -420,7 +431,7 @@ fun DiagnosticScreen(navController: NavController) {
                                             onPingApiServer = {
                                                 pingServer = ApiEndpoints.active()
                                                 pingPasses = ServerReachability.DEFAULT_PING_PASSES
-                                                pingState = DiagnosticPingState.Idle
+                                                pingState = ApiServerPingState.Idle
                                                 showApiServerPingDialog = true
                                             }
                                         )
@@ -453,12 +464,24 @@ fun DiagnosticScreen(navController: NavController) {
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    Button(
+                        onClick = { showLogViewerDialog = true },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Visibility,
+                            contentDescription = null,
+                            modifier = Modifier.size(sizing.component(18.dp))
+                        )
+                        Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
+                        Text(stringResource(R.string.appstrings_diagnostic_view_log))
+                    }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp)),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Button(
+                        OutlinedButton(
                             onClick = { shareDebugLog(context) },
                             modifier = Modifier.weight(1f)
                         ) {
@@ -475,6 +498,86 @@ fun DiagnosticScreen(navController: NavController) {
                             enabled = logSize > 0L
                         ) {
                             Text(stringResource(R.string.appstrings_diagnostic_clear_log))
+                        }
+                    }
+
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = sizing.spacing(4.dp)),
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    )
+
+                    var networkLogStats by remember(currentState.generatedAt) {
+                        mutableStateOf(fr.geotower.data.netlog.NetworkLogStore.getStats(context))
+                    }
+                    LaunchedEffect(currentState.generatedAt) {
+                        networkLogStats = kotlinx.coroutines.withContext(Dispatchers.IO) {
+                            fr.geotower.data.netlog.NetworkLogStore.getStats(context)
+                        }
+                    }
+
+                    Text(
+                        text = stringResource(R.string.network_log_title),
+                        style = sizing.textStyle(MaterialTheme.typography.titleMedium),
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Text(
+                        text = stringResource(
+                            R.string.appstrings_diagnostic_log_size,
+                            formatBytes(context, networkLogStats.totalSizeBytes)
+                        ) + if (networkLogStats.totalCount > 0) " · " + stringResource(R.string.network_log_requests_count, networkLogStats.totalCount) else "",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Button(
+                        onClick = { navController.navigate("network_log") },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Language,
+                            contentDescription = null,
+                            modifier = Modifier.size(sizing.component(18.dp))
+                        )
+                        Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
+                        Text(stringResource(R.string.network_log_view_requests))
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp)),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                val ok = fr.geotower.data.netlog.NetworkLogStore.shareLog(
+                                    context,
+                                    context.getString(R.string.network_log_share)
+                                )
+                                if (!ok) {
+                                    Toast.makeText(context, R.string.network_log_empty, Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            modifier = Modifier.weight(1f),
+                            enabled = networkLogStats.totalCount > 0L
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Share,
+                                contentDescription = null,
+                                modifier = Modifier.size(sizing.component(18.dp))
+                            )
+                            Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
+                            Text(stringResource(R.string.network_log_share))
+                        }
+                        TextButton(
+                            onClick = {
+                                fr.geotower.data.netlog.NetworkLogStore.clear(context)
+                                networkLogStats = fr.geotower.data.netlog.NetworkLogStore.getStats(context)
+                                Toast.makeText(context, R.string.network_log_cleared, Toast.LENGTH_SHORT).show()
+                            },
+                            enabled = networkLogStats.totalCount > 0L
+                        ) {
+                            Text(stringResource(R.string.network_log_clear))
                         }
                     }
                 }
@@ -500,19 +603,19 @@ fun DiagnosticScreen(navController: NavController) {
     }
 
     if (showApiServerPingDialog) {
-        DiagnosticApiServerPingDialog(
+        ApiServerPingDialog(
             selectedServer = pingServer,
             selectedPasses = pingPasses,
             state = pingState,
             onServerSelected = { server ->
                 pausePing()
                 pingServer = server
-                pingState = DiagnosticPingState.Idle
+                pingState = ApiServerPingState.Idle
             },
             onPassesSelected = { passes ->
                 pausePing()
                 pingPasses = passes
-                pingState = DiagnosticPingState.Idle
+                pingState = ApiServerPingState.Idle
             },
             onRun = { startPing(resume = false) },
             onPause = { pausePing() },
@@ -524,454 +627,17 @@ fun DiagnosticScreen(navController: NavController) {
             }
         )
     }
-}
 
-private sealed interface DiagnosticPingState {
-    object Idle : DiagnosticPingState
-    data class Running(
-        val server: ApiServer,
-        val passes: Int,
-        val completedPasses: Int,
-        val samples: List<ServerPingSample>
-    ) : DiagnosticPingState
-    data class Paused(
-        val server: ApiServer,
-        val passes: Int,
-        val completedPasses: Int,
-        val samples: List<ServerPingSample>
-    ) : DiagnosticPingState
-    data class Completed(val result: ServerPingResult) : DiagnosticPingState
-    object Failed : DiagnosticPingState
-}
-
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-private fun DiagnosticApiServerPingDialog(
-    selectedServer: ApiServer,
-    selectedPasses: Int,
-    state: DiagnosticPingState,
-    onServerSelected: (ApiServer) -> Unit,
-    onPassesSelected: (Int) -> Unit,
-    onRun: () -> Unit,
-    onPause: () -> Unit,
-    onResume: () -> Unit,
-    onRestart: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    val sizing = LocalGeoTowerUiSizing.current
-    val isRunning = state is DiagnosticPingState.Running
-    val isPaused = state is DiagnosticPingState.Paused
-
-    AlertDialog(
-        onDismissRequest = {
-            if (isRunning) onPause()
-            onDismiss()
-        },
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-        titleContentColor = MaterialTheme.colorScheme.onSurface,
-        textContentColor = MaterialTheme.colorScheme.onSurface,
-        title = {
-            Text(
-                text = stringResource(R.string.appstrings_diagnostic_ping_dialog_title),
-                color = MaterialTheme.colorScheme.onSurface,
-                style = sizing.textStyle(MaterialTheme.typography.headlineSmall),
-                fontWeight = FontWeight.Bold
-            )
-        },
-        text = {
-            Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(sizing.spacing(6.dp))
-            ) {
-                Text(
-                    text = stringResource(R.string.appstrings_diagnostic_ping_dialog_desc),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(sizing.spacing(4.dp)))
-                Text(
-                    text = stringResource(R.string.appstrings_diagnostic_ping_server_label),
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                ApiServer.entries.forEach { server ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable(enabled = !isRunning) { onServerSelected(server) },
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        RadioButton(
-                            selected = server == selectedServer,
-                            onClick = if (isRunning) null else { { onServerSelected(server) } }
-                        )
-                        Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
-                        Column {
-                            Text(
-                                text = server.host,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = if (server == selectedServer) FontWeight.Bold else FontWeight.Normal,
-                                color = if (server == selectedServer) {
-                                    MaterialTheme.colorScheme.onSurface
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                }
-                            )
-                        }
-                    }
-                }
-                Text(
-                    text = stringResource(R.string.appstrings_diagnostic_ping_passes_label),
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                listOf(
-                    ServerReachability.DEFAULT_PING_PASSES,
-                    ServerReachability.EXTENDED_PING_PASSES
-                ).forEach { passes ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable(enabled = !isRunning) { onPassesSelected(passes) },
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        RadioButton(
-                            selected = passes == selectedPasses,
-                            onClick = if (isRunning) null else { { onPassesSelected(passes) } }
-                        )
-                        Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
-                        Text(
-                            text = stringResource(R.string.appstrings_diagnostic_ping_passes_option, passes),
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = if (passes == selectedPasses) FontWeight.Bold else FontWeight.Normal,
-                            color = if (passes == selectedPasses) {
-                                MaterialTheme.colorScheme.onSurface
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            }
-                        )
-                    }
-                }
-
-                DiagnosticPingTerminal(
-                    state = state,
-                    selectedServer = selectedServer,
-                    selectedPasses = selectedPasses
-                )
-            }
-        },
-        confirmButton = {
-            when {
-                isRunning -> {
-                    Button(
-                        onClick = onPause,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.tertiary,
-                            contentColor = MaterialTheme.colorScheme.onTertiary
-                        )
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Pause,
-                            contentDescription = null,
-                            modifier = Modifier.size(sizing.component(18.dp))
-                        )
-                        Spacer(modifier = Modifier.width(sizing.spacing(6.dp)))
-                        Text(
-                            text = stringResource(R.string.appstrings_pause),
-                            maxLines = 1,
-                            softWrap = false
-                        )
-                    }
-                }
-                isPaused -> {
-                    Button(onClick = onResume) {
-                        Icon(
-                            imageVector = Icons.Default.PlayArrow,
-                            contentDescription = null,
-                            modifier = Modifier.size(sizing.component(18.dp))
-                        )
-                        Spacer(modifier = Modifier.width(sizing.spacing(6.dp)))
-                        Text(
-                            text = stringResource(R.string.appstrings_resume),
-                            maxLines = 1,
-                            softWrap = false
-                        )
-                    }
-                }
-                else -> {
-                    Button(onClick = onRun) {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = null,
-                            modifier = Modifier.size(sizing.component(18.dp))
-                        )
-                        Spacer(modifier = Modifier.width(sizing.spacing(6.dp)))
-                        Text(
-                            text = stringResource(R.string.appstrings_diagnostic_ping_run),
-                            maxLines = 1,
-                            softWrap = false
-                        )
-                    }
-                }
-            }
-        },
-        dismissButton = {
-            if (isPaused) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(sizing.spacing(4.dp)),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    TextButton(onClick = onRestart) {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = null,
-                            modifier = Modifier.size(sizing.component(16.dp))
-                        )
-                        Spacer(modifier = Modifier.width(sizing.spacing(4.dp)))
-                        Text(
-                            text = stringResource(R.string.appstrings_diagnostic_ping_restart),
-                            maxLines = 1,
-                            softWrap = false
-                        )
-                    }
-                    TextButton(onClick = onDismiss) {
-                        Text(
-                            text = stringResource(R.string.appstrings_close),
-                            maxLines = 1,
-                            softWrap = false
-                        )
-                    }
-                }
-            } else {
-                TextButton(
-                    onClick = {
-                        if (isRunning) onPause()
-                        onDismiss()
-                    }
-                ) {
-                    Text(
-                        text = stringResource(R.string.appstrings_close),
-                        maxLines = 1,
-                        softWrap = false
-                    )
-                }
-            }
-        }
-    )
-}
-
-@Composable
-private fun DiagnosticPingTerminal(
-    state: DiagnosticPingState,
-    selectedServer: ApiServer,
-    selectedPasses: Int
-) {
-    val terminalTextStyle = MaterialTheme.typography.bodySmall
-    val terminalPanelShape = RoundedCornerShape(14.dp)
-    val terminalBackground = MaterialTheme.colorScheme.surfaceContainerHigh
-    val terminalText = MaterialTheme.colorScheme.onSurface
-    val terminalMuted = MaterialTheme.colorScheme.onSurfaceVariant
-    val terminalAccent = MaterialTheme.colorScheme.primary
-    val terminalError = MaterialTheme.colorScheme.error
-    val progressTarget = when (state) {
-        DiagnosticPingState.Idle -> 0f
-        is DiagnosticPingState.Running -> state.completedPasses.toFloat() / state.passes
-        is DiagnosticPingState.Paused -> state.completedPasses.toFloat() / state.passes
-        is DiagnosticPingState.Completed -> 1f
-        DiagnosticPingState.Failed -> 0f
-    }.coerceIn(0f, 1f)
-    val animatedProgress by animateFloatAsState(
-        targetValue = progressTarget,
-        animationSpec = tween(
-            durationMillis = if (PowerProfile.richAnimations) 420 else 0,
-            easing = FastOutSlowInEasing
-        ),
-        label = "diagnostic-ping-terminal-progress"
-    )
-
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = terminalBackground,
-        contentColor = terminalText,
-        shape = terminalPanelShape,
-        tonalElevation = 2.dp,
-        border = BorderStroke(1.dp, terminalAccent.copy(alpha = 0.32f))
-    ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Text(
-                text = "$ ping --count $selectedPasses ${selectedServer.host}",
-                style = terminalTextStyle,
-                color = terminalAccent,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-
-            if (state is DiagnosticPingState.Running) {
-                LinearWavyProgressIndicator(
-                    progress = { animatedProgress },
-                    modifier = Modifier.fillMaxWidth().height(6.dp),
-                    color = terminalAccent,
-                    trackColor = terminalMuted.copy(alpha = 0.22f)
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-            } else if (state is DiagnosticPingState.Paused || state is DiagnosticPingState.Completed) {
-                LinearProgressIndicator(
-                    progress = { animatedProgress },
-                    modifier = Modifier.fillMaxWidth().height(6.dp),
-                    color = if (state is DiagnosticPingState.Paused) terminalMuted else terminalAccent,
-                    trackColor = terminalMuted.copy(alpha = 0.22f)
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-
-            when (state) {
-                DiagnosticPingState.Idle -> TerminalPrompt(
-                    text = stringResource(R.string.appstrings_diagnostic_ping_terminal_ready)
-                )
-                is DiagnosticPingState.Running -> {
-                    state.samples.forEach { sample ->
-                        key(sample.attempt) {
-                            AnimatedVisibility(visible = true) {
-                                DiagnosticPingTerminalLine(sample)
-                            }
-                        }
-                    }
-                    TerminalPrompt(
-                        text = stringResource(
-                            R.string.appstrings_diagnostic_ping_running,
-                            state.completedPasses,
-                            state.passes
-                        )
-                    )
-                }
-                is DiagnosticPingState.Paused -> {
-                    state.samples.forEach { sample ->
-                        key(sample.attempt) {
-                            AnimatedVisibility(visible = true) {
-                                DiagnosticPingTerminalLine(sample)
-                            }
-                        }
-                    }
-                    AnimatedVisibility(visible = true) {
-                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            TerminalPrompt(
-                                text = stringResource(
-                                    R.string.appstrings_diagnostic_ping_paused_summary,
-                                    state.completedPasses,
-                                    state.passes
-                                ),
-                                color = terminalMuted
-                            )
-                            val successfulSamples = state.samples.mapNotNull { it.latencyMs }
-                            if (successfulSamples.isNotEmpty()) {
-                                val average = successfulSamples.average().toLong()
-                                Text(
-                                    text = stringResource(
-                                        R.string.appstrings_diagnostic_ping_result_stats,
-                                        average,
-                                        successfulSamples.minOrNull() ?: average,
-                                        successfulSamples.maxOrNull() ?: average
-                                    ),
-                                    style = terminalTextStyle,
-                                    color = terminalAccent
-                                )
-                            }
-                            val failedCount = state.samples.count { it.latencyMs == null }
-                            if (failedCount > 0) {
-                                Text(
-                                    text = stringResource(
-                                        R.string.appstrings_diagnostic_ping_result_failures,
-                                        failedCount
-                                    ),
-                                    style = terminalTextStyle,
-                                    color = terminalError
-                                )
-                            }
-                        }
-                    }
-                }
-                is DiagnosticPingState.Completed -> {
-                    state.result.samples.forEach { sample ->
-                        key(sample.attempt) {
-                            AnimatedVisibility(visible = true) {
-                                DiagnosticPingTerminalLine(sample)
-                            }
-                        }
-                    }
-                    AnimatedVisibility(visible = true) {
-                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text(
-                                text = stringResource(
-                                    R.string.appstrings_diagnostic_ping_result_summary,
-                                    state.result.successfulPasses,
-                                    state.result.requestedPasses
-                                ),
-                                style = terminalTextStyle,
-                                color = terminalText,
-                                fontWeight = FontWeight.Bold
-                            )
-                            state.result.averageMs?.let { average ->
-                                Text(
-                                    text = stringResource(
-                                        R.string.appstrings_diagnostic_ping_result_stats,
-                                        average,
-                                        state.result.minimumMs ?: average,
-                                        state.result.maximumMs ?: average
-                                    ),
-                                    style = terminalTextStyle,
-                                    color = terminalAccent
-                                )
-                            }
-                            if (state.result.failedPasses > 0) {
-                                Text(
-                                    text = stringResource(
-                                        R.string.appstrings_diagnostic_ping_result_failures,
-                                        state.result.failedPasses
-                                    ),
-                                    style = terminalTextStyle,
-                                    color = terminalError
-                                )
-                            }
-                        }
-                    }
-                }
-                DiagnosticPingState.Failed -> TerminalPrompt(
-                    text = stringResource(R.string.appstrings_diagnostic_ping_failed),
-                    color = terminalError
-                )
-            }
-        }
+    if (showLogViewerDialog) {
+        DiagnosticLogViewerDialog(
+            onDismiss = { showLogViewerDialog = false },
+            onLogCleared = { refresh() }
+        )
     }
 }
 
-@Composable
-private fun TerminalPrompt(
-    text: String,
-    color: Color = MaterialTheme.colorScheme.onSurfaceVariant
-) {
-    Text(
-        text = "> $text",
-        style = MaterialTheme.typography.bodySmall,
-        color = color
-    )
-}
 
-@Composable
-private fun DiagnosticPingTerminalLine(sample: ServerPingSample) {
-    val textStyle = MaterialTheme.typography.bodySmall
-    val (text, color) = if (sample.latencyMs != null) {
-        stringResource(
-            R.string.appstrings_diagnostic_ping_terminal_reply,
-            sample.attempt,
-            sample.latencyMs
-        ) to MaterialTheme.colorScheme.onSurface
-    } else {
-        stringResource(R.string.appstrings_diagnostic_ping_terminal_timeout, sample.attempt) to MaterialTheme.colorScheme.error
-    }
-    Text(text = text, style = textStyle, color = color)
-}
+
 
 @Composable
 private fun DiagnosticGlobalCard(
@@ -2150,6 +1816,151 @@ private fun shareDebugLog(context: Context) {
         context = context,
         kind = ShareHistoryStore.KIND_DIAGNOSTIC,
         destination = ShareHistoryStore.DEST_SHARE
+    )
+}
+
+private fun copyDebugLog(context: Context, logText: String) {
+    if (logText.isEmpty()) {
+        Toast.makeText(context, R.string.appstrings_diagnostic_log_empty, Toast.LENGTH_SHORT).show()
+        return
+    }
+    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    clipboard.setPrimaryClip(
+        ClipData.newPlainText(
+            context.getString(R.string.appstrings_diagnostic_log_dialog_title),
+            logText
+        )
+    )
+    ShareHistoryStore.record(
+        context = context,
+        kind = ShareHistoryStore.KIND_DIAGNOSTIC,
+        destination = ShareHistoryStore.DEST_CLIPBOARD,
+        contents = ShareHistoryStore.FIELD_REPORT
+    )
+    Toast.makeText(context, R.string.appstrings_diagnostic_log_copied, Toast.LENGTH_SHORT).show()
+}
+
+@Composable
+private fun DiagnosticLogViewerDialog(
+    onDismiss: () -> Unit,
+    onLogCleared: () -> Unit
+) {
+    val context = LocalContext.current
+    val sizing = LocalGeoTowerUiSizing.current
+    var logText by remember { mutableStateOf(AppFileLog.readText(context)) }
+    val lines = remember(logText) {
+        if (logText.isEmpty()) emptyList() else logText.lines().let {
+            if (it.lastOrNull()?.isEmpty() == true) it.dropLast(1) else it
+        }
+    }
+    val listState = rememberLazyListState()
+
+    // Positionner la vue sur les entrées les plus récentes (fin du journal)
+    LaunchedEffect(lines.size) {
+        if (lines.isNotEmpty()) {
+            listState.scrollToItem(lines.lastIndex)
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(stringResource(R.string.appstrings_diagnostic_log_dialog_title))
+        },
+        text = {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 420.dp),
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            ) {
+                if (lines.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(sizing.spacing(24.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = stringResource(R.string.appstrings_diagnostic_log_empty),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(sizing.spacing(8.dp)),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        items(lines.size) { index ->
+                            val line = lines[index]
+                            val lineColor = when {
+                                line.contains(" E/") || line.contains("Crash") -> MaterialTheme.colorScheme.error
+                                line.contains(" W/") -> Color(0xFFE65100)
+                                line.startsWith("---") -> MaterialTheme.colorScheme.primary
+                                else -> MaterialTheme.colorScheme.onSurface
+                            }
+                            Text(
+                                text = line,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp,
+                                lineHeight = 15.sp,
+                                color = lineColor
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = onDismiss) {
+                Text(stringResource(R.string.appstrings_close))
+            }
+        },
+        dismissButton = {
+            if (lines.isNotEmpty()) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(sizing.spacing(4.dp)),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(
+                        onClick = {
+                            AppFileLog.clear(context)
+                            logText = ""
+                            onLogCleared()
+                            Toast.makeText(context, R.string.appstrings_diagnostic_log_cleared, Toast.LENGTH_SHORT).show()
+                        }
+                    ) {
+                        Text(
+                            text = stringResource(R.string.appstrings_diagnostic_clear_log),
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                    IconButton(
+                        onClick = { copyDebugLog(context, logText) }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ContentCopy,
+                            contentDescription = stringResource(R.string.appstrings_copy),
+                            modifier = Modifier.size(sizing.component(18.dp))
+                        )
+                    }
+                    IconButton(
+                        onClick = { shareDebugLog(context) }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Share,
+                            contentDescription = stringResource(R.string.appstrings_diagnostic_share_log),
+                            modifier = Modifier.size(sizing.component(18.dp))
+                        )
+                    }
+                }
+            }
+        }
     )
 }
 

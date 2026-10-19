@@ -196,6 +196,7 @@ object ServerReachability {
             .cacheControl(CacheControl.FORCE_NETWORK)
             .header("Accept", "application/json")
             .header(ApiEndpoints.PIN_HOST_HEADER, server.host)
+            .header("X-GeoTower-Purpose", "probe")
             .build()
 
         return try {
@@ -216,6 +217,7 @@ object ServerReachability {
                 .cacheControl(CacheControl.FORCE_NETWORK)
                 .header("Accept", "application/json")
                 .header(ApiEndpoints.PIN_HOST_HEADER, server.host)
+                .header("X-GeoTower-Purpose", "ping")
                 .build()
             val startedAt = SystemClock.elapsedRealtime()
             val call = pingClient.newCall(request)

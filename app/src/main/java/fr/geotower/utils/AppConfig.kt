@@ -368,6 +368,21 @@ object AppConfig {
     const val PREF_HOME_HELP_POSITION = "home_help_position"
     const val DEFAULT_HOME_HELP_POSITION = "bottom_end"
     val homeHelpPosition = mutableStateOf(DEFAULT_HOME_HELP_POSITION)
+
+    val homeShowQuitButton = mutableStateOf(true)
+
+    // Volet latéral du mode simplifié : ordre des boutons et déplacement par appui long.
+    val simpleDrawerOrder = mutableStateOf(SimpleDrawerPrefs.normalizeOrder(SimpleDrawerPrefs.DEFAULT_DRAWER_ORDER.split(",")))
+    const val PREF_SIMPLE_DRAWER_LONG_PRESS_REORDER = "simple_drawer_long_press_reorder"
+    val simpleDrawerLongPressReorder = mutableStateOf(true)
+
+    val simpleDrawerShowEmitters = mutableStateOf(true)
+    val simpleDrawerShowMap = mutableStateOf(true)
+    val simpleDrawerShowTrips = mutableStateOf(true)
+    val simpleDrawerShowStats = mutableStateOf(true)
+    val simpleDrawerShowHelp = mutableStateOf(true)
+    val simpleDrawerShowQuit = mutableStateOf(true)
+
     var statsDisplayMode = mutableStateOf(StatsDisplayMode.Both)
 
     // --- Capteurs matériels ---
@@ -712,6 +727,46 @@ object AppConfig {
         prefs.edit().putBoolean(PREF_HOME_LONG_PRESS_REORDER, enabled).apply()
     }
 
+    fun setSimpleDrawerOrder(prefs: SharedPreferences, order: List<String>) {
+        val normalized = SimpleDrawerPrefs.normalizeOrder(order)
+        simpleDrawerOrder.value = normalized
+        prefs.edit().putString(SimpleDrawerPrefs.DRAWER_ORDER, normalized.joinToString(",")).apply()
+    }
+
+    fun setSimpleDrawerLongPressReorder(prefs: SharedPreferences, enabled: Boolean) {
+        simpleDrawerLongPressReorder.value = enabled
+        prefs.edit().putBoolean(PREF_SIMPLE_DRAWER_LONG_PRESS_REORDER, enabled).apply()
+    }
+
+    fun simpleDrawerElementEnabled(id: String): Boolean = when (id) {
+        "emitters" -> simpleDrawerShowEmitters.value
+        "map" -> simpleDrawerShowMap.value
+        "trips" -> simpleDrawerShowTrips.value
+        "stats" -> simpleDrawerShowStats.value
+        "help" -> simpleDrawerShowHelp.value
+        "quit" -> simpleDrawerShowQuit.value
+        else -> true
+    }
+
+    fun setSimpleDrawerElementEnabled(prefs: SharedPreferences, id: String, enabled: Boolean) {
+        when (id) {
+            "emitters" -> simpleDrawerShowEmitters.value = enabled
+            "map" -> simpleDrawerShowMap.value = enabled
+            "trips" -> simpleDrawerShowTrips.value = enabled
+            "stats" -> simpleDrawerShowStats.value = enabled
+            "help" -> simpleDrawerShowHelp.value = enabled
+            "quit" -> simpleDrawerShowQuit.value = enabled
+        }
+        val editor = prefs.edit()
+        SimpleDrawerPrefs.setElementEnabled(editor, id, enabled)
+        editor.apply()
+    }
+
+    fun setHomeShowQuitButton(prefs: SharedPreferences, enabled: Boolean) {
+        homeShowQuitButton.value = enabled
+        HomePrefs.showQuitButton.write(prefs.edit(), enabled).apply()
+    }
+
     /** Nouveau coin du bouton « Aides » (réglages ou glissé sur la page). */
     fun setHomeHelpPosition(prefs: SharedPreferences, position: String) {
         homeHelpPosition.value = position
@@ -781,6 +836,18 @@ object AppConfig {
         homeLongPressReorder.value = prefs.getBoolean(PREF_HOME_LONG_PRESS_REORDER, true)
         homeHelpPosition.value = prefs.getString(PREF_HOME_HELP_POSITION, DEFAULT_HOME_HELP_POSITION)
             ?: DEFAULT_HOME_HELP_POSITION
+
+        homeShowQuitButton.value = HomePrefs.showQuitButton.read(prefs)
+
+        // Volet latéral du mode simplifié : ordre des boutons et déplacement par appui long.
+        simpleDrawerOrder.value = SimpleDrawerPrefs.normalizedDrawerOrder(prefs)
+        simpleDrawerLongPressReorder.value = prefs.getBoolean(PREF_SIMPLE_DRAWER_LONG_PRESS_REORDER, true)
+        simpleDrawerShowEmitters.value = SimpleDrawerPrefs.showEmitters.read(prefs)
+        simpleDrawerShowMap.value = SimpleDrawerPrefs.showMap.read(prefs)
+        simpleDrawerShowTrips.value = SimpleDrawerPrefs.showTrips.read(prefs)
+        simpleDrawerShowStats.value = SimpleDrawerPrefs.showStats.read(prefs)
+        simpleDrawerShowHelp.value = SimpleDrawerPrefs.showHelp.read(prefs)
+        simpleDrawerShowQuit.value = SimpleDrawerPrefs.showQuit.read(prefs)
 
         // Barre latérale de défilement, activable page par page.
         PageScrollPrefs.load(prefs)

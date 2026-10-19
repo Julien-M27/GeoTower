@@ -89,6 +89,7 @@ import fr.geotower.ui.screens.about.AboutScreen
 import fr.geotower.ui.screens.about.PhotoUploadHistoryScreen
 import fr.geotower.ui.screens.compass.CompassScreen
 import fr.geotower.ui.screens.diagnostic.DiagnosticScreen
+import fr.geotower.ui.screens.diagnostic.NetworkLogScreen
 import fr.geotower.ui.screens.emitters.SignalQuestUploadScreen
 import android.net.Uri
 
@@ -1032,6 +1033,15 @@ class MainActivity : ComponentActivity() {
                                     } else {
                                         DisabledFeatureRoute(navController, txtUnavailable)
                                     }
+                                }
+                            }
+
+                            composable(
+                                route = "network_log",
+                                deepLinks = listOf(navDeepLink { uriPattern = "geotower://network_log" })
+                            ) {
+                                Box(modifier = Modifier.padding(innerPadding)) {
+                                    NetworkLogScreen(navController)
                                 }
                             }
 

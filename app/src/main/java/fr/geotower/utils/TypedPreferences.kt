@@ -525,6 +525,11 @@ object HomePrefs {
     val showTripsPage = BooleanPreference("show_trips_page", true)
 
     /**
+     * Bouton « Quitter sans notification live » affiché en haut de l'accueil.
+     */
+    val showQuitButton = BooleanPreference("show_home_quit", true)
+
+    /**
      * Lien « À propos » de l'accueil. C'est un élément de [PAGES_ORDER] comme les autres : il garde
      * son apparence de lien discret, mais se déplace et se masque comme un bouton du menu.
      */
@@ -575,6 +580,97 @@ object HomePrefs {
      * accroché au voisin visible qui le précédait, pour retrouver sa place le jour où il réapparaît
      * — l'envoyer en fin de liste serait une surprise au moment de le réactiver.
      */
+    fun reorderVisible(fullOrder: List<String>, visibleOrder: List<String>): List<String> {
+        val visible = visibleOrder.toSet()
+        val leading = mutableListOf<String>()
+        val trailing = mutableMapOf<String, MutableList<String>>()
+        var anchor: String? = null
+        fullOrder.filter { it.isNotBlank() }.distinct().forEach { id ->
+            if (id in visible) {
+                anchor = id
+            } else {
+                val current = anchor
+                if (current == null) leading.add(id) else trailing.getOrPut(current) { mutableListOf() }.add(id)
+            }
+        }
+
+        val merged = mutableListOf<String>()
+        merged.addAll(leading)
+        visibleOrder.forEach { id ->
+            merged.add(id)
+            trailing[id]?.let { merged.addAll(it) }
+        }
+        return normalizeOrder(merged)
+    }
+}
+
+/**
+ * Boutons du volet latéral en mode simplifié, personnalisables et réorganisables.
+ */
+object SimpleDrawerPrefs {
+    const val DRAWER_ORDER = "simple_drawer_order"
+    const val DEFAULT_DRAWER_ORDER = "emitters,map,trips,stats,settings,help,simple_mode_disable,quit"
+    const val LONG_PRESS_REORDER = "simple_drawer_long_press_reorder"
+    const val DEFAULT_LONG_PRESS_REORDER = true
+
+    val showEmitters = BooleanPreference("simple_drawer_show_emitters", true)
+    val showMap = BooleanPreference("simple_drawer_show_map", true)
+    val showTrips = BooleanPreference("simple_drawer_show_trips", true)
+    val showStats = BooleanPreference("simple_drawer_show_stats", true)
+    val showHelp = BooleanPreference("simple_drawer_show_help", true)
+    val showQuit = BooleanPreference("simple_drawer_show_quit", true)
+
+    val indispensableElements = setOf("settings", "simple_mode_disable")
+
+    val allDrawerElements = listOf(
+        "emitters",
+        "map",
+        "trips",
+        "stats",
+        "settings",
+        "help",
+        "simple_mode_disable",
+        "quit"
+    )
+
+    fun isElementEnabled(prefs: SharedPreferences, id: String): Boolean = when (id) {
+        "emitters" -> showEmitters.read(prefs)
+        "map" -> showMap.read(prefs)
+        "trips" -> showTrips.read(prefs)
+        "stats" -> showStats.read(prefs)
+        "help" -> showHelp.read(prefs)
+        "quit" -> showQuit.read(prefs)
+        else -> true
+    }
+
+    fun setElementEnabled(editor: SharedPreferences.Editor, id: String, enabled: Boolean) {
+        when (id) {
+            "emitters" -> showEmitters.write(editor, enabled)
+            "map" -> showMap.write(editor, enabled)
+            "trips" -> showTrips.write(editor, enabled)
+            "stats" -> showStats.write(editor, enabled)
+            "help" -> showHelp.write(editor, enabled)
+            "quit" -> showQuit.write(editor, enabled)
+        }
+    }
+
+    fun defaultDrawerOrder(): List<String> = allDrawerElements
+
+    fun drawerOrder(prefs: SharedPreferences): List<String> {
+        return (prefs.getString(DRAWER_ORDER, DEFAULT_DRAWER_ORDER) ?: DEFAULT_DRAWER_ORDER)
+            .split(",")
+            .filter { it.isNotBlank() }
+    }
+
+    fun normalizeOrder(order: List<String>): List<String> {
+        val mapped = order.map { if (it == "compass") "trips" else it }
+        val normalized = mapped.filter { it.isNotBlank() && it in allDrawerElements }.distinct().toMutableList()
+        allDrawerElements.forEach { if (!normalized.contains(it)) normalized.add(it) }
+        return normalized
+    }
+
+    fun normalizedDrawerOrder(prefs: SharedPreferences): List<String> = normalizeOrder(drawerOrder(prefs))
+
     fun reorderVisible(fullOrder: List<String>, visibleOrder: List<String>): List<String> {
         val visible = visibleOrder.toSet()
         val leading = mutableListOf<String>()

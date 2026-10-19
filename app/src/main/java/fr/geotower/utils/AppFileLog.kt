@@ -81,6 +81,13 @@ object AppFileLog {
         }
     }
 
+    fun readText(context: Context): String = synchronized(lock) {
+        runCatching {
+            val target = file(context)
+            if (target.exists() && target.length() > 0L) target.readText(Charsets.UTF_8) else ""
+        }.getOrDefault("")
+    }
+
     fun shareUri(context: Context): Uri? = runCatching {
         val target = file(context)
         if (!target.exists() || target.length() <= 0L) return@runCatching null

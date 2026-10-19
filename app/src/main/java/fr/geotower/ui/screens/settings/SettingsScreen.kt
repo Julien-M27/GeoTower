@@ -802,9 +802,11 @@ fun SettingsScreen(
     // La sauvegarde de la page de démarrage
     var startupPage by remember { mutableStateOf(HomePrefs.startupPage(prefs)) }
     var showHomeSettingsSheet by remember { mutableStateOf(false) }
+    var showSimpleDrawerSettingsSheet by remember { mutableStateOf(false) }
     // Ordre partagé avec la page d'accueil, qui se réordonne aussi par appui long : chacun doit
     // voir tout de suite ce que l'autre a déplacé, d'où l'état commun plutôt qu'une copie locale.
     val pagesOrder by AppConfig.pagesOrder
+    val simpleDrawerOrder by AppConfig.simpleDrawerOrder
     var showNearbySettingsSheet by remember { mutableStateOf(false) }
     var pageSpeedtestsFilterMajorEnb by remember { mutableStateOf(prefs.getBoolean(SiteSpeedtestsPagePreferences.FILTER_MAJOR_ENB, SiteSpeedtestsPagePreferences.DEFAULT_FILTER_MAJOR_ENB)) }
     var pageSpeedtestsIncludeMissingEnb by remember { mutableStateOf(prefs.getBoolean(SiteSpeedtestsPagePreferences.INCLUDE_MISSING_ENB, SiteSpeedtestsPagePreferences.DEFAULT_INCLUDE_MISSING_ENB)) }
@@ -973,6 +975,7 @@ fun SettingsScreen(
     val pagesSectionActions = PagesSectionActions(
         onStartupPage = { safeClick { showStartupPageSheet = true } },
         onHome = { safeClick { showHomeSettingsSheet = true } },
+        onSimpleDrawer = { safeClick { showSimpleDrawerSettingsSheet = true } },
         onNearby = { safeClick { showNearbySettingsSheet = true } },
         onMap = { safeClick { showMapSettingsSheet = true } },
         onCompass = { safeClick { showCompassSettingsSheet = true } },
@@ -1091,6 +1094,8 @@ fun SettingsScreen(
                 if (!AppConfig.simpleModeActive()) {
                     entry(context.getString(R.string.appstrings_startup_page_settings), "demarrage startup page ouverture lancement", SECTION_PAGES) { showStartupPageSheet = true }
                     entry(context.getString(R.string.appstrings_page_home_settings), "accueil home menu ordre pages bouton aide reorganiser appui long", SECTION_PAGES) { showHomeSettingsSheet = true }
+                } else {
+                    entry(context.getString(R.string.settings_page_simple_drawer_title), "volet lateral tiroir drawer mode simplifie ordre boutons reorganiser appui long", SECTION_PAGES) { showSimpleDrawerSettingsSheet = true }
                 }
                 if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.NEARBY)) {
                     entry(context.getString(R.string.appstrings_page_nearby_settings), "proximite nearby recherche suggestions rayon distance", SECTION_PAGES) { showNearbySettingsSheet = true }
@@ -1719,6 +1724,7 @@ fun SettingsScreen(
                                     targetMapFilename = offlineMapsTargetFilename,
                                     onTargetMapPositioned = { top, height -> offlineMapsTargetBounds = SettingsSectionBounds(top = top, height = height) },
                                     onOpenDiagnostic = { navController.navigate("diagnostic") },
+                                    onOpenNetworkLog = { navController.navigate("network_log") },
                                     onPhotosFavorites = { navController.navigate("photos_favorites") },
                                     onPhotoReports = { navController.navigate("photo_reports") },
                                     onHistories = { navController.navigate("histories") },
@@ -1848,6 +1854,7 @@ fun SettingsScreen(
                                         useOneUi = useOneUi,
                                         safeClick = safeClick,
                                         onOpenDiagnostic = { navController.navigate("diagnostic") },
+                                        onOpenNetworkLog = { navController.navigate("network_log") },
                                         initialOpenDisclosure = initialSection == "background_disclosure",
                                         openDisclosure = triggerBgDisclosure,
                                         onDisclosureDismissed = {
@@ -2141,6 +2148,18 @@ fun SettingsScreen(
                 },
                 onDismiss = { showHomeSettingsSheet = false },
                 onBack = { safeClick { showHomeSettingsSheet = false } },
+                sheetState = sheetState,
+                useOneUi = useOneUi,
+                bubbleColor = bubbleBaseColor
+            )
+        }
+        // --- SOUS-MENU : VOLET LATÉRAL (MODE SIMPLIFIÉ) ---
+        if (showSimpleDrawerSettingsSheet) {
+            SimpleDrawerSettingsSheet(
+                drawerOrder = simpleDrawerOrder,
+                onOrderChange = { newOrder -> AppConfig.setSimpleDrawerOrder(prefs, newOrder) },
+                onDismiss = { showSimpleDrawerSettingsSheet = false },
+                onBack = { safeClick { showSimpleDrawerSettingsSheet = false } },
                 sheetState = sheetState,
                 useOneUi = useOneUi,
                 bubbleColor = bubbleBaseColor
@@ -2922,6 +2941,7 @@ fun AllSettingsContent(
     targetMapFilename: String? = null,
     onTargetMapPositioned: (Float, Int) -> Unit = { _, _ -> },
     onOpenDiagnostic: () -> Unit = {},
+    onOpenNetworkLog: () -> Unit = {},
     onPhotosFavorites: () -> Unit = {},
     onPhotoReports: () -> Unit = {},
     onHistories: () -> Unit = {},
@@ -2973,6 +2993,7 @@ fun AllSettingsContent(
     Column(modifier = systemSectionModifier.fillMaxWidth()) {
         SectionSysteme(
             ctx, shape, border, bubbleColor, useOneUi, safeClick, onOpenDiagnostic,
+            onOpenNetworkLog = onOpenNetworkLog,
             initialOpenDisclosure = initialOpenDisclosure,
             openDisclosure = openDisclosure,
             onDisclosureDismissed = onDisclosureDismissed,
@@ -3716,6 +3737,7 @@ fun SectionSysteme(
     useOneUi: Boolean,
     safeClick: SafeClick,
     onOpenDiagnostic: () -> Unit = {},
+    onOpenNetworkLog: () -> Unit = {},
     initialOpenDisclosure: Boolean = false,
     openDisclosure: Boolean = false,
     onDisclosureDismissed: () -> Unit = {},
@@ -3929,6 +3951,57 @@ fun SectionSysteme(
 
     Spacer(Modifier.height(sizing.spacing(12.dp)))
 
+    var networkLogRetentionDays by remember {
+        mutableIntStateOf(fr.geotower.data.netlog.NetworkLogStore.getRetentionDays(ctx))
+    }
+
+    fr.geotower.ui.components.CustomSliderCard(
+        title = stringResource(R.string.network_log_retention_title),
+        currentValue = networkLogRetentionDays,
+        steps = fr.geotower.data.netlog.NetworkLogStore.RETENTION_OPTIONS_DAYS,
+        labels = listOf(
+            stringResource(R.string.network_log_duration_1_day),
+            stringResource(R.string.network_log_duration_7_days),
+            stringResource(R.string.network_log_duration_15_days),
+            stringResource(R.string.network_log_duration_30_days),
+            stringResource(R.string.network_log_duration_3_months),
+            stringResource(R.string.network_log_duration_6_months),
+            stringResource(R.string.network_log_duration_12_months),
+            stringResource(R.string.network_log_duration_always)
+        ),
+        onValueChange = { newDays ->
+            networkLogRetentionDays = newDays
+            fr.geotower.data.netlog.NetworkLogStore.setRetentionDays(ctx, newDays)
+        },
+        shape = shape,
+        border = border,
+        bubbleColor = bubbleColor,
+        useOneUi = useOneUi,
+        footerText = stringResource(R.string.network_log_retention_footer)
+    )
+
+    Spacer(Modifier.height(sizing.spacing(12.dp)))
+
+    Surface(
+        onClick = { safeClick("system_network_log") { onOpenNetworkLog() } },
+        shape = shape,
+        border = border,
+        color = cardBg,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(modifier = Modifier.padding(sizing.spacing(16.dp)), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.Language, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(sizing.component(24.dp)))
+            Spacer(Modifier.width(sizing.spacing(16.dp)))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(stringResource(R.string.network_log_title), style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.network_log_desc), style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+
+    Spacer(Modifier.height(sizing.spacing(12.dp)))
+
     Surface(
         onClick = { safeClick("system_diagnostic") { onOpenDiagnostic() } },
         shape = shape,
@@ -3939,10 +4012,11 @@ fun SectionSysteme(
         Row(modifier = Modifier.padding(sizing.spacing(16.dp)), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Outlined.Info, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(sizing.component(24.dp)))
             Spacer(Modifier.width(sizing.spacing(16.dp)))
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(stringResource(R.string.appstrings_diagnostic_title), style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.Bold)
                 Text(stringResource(R.string.appstrings_diagnostic_desc), style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -4255,10 +4329,6 @@ fun SectionDatabase(
                 onSelect = { selectedMode ->
                     showApiServerDialog = false
                     applyApiServerMode(context, scope, selectedMode)
-                },
-                onOpenPing = {
-                    showApiServerDialog = false
-                    showApiServerPingDialog = true
                 }
             )
         }
@@ -4266,14 +4336,7 @@ fun SectionDatabase(
         if (showApiServerPingDialog) {
             ApiServerPingDialog(
                 initialServer = apiServerActive,
-                onDismiss = { showApiServerPingDialog = false },
-                onApplyServer = { server ->
-                    val targetMode = when (server) {
-                        ApiServer.PRIMARY -> ApiServerMode.FORCE_PRIMARY
-                        ApiServer.MIRROR -> ApiServerMode.FORCE_MIRROR
-                    }
-                    applyApiServerMode(context, scope, targetMode)
-                }
+                onDismiss = { showApiServerPingDialog = false }
             )
         }
 

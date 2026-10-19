@@ -166,6 +166,7 @@ object RetrofitClient {
             .addInterceptor(localModeBlockInterceptor)
             .addInterceptor(offlineFallbackInterceptor)
             .addInterceptor(serverFailoverInterceptor)
+            .addInterceptor(fr.geotower.data.netlog.NetworkLogInterceptor { appContext })
             .connectTimeout(5, TimeUnit.SECONDS)
             .readTimeout(15, TimeUnit.SECONDS)
             .writeTimeout(15, TimeUnit.SECONDS)

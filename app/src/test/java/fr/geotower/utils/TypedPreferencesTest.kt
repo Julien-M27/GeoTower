@@ -166,6 +166,81 @@ class TypedPreferencesTest {
     }
 
     @Test
+    fun simpleDrawerOrderKeepsDefaultsWhenAbsent() {
+        val prefs = FakeSharedPreferences()
+
+        assertEquals(
+            listOf("emitters", "map", "trips", "stats", "settings", "help", "simple_mode_disable", "quit"),
+            SimpleDrawerPrefs.normalizedDrawerOrder(prefs)
+        )
+    }
+
+    @Test
+    fun simpleDrawerOrderAppendsMissingElements() {
+        val prefs = FakeSharedPreferences(SimpleDrawerPrefs.DRAWER_ORDER to "settings,map,quit")
+
+        assertEquals(
+            listOf("settings", "map", "quit", "emitters", "trips", "stats", "help", "simple_mode_disable"),
+            SimpleDrawerPrefs.normalizedDrawerOrder(prefs)
+        )
+    }
+
+    @Test
+    fun simpleDrawerOrderMigratesLegacyCompassToTrips() {
+        val prefs = FakeSharedPreferences(SimpleDrawerPrefs.DRAWER_ORDER to "map,compass,settings")
+
+        assertEquals(
+            listOf("map", "trips", "settings", "emitters", "stats", "help", "simple_mode_disable", "quit"),
+            SimpleDrawerPrefs.normalizedDrawerOrder(prefs)
+        )
+    }
+
+    @Test
+    fun simpleDrawerOrderKeepsHiddenElementsNextToTheirVisibleNeighbour() {
+        val merged = SimpleDrawerPrefs.reorderVisible(
+            fullOrder = listOf("emitters", "map", "trips", "stats", "settings", "help", "simple_mode_disable", "quit"),
+            visibleOrder = listOf("quit", "emitters", "map", "stats", "settings", "help", "simple_mode_disable")
+        )
+
+        assertEquals(
+            listOf("quit", "emitters", "map", "trips", "stats", "settings", "help", "simple_mode_disable"),
+            merged
+        )
+    }
+
+    @Test
+    fun simpleDrawerElementVisibilityDefaultsToTrueAndCanBeToggled() {
+        val prefs = FakeSharedPreferences()
+
+        assertTrue(SimpleDrawerPrefs.isElementEnabled(prefs, "emitters"))
+        assertTrue(SimpleDrawerPrefs.isElementEnabled(prefs, "map"))
+        assertTrue(SimpleDrawerPrefs.isElementEnabled(prefs, "trips"))
+        assertTrue(SimpleDrawerPrefs.isElementEnabled(prefs, "stats"))
+        assertTrue(SimpleDrawerPrefs.isElementEnabled(prefs, "help"))
+        assertTrue(SimpleDrawerPrefs.isElementEnabled(prefs, "quit"))
+        assertTrue(SimpleDrawerPrefs.isElementEnabled(prefs, "settings"))
+        assertTrue(SimpleDrawerPrefs.isElementEnabled(prefs, "simple_mode_disable"))
+
+        val editor = prefs.edit()
+        SimpleDrawerPrefs.setElementEnabled(editor, "quit", false)
+        SimpleDrawerPrefs.setElementEnabled(editor, "map", false)
+        editor.apply()
+
+        assertFalse(SimpleDrawerPrefs.isElementEnabled(prefs, "quit"))
+        assertFalse(SimpleDrawerPrefs.isElementEnabled(prefs, "map"))
+        assertTrue(SimpleDrawerPrefs.isElementEnabled(prefs, "emitters"))
+    }
+
+    @Test
+    fun homePrefsShowQuitButtonDefaultsToTrue() {
+        val prefs = FakeSharedPreferences()
+        assertTrue(HomePrefs.showQuitButton.read(prefs))
+
+        HomePrefs.showQuitButton.write(prefs.edit(), false).apply()
+        assertFalse(HomePrefs.showQuitButton.read(prefs))
+    }
+
+    @Test
     fun homeAndWidgetPrefsKeepDefaultsWhenLegacyValuesAreAbsent() {
         val prefs = FakeSharedPreferences()
 

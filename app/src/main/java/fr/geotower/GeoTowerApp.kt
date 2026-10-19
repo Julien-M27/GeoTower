@@ -31,6 +31,7 @@ class GeoTowerApp : Application() {
         fr.geotower.utils.AppFileLog.init(this)
         fr.geotower.utils.AppFileLog.installCrashHandler()
         RetrofitClient.init(applicationContext)
+        fr.geotower.data.netlog.NetworkLogStore.init(this)
         // Choix principal / miroir : doit précéder la première requête, sinon un appareil réglé sur
         // le miroir repartirait sur le serveur principal le temps du démarrage.
         fr.geotower.data.api.ApiEndpoints.init(applicationContext)
