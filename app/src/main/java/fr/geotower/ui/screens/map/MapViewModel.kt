@@ -1,4 +1,4 @@
-﻿package fr.geotower.ui.screens.map
+package fr.geotower.ui.screens.map
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -159,6 +159,7 @@ class MapViewModel(
         isCityLocked = true // ✅ ON VERROUILLE LE CHARGEMENT AUTOMATIQUE
 
         searchJob = viewModelScope.launch {
+            val thisJob = coroutineContext[Job]
             _isLoading.value = true
             try {
                 val frequencyFilter = FrequencyFilterSelection.fromMapConfig()
@@ -180,7 +181,9 @@ class MapViewModel(
             } catch (e: Exception) {
                 AppLogger.w(TAG, "City map request failed", e)
             } finally {
-                _isLoading.value = false
+                if (searchJob === thisJob) {
+                    _isLoading.value = false
+                }
             }
         }
     }
@@ -265,9 +268,10 @@ class MapViewModel(
         if (isCityLocked) return // ✅ MAGIQUE : Si on regarde une ville, on ne recalcule RIEN quand on bouge la carte !
 
         searchJob?.cancel()
+        _isLoading.value = true
 
         searchJob = viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            _isLoading.value = true
+            val thisJob = coroutineContext[Job]
             try {
                 // ✅ 2. ON EMPÊCHE LE CLUSTERING GLOBAL SI UNE VILLE EST RECHERCHÉE
                 val showSitesInService = AppConfig.showSitesInService.value
@@ -429,7 +433,9 @@ class MapViewModel(
                 _antennas.value = emptyList()
                 _radioMarkers.value = emptyList()
             } finally {
-                _isLoading.value = false
+                if (searchJob === thisJob) {
+                    _isLoading.value = false
+                }
             }
         }
     }
@@ -869,6 +875,7 @@ class MapViewModel(
 
     fun resetCityLock() {
         searchJob?.cancel()
+        _isLoading.value = false
         clearSignalQuestCoveragePoints()
         isCityLocked = false // ✅ ON DÉVERROUILLE
         cityPolygons = null

@@ -3419,6 +3419,7 @@
     <string name="appstrings_release_v2075_summary_diagnostics_and_clustering">Enriched system and memory diagnostics, ping test controls and antenna clustering reset marker</string>
     <string name="appstrings_release_v2076_summary_ping_dialog_ergonomics">Improved layout and ergonomics for the API server ping latency dialog</string>
     <string name="appstrings_release_v2077_summary_network_log_and_drawer_order">HTTP network request log in diagnostics and button reordering for the simple mode side drawer</string>
+    <string name="appstrings_release_v2078_summary_map_loading_indicator">Discrete visual loading indicator for sites and statistics at the bottom of the map</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Network requests log</string>

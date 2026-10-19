@@ -1,4 +1,4 @@
-﻿package fr.geotower.ui.screens.map
+package fr.geotower.ui.screens.map
 
 import android.Manifest
 import android.content.Context
@@ -106,6 +106,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -142,6 +143,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
@@ -7688,6 +7690,50 @@ fun MapScreen(
                         )
                     }
                 }
+            }
+        }
+
+        // Barre de chargement animée collée tout en bas de l'écran, signalant la recherche des sites
+        AnimatedVisibility(
+            visible = isLoading || isAdminAreaStatsLoading,
+            enter = fadeIn(animationSpec = tween(180)) + expandVertically(
+                animationSpec = tween(180),
+                expandFrom = Alignment.Bottom
+            ),
+            exit = fadeOut(animationSpec = tween(280)) + shrinkVertically(
+                animationSpec = tween(280),
+                shrinkTowards = Alignment.Bottom
+            ),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .zIndex(10f)
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Léger dégradé d'ambiance vers le haut pour une visibilité optimale sur tous les fonds de carte
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(sizing.component(12.dp))
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Transparent,
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
+                                )
+                            )
+                        )
+                )
+                LinearProgressIndicator(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(sizing.component(3.5.dp)),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                )
             }
         }
 

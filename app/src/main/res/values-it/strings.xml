@@ -3396,6 +3396,7 @@
     <string name="appstrings_release_v2075_summary_diagnostics_and_clustering">Diagnostica di sistema e memoria avanzata, controllo del test di latenza e regolazione raggruppamento</string>
     <string name="appstrings_release_v2076_summary_ping_dialog_ergonomics">Layout ed ergonomia migliorati per la finestra di dialogo del test di latenza dei server API</string>
     <string name="appstrings_release_v2077_summary_network_log_and_drawer_order">Registro delle richieste di rete HTTP nella diagnostica e riordino dei pulsanti del cassetto in modalità semplificata</string>
+    <string name="appstrings_release_v2078_summary_map_loading_indicator">Discreto indicatore visivo di caricamento dei siti e delle statistiche in fondo alla mappa</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registro richieste di rete</string>

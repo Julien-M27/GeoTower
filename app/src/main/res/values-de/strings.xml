@@ -3396,6 +3396,7 @@
     <string name="appstrings_release_v2075_summary_diagnostics_and_clustering">Erweiterte System- und Speicherdiagnose, Ping-Test-Steuerung und Markierung für Antennengruppierung</string>
     <string name="appstrings_release_v2076_summary_ping_dialog_ergonomics">Verbessertes Layout und Ergonomie für den API-Server-Ping-Test-Dialog</string>
     <string name="appstrings_release_v2077_summary_network_log_and_drawer_order">HTTP-Netzwerkanfragen-Protokoll in der Diagnose und Neuanordnung der Schubladen-Schaltflächen im vereinfachten Modus</string>
+    <string name="appstrings_release_v2078_summary_map_loading_indicator">Diskrete visuelle Ladeanzeige für Standorte und Statistiken am unteren Kartenrand</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Netzwerkanfragen-Protokoll</string>
