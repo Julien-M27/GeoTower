@@ -390,12 +390,18 @@
     <string name="database_download_success_title">Download finished</string>
     <string name="database_download_success_desc">The database was successfully downloaded!</string>
     <string name="database_download_success_desc_named">Downloaded successfully: %1$s.</string>
+    <string name="database_build_success_title">Build finished</string>
+    <string name="database_build_success_desc">The database was successfully built!</string>
+    <string name="database_build_success_desc_named">Built successfully: %1$s.</string>
     <string name="notification_database_channel_name">Databases</string>
     <string name="notification_database_download_title">Database update: %1$s</string>
     <string name="notification_database_first_download_title">Downloading database: %1$s</string>
     <string name="notification_database_download_progress">Downloading... %1$d%%</string>
     <string name="notification_database_downloaded_title">Download complete: %1$s</string>
     <string name="notification_database_downloaded_content">Available offline: %1$s. Tap to open.</string>
+    <string name="notification_database_built_title">Build complete: %1$s</string>
+    <string name="notification_database_built_content">Available offline: %1$s. Tap to open.</string>
+    <string name="notification_database_build_failed_title">Build failed: %1$s</string>
     <string name="notification_database_download_failed_title">Download failed: %1$s</string>
     <string name="notification_database_download_failed_content">Check your connection and try again.</string>
     <string name="notification_map_channel_name">Maps download</string>
@@ -900,6 +906,8 @@
     <string name="appstrings_frequency_reference_fdd">FDD · separate uplink/downlink</string>
     <string name="appstrings_frequency_reference_tdd">TDD · shared band</string>
     <string name="appstrings_frequency_reference_sdl">SDL · downlink only</string>
+    <string name="appstrings_frequency_reference_search_placeholder">Search band or frequency (e.g. 700, B28, n78)</string>
+    <string name="appstrings_frequency_reference_search_empty">No frequency bands match your search.</string>
     <string name="appstrings_from_my_position">from you</string>
     <string name="appstrings_full_screen_photo_desc">Full screen photo</string>
     <string name="appstrings_gallery">Gallery</string>
@@ -2719,8 +2727,8 @@
     <string name="appstrings_local_build_packs_title">What to generate?</string>
     <string name="appstrings_local_build_pack_mobile">Mobile</string>
     <string name="appstrings_local_build_pack_mobile_desc">2G · 3G · 4G · 5G — operators</string>
-    <string name="appstrings_local_build_pack_radio">Radio &amp; TV</string>
-    <string name="appstrings_local_build_pack_radio_desc">FM, DAB+ broadcast, television</string>
+    <string name="appstrings_local_build_pack_radio">Radio, TV &amp; non-mobile technical</string>
+    <string name="appstrings_local_build_pack_radio_desc">FM, DAB+, television, microwave links, private networks…</string>
     <string name="appstrings_local_build_pack_nonmobile">Non-mobile technical</string>
     <string name="appstrings_local_build_pack_nonmobile_desc">Microwave links, private networks, rail…</string>
     <string name="appstrings_local_build_packs_hint">The ANFR file (required) is shared. Unchecking \"Mobile\" also skips the ~500 MB observatory download.</string>
@@ -3420,6 +3428,7 @@
     <string name="appstrings_release_v2076_summary_ping_dialog_ergonomics">Improved layout and ergonomics for the API server ping latency dialog</string>
     <string name="appstrings_release_v2077_summary_network_log_and_drawer_order">HTTP network request log in diagnostics and button reordering for the simple mode side drawer</string>
     <string name="appstrings_release_v2078_summary_map_loading_indicator">Discrete visual loading indicator for sites and statistics at the bottom of the map</string>
+    <string name="appstrings_release_v2079_summary_frequency_search_and_voice_assistant">Search in frequency bands reference, Assistant voice command for antennas and local build notifications</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Network requests log</string>

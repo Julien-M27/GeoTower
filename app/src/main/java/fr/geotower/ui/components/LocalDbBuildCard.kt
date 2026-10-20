@@ -146,14 +146,13 @@ fun LocalDbBuildCard(
 
     // Packs a generer : Mobile coche par defaut (cas le plus courant + le plus utile).
     var packMobile by remember { mutableStateOf(true) }
-    var packRadioBroadcast by remember { mutableStateOf(false) }
-    var packNonMobileTech by remember { mutableStateOf(false) }
+    var packRadio by remember { mutableStateOf(false) }
 
     // L'eligibilite depend des packs COCHES : le stockage necessaire va du simple au double entre
     // « mobile seul » et « tout », alors que la memoire, elle, ne bouge presque pas. Un appareil
     // trop juste pour tout generer peut donc tres bien generer le pack mobile.
-    val eligibility = remember(packMobile, packRadioBroadcast, packNonMobileTech) {
-        LocalBuildCapability.evaluate(context, packMobile, packRadioBroadcast || packNonMobileTech)
+    val eligibility = remember(packMobile, packRadio) {
+        LocalBuildCapability.evaluate(context, packMobile, packRadio)
     }
     // « Tenter quand meme » : un appareil sous les budgets mesures n'est pas forcement incapable —
     // ils portent une marge, et un echec ne coute que du temps et des donnees (la base installee
@@ -529,17 +528,11 @@ fun LocalDbBuildCard(
                         subtitle = stringResource(R.string.appstrings_local_build_pack_mobile_desc),
                     ) { packMobile = !packMobile }
                     PackOption(
-                        checked = packRadioBroadcast,
+                        checked = packRadio,
                         icon = Icons.Default.Radio,
                         label = stringResource(R.string.appstrings_local_build_pack_radio),
                         subtitle = stringResource(R.string.appstrings_local_build_pack_radio_desc),
-                    ) { packRadioBroadcast = !packRadioBroadcast }
-                    PackOption(
-                        checked = packNonMobileTech,
-                        icon = Icons.Default.SettingsInputAntenna,
-                        label = stringResource(R.string.appstrings_local_build_pack_nonmobile),
-                        subtitle = stringResource(R.string.appstrings_local_build_pack_nonmobile_desc),
-                    ) { packNonMobileTech = !packNonMobileTech }
+                    ) { packRadio = !packRadio }
                     Text(
                         text = stringResource(R.string.appstrings_local_build_packs_hint),
                         style = sizing.textStyle(MaterialTheme.typography.bodySmall),
@@ -549,7 +542,7 @@ fun LocalDbBuildCard(
                     // Un pack coche dont la base est deja installee (telechargee OU generee) sera ecrase :
                     // le bouton previent alors du remplacement.
                     val willReplace = (packMobile && mobileInfo.installed) ||
-                        ((packRadioBroadcast || packNonMobileTech) && radioInfo.installed)
+                        (packRadio && radioInfo.installed)
 
                     Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
                     if (eligibility.eligible) {
@@ -617,14 +610,16 @@ fun LocalDbBuildCard(
                                 OperationPauseStore.clear(context, OperationPauseStore.LOCAL_DB_BUILD)
                                 pauseStateVersion++
                                 LocalDbBuildWorker.enqueue(
-                                    workManager, packMobile, packRadioBroadcast, packNonMobileTech,
+                                    workManager,
+                                    mobile = packMobile,
+                                    radio = packRadio,
                                     force = forceBuild,
                                 )
                             }
                         },
                         enabled = !isDownloading &&
                             RemoteFeatureFlags.isLocalDbBuildAllowed() &&
-                            (packMobile || packRadioBroadcast || packNonMobileTech) &&
+                            (packMobile || packRadio) &&
                             (eligibility.eligible || forceBuild),
                         modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = sizing.component(56.dp)),
                         shape = RoundedCornerShape(sizing.component(12.dp)),

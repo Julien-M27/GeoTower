@@ -110,14 +110,19 @@ import org.mapsforge.map.android.graphics.AndroidGraphicFactory
 object AppGlobalState {
     val showDbSuccessPopup = androidx.compose.runtime.mutableStateOf(false)
     val dbSuccessPopupName = androidx.compose.runtime.mutableStateOf<String?>(null)
+    val dbSuccessPopupIsGeneration = androidx.compose.runtime.mutableStateOf(false)
     val pendingDbSuccessPopups = androidx.compose.runtime.mutableStateListOf<DbSuccessPopup>()
     private val queuedDbSuccessPopupWorkIds = mutableSetOf<String>()
 
-    data class DbSuccessPopup(val workId: String, val databaseName: String)
+    data class DbSuccessPopup(
+        val workId: String,
+        val databaseName: String,
+        val isGeneration: Boolean = false,
+    )
 
-    fun enqueueDbSuccessPopup(workId: String, databaseName: String) {
+    fun enqueueDbSuccessPopup(workId: String, databaseName: String, isGeneration: Boolean = false) {
         if (queuedDbSuccessPopupWorkIds.add(workId)) {
-            pendingDbSuccessPopups.add(DbSuccessPopup(workId, databaseName))
+            pendingDbSuccessPopups.add(DbSuccessPopup(workId, databaseName, isGeneration))
         }
     }
 
@@ -340,6 +345,9 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         handleGlobalPopupIntent(intent)
+        if (handleVoiceAntennaIntent(intent)) {
+            return
+        }
 
         sharedPhotoMapRoute(intent)?.let { route ->
             navigateToSiteFlow.tryEmit(route)
@@ -390,6 +398,8 @@ class MainActivity : ComponentActivity() {
         if (intent?.getBooleanExtra("SHOW_DB_SUCCESS_POPUP", false) == true) {
             AppGlobalState.dbSuccessPopupName.value =
                 intent.getStringExtra(fr.geotower.data.workers.DownloadNotificationCenter.EXTRA_DATABASE_DISPLAY_NAME)
+            AppGlobalState.dbSuccessPopupIsGeneration.value =
+                intent.getBooleanExtra(fr.geotower.data.workers.DownloadNotificationCenter.EXTRA_IS_GENERATION, false)
             AppGlobalState.showDbSuccessPopup.value = true
         }
 
@@ -408,6 +418,60 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private var voiceSpeaker: fr.geotower.assistant.VoiceSpeaker? = null
+
+    private fun handleVoiceAntennaIntent(intent: Intent?): Boolean {
+        if (intent == null) return false
+        val uri = intent.data
+        val isVoiceUri = uri != null && uri.scheme == "geotower" && uri.host == "voice"
+        val isActionGetThing = intent.action == "actions.intent.GET_THING"
+
+        if (!isVoiceUri && !isActionGetThing) return false
+
+        val operatorQuery = uri?.getQueryParameter("operator_name")
+            ?: intent.getStringExtra("operator_name")
+            ?: intent.getStringExtra("thing.name")
+
+        lifecycleScope.launch {
+            val app = applicationContext as GeoTowerApp
+            val locationHelper = fr.geotower.assistant.DeviceLocationHelper(applicationContext)
+            val handler = fr.geotower.assistant.AntennaVoiceQueryHandler(app.repository, locationHelper)
+
+            val (results, speechText) = handler.queryNearestAntennas(
+                operatorFilter = operatorQuery,
+                limit = 1
+            )
+
+            withContext(Dispatchers.Main) {
+                Toast.makeText(this@MainActivity, speechText, Toast.LENGTH_LONG).show()
+
+                if (voiceSpeaker == null) {
+                    voiceSpeaker = fr.geotower.assistant.VoiceSpeaker(applicationContext)
+                }
+                voiceSpeaker?.speak(speechText)
+
+                if (results.isNotEmpty()) {
+                    val first = results.first()
+                    getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
+                        .edit()
+                        .putFloat("last_map_lat", first.latitude.toFloat())
+                        .putFloat("last_map_lon", first.longitude.toFloat())
+                        .putFloat("last_map_zoom", 16.5f)
+                        .apply()
+
+                    navigateToSiteFlow.tryEmit("map")
+                }
+            }
+        }
+        return true
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        voiceSpeaker?.shutdown()
+        voiceSpeaker = null
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -416,6 +480,7 @@ class MainActivity : ComponentActivity() {
         // Indispensable pour que le téléphone sache "dessiner" les données du fichier .map
         AndroidGraphicFactory.createInstance(this.application)
         handleGlobalPopupIntent(intent)
+        handleVoiceAntennaIntent(intent)
 
         // ✅ ÉTAPE 2 : Vérifie si on a cliqué sur la notif quand l'app était fermée
         if (intent?.getBooleanExtra("SHOW_DB_SUCCESS_POPUP", false) == true) {
@@ -614,13 +679,16 @@ class MainActivity : ComponentActivity() {
             val txtUnavailable = stringResource(R.string.appstrings_unavailable)
             val featureFlags by RemoteFeatureFlags.config
 
-            // Écoute la réussite des téléchargements mobile, radio et eNB/gNB.
+            // Écoute la réussite des téléchargements (mobile, radio, eNB/gNB) et de la génération locale de base.
             val workManager = remember { androidx.work.WorkManager.getInstance(context) }
             val databaseDownloadWorkInfos by workManager
                 .getWorkInfosByTagFlow(fr.geotower.data.workers.DownloadNotificationCenter.DATABASE_DOWNLOADS_WORK_TAG)
                 .collectAsState(initial = emptyList())
+            val localBuildWorkInfos by workManager
+                .getWorkInfosForUniqueWorkFlow(fr.geotower.data.workers.LocalDbBuildWorker.UNIQUE_WORK_NAME)
+                .collectAsState(initial = emptyList())
 
-            LaunchedEffect(databaseDownloadWorkInfos) {
+            LaunchedEffect(databaseDownloadWorkInfos, localBuildWorkInfos) {
                 val completedDownloads = databaseDownloadWorkInfos.filter { workInfo ->
                     workInfo.state == androidx.work.WorkInfo.State.SUCCEEDED &&
                         workInfo.outputData.getBoolean(
@@ -632,9 +700,32 @@ class MainActivity : ComponentActivity() {
                     val databaseName = workInfo.outputData.getString(
                         fr.geotower.data.workers.DownloadNotificationCenter.KEY_DATABASE_DISPLAY_NAME
                     ) ?: return@forEach
-                    AppGlobalState.enqueueDbSuccessPopup(workInfo.id.toString(), databaseName)
+                    val isGeneration = workInfo.outputData.getBoolean(
+                        fr.geotower.data.workers.DownloadNotificationCenter.KEY_IS_GENERATION,
+                        false
+                    )
+                    AppGlobalState.enqueueDbSuccessPopup(workInfo.id.toString(), databaseName, isGeneration)
                 }
-                if (completedDownloads.isNotEmpty()) {
+
+                val completedBuilds = localBuildWorkInfos.filter { workInfo ->
+                    workInfo.state == androidx.work.WorkInfo.State.SUCCEEDED &&
+                        workInfo.outputData.getBoolean(
+                            fr.geotower.data.workers.DownloadNotificationCenter.KEY_SUCCESSFUL_DATABASE_DOWNLOAD,
+                            false
+                        )
+                }
+                completedBuilds.forEach { workInfo ->
+                    val databaseName = workInfo.outputData.getString(
+                        fr.geotower.data.workers.DownloadNotificationCenter.KEY_DATABASE_DISPLAY_NAME
+                    ) ?: return@forEach
+                    val isGeneration = workInfo.outputData.getBoolean(
+                        fr.geotower.data.workers.DownloadNotificationCenter.KEY_IS_GENERATION,
+                        true
+                    )
+                    AppGlobalState.enqueueDbSuccessPopup(workInfo.id.toString(), databaseName, isGeneration)
+                }
+
+                if (completedDownloads.isNotEmpty() || completedBuilds.isNotEmpty()) {
                     // Le flux partagé a d'abord copié tous les succès dans la file.
                     workManager.pruneWork()
                 }
@@ -1682,6 +1773,8 @@ class MainActivity : ComponentActivity() {
 
                         // L'onboarding affiche lui-même la file afin de conserver son avancement.
                         val pendingDbSuccessPopup = AppGlobalState.pendingDbSuccessPopups.firstOrNull()
+                        val isGeneration = pendingDbSuccessPopup?.isGeneration
+                            ?: AppGlobalState.dbSuccessPopupIsGeneration.value
                         val dbSuccessPopupName = pendingDbSuccessPopup?.databaseName
                             ?: AppGlobalState.dbSuccessPopupName.value
                         val shouldShowDbSuccessPopup = pendingDbSuccessPopup != null ||
@@ -1694,19 +1787,31 @@ class MainActivity : ComponentActivity() {
                                     }
                                     AppGlobalState.showDbSuccessPopup.value = false
                                     AppGlobalState.dbSuccessPopupName.value = null
+                                    AppGlobalState.dbSuccessPopupIsGeneration.value = false
                                 },
                                 title = {
                                     Text(
-                                        text = stringResource(R.string.database_download_success_title),
+                                        text = stringResource(
+                                            if (isGeneration) R.string.database_build_success_title
+                                            else R.string.database_download_success_title
+                                        ),
                                         fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
                                     )
                                 },
                                 text = {
                                     Text(
-                                        text = if (dbSuccessPopupName != null) {
-                                            stringResource(R.string.database_download_success_desc_named, dbSuccessPopupName)
+                                        text = if (isGeneration) {
+                                            if (dbSuccessPopupName != null) {
+                                                stringResource(R.string.database_build_success_desc_named, dbSuccessPopupName)
+                                            } else {
+                                                stringResource(R.string.database_build_success_desc)
+                                            }
                                         } else {
-                                            stringResource(R.string.database_download_success_desc)
+                                            if (dbSuccessPopupName != null) {
+                                                stringResource(R.string.database_download_success_desc_named, dbSuccessPopupName)
+                                            } else {
+                                                stringResource(R.string.database_download_success_desc)
+                                            }
                                         }
                                     )
                                 },
@@ -1717,6 +1822,7 @@ class MainActivity : ComponentActivity() {
                                         }
                                         AppGlobalState.showDbSuccessPopup.value = false
                                         AppGlobalState.dbSuccessPopupName.value = null
+                                        AppGlobalState.dbSuccessPopupIsGeneration.value = false
                                     }) {
                                         Text(stringResource(R.string.common_finish))
                                     }

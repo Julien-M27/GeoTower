@@ -18,9 +18,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.WifiTethering
 import androidx.compose.material3.Card
@@ -30,6 +35,8 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -45,8 +52,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
@@ -84,13 +95,13 @@ enum class FrequencyReferenceTechnology(
     NR_5G("5G", R.string.appstrings_frequency_reference_5g, R.string.appstrings_frequency_reference_5g_desc)
 }
 
-private enum class FrequencyReferenceDuplex {
+internal enum class FrequencyReferenceDuplex {
     FDD,
     TDD,
     SDL
 }
 
-private data class FrequencyReferenceBand(
+internal data class FrequencyReferenceBand(
     val technology: FrequencyReferenceTechnology,
     val name: String,
     val duplex: FrequencyReferenceDuplex,
@@ -132,6 +143,77 @@ private fun FrequencyReferenceBand.bandNameSortNumber(): Int =
 private fun FrequencyReferenceBand.bandNameSortGroup(): Int =
     if (bandNameRegex.containsMatchIn(name)) 0 else 1
 
+private fun normalizeForSearch(text: String): String {
+    return java.text.Normalizer.normalize(text, java.text.Normalizer.Form.NFD)
+        .replace(Regex("\\p{M}"), "")
+        .lowercase()
+        .replace('·', ' ')
+        .replace('–', '-')
+        .replace('—', '-')
+}
+
+private fun FrequencyReferenceBand.searchableContent(): String {
+    val builder = StringBuilder()
+    builder.append(technology.id).append(' ')
+    when (technology) {
+        FrequencyReferenceTechnology.GSM_2G -> builder.append("gsm 2g ")
+        FrequencyReferenceTechnology.UMTS_3G -> builder.append("umts hspa 3g ")
+        FrequencyReferenceTechnology.LTE_4G -> builder.append("lte 4g ")
+        FrequencyReferenceTechnology.NR_5G -> builder.append("nr 5g new radio ")
+    }
+    builder.append(name).append(' ')
+    val bandNum = bandNameRegex.find(name)?.groupValues?.get(1)
+    if (bandNum != null) {
+        if (name.startsWith("B", ignoreCase = true)) {
+            builder.append("b ").append(bandNum).append(' ')
+        } else if (name.startsWith("n", ignoreCase = true)) {
+            builder.append("n ").append(bandNum).append(' ')
+        }
+    }
+    builder.append(duplex.name).append(' ')
+    when (duplex) {
+        FrequencyReferenceDuplex.FDD -> builder.append("fdd duplex ")
+        FrequencyReferenceDuplex.TDD -> builder.append("tdd duplex ")
+        FrequencyReferenceDuplex.SDL -> builder.append("sdl downlink ")
+    }
+    uplink?.let { builder.append(it).append(' ') }
+    downlink?.let { builder.append(it).append(' ') }
+    sharedRange?.let { builder.append(it).append(' ') }
+
+    val raw = builder.toString()
+    val mhzMatches = Regex("""(\d+(?:[.,]\d+)?)\s*mhz""", RegexOption.IGNORE_CASE).findAll(raw)
+    for (match in mhzMatches) {
+        val num = match.groupValues[1].replace(',', '.').toDoubleOrNull()
+        if (num != null && num >= 1000) {
+            val ghz = num / 1000.0
+            val ghzStrDot = if (ghz % 1.0 == 0.0) "${ghz.toInt()}" else "$ghz"
+            val ghzStrComma = ghzStrDot.replace('.', ',')
+            builder.append(" ${ghzStrDot} ghz ${ghzStrComma} ghz ")
+        }
+    }
+    return normalizeForSearch(builder.toString())
+}
+
+internal fun FrequencyReferenceBand.matchesQuery(query: String): Boolean {
+    val trimmed = query.trim()
+    if (trimmed.isEmpty()) return true
+
+    val normalizedQuery = normalizeForSearch(trimmed)
+    val queryTokens = normalizedQuery.split(Regex("""\s+""")).filter { it.isNotEmpty() }
+    if (queryTokens.isEmpty()) return true
+
+    val content = searchableContent()
+    val words = content.split(Regex("""\s+""")).filter { it.isNotEmpty() }
+
+    return queryTokens.all { token ->
+        if (token in listOf("2g", "3g", "4g", "5g")) {
+            technology.id.equals(token, ignoreCase = true) || words.contains(token)
+        } else {
+            content.contains(token)
+        }
+    }
+}
+
 private fun fdd(
     technology: FrequencyReferenceTechnology,
     name: String,
@@ -156,7 +238,7 @@ private fun sdl(
  * ne préjugent pas de l'opérateur qui détient une autorisation ni des bandes réellement actives
  * sur un site donné.
  */
-private object FrequencyReferenceCatalog {
+internal object FrequencyReferenceCatalog {
     val franceMetropolitan: List<FrequencyReferenceBand> = listOf(
         fdd(FrequencyReferenceTechnology.GSM_2G, "GSM 900", "880–915 MHz", "925–960 MHz"),
         fdd(FrequencyReferenceTechnology.GSM_2G, "DCS 1800", "1710–1785 MHz", "1805–1880 MHz"),
@@ -275,9 +357,11 @@ fun FrequencyReferenceScreen(navController: NavController) {
     val uiStyle = LocalGeoTowerUiStyle.current
     val sizing = uiStyle.sizing
     val context = LocalContext.current
+    val focusManager = LocalFocusManager.current
     val prefs = remember(context) { context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE) }
     val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = ROOT_FALLBACK_ROUTE)
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
     var sortOrder by rememberSaveable {
         mutableStateOf(FrequencyReferencePagePreferences.read(prefs))
     }
@@ -290,26 +374,35 @@ fun FrequencyReferenceScreen(navController: NavController) {
     var showSettingsSheet by rememberSaveable { mutableStateOf(false) }
     val settingsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = if (selectedTab == 0) FrequencyReferenceScope.FRANCE else FrequencyReferenceScope.INTERNATIONAL
-    val bands = when (scope) {
+    val allBands = when (scope) {
         FrequencyReferenceScope.FRANCE -> FrequencyReferenceCatalog.franceMetropolitan
         FrequencyReferenceScope.INTERNATIONAL -> FrequencyReferenceCatalog.international
-    }.sortedWith(
-        if (sortOrder == FrequencyReferencePagePreferences.SORT_BAND) {
-            compareBy<FrequencyReferenceBand> { it.bandNameSortGroup() }
-                .thenBy { it.bandNameSortNumber() }
-                .thenBy { it.name }
-        } else {
-            compareBy<FrequencyReferenceBand> { it.frequencySortKey() }
-                .thenBy { it.name }
-        }
-    )
+    }
+    val bands = remember(allBands, searchQuery, sortOrder) {
+        allBands
+            .filter { it.matchesQuery(searchQuery) }
+            .sortedWith(
+                if (sortOrder == FrequencyReferencePagePreferences.SORT_BAND) {
+                    compareBy<FrequencyReferenceBand> { it.bandNameSortGroup() }
+                        .thenBy { it.bandNameSortNumber() }
+                        .thenBy { it.name }
+                } else {
+                    compareBy<FrequencyReferenceBand> { it.frequencySortKey() }
+                        .thenBy { it.name }
+                }
+            )
+    }
     val scrollState = rememberScrollState()
     val mainBgColor = uiStyle.backgroundColor
     val cardBgColor = uiStyle.cardColor
     val blockShape = uiStyle.blockShape
 
-    BackHandler(enabled = !safeBackNavigation.isLocked) {
-        safeBackNavigation.navigateBack()
+    BackHandler(enabled = searchQuery.isNotBlank() || !safeBackNavigation.isLocked) {
+        if (searchQuery.isNotBlank()) {
+            searchQuery = ""
+        } else {
+            safeBackNavigation.navigateBack()
+        }
     }
 
     Scaffold(
@@ -396,6 +489,49 @@ fun FrequencyReferenceScreen(navController: NavController) {
                     )
                 }
 
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = {
+                        Text(
+                            text = stringResource(R.string.appstrings_frequency_reference_search_placeholder),
+                            style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = null,
+                            modifier = Modifier.size(sizing.component(20.dp)),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = stringResource(R.string.appstrings_clear),
+                                    modifier = Modifier.size(sizing.component(20.dp))
+                                )
+                            }
+                        }
+                    },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
+                    shape = if (uiStyle.useOneUi) RoundedCornerShape(sizing.component(28.dp)) else blockShape,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedContainerColor = if (uiStyle.useOneUi) cardBgColor else Color.Transparent,
+                        focusedContainerColor = if (uiStyle.useOneUi) cardBgColor else Color.Transparent
+                    )
+                )
+
                 Text(
                     text = stringResource(
                         if (scope == FrequencyReferenceScope.FRANCE) {
@@ -409,17 +545,44 @@ fun FrequencyReferenceScreen(navController: NavController) {
                     fontWeight = FontWeight.Bold
                 )
 
-                technologyOrder.forEach { technologyId ->
-                    val technology = FrequencyReferenceTechnology.entries.firstOrNull { it.id == technologyId }
-                        ?: return@forEach
-                    val technologyBands = bands.filter { it.technology == technology }
-                    if (technologyId in visibleTechnologies && technologyBands.isNotEmpty()) {
-                        FrequencyTechnologyCard(
-                            technology = technology,
-                            bands = technologyBands,
-                            cardBgColor = cardBgColor,
-                            blockShape = blockShape
-                        )
+                val anyTechnologyVisible = technologyOrder.any { technologyId ->
+                    technologyId in visibleTechnologies && bands.any { it.technology.id == technologyId }
+                }
+
+                if (anyTechnologyVisible) {
+                    technologyOrder.forEach { technologyId ->
+                        val technology = FrequencyReferenceTechnology.entries.firstOrNull { it.id == technologyId }
+                            ?: return@forEach
+                        val technologyBands = bands.filter { it.technology == technology }
+                        if (technologyId in visibleTechnologies && technologyBands.isNotEmpty()) {
+                            FrequencyTechnologyCard(
+                                technology = technology,
+                                bands = technologyBands,
+                                cardBgColor = cardBgColor,
+                                blockShape = blockShape
+                            )
+                        }
+                    }
+                } else if (searchQuery.isNotBlank()) {
+                    Card(
+                        shape = blockShape,
+                        colors = CardDefaults.cardColors(containerColor = cardBgColor),
+                        border = uiStyle.cardBorder,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(sizing.spacing(24.dp)),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = stringResource(R.string.appstrings_frequency_reference_search_empty),
+                                style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center
+                            )
+                        }
                     }
                 }
 

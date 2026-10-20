@@ -12,7 +12,21 @@
         </intent>
     </capability>
 
+    <!-- Intention vocale reconnue par Google Assistant / Gemini pour rechercher une antenne -->
     <capability android:name="actions.intent.GET_THING">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="fr.geotower"
+            android:targetClass="fr.geotower.MainActivity">
+            <url-template android:value="geotower://voice/antenna{?operator_name}">
+                <parameter
+                    android:name="thing.name"
+                    android:key="operator_name" />
+            </url-template>
+            <parameter
+                android:name="thing.name"
+                android:key="operator_name" />
+        </intent>
         <app-widget
             android:targetPackage="fr.geotower"
             android:targetClass="fr.geotower.widget.AntennaWidgetReceiver">
@@ -21,5 +35,74 @@
                 android:key="q" />
         </app-widget>
     </capability>
+
+    <!-- Raccourcis statiques pour orienter la reconnaissance NLU de l'Assistant et l'appui long -->
+    <shortcut
+        android:shortcutId="shortcut_antenna_free"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher_geotower"
+        android:shortLabel="@string/appstrings_operator_free">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="fr.geotower"
+            android:targetClass="fr.geotower.MainActivity"
+            android:data="geotower://voice/antenna?operator_name=Free" />
+        <capability-binding android:key="actions.intent.GET_THING">
+            <parameter-binding
+                android:key="thing.name"
+                android:value="Free" />
+        </capability-binding>
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="shortcut_antenna_orange"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher_geotower"
+        android:shortLabel="@string/appstrings_operator_orange">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="fr.geotower"
+            android:targetClass="fr.geotower.MainActivity"
+            android:data="geotower://voice/antenna?operator_name=Orange" />
+        <capability-binding android:key="actions.intent.GET_THING">
+            <parameter-binding
+                android:key="thing.name"
+                android:value="Orange" />
+        </capability-binding>
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="shortcut_antenna_sfr"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher_geotower"
+        android:shortLabel="@string/appstrings_operator_sfr">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="fr.geotower"
+            android:targetClass="fr.geotower.MainActivity"
+            android:data="geotower://voice/antenna?operator_name=SFR" />
+        <capability-binding android:key="actions.intent.GET_THING">
+            <parameter-binding
+                android:key="thing.name"
+                android:value="SFR" />
+        </capability-binding>
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="shortcut_antenna_bouygues"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher_geotower"
+        android:shortLabel="@string/appstrings_operator_bouygues">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="fr.geotower"
+            android:targetClass="fr.geotower.MainActivity"
+            android:data="geotower://voice/antenna?operator_name=Bouygues" />
+        <capability-binding android:key="actions.intent.GET_THING">
+            <parameter-binding
+                android:key="thing.name"
+                android:value="Bouygues" />
+        </capability-binding>
+    </shortcut>
 
 </shortcuts>

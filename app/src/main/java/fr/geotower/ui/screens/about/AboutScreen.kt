@@ -1251,16 +1251,21 @@ fun SectionVersions(
             // désormais leur heure de génération (à la minute) ; il ne reste que la date seule
             // quand le fichier serveur ne l'annonce pas.
             val hsGeneratedLocally = hsLocalGeneratedAt > 0L
+            val isDailyOutage = !hsGeneratedLocally && AppConfig.outageSourceMode.value == fr.geotower.data.outages.OutageSourceMode.DAILY
             val hsLabel = stringResource(
                 if (hsGeneratedLocally) R.string.appstrings_version_hs_local_label
                 else R.string.appstrings_version_hs_label
             )
             val hsValue = when {
+                isDailyOutage -> when {
+                    hsServerGeneratedAt > 0L -> LocalizedDateLabels.formatShortDate(context, hsServerGeneratedAt, AppConfig.appLanguage.value)
+                    else -> LocalizedDateLabels.formatVersionDate(context, hsDate, AppConfig.appLanguage.value)
+                }
                 hsGeneratedLocally ->
                     LocalizedDateLabels.formatVersionDateTime(context, hsLocalGeneratedAt, txtVersionTimeAt)
                 hsServerGeneratedAt > 0L ->
                     LocalizedDateLabels.formatVersionDateTime(context, hsServerGeneratedAt, txtVersionTimeAt)
-                else -> LocalizedDateLabels.formatVersionDate(context, hsDate)
+                else -> LocalizedDateLabels.formatVersionDate(context, hsDate, AppConfig.appLanguage.value)
             }
 
             // Génération locale en cours : la base n'est installée qu'à la fin du build. On dit

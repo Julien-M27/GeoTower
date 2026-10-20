@@ -209,5 +209,13 @@
                 <category android:name="androidx.car.app.category.POI" />
             </intent-filter>
         </service>
+        <!-- Récepteur vocal pour l'Assistant Android / Gemini (App Actions / Shortcuts) -->
+        <receiver
+            android:name=".assistant.GeminiAntennaReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="fr.geotower.action.VOICE_QUERY_ANTENNA" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

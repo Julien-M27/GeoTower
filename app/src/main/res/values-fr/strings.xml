@@ -288,12 +288,18 @@
     <string name="database_download_success_title">Téléchargement terminé</string>
     <string name="database_download_success_desc">La base de données a été téléchargée avec succès !</string>
     <string name="database_download_success_desc_named">Téléchargement réussi : %1$s.</string>
+    <string name="database_build_success_title">Génération terminée</string>
+    <string name="database_build_success_desc">La base de données a été générée avec succès !</string>
+    <string name="database_build_success_desc_named">Génération réussie : %1$s.</string>
     <string name="notification_database_channel_name">Bases de données</string>
     <string name="notification_database_download_title">Mise à jour de la base : %1$s</string>
     <string name="notification_database_first_download_title">Téléchargement de la base : %1$s</string>
     <string name="notification_database_download_progress">Téléchargement en cours... %1$d%%</string>
     <string name="notification_database_downloaded_title">Téléchargement terminé : %1$s</string>
     <string name="notification_database_downloaded_content">Disponible hors connexion : %1$s. Appuyez pour ouvrir.</string>
+    <string name="notification_database_built_title">Génération terminée : %1$s</string>
+    <string name="notification_database_built_content">Disponible hors connexion : %1$s. Appuyez pour ouvrir.</string>
+    <string name="notification_database_build_failed_title">Échec de la génération : %1$s</string>
     <string name="notification_database_download_failed_title">Échec du téléchargement : %1$s</string>
     <string name="notification_database_download_failed_content">Vérifiez votre connexion puis réessayez.</string>
     <string name="notification_map_channel_name">Téléchargement de cartes</string>
@@ -796,6 +802,8 @@
     <string name="appstrings_frequency_reference_fdd">FDD · montante/descendante séparées</string>
     <string name="appstrings_frequency_reference_tdd">TDD · bande partagée</string>
     <string name="appstrings_frequency_reference_sdl">SDL · descendante uniquement</string>
+    <string name="appstrings_frequency_reference_search_placeholder">Rechercher une bande ou fréquence (ex. 700, B28, n78)</string>
+    <string name="appstrings_frequency_reference_search_empty">Aucune bande de fréquence ne correspond à votre recherche.</string>
     <string name="appstrings_from_my_position">de vous</string>
     <string name="appstrings_full_screen_photo_desc">Photo en plein écran</string>
     <string name="appstrings_gallery">Galerie</string>
@@ -2699,8 +2707,8 @@
     <string name="appstrings_local_build_packs_title">Que générer ?</string>
     <string name="appstrings_local_build_pack_mobile">Mobile</string>
     <string name="appstrings_local_build_pack_mobile_desc">2G · 3G · 4G · 5G — opérateurs</string>
-    <string name="appstrings_local_build_pack_radio">Radios &amp; TV</string>
-    <string name="appstrings_local_build_pack_radio_desc">Diffusion FM, DAB+, télévision</string>
+    <string name="appstrings_local_build_pack_radio">Radios, TV &amp; non-mobile technique</string>
+    <string name="appstrings_local_build_pack_radio_desc">Diffusion FM, DAB+, télévision, faisceaux, réseaux privés…</string>
     <string name="appstrings_local_build_pack_nonmobile">Non-mobile technique</string>
     <string name="appstrings_local_build_pack_nonmobile_desc">Faisceaux, réseaux privés, ferroviaire…</string>
     <string name="appstrings_local_build_packs_hint">Le fichier ANFR (obligatoire) est partagé. Décocher « Mobile » évite en plus le téléchargement de l\'observatoire (~500 Mo).</string>
@@ -3399,6 +3407,7 @@
     <string name="appstrings_release_v2076_summary_ping_dialog_ergonomics">Ergonomie et disposition améliorées de la boîte de dialogue du test de latence des serveurs API</string>
     <string name="appstrings_release_v2077_summary_network_log_and_drawer_order">Journal des requêtes réseau HTTP dans le diagnostic et réorganisation des boutons du tiroir en mode simplifié</string>
     <string name="appstrings_release_v2078_summary_map_loading_indicator">Indicateur visuel discret de chargement des sites et statistiques en bas de la carte</string>
+    <string name="appstrings_release_v2079_summary_frequency_search_and_voice_assistant">Recherche dans les bandes de fréquences, commande vocale Assistant pour les antennes et notifications de génération locale</string>
 
     <!-- Journal des requêtes réseau -->
     <string name="network_log_title">Journal des requêtes réseau</string>

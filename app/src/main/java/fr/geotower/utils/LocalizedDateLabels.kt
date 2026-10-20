@@ -41,7 +41,11 @@ object LocalizedDateLabels {
         return rawName
     }
 
-    fun formatVersionDate(context: Context, rawValue: String): String {
+    fun formatVersionDate(
+        context: Context? = null,
+        rawValue: String,
+        languagePreference: String? = null
+    ): String {
         val cleanValue = rawValue.trim()
         if (cleanValue.isBlank() || cleanValue == "-") return cleanValue.ifBlank { "-" }
 
@@ -52,7 +56,12 @@ object LocalizedDateLabels {
         }
 
         return if (parsedDate != null) {
-            DateFormat.getDateInstance(DateFormat.SHORT, context.currentLocale()).format(parsedDate)
+            val locale = localeFor(context, languagePreference)
+            if (locale.language == Locale.FRENCH.language) {
+                SimpleDateFormat("dd/MM/yyyy", Locale.FRANCE).format(parsedDate)
+            } else {
+                DateFormat.getDateInstance(DateFormat.SHORT, locale).format(parsedDate)
+            }
         } else {
             rawValue
         }
@@ -72,7 +81,7 @@ object LocalizedDateLabels {
 
     /** Format court date + heure dans la langue choisie dans GeoTower, pas celle du système. */
     fun formatShortDateTime(
-        context: Context,
+        context: Context? = null,
         millis: Long,
         languagePreference: String? = null
     ): String {
@@ -95,7 +104,7 @@ object LocalizedDateLabels {
 
     /** Format court d'une date dans la langue choisie dans GeoTower, pas celle du système. */
     fun formatShortDate(
-        context: Context,
+        context: Context? = null,
         millis: Long,
         languagePreference: String? = null
     ): String {
@@ -139,11 +148,12 @@ object LocalizedDateLabels {
         }
     }
 
-    private fun localeFor(context: Context, languagePreference: String?): Locale {
+    private fun localeFor(context: Context?, languagePreference: String?): Locale {
         return languagePreference
             ?.let(AppLocale::languageTagForPreference)
             ?.let(Locale::forLanguageTag)
-            ?: context.currentLocale()
+            ?: context?.currentLocale()
+            ?: Locale.getDefault()
     }
 
     /**
@@ -339,6 +349,8 @@ object LocalizedDateLabels {
         "yyyy_MM_dd",
         "yyyyMMdd",
         "dd/MM/yyyy",
+        "yyyy-MM-dd HH:mm:ss",
+        "yyyy-MM-dd'T'HH:mm:ss",
         "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
         "yyyy-MM-dd'T'HH:mm:ssXXX",
         "yyyy-MM-dd'T'HH:mm:ss.SSSX",

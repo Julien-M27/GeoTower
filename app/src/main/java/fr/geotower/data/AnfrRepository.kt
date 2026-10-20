@@ -1,4 +1,4 @@
-﻿package fr.geotower.data
+package fr.geotower.data
 
 import kotlin.math.roundToInt
 import android.content.Context
@@ -1281,6 +1281,24 @@ class AnfrRepository(
     // =================================================================
     // 1.5 POUR LA CARTE (Mode Macro : Clustering progressif à 5 niveaux)
     // =================================================================
+    suspend fun getNearestActiveByOperator(
+        operatorName: String,
+        lat: Double,
+        lon: Double,
+        limit: Int
+    ): List<LocalisationEntity> {
+        val safeLimit = limit.coerceAtLeast(1)
+        val localisations = queryLocalDatabase(emptyList()) {
+            getNearestActiveLocalisationsByOperator(
+                operatorName = operatorName,
+                lat = lat,
+                lon = lon,
+                limit = safeLimit
+            )
+        }
+        return hideHiddenSites(localisations).take(safeLimit)
+    }
+
     private val macroClusterCache = android.util.LruCache<String, List<DbCluster>>(64)
 
     fun clearMacroClusterCache() {
@@ -1970,6 +1988,7 @@ class AnfrRepository(
                         generatedAtIso = null,
                         sites = dailyResult.sites,
                         downloadedAtMillis = downloadedAt,
+                        mode = sourceMode,
                     )
                     withContext(Dispatchers.IO) {
                         serverOutageCache.save(
@@ -2001,6 +2020,7 @@ class AnfrRepository(
             generatedAtIso = parseResult.generatedAtIso,
             sites = hsList,
             downloadedAtMillis = downloadedAt,
+            mode = sourceMode,
         )
 
         withContext(Dispatchers.IO) {

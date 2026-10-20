@@ -8,7 +8,9 @@ object DownloadNotificationCenter {
     const val DATABASE_DOWNLOADS_WORK_TAG = "database_download_all"
     const val KEY_SUCCESSFUL_DATABASE_DOWNLOAD = "successful_database_download"
     const val KEY_DATABASE_DISPLAY_NAME = "database_display_name"
+    const val KEY_IS_GENERATION = "is_generation"
     const val EXTRA_DATABASE_DISPLAY_NAME = "DB_SUCCESS_POPUP_NAME"
+    const val EXTRA_IS_GENERATION = "DB_SUCCESS_POPUP_IS_GENERATION"
 
     const val DB_UPDATE_AVAILABLE_NOTIFICATION_ID = 2001
     const val APP_UPDATE_AVAILABLE_NOTIFICATION_ID = 2002
@@ -75,6 +77,7 @@ object DownloadNotificationCenter {
         manager.cancel(DB_DOWNLOAD_RESULT_NOTIFICATION_ID)
         manager.cancel(RADIO_DB_DOWNLOAD_RESULT_NOTIFICATION_ID)
         manager.cancel(ENB_DB_DOWNLOAD_RESULT_NOTIFICATION_ID)
+        manager.cancel(LocalDbBuildWorker.RESULT_NOTIFICATION_ID)
     }
 
     fun clearOfflineMapNotifications(context: Context, mapFilename: String) {

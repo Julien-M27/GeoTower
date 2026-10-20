@@ -163,13 +163,14 @@ class LocalDbBuildWorker(
         runCatching { wakeLock.acquire(WAKE_LOCK_TIMEOUT_MS) }
             .onFailure { AppLogger.w(TAG, "Local build wake lock unavailable", it) }
 
+        val packs = LocalDbBuildPipeline.Packs(
+            mobile = inputData.getBoolean(KEY_PACK_MOBILE, true),
+            radioBroadcast = inputData.getBoolean(KEY_PACK_RADIO_BROADCAST, true),
+            nonMobileTech = inputData.getBoolean(KEY_PACK_NONMOBILE, true),
+        )
+        val force = inputData.getBoolean(KEY_FORCE, false)
+
         try {
-            val packs = LocalDbBuildPipeline.Packs(
-                mobile = inputData.getBoolean(KEY_PACK_MOBILE, true),
-                radioBroadcast = inputData.getBoolean(KEY_PACK_RADIO_BROADCAST, true),
-                nonMobileTech = inputData.getBoolean(KEY_PACK_NONMOBILE, true),
-            )
-            val force = inputData.getBoolean(KEY_FORCE, false)
             val result = LocalDbBuildPipeline().run(
                 context = context,
                 packs = packs,
@@ -215,11 +216,12 @@ class LocalDbBuildWorker(
             ticker.cancel()
             ticker.join()
             cancelSafely(PROGRESS_NOTIFICATION_ID)
+            val databasesLabel = formatDatabasesLabel(context, packs)
             if (result.success) {
                 OperationPauseStore.clear(context, OperationPauseStore.LOCAL_DB_BUILD)
                 DbOperationTimings.finish(context, DbOperationTimings.LOCAL_BUILD)
                 setProgress(workDataOf(KEY_PROGRESS to 100, KEY_PHASE to BuildPhase.DONE.ordinal))
-                showResult(success = true, reason = null)
+                showResult(success = true, packs = packs, reason = null)
                 val source = observatoireSourceSnapshot.get()
                 if (source != null) {
                     val mobileInfo = LocalDbProvenance.readMobile(context)
@@ -233,12 +235,18 @@ class LocalDbBuildWorker(
                         )
                     }
                 }
-                Result.success()
+                Result.success(
+                    workDataOf(
+                        DownloadNotificationCenter.KEY_SUCCESSFUL_DATABASE_DOWNLOAD to true,
+                        DownloadNotificationCenter.KEY_DATABASE_DISPLAY_NAME to databasesLabel,
+                        DownloadNotificationCenter.KEY_IS_GENERATION to true,
+                    ),
+                )
             } else {
                 OperationPauseStore.clear(context, OperationPauseStore.LOCAL_DB_BUILD)
                 DbOperationTimings.clearStart(context, DbOperationTimings.LOCAL_BUILD)
                 AppLogger.w(TAG, "Local DB build failed: ${result.reason}")
-                showResult(success = false, reason = result.reason)
+                showResult(success = false, packs = packs, reason = result.reason)
                 Result.failure(workDataOf(KEY_ERROR to (result.reason ?: "Cause inconnue")))
             }
         } catch (e: CancellationException) {
@@ -252,7 +260,7 @@ class LocalDbBuildWorker(
             ticker.cancel()
             AppLogger.w(TAG, "Local DB build worker crashed", e)
             cancelSafely(PROGRESS_NOTIFICATION_ID)
-            showResult(success = false, reason = e.message)
+            showResult(success = false, packs = packs, reason = e.message)
             Result.failure(workDataOf(KEY_ERROR to (e.message ?: e.javaClass.simpleName)))
         } finally {
             runCatching { if (wakeLock.isHeld) wakeLock.release() }
@@ -357,41 +365,56 @@ class LocalDbBuildWorker(
         return builder.build()
     }
 
-    private fun showResult(success: Boolean, reason: String?) {
+    private fun showResult(success: Boolean, packs: LocalDbBuildPipeline.Packs, reason: String?) {
+        val databasesLabel = formatDatabasesLabel(context, packs)
         // Consigné même quand la notification ne part pas : voir [NotificationHistoryStore].
         NotificationHistoryStore.record(
             context = context,
             type = NotificationHistoryStore.TYPE_DB_LOCAL_BUILD,
             status = if (success) NotificationHistoryStore.STATUS_SUCCESS else NotificationHistoryStore.STATUS_ERROR,
-            detail = reason.orEmpty(),
+            detail = if (success) databasesLabel else reason.orEmpty(),
             target = "geotower://settings?section=db_local_build",
             posted = AppNotifications.canPost(context)
         )
-        val title = context.getString(R.string.appstrings_local_build_notif_title)
-        val content = if (success) {
-            context.getString(R.string.appstrings_local_build_notif_done)
+        val title = if (success) {
+            context.getString(R.string.notification_database_built_title, databasesLabel)
         } else {
-            context.getString(R.string.appstrings_local_build_notif_failed, reason ?: "?")
+            context.getString(R.string.notification_database_build_failed_title, databasesLabel)
+        }
+        val content = if (success) {
+            context.getString(R.string.notification_database_built_content, databasesLabel)
+        } else {
+            reason ?: context.getString(R.string.notification_database_download_failed_content)
         }
         val builder = NotificationCompat.Builder(context, channelId)
             .setContentTitle(title)
             .setContentText(content)
             .setStyle(NotificationCompat.BigTextStyle().bigText(content))
-            .setContentIntent(settingsPendingIntent())
+            .setContentIntent(settingsPendingIntent(showSuccessPopup = success, databaseName = databasesLabel))
             .setAutoCancel(true)
         NotificationIconResources.applyTo(builder, context)
         notifySafely(RESULT_NOTIFICATION_ID, builder.build())
     }
 
-    private fun settingsPendingIntent(): PendingIntent {
+    private fun settingsPendingIntent(
+        showSuccessPopup: Boolean = false,
+        databaseName: String? = null,
+    ): PendingIntent {
         // Cible le bloc « generation locale » (LocalDbBuildCard) precisement, pas seulement le haut
         // de la section « Base de donnees ».
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
             data = android.net.Uri.parse("geotower://settings?section=db_local_build")
+            if (showSuccessPopup && databaseName != null) {
+                putExtra("SHOW_DB_SUCCESS_POPUP", true)
+                putExtra(DownloadNotificationCenter.EXTRA_DATABASE_DISPLAY_NAME, databaseName)
+                putExtra(DownloadNotificationCenter.EXTRA_IS_GENERATION, true)
+            }
         }
         return PendingIntent.getActivity(
-            context, 0, intent,
+            context,
+            if (showSuccessPopup) 1 else 0,
+            intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
     }
@@ -437,12 +460,54 @@ class LocalDbBuildWorker(
         const val KEY_FORCE = "force"
 
         private const val TAG = "GeoTowerDb"
+        fun formatDatabasesLabel(
+            packs: LocalDbBuildPipeline.Packs,
+            mobileLabel: String,
+            radioLabel: String,
+            fallbackLabel: String,
+        ): String {
+            val names = buildList {
+                if (packs.mobile) {
+                    add(mobileLabel)
+                }
+                if (packs.anyRadio) {
+                    add(radioLabel)
+                }
+            }
+            return if (names.isEmpty()) {
+                fallbackLabel
+            } else {
+                names.joinToString(", ")
+            }
+        }
+
+        fun formatDatabasesLabel(context: Context, packs: LocalDbBuildPipeline.Packs): String =
+            formatDatabasesLabel(
+                packs = packs,
+                mobileLabel = context.getString(R.string.notification_history_type_db_mobile),
+                radioLabel = context.getString(R.string.notification_history_type_db_radio),
+                fallbackLabel = context.getString(R.string.notification_history_type_db_local_build),
+            )
+
         private const val PROGRESS_NOTIFICATION_ID = 471_001
-        private const val RESULT_NOTIFICATION_ID = 471_002
+        const val RESULT_NOTIFICATION_ID = 471_002
         private const val WAKE_LOCK_TAG = "GeoTower:localDbBuild"
 
         /** Plafond de securite du wake lock : tres au-dela d'un build normal, mais borne. */
         private const val WAKE_LOCK_TIMEOUT_MS = 4L * 60L * 60L * 1000L
+
+        fun buildRequest(
+            mobile: Boolean,
+            radio: Boolean,
+            force: Boolean = false,
+        ) = buildRequest(mobile, radioBroadcast = radio, nonMobileTech = radio, force = force)
+
+        fun enqueue(
+            workManager: WorkManager,
+            mobile: Boolean = true,
+            radio: Boolean = true,
+            force: Boolean = false,
+        ) = enqueue(workManager, mobile, radioBroadcast = radio, nonMobileTech = radio, force = force)
 
         fun buildRequest(
             mobile: Boolean,

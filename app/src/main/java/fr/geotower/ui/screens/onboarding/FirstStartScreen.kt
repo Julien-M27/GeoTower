@@ -556,12 +556,15 @@ fun FirstStartScreen(
     // pendant une mise à jour groupée.
     val pendingDbSuccessPopup = fr.geotower.AppGlobalState.pendingDbSuccessPopups.firstOrNull()
     if (pendingDbSuccessPopup != null) {
+        val isGeneration = pendingDbSuccessPopup.isGeneration
         fun dismissDownloadedDatabasePopup() {
+            showSuccessDialog = false
             fr.geotower.AppGlobalState.dismissDbSuccessPopup(pendingDbSuccessPopup.workId)
             fr.geotower.AppGlobalState.showDbSuccessPopup.value = false
             fr.geotower.AppGlobalState.dbSuccessPopupName.value = null
+            fr.geotower.AppGlobalState.dbSuccessPopupIsGeneration.value = false
             if (
-                pendingDbSuccessPopup.databaseName == context.getString(R.string.notification_history_type_db_mobile) &&
+                pendingDbSuccessPopup.databaseName.contains(context.getString(R.string.notification_history_type_db_mobile)) &&
                 steps.getOrNull(currentStep) == OnboardingStep.Database
             ) {
                 goToNextStep()
@@ -572,7 +575,10 @@ fun FirstStartScreen(
             onDismissRequest = ::dismissDownloadedDatabasePopup,
             title = {
                 Text(
-                    text = stringResource(R.string.database_download_success_title),
+                    text = stringResource(
+                        if (isGeneration) R.string.database_build_success_title
+                        else R.string.database_download_success_title
+                    ),
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -580,7 +586,8 @@ fun FirstStartScreen(
             text = {
                 Text(
                     stringResource(
-                        R.string.database_download_success_desc_named,
+                        if (isGeneration) R.string.database_build_success_desc_named
+                        else R.string.database_download_success_desc_named,
                         pendingDbSuccessPopup.databaseName
                     )
                 )

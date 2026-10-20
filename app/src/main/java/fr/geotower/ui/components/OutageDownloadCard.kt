@@ -57,6 +57,7 @@ import fr.geotower.data.AnfrRepository
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.outages.OutageLocalConfig
 import fr.geotower.data.outages.OutageServerInfo
+import fr.geotower.data.outages.OutageSourceMode
 import fr.geotower.data.outages.OutageTechBreakdown
 import fr.geotower.data.outages.OutageTechRow
 import fr.geotower.data.outages.ServerOutageCache
@@ -215,6 +216,7 @@ private fun OutageServerCopySection(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var refreshTrigger by remember { mutableIntStateOf(0) }
     val currentMode = AppConfig.outageSourceMode.value
+    val isDaily = currentMode == OutageSourceMode.DAILY
 
     LaunchedEffect(refreshTrigger, sectionRefreshKey, isDownloading, currentMode) {
         summary = withContext(Dispatchers.IO) { readServerOutageSummary(context) }
@@ -247,6 +249,19 @@ private fun OutageServerCopySection(
         },
         label = stringResource(R.string.outage_download_server_data),
         value = when {
+            isDaily -> when {
+                summary.serverGeneratedAtMillis > 0L -> LocalizedDateLabels.formatShortDate(
+                    context,
+                    summary.serverGeneratedAtMillis,
+                    AppConfig.appLanguage.value
+                )
+                summary.serverDate != "-" -> LocalizedDateLabels.formatVersionDate(
+                    context,
+                    summary.serverDate,
+                    AppConfig.appLanguage.value
+                )
+                else -> txtNever
+            }
             summary.serverGeneratedAtMillis > 0L -> LocalizedDateLabels.formatShortDateTime(
                 context,
                 summary.serverGeneratedAtMillis,
@@ -269,11 +284,19 @@ private fun OutageServerCopySection(
         },
         label = stringResource(R.string.outage_download_local_copy),
         value = if (summary.hasCopy && summary.downloadedAtMillis > 0L) {
-            LocalizedDateLabels.formatShortDateTime(
-                context,
-                summary.downloadedAtMillis,
-                AppConfig.appLanguage.value
-            )
+            if (isDaily) {
+                LocalizedDateLabels.formatShortDate(
+                    context,
+                    summary.downloadedAtMillis,
+                    AppConfig.appLanguage.value
+                )
+            } else {
+                LocalizedDateLabels.formatShortDateTime(
+                    context,
+                    summary.downloadedAtMillis,
+                    AppConfig.appLanguage.value
+                )
+            }
         } else {
             stringResource(R.string.outage_download_no_copy)
         },
@@ -406,7 +429,7 @@ private fun OutageServerCopySection(
     // Le relevé du serveur peut être plus vieux que la panne constatée : on lui demande alors
     // d'aller le refaire, dans la limite de ce qu'il accepte (deux générations par heure).
     // Pertinent uniquement pour la source directe opérateurs, la source journalière dépendant du fichier officiel Arcep.
-    if (rebuildAvailable && currentMode == fr.geotower.data.outages.OutageSourceMode.OPERATORS) {
+    if (rebuildAvailable && currentMode == OutageSourceMode.OPERATORS) {
         Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
         OutageServerRebuildControls(
             repository = repository,
