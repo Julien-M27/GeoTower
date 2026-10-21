@@ -139,6 +139,24 @@ fun OutageLocalGenerationControls(modifier: Modifier = Modifier) {
     val isDaily = currentSourceMode == fr.geotower.data.outages.OutageSourceMode.DAILY
     val databaseReady = isDaily || (dbState == GeoTowerDatabaseValidator.LocalDatabaseState.VALID)
 
+    var remoteArcepDate by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(currentSourceMode, dbCheckTick) {
+        if (isDaily) {
+            remoteArcepDate = withContext(Dispatchers.IO) {
+                runCatching {
+                    val downloader = fr.geotower.data.build.RawSourceDownloader()
+                    val datasetJson = downloader.fetchText(
+                        fr.geotower.data.build.OfficialSources.ARCEP_SITES_INDISPONIBLES_DATASET_API_URL,
+                        10L * 1024 * 1024,
+                    )
+                    fr.geotower.data.build.OfficialSources.selectLatestDailyOutageResource(datasetJson)?.date
+                }.getOrNull()
+            }
+        } else {
+            remoteArcepDate = null
+        }
+    }
+
     // Fin d'une génération (SUCCEEDED du one-shot, ou retour du périodique à ENQUEUED) → on relit.
     LaunchedEffect(oneShotInfo?.id, oneShotInfo?.state, periodicInfo?.id, periodicInfo?.state) {
         refreshLastGeneration()
@@ -217,6 +235,20 @@ fun OutageLocalGenerationControls(modifier: Modifier = Modifier) {
                 style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.error,
+            )
+        }
+
+        if (isDaily && remoteArcepDate != null) {
+            val formattedArcepDate = LocalizedDateLabels.formatVersionDate(
+                context,
+                remoteArcepDate!!,
+                AppConfig.appLanguage.value
+            )
+            Text(
+                text = "${stringResource(R.string.outage_download_server_data)} : $formattedArcepDate",
+                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary,
             )
         }
 

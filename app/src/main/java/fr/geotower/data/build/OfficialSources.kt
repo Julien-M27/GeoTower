@@ -36,17 +36,46 @@ object OfficialSources {
         "couverture-mobile.orange.fr",
     )
 
+    /** Presets identiques a l'interface d'administration serveur (docs/server/admin_ui.py). */
+    const val WEEKLY_PRESET_DATAGOUV_ZIP = "datagouv_zip"
+    const val WEEKLY_PRESET_ANFR_API = "anfr_api"
+    const val WEEKLY_PRESET_ANFR_API_FALLBACK = "anfr_api_fallback"
+    const val WEEKLY_PRESET_ANFR_PAGE = "anfr_page"
+    const val MONTHLY_PRESET_DATAGOUV_MONTHLY = "datagouv_monthly"
+    const val QUARTERLY_PRESET_ARCEP_LAST = "arcep_last"
+    const val PRESET_CUSTOM = "custom"
+
+    const val URL_WEEKLY_DATAGOUV_ZIP = "https://www.data.gouv.fr/api/1/datasets/donnees-sur-les-reseaux-mobiles/"
+    const val URL_WEEKLY_ANFR_API = "https://data.anfr.fr/d4c/api/records/2.0/downloadfile/format=csv&resource_id=88ef0887-6b0f-4d3f-8545-6d64c8f597da&use_labels_for_header=true&user_defined_fields=true"
+    const val URL_WEEKLY_ANFR_API_FALLBACK = "https://data.anfr.fr/d4c/api/records/2.0/downloadfile/format=csv&refine.generation=2G&refine.generation=3G&refine.generation=4G&refine.generation=5G&resource_id=88ef0887-6b0f-4d3f-8545-6d64c8f597da&use_labels_for_header=true&user_defined_fields=true"
+    const val URL_WEEKLY_ANFR_PAGE = "https://data.anfr.fr/explore/dataset/observatoire_2g_3g_4g/export/"
+    const val URL_MONTHLY_DATAGOUV = "https://www.data.gouv.fr/api/1/datasets/donnees-sur-les-installations-radioelectriques-de-plus-de-5-watts-1/"
+    const val URL_ARCEP_LAST = "https://data.arcep.fr/mobile/sites/last/"
+
+    fun defaultUrlForWeekly(preset: String): String = when (preset) {
+        WEEKLY_PRESET_ANFR_API -> URL_WEEKLY_ANFR_API
+        WEEKLY_PRESET_ANFR_API_FALLBACK -> URL_WEEKLY_ANFR_API_FALLBACK
+        WEEKLY_PRESET_ANFR_PAGE -> URL_WEEKLY_ANFR_PAGE
+        else -> URL_WEEKLY_DATAGOUV_ZIP
+    }
+
+    fun defaultUrlForMonthly(preset: String): String = when (preset) {
+        else -> URL_MONTHLY_DATAGOUV
+    }
+
+    fun defaultUrlForQuarterly(preset: String): String = when (preset) {
+        else -> URL_ARCEP_LAST
+    }
+
     /** API data.gouv du dataset "Donnees SUP" a interroger pour trouver le ZIP mensuel courant. */
-    const val MONTHLY_SUP_DATASET_API_URL =
-        "https://www.data.gouv.fr/api/1/datasets/donnees-sur-les-installations-radioelectriques-de-plus-de-5-watts-1/"
+    const val MONTHLY_SUP_DATASET_API_URL = URL_MONTHLY_DATAGOUV
 
     /**
      * Page d'export ANFR de l'observatoire. Son HTML reference l'URL du **fichier CSV statique
      * courant** (`file_csv`) — c'est la vraie source (l'API d4c/records ne renvoie qu'une erreur).
      * Le CSV est en `;`, avec BOM, ~180 Mo, colonnes techniques (sta_nm_anfr, coordonnees, statut...).
      */
-    const val OBSERVATOIRE_EXPORT_PAGE_URL =
-        "https://data.anfr.fr/explore/dataset/observatoire_2g_3g_4g/export/"
+    const val OBSERVATOIRE_EXPORT_PAGE_URL = URL_WEEKLY_ANFR_PAGE
 
     // Le nom du CSV porte une date (ex. 20260702170329_observatoireod_20260702.csv), a resoudre.
     private val OBSERVATOIRE_CSV_REGEX = Regex(
@@ -123,7 +152,7 @@ object OfficialSources {
      * liste les CSV de sites du trimestre (Metropole, Outremer, comptage 5G). On resout ce listing
      * plutot que le repertoire parent : `last/` pointe toujours vers la publication la plus recente.
      */
-    const val ARCEP_SITES_LAST_URL = "https://data.arcep.fr/mobile/sites/last/"
+    const val ARCEP_SITES_LAST_URL = URL_ARCEP_LAST
 
     /** `href="....csv"` d'un listing ARCEP (liens relatifs ou absolus). */
     private val ARCEP_CSV_HREF_REGEX = Regex(
@@ -141,6 +170,7 @@ object OfficialSources {
     fun resolveArcepSitesCsvUrls(
         listingHtml: String,
         listingUrl: String = ARCEP_SITES_LAST_URL,
+        allowCustomHosts: Boolean = false,
     ): List<String> {
         val base = try {
             URI(listingUrl)
@@ -155,21 +185,93 @@ object OfficialSources {
                 name.endsWith(".csv") && name.contains("sites") &&
                     !name.contains("historique") && !name.contains("comptage")
             }
-            .filter { isAllowedHost(it) }
+            .filter { isAllowedUrl(it, allowCustomHosts) }
             .distinct()
             .toList()
     }
 
-    /** Vrai si `url` est en HTTPS, sur un hote autorise, sans userinfo. */
-    fun isAllowedHost(url: String): Boolean {
+    /** Vrai si `url` est valide (HTTPS officiel par défaut, ou HTTP/HTTPS si hôte personnalisé). */
+    fun isAllowedUrl(url: String, allowCustom: Boolean = false): Boolean {
         return try {
-            val uri = URI(url)
-            uri.scheme.equals("https", ignoreCase = true) &&
-                uri.userInfo == null &&
-                (uri.host?.lowercase() in ALLOWED_HOSTS)
+            val uri = URI(url.trim())
+            val scheme = uri.scheme?.lowercase() ?: return false
+            if (uri.userInfo != null) return false
+            if (allowCustom) {
+                (scheme == "https" || scheme == "http") && !uri.host.isNullOrBlank()
+            } else {
+                scheme == "https" && (uri.host?.lowercase() in ALLOWED_HOSTS)
+            }
         } catch (_: Exception) {
             false
         }
+    }
+
+    /** Vrai si `url` est en HTTPS, sur un hote autorise, sans userinfo. */
+    fun isAllowedHost(url: String): Boolean = isAllowedUrl(url, allowCustom = false)
+
+    private val DATAGOUV_DATASET_SLUG_REGEX = Regex("""datasets/(?:r/|fr/)?([a-zA-Z0-9_-]+)""")
+
+    /**
+     * Normalise une URL d'un dataset data.gouv (ex: page web `https://www.data.gouv.fr/fr/datasets/donnees-sur-les-reseaux-mobiles/`)
+     * en son point d'accès API JSON `https://www.data.gouv.fr/api/1/datasets/{slug}/`.
+     */
+    fun normalizeDatagouvApiUrl(url: String): String {
+        val trimmed = url.trim().trimEnd('/')
+        val match = DATAGOUV_DATASET_SLUG_REGEX.find(trimmed)
+        val slug = match?.groupValues?.getOrNull(1) ?: trimmed.substringAfterLast('/')
+        return if (slug.isNotBlank() && trimmed.contains("data.gouv.fr")) {
+            "https://www.data.gouv.fr/api/1/datasets/$slug/"
+        } else {
+            trimmed
+        }
+    }
+
+    data class DatagouvResource(
+        val url: String,
+        val title: String,
+        val format: String,
+        val filesize: Long,
+    )
+
+    /**
+     * Sélectionne une ressource (ZIP ou CSV) dans un dataset data.gouv, filtrée optionnellement
+     * par mot-clé (ex: "observatoire").
+     */
+    fun selectDatagouvResource(
+        datasetJson: String,
+        filterKeyword: String? = null,
+        allowCustomHosts: Boolean = false,
+    ): DatagouvResource? {
+        val resources = try {
+            JsonParser.parseString(datasetJson).asJsonObject.getAsJsonArray("resources")
+        } catch (_: Exception) {
+            null
+        } ?: return null
+
+        val candidates = ArrayList<DatagouvResource>()
+        for (element in resources) {
+            val obj = element.takeIf { it.isJsonObject }?.asJsonObject ?: continue
+            val url = obj.get("url").stringOrNull() ?: continue
+            val title = obj.get("title").stringOrNull().orEmpty()
+            val format = obj.get("format").stringOrNull()?.lowercase().orEmpty()
+            val filesize = obj.get("filesize")?.takeIf { it.isJsonPrimitive }?.asLong ?: 0L
+            if (isAllowedUrl(url, allowCustomHosts)) {
+                candidates.add(DatagouvResource(url, title, format, filesize))
+            }
+        }
+
+        if (filterKeyword != null) {
+            val kw = filterKeyword.lowercase()
+            val matched = candidates.firstOrNull {
+                it.url.lowercase().contains(kw) || it.title.lowercase().contains(kw)
+            }
+            if (matched != null) return matched
+        }
+
+        return candidates.firstOrNull {
+            it.format == "zip" || it.format == "csv" ||
+                it.url.lowercase().endsWith(".zip") || it.url.lowercase().endsWith(".csv")
+        } ?: candidates.firstOrNull()
     }
 
     /** URLs des deux ZIP mensuels "Donnees SUP" : donnees (SUP_*) et references. */
@@ -205,7 +307,10 @@ object OfficialSources {
      * (le ZIP de donnees est obligatoire, celui des references optionnel), en prenant les plus
      * recents sur un hote autorise. `null` si aucun ZIP de donnees exploitable.
      */
-    fun selectMonthlySupZipUrls(datasetJson: String): MonthlySupUrls? {
+    fun selectMonthlySupZipUrls(
+        datasetJson: String,
+        allowCustomHosts: Boolean = false,
+    ): MonthlySupUrls? {
         val resources = try {
             JsonParser.parseString(datasetJson).asJsonObject.getAsJsonArray("resources")
         } catch (_: Exception) {
@@ -220,7 +325,7 @@ object OfficialSources {
             val format = obj.get("format").stringOrNull()?.lowercase().orEmpty()
             val filename = url.substringAfterLast('/').lowercase()
             val isZip = format == "zip" || filename.endsWith(".zip")
-            if (!isZip || !isAllowedHost(url)) continue
+            if (!isZip || !isAllowedUrl(url, allowCustomHosts)) continue
             // La date des DONNEES est le prefixe du nom de fichier (ex. 20260630-export-etalab-data.zip),
             // PAS la date d'upload : data.gouv re-publie parfois de vieux exports (last_modified recent
             // mais donnees de 2022). Trier sur last_modified choisissait alors un fichier perime, plus
@@ -287,6 +392,7 @@ object OfficialSources {
         } ?: return null
 
         val dateRegex = Regex("""(\d{4}-\d{2}-\d{2})""")
+        val candidates = mutableListOf<DailyOutageResource>()
 
         for (element in resources) {
             val obj = element.takeIf { it.isJsonObject }?.asJsonObject ?: continue
@@ -298,10 +404,10 @@ object OfficialSources {
                 val date = dateRegex.find(title)?.value
                     ?: dateRegex.find(url)?.value
                     ?: obj.get("last_modified").stringOrNull()?.take(10)
-                return DailyOutageResource(url, date)
+                candidates.add(DailyOutageResource(url, date))
             }
         }
-        return null
+        return candidates.maxWithOrNull(compareBy({ it.date ?: "" }, { it.url }))
     }
 
     private fun JsonElement?.stringOrNull(): String? =

@@ -266,6 +266,7 @@ class DatabaseDownloadWorker(
         val notification = NotificationCompat.Builder(context, channelId)
             .setContentTitle(title)
             .setContentText(content)
+            .setContentIntent(settingsPendingIntent(2, showSuccessPopup = false))
             .setAutoCancel(true)
             .let { NotificationIconResources.applyTo(it, context) }
             .build()
@@ -275,8 +276,7 @@ class DatabaseDownloadWorker(
     /**
      * Le journal des notifications garde la trace de l'événement même quand la notification ne part
      * pas (notifications coupées, permission refusée) : c'est justement là qu'il sert. L'échec vise
-     * la même carte de réglages que la réussite — la notification d'échec n'est pas cliquable, mais
-     * depuis le journal c'est de là qu'on relance le téléchargement.
+     * la même carte de réglages que la réussite, ce qui permet de relancer le téléchargement.
      */
     private fun recordHistory(status: String) {
         NotificationHistoryStore.record(

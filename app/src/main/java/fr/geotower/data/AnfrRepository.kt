@@ -34,6 +34,10 @@ import fr.geotower.data.models.RadioFilterMasks
 import fr.geotower.data.models.RefTypeAntenneDbEntity
 import fr.geotower.data.models.TechniqueEntity
 import fr.geotower.data.models.isDeclaredActive
+import fr.geotower.data.build.OfficialSources
+import fr.geotower.data.build.RawSourceDownloader
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import fr.geotower.data.api.SignalQuestClient
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.models.SiteHsEntity
@@ -2046,9 +2050,39 @@ class AnfrRepository(
         // cran « pannes en local » du traitement local, il contient les pannes produites sur l'appareil.
         if (!AppConfig.outagesLocal()) {
             sitesHsCache = null
-            if (sites.isNotEmpty()) storeSitesHsCache(SOURCE_KEY_REMOTE, sites)
+            if (sites.isNotEmpty()) storeSitesHsCache(currentSitesHsSourceKey(), sites)
         }
+        notifyOutagesUpdated()
         return sites
+    }
+
+    /**
+     * Récupère la dernière date de mise à jour des pannes disponible en ligne
+     * pour la source demandée, sans télécharger le GeoJSON complet.
+     */
+    suspend fun getServerSitesHsLastUpdate(
+        sourceMode: OutageSourceMode = AppConfig.outageSourceMode.value,
+    ): String? {
+        val sourceKey = sourceMode.key
+        val remoteUpdate = runCatching {
+            api.getSitesHsInfo(source = sourceKey).lastUpdate
+                ?.trim()
+                ?.takeIf { it.isNotBlank() && !it.equals("Inconnue", ignoreCase = true) }
+        }.getOrNull()
+
+        if (remoteUpdate != null) return remoteUpdate
+
+        if (sourceMode == OutageSourceMode.DAILY) {
+            return runCatching {
+                val downloader = RawSourceDownloader()
+                val datasetJson = downloader.fetchText(
+                    OfficialSources.ARCEP_SITES_INDISPONIBLES_DATASET_API_URL,
+                    10L * 1024 * 1024,
+                )
+                OfficialSources.selectLatestDailyOutageResource(datasetJson)?.date
+            }.getOrNull()
+        }
+        return null
     }
 
     /**
@@ -2084,6 +2118,7 @@ class AnfrRepository(
         serverOutageCache.clear()
         OutageServerInfo.clear(outagePrefs)
         if (!AppConfig.outagesLocal()) sitesHsCache = null
+        notifyOutagesUpdated()
     }
 
     /**
@@ -2097,6 +2132,7 @@ class AnfrRepository(
         // Le cache mémoire deviendrait obsolète juste après une génération manuelle.
         sitesHsCache = null
         if (sites.isNotEmpty()) storeSitesHsCache(currentSitesHsSourceKey(), sites)
+        notifyOutagesUpdated()
         return sites
     }
 
@@ -2111,7 +2147,7 @@ class AnfrRepository(
         val sites: List<SiteHsEntity>,
     )
 
-    private companion object {
+    companion object {
         const val TAG_DB = "GeoTowerDb"
         const val TAG_MAP = "GeoTowerMap"
 
@@ -2134,10 +2170,17 @@ class AnfrRepository(
         const val SOURCE_KEY_LOCAL = "local"
         const val SOURCE_KEY_REMOTE = "remote"
 
-        val sitesHsCacheMutex = Mutex()
+        private val _outageUpdateSignal = MutableStateFlow(0L)
+        val outageUpdateSignal = _outageUpdateSignal.asStateFlow()
+
+        fun notifyOutagesUpdated() {
+            _outageUpdateSignal.value = System.currentTimeMillis()
+        }
+
+        private val sitesHsCacheMutex = Mutex()
 
         @Volatile
-        var sitesHsCache: CachedSitesHs? = null
+        private var sitesHsCache: CachedSitesHs? = null
 
         /** Demi-côté de la boîte de recherche du département courant, en degrés (~25 km). */
         const val NEAREST_DEPARTMENT_DEGREES = 0.25

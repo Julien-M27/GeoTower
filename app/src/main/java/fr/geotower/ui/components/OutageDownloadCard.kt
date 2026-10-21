@@ -156,6 +156,9 @@ fun OutageDownloadCard(
             OutageSourceSelector(
                 useOneUi = useOneUi,
                 modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(12.dp)),
+                onSourceChanged = {
+                    AnfrRepository.notifyOutagesUpdated()
+                },
             )
 
             if (locallyGenerated) {
@@ -211,6 +214,8 @@ private fun OutageServerCopySection(
         outagesAvailable && featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.OUTAGES_REBUILD)
 
     var summary by remember { mutableStateOf(ServerOutageSummary()) }
+    var remoteAvailableDate by remember { mutableStateOf<String?>(null) }
+    var isCheckingRemote by remember { mutableStateOf(false) }
     var isDownloading by remember { mutableStateOf(false) }
     var errorText by remember { mutableStateOf<String?>(null) }
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -222,6 +227,20 @@ private fun OutageServerCopySection(
         summary = withContext(Dispatchers.IO) { readServerOutageSummary(context) }
         refreshState?.reportRefreshed(DatabaseRefreshIds.OUTAGES, sectionRefreshKey)
     }
+
+    LaunchedEffect(refreshTrigger, sectionRefreshKey, currentMode, outagesAvailable) {
+        if (outagesAvailable) {
+            isCheckingRemote = true
+            val remote = withContext(Dispatchers.IO) {
+                repository.getServerSitesHsLastUpdate(currentMode)
+            }
+            remoteAvailableDate = remote
+            isCheckingRemote = false
+        } else {
+            remoteAvailableDate = null
+            isCheckingRemote = false
+        }
+    }
     // Un téléchargement automatique a pu aboutir pendant que la page dormait (carte, fiche, widget).
     LifecycleResumeEffect(Unit) {
         refreshTrigger++
@@ -230,6 +249,8 @@ private fun OutageServerCopySection(
 
     val txtNever = stringResource(R.string.outage_download_never)
     val txtFailed = stringResource(R.string.outage_download_failed)
+    val txtSearching = stringResource(R.string.database_searching)
+    val displayServerDate = remoteAvailableDate ?: summary.serverDate.takeIf { it != "-" }
 
     Text(
         text = stringResource(R.string.outage_download_desc),
@@ -249,15 +270,16 @@ private fun OutageServerCopySection(
         },
         label = stringResource(R.string.outage_download_server_data),
         value = when {
+            isCheckingRemote && displayServerDate == null -> txtSearching
             isDaily -> when {
+                displayServerDate != null && displayServerDate != "-" -> LocalizedDateLabels.formatVersionDate(
+                    context,
+                    displayServerDate,
+                    AppConfig.appLanguage.value
+                )
                 summary.serverGeneratedAtMillis > 0L -> LocalizedDateLabels.formatShortDate(
                     context,
                     summary.serverGeneratedAtMillis,
-                    AppConfig.appLanguage.value
-                )
-                summary.serverDate != "-" -> LocalizedDateLabels.formatVersionDate(
-                    context,
-                    summary.serverDate,
                     AppConfig.appLanguage.value
                 )
                 else -> txtNever
@@ -267,7 +289,7 @@ private fun OutageServerCopySection(
                 summary.serverGeneratedAtMillis,
                 AppConfig.appLanguage.value
             )
-            summary.serverDate != "-" -> summary.serverDate
+            displayServerDate != null && displayServerDate != "-" -> displayServerDate
             else -> txtNever
         },
         iconColumnWidth = iconColumnWidth,

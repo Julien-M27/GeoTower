@@ -74,11 +74,21 @@ class SitesHsGeoJsonParserTest {
 
         val second = result.sites[1]
         assertEquals("0691234567", second.idAnfr)
-        assertEquals("Free", second.operateur)
+        assertEquals("Free Mobile", second.operateur)
         assertEquals(45.7640, second.latitude, 0.0001)
         assertEquals(4.8357, second.longitude, 0.0001)
         assertEquals("LYON", second.commune)
         assertNull(second.raison)
+    }
+
+    @Test
+    fun normalizeOperatorHarmonizesNames() {
+        assertEquals("Free Mobile", SitesHsGeoJsonParser.normalizeOperator("Free"))
+        assertEquals("Free Mobile", SitesHsGeoJsonParser.normalizeOperator("Free Mobile"))
+        assertEquals("Orange", SitesHsGeoJsonParser.normalizeOperator("Orange"))
+        assertEquals("SFR", SitesHsGeoJsonParser.normalizeOperator("SFR"))
+        assertEquals("Bouygues Telecom", SitesHsGeoJsonParser.normalizeOperator("Bouygues Telecom"))
+        assertEquals("Bouygues Telecom", SitesHsGeoJsonParser.normalizeOperator("BOUYGUES"))
     }
 
     @Test

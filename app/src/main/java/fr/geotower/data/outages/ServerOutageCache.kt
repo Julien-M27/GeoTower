@@ -84,6 +84,7 @@ class ServerOutageCache(
 
     fun clear() {
         val target = targetFile()
+        runCatching { target.delete() }
         val ctx = context
         if (ctx != null && AppConfig.outageSourceMode.value == OutageSourceMode.OPERATORS) {
             runCatching { File(ctx.filesDir, FILE_NAME).delete() }

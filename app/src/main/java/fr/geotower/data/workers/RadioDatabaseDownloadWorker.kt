@@ -247,6 +247,7 @@ class RadioDatabaseDownloadWorker(
                 )
             )
             .setContentText(context.getString(R.string.notification_database_download_failed_content))
+            .setContentIntent(settingsPendingIntent(2, showSuccessPopup = false))
             .setAutoCancel(true)
             .let { NotificationIconResources.applyTo(it, context) }
             .build()

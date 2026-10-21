@@ -24,8 +24,8 @@ class RawSourceDownloader(private val client: OkHttpClient = defaultClient()) {
      * Ouvre `url` en flux et le confie a `block`, SANS le poser sur disque (indispensable pour
      * l'observatoire de ~500 Mo). La compression gzip est laissee transparente (OkHttp).
      */
-    fun <T> withStream(url: String, block: (InputStream) -> T): T {
-        require(OfficialSources.isAllowedHost(url)) { "Hote non autorise: $url" }
+    fun <T> withStream(url: String, allowCustomHosts: Boolean = false, block: (InputStream) -> T): T {
+        require(OfficialSources.isAllowedUrl(url, allowCustomHosts)) { "Hote non autorise: $url" }
         val request = Request.Builder().url(url).build()
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) throw IOException("HTTP ${response.code} pour $url")
@@ -35,8 +35,8 @@ class RawSourceDownloader(private val client: OkHttpClient = defaultClient()) {
     }
 
     /** Recupere un corps texte (JSON, listing), plafonne a `maxBytes`. */
-    fun fetchText(url: String, maxBytes: Long): String {
-        require(OfficialSources.isAllowedHost(url)) { "Hote non autorise: $url" }
+    fun fetchText(url: String, maxBytes: Long, allowCustomHosts: Boolean = false): String {
+        require(OfficialSources.isAllowedUrl(url, allowCustomHosts)) { "Hote non autorise: $url" }
         val request = Request.Builder().url(url).header("Accept-Encoding", "identity").build()
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) throw IOException("HTTP ${response.code} pour $url")
@@ -53,10 +53,11 @@ class RawSourceDownloader(private val client: OkHttpClient = defaultClient()) {
         url: String,
         dest: File,
         maxBytes: Long,
+        allowCustomHosts: Boolean = false,
         onProgress: ((copied: Long, total: Long) -> Unit)? = null,
         beforeRead: (() -> Unit)? = null,
     ) {
-        require(OfficialSources.isAllowedHost(url)) { "Hote non autorise: $url" }
+        require(OfficialSources.isAllowedUrl(url, allowCustomHosts)) { "Hote non autorise: $url" }
         val request = Request.Builder().url(url).header("Accept-Encoding", "identity").build()
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) throw IOException("HTTP ${response.code} pour $url")

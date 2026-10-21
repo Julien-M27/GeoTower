@@ -22,6 +22,11 @@ class OutageSourceModeTest {
             {
                 "resources": [
                     {
+                        "title": "Fichier GeoJSON 2026-10-01",
+                        "format": "geojson",
+                        "url": "https://arcep.s3.rbx.io.cloud.ovh.net/sites-indisponibles/all/2026-10-01/raw2026-10-01.geojson"
+                    },
+                    {
                         "title": "Fichier CSV ancien",
                         "format": "csv",
                         "url": "https://arcep.s3.rbx.io.cloud.ovh.net/sites-indisponibles/all/2026-10-01/raw.csv"

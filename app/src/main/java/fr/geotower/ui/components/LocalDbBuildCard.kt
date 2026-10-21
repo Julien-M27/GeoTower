@@ -2,8 +2,10 @@ package fr.geotower.ui.components
 
 import android.text.format.Formatter
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -20,18 +22,25 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Circle
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Radio
+import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.SettingsInputAntenna
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -65,6 +74,9 @@ import fr.geotower.data.build.BuildImportType
 import fr.geotower.data.build.BuildSourceLink
 import fr.geotower.data.build.labelRes
 import fr.geotower.data.build.LocalBuildCapability
+import fr.geotower.data.build.LocalBuildSourceConfig
+import fr.geotower.data.build.LocalBuildSourceStore
+import fr.geotower.data.build.OfficialSources
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.db.DbOperationTimings
 import fr.geotower.data.db.LocalDbProvenance
@@ -539,6 +551,176 @@ fun LocalDbBuildCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = sizing.spacing(8.dp)),
                     )
+
+                    var sourceConfig by remember { mutableStateOf(LocalBuildSourceStore.load(context)) }
+                    var sourcesExpanded by remember { mutableStateOf(false) }
+
+                    Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+
+                    Surface(
+                        shape = RoundedCornerShape(sizing.component(12.dp)),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Column(modifier = Modifier.padding(sizing.spacing(12.dp))) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { sourcesExpanded = !sourcesExpanded },
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f),
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Tune,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(sizing.component(20.dp)),
+                                    )
+                                    Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
+                                    Column {
+                                        Text(
+                                            text = stringResource(R.string.appstrings_local_build_sources_title),
+                                            fontWeight = FontWeight.Bold,
+                                            style = sizing.textStyle(MaterialTheme.typography.titleSmall),
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                        )
+                                        Text(
+                                            text = stringResource(R.string.appstrings_local_build_sources_subtitle),
+                                            style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                }
+                                Icon(
+                                    imageVector = if (sourcesExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(sizing.component(22.dp)),
+                                )
+                            }
+
+                            if (sourcesExpanded) {
+                                Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+
+                                // 1. Hebdo Observatoire
+                                SourceOptionBlock(
+                                    title = "📊 " + stringResource(R.string.appstrings_local_build_source_weekly_header),
+                                    options = listOf(
+                                        OfficialSources.WEEKLY_PRESET_DATAGOUV_ZIP to stringResource(R.string.appstrings_local_build_source_weekly_opt_datagouv_zip),
+                                        OfficialSources.WEEKLY_PRESET_ANFR_API to stringResource(R.string.appstrings_local_build_source_weekly_opt_anfr_api),
+                                        OfficialSources.WEEKLY_PRESET_ANFR_API_FALLBACK to stringResource(R.string.appstrings_local_build_source_weekly_opt_anfr_api_fallback),
+                                        OfficialSources.WEEKLY_PRESET_ANFR_PAGE to stringResource(R.string.appstrings_local_build_source_weekly_opt_anfr_page),
+                                        OfficialSources.PRESET_CUSTOM to stringResource(R.string.appstrings_local_build_source_custom),
+                                    ),
+                                    selectedPreset = sourceConfig.weeklyPreset,
+                                    urlValue = if (sourceConfig.weeklyPreset == OfficialSources.PRESET_CUSTOM) sourceConfig.weeklyCustomUrl else OfficialSources.defaultUrlForWeekly(sourceConfig.weeklyPreset),
+                                    onPresetSelected = { preset ->
+                                        val newConfig = sourceConfig.copy(
+                                            weeklyPreset = preset,
+                                            weeklyCustomUrl = if (preset == OfficialSources.PRESET_CUSTOM) sourceConfig.weeklyCustomUrl.ifBlank { OfficialSources.defaultUrlForWeekly(sourceConfig.weeklyPreset) } else "",
+                                        )
+                                        sourceConfig = newConfig
+                                        LocalBuildSourceStore.save(context, newConfig)
+                                    },
+                                    onUrlChanged = { newUrl ->
+                                        val newConfig = sourceConfig.copy(
+                                            weeklyPreset = OfficialSources.PRESET_CUSTOM,
+                                            weeklyCustomUrl = newUrl,
+                                        )
+                                        sourceConfig = newConfig
+                                        LocalBuildSourceStore.save(context, newConfig)
+                                    },
+                                )
+
+                                Spacer(modifier = Modifier.height(sizing.spacing(10.dp)))
+
+                                // 2. Mensuel ANFR
+                                SourceOptionBlock(
+                                    title = "📦 " + stringResource(R.string.appstrings_local_build_source_monthly_header),
+                                    options = listOf(
+                                        OfficialSources.MONTHLY_PRESET_DATAGOUV_MONTHLY to stringResource(R.string.appstrings_local_build_source_monthly_opt_datagouv),
+                                        OfficialSources.PRESET_CUSTOM to stringResource(R.string.appstrings_local_build_source_custom),
+                                    ),
+                                    selectedPreset = sourceConfig.monthlyPreset,
+                                    urlValue = if (sourceConfig.monthlyPreset == OfficialSources.PRESET_CUSTOM) sourceConfig.monthlyCustomUrl else OfficialSources.defaultUrlForMonthly(sourceConfig.monthlyPreset),
+                                    onPresetSelected = { preset ->
+                                        val newConfig = sourceConfig.copy(
+                                            monthlyPreset = preset,
+                                            monthlyCustomUrl = if (preset == OfficialSources.PRESET_CUSTOM) sourceConfig.monthlyCustomUrl.ifBlank { OfficialSources.defaultUrlForMonthly(sourceConfig.monthlyPreset) } else "",
+                                        )
+                                        sourceConfig = newConfig
+                                        LocalBuildSourceStore.save(context, newConfig)
+                                    },
+                                    onUrlChanged = { newUrl ->
+                                        val newConfig = sourceConfig.copy(
+                                            monthlyPreset = OfficialSources.PRESET_CUSTOM,
+                                            monthlyCustomUrl = newUrl,
+                                        )
+                                        sourceConfig = newConfig
+                                        LocalBuildSourceStore.save(context, newConfig)
+                                    },
+                                )
+
+                                Spacer(modifier = Modifier.height(sizing.spacing(10.dp)))
+
+                                // 3. Trimestriel ARCEP
+                                SourceOptionBlock(
+                                    title = "📡 " + stringResource(R.string.appstrings_local_build_source_quarterly_header),
+                                    options = listOf(
+                                        OfficialSources.QUARTERLY_PRESET_ARCEP_LAST to stringResource(R.string.appstrings_local_build_source_quarterly_opt_last),
+                                        OfficialSources.PRESET_CUSTOM to stringResource(R.string.appstrings_local_build_source_custom),
+                                    ),
+                                    selectedPreset = sourceConfig.quarterlyPreset,
+                                    urlValue = if (sourceConfig.quarterlyPreset == OfficialSources.PRESET_CUSTOM) sourceConfig.quarterlyCustomUrl else OfficialSources.defaultUrlForQuarterly(sourceConfig.quarterlyPreset),
+                                    onPresetSelected = { preset ->
+                                        val newConfig = sourceConfig.copy(
+                                            quarterlyPreset = preset,
+                                            quarterlyCustomUrl = if (preset == OfficialSources.PRESET_CUSTOM) sourceConfig.quarterlyCustomUrl.ifBlank { OfficialSources.defaultUrlForQuarterly(sourceConfig.quarterlyPreset) } else "",
+                                        )
+                                        sourceConfig = newConfig
+                                        LocalBuildSourceStore.save(context, newConfig)
+                                    },
+                                    onUrlChanged = { newUrl ->
+                                        val newConfig = sourceConfig.copy(
+                                            quarterlyPreset = OfficialSources.PRESET_CUSTOM,
+                                            quarterlyCustomUrl = newUrl,
+                                        )
+                                        sourceConfig = newConfig
+                                        LocalBuildSourceStore.save(context, newConfig)
+                                    },
+                                )
+
+                                Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.End,
+                                ) {
+                                    TextButton(
+                                        onClick = {
+                                            sourceConfig = LocalBuildSourceStore.reset(context)
+                                        },
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.RestartAlt,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(sizing.component(18.dp)),
+                                        )
+                                        Spacer(modifier = Modifier.width(sizing.spacing(4.dp)))
+                                        Text(
+                                            text = stringResource(R.string.appstrings_local_build_source_reset),
+                                            style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                     // Un pack coche dont la base est deja installee (telechargee OU generee) sera ecrase :
                     // le bouton previent alors du remplacement.
                     val willReplace = (packMobile && mobileInfo.installed) ||
@@ -857,5 +1039,109 @@ private fun PackOption(
             Spacer(Modifier.width(sizing.spacing(8.dp)))
             Checkbox(checked = checked, onCheckedChange = { onToggle() })
         }
+    }
+}
+
+@Composable
+private fun SourceOptionBlock(
+    title: String,
+    options: List<Pair<String, String>>,
+    selectedPreset: String,
+    urlValue: String,
+    onPresetSelected: (String) -> Unit,
+    onUrlChanged: (String) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val selectedLabel = options.firstOrNull { it.first == selectedPreset }?.second
+        ?: options.firstOrNull()?.second.orEmpty()
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(sizing.component(10.dp)))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+            .padding(sizing.spacing(12.dp)),
+    ) {
+        Text(
+            text = title,
+            fontWeight = FontWeight.Bold,
+            style = sizing.textStyle(MaterialTheme.typography.labelLarge),
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Spacer(modifier = Modifier.height(sizing.spacing(6.dp)))
+
+        Text(
+            text = stringResource(R.string.appstrings_local_build_source_choose),
+            style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(sizing.spacing(4.dp)))
+
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Surface(
+                shape = RoundedCornerShape(sizing.component(8.dp)),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
+                color = MaterialTheme.colorScheme.surface,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = true },
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = sizing.spacing(12.dp), vertical = sizing.spacing(10.dp)),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        text = selectedLabel,
+                        style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Icon(
+                        imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(sizing.component(20.dp)),
+                    )
+                }
+            }
+
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                modifier = Modifier.fillMaxWidth(0.85f),
+            ) {
+                options.forEach { (preset, label) ->
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                text = label,
+                                fontWeight = if (preset == selectedPreset) FontWeight.Bold else FontWeight.Normal,
+                                color = if (preset == selectedPreset) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                            )
+                        },
+                        onClick = {
+                            expanded = false
+                            onPresetSelected(preset)
+                        },
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
+        OutlinedTextField(
+            value = urlValue,
+            onValueChange = onUrlChanged,
+            label = { Text(stringResource(R.string.appstrings_local_build_source_url_label)) },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            textStyle = sizing.textStyle(MaterialTheme.typography.bodySmall),
+            shape = RoundedCornerShape(sizing.component(8.dp)),
+        )
     }
 }

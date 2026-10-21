@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -29,8 +30,10 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -51,6 +54,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import fr.geotower.R
@@ -63,6 +67,7 @@ import fr.geotower.data.db.InspectableDatabase
 import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
+import fr.geotower.utils.PowerProfile
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -119,7 +124,11 @@ fun DatabaseViewerScreen(navController: NavController) {
         } catch (error: Exception) {
             tables = emptyList()
             errorMessage = if (error is DatabaseNotAvailableException) {
-                context.getString(R.string.database_viewer_missing_database)
+                if (selectedDatabase.isOutages) {
+                    context.getString(R.string.database_viewer_missing_outages)
+                } else {
+                    context.getString(R.string.database_viewer_missing_database)
+                }
             } else {
                 context.getString(R.string.database_viewer_read_error)
             }
@@ -181,6 +190,7 @@ fun DatabaseViewerScreen(navController: NavController) {
             DatabaseChoiceMenu(
                 selected = selectedDatabase,
                 onSelected = { selectedDatabase = it },
+                inspector = inspector,
             )
 
             if (isLoadingTables) {
@@ -257,7 +267,14 @@ fun DatabaseViewerScreen(navController: NavController) {
             }
 
             if (isLoadingPage) {
-                LoadingLine()
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    LoadingLine(size = 48.dp)
+                }
             } else {
                 tablePage?.let { loadedPage ->
                     DatabaseTableContent(
@@ -307,13 +324,10 @@ private fun DatabaseSearchSuggestionItem(
 private fun DatabaseChoiceMenu(
     selected: InspectableDatabase,
     onSelected: (InspectableDatabase) -> Unit,
+    inspector: DatabaseInspector,
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val label = when (selected) {
-        InspectableDatabase.MOBILE -> stringResource(R.string.database_viewer_mobile)
-        InspectableDatabase.RADIO -> stringResource(R.string.database_viewer_radio)
-        InspectableDatabase.ENB -> stringResource(R.string.database_viewer_enb)
-    }
+    val label = databaseLabel(selected)
     Box {
         OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
             Icon(Icons.Outlined.TableView, contentDescription = null)
@@ -323,14 +337,18 @@ private fun DatabaseChoiceMenu(
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             InspectableDatabase.entries.forEach { database ->
+                val available = inspector.isAvailable(database)
                 DropdownMenuItem(
                     text = {
+                        val baseText = databaseLabel(database)
+                        val text = if (!available) {
+                            "$baseText (${stringResource(R.string.database_viewer_missing_tag)})"
+                        } else {
+                            baseText
+                        }
                         Text(
-                            when (database) {
-                                InspectableDatabase.MOBILE -> stringResource(R.string.database_viewer_mobile)
-                                InspectableDatabase.RADIO -> stringResource(R.string.database_viewer_radio)
-                                InspectableDatabase.ENB -> stringResource(R.string.database_viewer_enb)
-                            }
+                            text = text,
+                            color = if (available) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
                         )
                     },
                     onClick = {
@@ -341,6 +359,15 @@ private fun DatabaseChoiceMenu(
             }
         }
     }
+}
+
+@Composable
+private fun databaseLabel(database: InspectableDatabase): String = when (database) {
+    InspectableDatabase.MOBILE -> stringResource(R.string.database_viewer_mobile)
+    InspectableDatabase.RADIO -> stringResource(R.string.database_viewer_radio)
+    InspectableDatabase.ENB -> stringResource(R.string.database_viewer_enb)
+    InspectableDatabase.OUTAGES_OPERATORS -> stringResource(R.string.database_viewer_outages_operators)
+    InspectableDatabase.OUTAGES_DAILY -> stringResource(R.string.database_viewer_outages_daily)
 }
 
 @Composable
@@ -519,13 +546,29 @@ private fun DatabasePageControls(
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun LoadingLine() {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
+private fun LoadingLine(
+    modifier: Modifier = Modifier,
+    size: Dp = 36.dp,
+) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = sizing.spacing(12.dp)),
+        contentAlignment = Alignment.Center,
     ) {
-        CircularProgressIndicator()
+        if (PowerProfile.richAnimations) {
+            LoadingIndicator(
+                modifier = Modifier.size(sizing.component(size)),
+                color = MaterialTheme.colorScheme.primary,
+            )
+        } else {
+            CircularProgressIndicator(
+                modifier = Modifier.size(sizing.component(size)),
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
     }
 }

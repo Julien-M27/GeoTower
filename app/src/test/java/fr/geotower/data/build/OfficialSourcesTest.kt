@@ -245,4 +245,64 @@ class OfficialSourcesTest {
             OfficialSources.resolveArcepSitesCsvUrls("<a href=\"../index.html\">up</a>"),
         )
     }
+
+    @Test
+    fun isAllowedUrlValidatesOfficialAndCustomUrls() {
+        assertTrue(OfficialSources.isAllowedUrl("https://www.data.gouv.fr/api/1/datasets/x", allowCustom = false))
+        assertFalse(OfficialSources.isAllowedUrl("http://www.data.gouv.fr/x", allowCustom = false))
+        assertFalse(OfficialSources.isAllowedUrl("https://custom.server.local/file.csv", allowCustom = false))
+
+        assertTrue(OfficialSources.isAllowedUrl("https://custom.server.local/file.csv", allowCustom = true))
+        assertTrue(OfficialSources.isAllowedUrl("http://192.168.1.50:8000/export.zip", allowCustom = true))
+        assertFalse(OfficialSources.isAllowedUrl("ftp://custom.server.local/file.csv", allowCustom = true))
+        assertFalse(OfficialSources.isAllowedUrl("invalid-url", allowCustom = true))
+    }
+
+    @Test
+    fun normalizeDatagouvApiUrlHandlesSlugsAndWebUrls() {
+        assertEquals(
+            "https://www.data.gouv.fr/api/1/datasets/donnees-sur-les-reseaux-mobiles/",
+            OfficialSources.normalizeDatagouvApiUrl("https://www.data.gouv.fr/fr/datasets/donnees-sur-les-reseaux-mobiles/"),
+        )
+        assertEquals(
+            "https://www.data.gouv.fr/api/1/datasets/donnees-sur-les-reseaux-mobiles/",
+            OfficialSources.normalizeDatagouvApiUrl("https://www.data.gouv.fr/api/1/datasets/donnees-sur-les-reseaux-mobiles/"),
+        )
+        assertEquals(
+            "https://other-domain.fr/path",
+            OfficialSources.normalizeDatagouvApiUrl("https://other-domain.fr/path"),
+        )
+    }
+
+    @Test
+    fun selectDatagouvResourcePicksMatchingKeywordOrFormat() {
+        val json = """
+            {
+              "resources": [
+                {"title": "Documentation", "url": "https://www.data.gouv.fr/doc.pdf", "format": "pdf", "filesize": 100},
+                {"title": "Export Observatoire Hebdo", "url": "https://static.data.gouv.fr/obs.zip", "format": "zip", "filesize": 200000},
+                {"title": "Autre fichier", "url": "https://static.data.gouv.fr/autre.csv", "format": "csv", "filesize": 50000}
+              ]
+            }
+        """.trimIndent()
+
+        val resource = OfficialSources.selectDatagouvResource(json, "observatoire")
+        assertEquals("https://static.data.gouv.fr/obs.zip", resource?.url)
+        assertEquals("zip", resource?.format)
+
+        val fallbackResource = OfficialSources.selectDatagouvResource(json, "introuvable")
+        // En fallback, premier zip ou csv
+        assertEquals("https://static.data.gouv.fr/obs.zip", fallbackResource?.url)
+    }
+
+    @Test
+    fun defaultPresetUrlsMatchAdminDashboardPresets() {
+        assertEquals(OfficialSources.URL_WEEKLY_DATAGOUV_ZIP, OfficialSources.defaultUrlForWeekly(OfficialSources.WEEKLY_PRESET_DATAGOUV_ZIP))
+        assertEquals(OfficialSources.URL_WEEKLY_ANFR_API, OfficialSources.defaultUrlForWeekly(OfficialSources.WEEKLY_PRESET_ANFR_API))
+        assertEquals(OfficialSources.URL_WEEKLY_ANFR_API_FALLBACK, OfficialSources.defaultUrlForWeekly(OfficialSources.WEEKLY_PRESET_ANFR_API_FALLBACK))
+        assertEquals(OfficialSources.URL_WEEKLY_ANFR_PAGE, OfficialSources.defaultUrlForWeekly(OfficialSources.WEEKLY_PRESET_ANFR_PAGE))
+
+        assertEquals(OfficialSources.URL_MONTHLY_DATAGOUV, OfficialSources.defaultUrlForMonthly(OfficialSources.MONTHLY_PRESET_DATAGOUV_MONTHLY))
+        assertEquals(OfficialSources.URL_ARCEP_LAST, OfficialSources.defaultUrlForQuarterly(OfficialSources.QUARTERLY_PRESET_ARCEP_LAST))
+    }
 }

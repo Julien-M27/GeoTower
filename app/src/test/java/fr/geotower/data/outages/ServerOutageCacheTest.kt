@@ -76,4 +76,18 @@ class ServerOutageCacheTest {
             file.delete()
         }
     }
+
+    @Test
+    fun clearDeletesTargetFile() {
+        val file = File.createTempFile("server_outage_clear", ".json")
+        try {
+            val cache = ServerOutageCache(file)
+            cache.save(CachedServerOutages(1L, null, 0L, emptyList()))
+            org.junit.Assert.assertTrue(file.exists())
+            cache.clear()
+            org.junit.Assert.assertFalse(file.exists())
+        } finally {
+            file.delete()
+        }
+    }
 }

@@ -1,5 +1,6 @@
 package fr.geotower.ui.screens.map
 
+import androidx.compose.runtime.snapshotFlow
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -634,14 +635,24 @@ class MapViewModel(
     val sitesHs = _sitesHs.asStateFlow()
 
     init {
-        fetchSitesHs()
+        viewModelScope.launch {
+            snapshotFlow { Pair(AppConfig.outageSourceMode.value, AppConfig.effectiveLocalModeLevel()) }
+                .collect {
+                    fetchSitesHs(forceRefresh = true)
+                }
+        }
+        viewModelScope.launch {
+            AnfrRepository.outageUpdateSignal.collect {
+                fetchSitesHs(forceRefresh = false)
+            }
+        }
     }
 
-    fun fetchSitesHs() {
+    fun fetchSitesHs(forceRefresh: Boolean = false) {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
-                // On télécharge toutes les pannes de tous les opérateurs en une seule fois !
-                val allHs = repository.getSitesHs()
+                // On télécharge toutes les pannes de la source active
+                val allHs = repository.getSitesHs(forceRefresh = forceRefresh)
                 _sitesHs.value = allHs
                 AppLogger.d(TAG, "Outage markers loaded count=${allHs.size}")
             } catch (e: CancellationException) {

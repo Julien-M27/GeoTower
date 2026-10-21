@@ -103,7 +103,11 @@ class AntennaVoiceQueryHandler(
                 lower.contains("orange") -> "Orange"
                 lower.contains("sfr") -> "SFR"
                 lower.contains("bouygues") -> "Bouygues"
-                else -> raw.trim()
+                lower.contains("digicel") -> "Digicel"
+                lower.contains("outremer") -> "Outremer"
+                // Si la phrase contient "antenne", "relais", etc. sans nom d'opérateur spécifique,
+                // on renvoie null pour chercher tous les opérateurs confondus.
+                else -> null
             }
         }
 

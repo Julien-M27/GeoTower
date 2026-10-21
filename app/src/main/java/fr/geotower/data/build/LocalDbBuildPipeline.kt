@@ -62,6 +62,42 @@ class LocalDbBuildPipeline(
             ).joinToString("+").ifEmpty { "aucun" }
     }
 
+    private fun extractFirstCsvFromZip(zipFile: File, destCsv: File): Boolean {
+        return runCatching {
+            java.util.zip.ZipFile(zipFile).use { zip ->
+                val entry = zip.entries().asSequence().firstOrNull {
+                    !it.isDirectory && it.name.lowercase().endsWith(".csv")
+                } ?: return false
+                zip.getInputStream(entry).use { input ->
+                    destCsv.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                true
+            }
+        }.getOrDefault(false)
+    }
+
+    private fun extractAllCsvsFromZip(zipFile: File, destDir: File): Int {
+        var count = 0
+        runCatching {
+            java.util.zip.ZipFile(zipFile).use { zip ->
+                zip.entries().asSequence().filter {
+                    !it.isDirectory && it.name.lowercase().endsWith(".csv")
+                }.forEach { entry ->
+                    val outFile = File(destDir, "arcep_$count.csv")
+                    zip.getInputStream(entry).use { input ->
+                        outFile.outputStream().use { output ->
+                            input.copyTo(output)
+                        }
+                    }
+                    count++
+                }
+            }
+        }
+        return count
+    }
+
     /**
      * Lance la generation et **mesure** ce qu'elle coute a l'appareil (duree par phase, pics de tas
      * Java / memoire native / stockage, taille des sources et des bases produites). Le rapport est
@@ -73,12 +109,13 @@ class LocalDbBuildPipeline(
         context: Context,
         packs: Packs,
         force: Boolean = false,
+        sourceConfig: LocalBuildSourceConfig = LocalBuildSourceStore.load(context),
         onProgress: (BuildProgressUpdate) -> Unit,
         onPause: () -> Unit = {},
     ): Result {
         val metrics = LocalBuildMetrics()
         val device = BuildDeviceProfiles.read(context)
-        val result = runMeasured(context, packs, force, metrics, onProgress, onPause)
+        val result = runMeasured(context, packs, force, sourceConfig, metrics, onProgress, onPause)
         runCatching {
             LocalBuildReportStore.save(context, metrics.report(device, packs.label, result.success, result.reason))
         }.onFailure { AppLogger.w("GeoTowerDb", "Rapport de mesures non enregistre", it) }
@@ -89,6 +126,7 @@ class LocalDbBuildPipeline(
         context: Context,
         packs: Packs,
         force: Boolean,
+        sourceConfig: LocalBuildSourceConfig,
         metrics: LocalBuildMetrics,
         onProgress: (BuildProgressUpdate) -> Unit,
         onPause: () -> Unit,
@@ -164,9 +202,16 @@ class LocalDbBuildPipeline(
 
         try {
             emit(BuildPhase.RESOLVING, 0, null)
-            val datasetJson = downloader.fetchText(OfficialSources.MONTHLY_SUP_DATASET_API_URL, MAX_JSON_BYTES)
-            val monthly = OfficialSources.selectMonthlySupZipUrls(datasetJson)
-                ?: return@withContext Result(false, "ZIP mensuel ANFR introuvable sur data.gouv")
+            val monthlyUrl = sourceConfig.effectiveMonthlyUrl()
+            val isMonthlyCustom = sourceConfig.isMonthlyCustom
+            val monthly = if (monthlyUrl.lowercase().endsWith(".zip")) {
+                OfficialSources.MonthlySupUrls(monthlyUrl, null)
+            } else {
+                val apiUrl = OfficialSources.normalizeDatagouvApiUrl(monthlyUrl)
+                val datasetJson = downloader.fetchText(apiUrl, MAX_JSON_BYTES, allowCustomHosts = isMonthlyCustom)
+                OfficialSources.selectMonthlySupZipUrls(datasetJson, allowCustomHosts = isMonthlyCustom)
+                    ?: return@withContext Result(false, "ZIP mensuel ANFR introuvable sur la source choisie")
+            }
             // Version « fichier » du mensuel = le VRAI nom ANFR (ex. 20260630-export-etalab-data.zip),
             // extrait de l'URL data.gouv. On NE stocke PAS dataZip.name ("sup_data.zip", le fichier temporaire
             // local) : c'est ce prefixe AAAAMMJJ que la section « Versions » de l'A-propos formate en « Juin 2026 »,
@@ -181,24 +226,31 @@ class LocalDbBuildPipeline(
             while (attempt < MAX_ZIP_ATTEMPTS) {
                 attempt++
                 try {
-                    downloader.downloadToFile(monthly.dataUrl, dataZip, MAX_ZIP_BYTES, onProgress = { copied, total ->
-                        val mb = copied / (1024 * 1024)
-                        val pct = if (total > 0) (5 + copied * 30 / total).toInt().coerceIn(5, 35) else 20
-                        if (pct != lastPct) {
-                            lastPct = pct
-                            emit(
-                                phase = BuildPhase.DOWNLOADING,
-                                percent = pct,
-                                detail = "$mb Mo (essai $attempt)",
-                                importType = BuildImportType.MONTHLY,
-                                fileName = monthlyFileVersion,
-                                sourceUrl = monthly.dataUrl,
-                                sourceLink = BuildSourceLink.STANDARD,
-                                downloadedBytes = copied,
-                                totalBytes = total,
-                            )
-                        }
-                    }, beforeRead = onPause)
+                    downloader.downloadToFile(
+                        url = monthly.dataUrl,
+                        dest = dataZip,
+                        maxBytes = MAX_ZIP_BYTES,
+                        allowCustomHosts = isMonthlyCustom,
+                        onProgress = { copied, total ->
+                            val mb = copied / (1024 * 1024)
+                            val pct = if (total > 0) (5 + copied * 30 / total).toInt().coerceIn(5, 35) else 20
+                            if (pct != lastPct) {
+                                lastPct = pct
+                                emit(
+                                    phase = BuildPhase.DOWNLOADING,
+                                    percent = pct,
+                                    detail = "$mb Mo (essai $attempt)",
+                                    importType = BuildImportType.MONTHLY,
+                                    fileName = monthlyFileVersion,
+                                    sourceUrl = monthly.dataUrl,
+                                    sourceLink = BuildSourceLink.STANDARD,
+                                    downloadedBytes = copied,
+                                    totalBytes = total,
+                                )
+                            }
+                        },
+                        beforeRead = onPause,
+                    )
                     zipError = verifyMonthlyZip(dataZip)
                     if (zipError == null) break
                 } catch (e: CancellationException) {
@@ -215,28 +267,35 @@ class LocalDbBuildPipeline(
             monthly.refUrl?.let { refUrl ->
                 var refPct = -1
                 runBuildCatching {
-                    downloader.downloadToFile(refUrl, refZip, MAX_REF_ZIP_BYTES, onProgress = { copied, total ->
-                        val pct = if (total > 0L) {
-                            (copied * 100L / total).toInt().coerceIn(0, 100)
-                        } else {
-                            0
-                        }
-                        if (pct != refPct) {
-                            refPct = pct
-                            emit(
-                                phase = BuildPhase.DOWNLOADING,
-                                percent = 35,
-                                detail = "Références mensuelles",
-                                importType = BuildImportType.MONTHLY,
-                                fileName = refUrl.substringAfterLast('/').substringBefore('?')
-                                    .ifBlank { refZip.name },
-                                sourceUrl = refUrl,
-                                sourceLink = BuildSourceLink.STANDARD,
-                                downloadedBytes = copied,
-                                totalBytes = total,
-                            )
-                        }
-                    }, beforeRead = onPause)
+                    downloader.downloadToFile(
+                        url = refUrl,
+                        dest = refZip,
+                        maxBytes = MAX_REF_ZIP_BYTES,
+                        allowCustomHosts = isMonthlyCustom,
+                        onProgress = { copied, total ->
+                            val pct = if (total > 0L) {
+                                (copied * 100L / total).toInt().coerceIn(0, 100)
+                            } else {
+                                0
+                            }
+                            if (pct != refPct) {
+                                refPct = pct
+                                emit(
+                                    phase = BuildPhase.DOWNLOADING,
+                                    percent = 35,
+                                    detail = "Références mensuelles",
+                                    importType = BuildImportType.MONTHLY,
+                                    fileName = refUrl.substringAfterLast('/').substringBefore('?')
+                                        .ifBlank { refZip.name },
+                                    sourceUrl = refUrl,
+                                    sourceLink = BuildSourceLink.STANDARD,
+                                    downloadedBytes = copied,
+                                    totalBytes = total,
+                                )
+                            }
+                        },
+                        beforeRead = onPause,
+                    )
                 }
             }
             metrics.noteFile("sup_ref.zip", refZip.length())
@@ -270,11 +329,8 @@ class LocalDbBuildPipeline(
             // est demande. Pour un build « non-mobile seul », ces ~500 Mo sont economises.
             if (packs.mobile) {
                 emit(BuildPhase.READING_STATIONS, 36, null)
-                val exportHtml = downloader.fetchText(OfficialSources.OBSERVATOIRE_EXPORT_PAGE_URL, MAX_JSON_BYTES)
-                val observatoireUrls = OfficialSources.resolveObservatoireCsvUrls(exportHtml)
-                val observatoireUrl = observatoireUrls.firstOrNull()
-                    ?: return@withContext Result(false, "URL de l'observatoire ANFR introuvable (page d'export)")
-                val fallbackObservatoireUrl = observatoireUrls.getOrNull(1)
+                val weeklyUrl = sourceConfig.effectiveWeeklyUrl()
+                val isWeeklyCustom = sourceConfig.isWeeklyCustom
 
                 // Observatoire telecharge dans un FICHIER (retry + completude) plutot que streame :
                 // un flux HTTP peut casser (PROTOCOL_ERROR) en plein build ; un fichier est retryable.
@@ -289,26 +345,33 @@ class LocalDbBuildPipeline(
                     while (obsAttempt < MAX_ZIP_ATTEMPTS) {
                         obsAttempt++
                         try {
-                            downloader.downloadToFile(url, observatoireCsv, MAX_OBS_BYTES, onProgress = { copied, total ->
-                                val mb = copied / (1024 * 1024)
-                                val pct = if (total > 0) (36 + copied * 8 / total).toInt().coerceIn(36, 44) else 40
-                                if (pct != obsPct) {
-                                    obsPct = pct
-                                    emit(
-                                        phase = BuildPhase.READING_STATIONS,
-                                        percent = pct,
-                                        detail = "$mb Mo (essai $obsAttempt)",
-                                        importType = BuildImportType.WEEKLY,
-                                        fileName = url.substringAfterLast('/').substringBefore('?')
-                                            .ifBlank { observatoireCsv.name },
-                                        sourceUrl = url,
-                                        sourceLink = sourceLink,
-                                        sourceSwitchReason = switchReason,
-                                        downloadedBytes = copied,
-                                        totalBytes = total,
-                                    )
-                                }
-                            }, beforeRead = onPause)
+                            downloader.downloadToFile(
+                                url = url,
+                                dest = observatoireCsv,
+                                maxBytes = MAX_OBS_BYTES,
+                                allowCustomHosts = isWeeklyCustom,
+                                onProgress = { copied, total ->
+                                    val mb = copied / (1024 * 1024)
+                                    val pct = if (total > 0) (36 + copied * 8 / total).toInt().coerceIn(36, 44) else 40
+                                    if (pct != obsPct) {
+                                        obsPct = pct
+                                        emit(
+                                            phase = BuildPhase.READING_STATIONS,
+                                            percent = pct,
+                                            detail = "$mb Mo (essai $obsAttempt)",
+                                            importType = BuildImportType.WEEKLY,
+                                            fileName = url.substringAfterLast('/').substringBefore('?')
+                                                .ifBlank { observatoireCsv.name },
+                                            sourceUrl = url,
+                                            sourceLink = sourceLink,
+                                            sourceSwitchReason = switchReason,
+                                            downloadedBytes = copied,
+                                            totalBytes = total,
+                                        )
+                                    }
+                                },
+                                beforeRead = onPause,
+                            )
                             obsError = if (observatoireCsv.length() > 1000L) null else "Observatoire vide"
                             if (obsError == null) break
                         } catch (e: CancellationException) {
@@ -320,81 +383,177 @@ class LocalDbBuildPipeline(
                     return obsError
                 }
 
-                var obsError = downloadObservatoire(observatoireUrl, BuildSourceLink.STANDARD)
-                val selectedObservatoire = OfficialSources.selectObservatoireCsvSource(
-                    standardUrl = observatoireUrl,
-                    fallbackUrl = fallbackObservatoireUrl,
-                    standardBytes = observatoireCsv.length(),
-                ) ?: return@withContext Result(
-                    false,
-                    context.getString(
-                        R.string.appstrings_local_build_fallback_unavailable,
-                        observatoireCsv.length() / (1024L * 1024L),
-                    ),
-                )
-                if (selectedObservatoire.link == OfficialSources.ObservatoireCsvLink.FALLBACK) {
-                    val standardSizeMb = observatoireCsv.length() / (1024L * 1024L)
-                    val switchReason = context.getString(
-                        R.string.appstrings_local_build_switch_to_fallback,
-                        standardSizeMb,
-                    )
-                    observatoireCsv.delete()
-                    emit(
-                        phase = BuildPhase.READING_STATIONS,
-                        percent = 36,
-                        detail = switchReason,
-                        importType = BuildImportType.WEEKLY,
-                        fileName = selectedObservatoire.url.substringAfterLast('/').substringBefore('?')
-                            .ifBlank { observatoireCsv.name },
-                        sourceUrl = selectedObservatoire.url,
-                        sourceLink = BuildSourceLink.FALLBACK,
-                        sourceSwitchReason = switchReason,
-                    )
-                    obsError = downloadObservatoire(
-                        selectedObservatoire.url,
-                        BuildSourceLink.FALLBACK,
-                        switchReason,
-                    )
+                fun downloadZipObservatoire(zipUrl: String, sourceLink: BuildSourceLink): String? {
+                    val tempZip = File(workDir, "temp_weekly.zip")
+                    var obsError: String? = null
+                    try {
+                        downloader.downloadToFile(
+                            url = zipUrl,
+                            dest = tempZip,
+                            maxBytes = MAX_OBS_BYTES,
+                            allowCustomHosts = isWeeklyCustom,
+                            onProgress = { copied, total ->
+                                val mb = copied / (1024 * 1024)
+                                val pct = if (total > 0) (36 + copied * 8 / total).toInt().coerceIn(36, 44) else 40
+                                emit(
+                                    phase = BuildPhase.READING_STATIONS,
+                                    percent = pct,
+                                    detail = "$mb Mo (extraction)",
+                                    importType = BuildImportType.WEEKLY,
+                                    fileName = zipUrl.substringAfterLast('/').substringBefore('?')
+                                        .ifBlank { tempZip.name },
+                                    sourceUrl = zipUrl,
+                                    sourceLink = sourceLink,
+                                    downloadedBytes = copied,
+                                    totalBytes = total,
+                                )
+                            },
+                            beforeRead = onPause,
+                        )
+                        val extracted = extractFirstCsvFromZip(tempZip, observatoireCsv)
+                        if (!extracted || observatoireCsv.length() <= 1000L) {
+                            obsError = "L'archive ZIP hebdo ne contenait aucun fichier .csv valide"
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        obsError = "Téléchargement ZIP hebdo : ${e.message ?: e.javaClass.simpleName}"
+                    } finally {
+                        tempZip.delete()
+                    }
+                    return obsError
                 }
+
+                var obsError: String? = null
+                if (sourceConfig.weeklyPreset == OfficialSources.WEEKLY_PRESET_ANFR_PAGE ||
+                    (!isWeeklyCustom && weeklyUrl.contains("explore/dataset/observatoire_2g_3g_4g/export"))
+                ) {
+                    val exportHtml = downloader.fetchText(weeklyUrl, MAX_JSON_BYTES, allowCustomHosts = isWeeklyCustom)
+                    val observatoireUrls = OfficialSources.resolveObservatoireCsvUrls(exportHtml)
+                    val observatoireUrl = observatoireUrls.firstOrNull()
+                        ?: return@withContext Result(false, "URL de l'observatoire ANFR introuvable (page d'export)")
+                    val fallbackObservatoireUrl = observatoireUrls.getOrNull(1)
+
+                    obsError = downloadObservatoire(observatoireUrl, BuildSourceLink.STANDARD)
+                    val selectedObservatoire = OfficialSources.selectObservatoireCsvSource(
+                        standardUrl = observatoireUrl,
+                        fallbackUrl = fallbackObservatoireUrl,
+                        standardBytes = observatoireCsv.length(),
+                    ) ?: return@withContext Result(
+                        false,
+                        context.getString(
+                            R.string.appstrings_local_build_fallback_unavailable,
+                            observatoireCsv.length() / (1024L * 1024L),
+                        ),
+                    )
+                    if (selectedObservatoire.link == OfficialSources.ObservatoireCsvLink.FALLBACK) {
+                        val standardSizeMb = observatoireCsv.length() / (1024L * 1024L)
+                        val switchReason = context.getString(
+                            R.string.appstrings_local_build_switch_to_fallback,
+                            standardSizeMb,
+                        )
+                        observatoireCsv.delete()
+                        emit(
+                            phase = BuildPhase.READING_STATIONS,
+                            percent = 36,
+                            detail = switchReason,
+                            importType = BuildImportType.WEEKLY,
+                            fileName = selectedObservatoire.url.substringAfterLast('/').substringBefore('?')
+                                .ifBlank { observatoireCsv.name },
+                            sourceUrl = selectedObservatoire.url,
+                            sourceLink = BuildSourceLink.FALLBACK,
+                            sourceSwitchReason = switchReason,
+                        )
+                        obsError = downloadObservatoire(
+                            selectedObservatoire.url,
+                            BuildSourceLink.FALLBACK,
+                            switchReason,
+                        )
+                    }
+                } else if (sourceConfig.weeklyPreset == OfficialSources.WEEKLY_PRESET_DATAGOUV_ZIP ||
+                    (weeklyUrl.contains("data.gouv.fr") && !weeklyUrl.lowercase().endsWith(".csv"))
+                ) {
+                    val apiUrl = OfficialSources.normalizeDatagouvApiUrl(weeklyUrl)
+                    val datasetJson = downloader.fetchText(apiUrl, MAX_JSON_BYTES, allowCustomHosts = isWeeklyCustom)
+                    val res = OfficialSources.selectDatagouvResource(datasetJson, "observatoire", allowCustomHosts = isWeeklyCustom)
+                        ?: return@withContext Result(false, "Ressource observatoire introuvable sur data.gouv.fr")
+                    if (res.url.lowercase().endsWith(".zip") || res.format == "zip") {
+                        obsError = downloadZipObservatoire(res.url, BuildSourceLink.STANDARD)
+                    } else {
+                        obsError = downloadObservatoire(res.url, BuildSourceLink.STANDARD)
+                    }
+                } else if (weeklyUrl.lowercase().endsWith(".zip")) {
+                    obsError = downloadZipObservatoire(weeklyUrl, BuildSourceLink.STANDARD)
+                } else {
+                    obsError = downloadObservatoire(weeklyUrl, BuildSourceLink.STANDARD)
+                }
+
                 if (obsError != null) return@withContext Result(false, obsError)
                 metrics.noteFile("observatoire.csv", observatoireCsv.length())
 
-                // ARCEP trimestriel : resout le listing "last/" (trimestre courant) et telecharge les
-                // CSV de sites (Metropole + Outremer). Entierement best-effort : source d'enrichissement
-                // OPTIONNELLE (arcep_nidt/is_zb), un echec ne doit jamais interrompre la generation.
+                // ARCEP trimestriel : resout le listing "last/" ou l'URL choisie.
+                // Entierement best-effort : source d'enrichissement OPTIONNELLE (arcep_nidt/is_zb).
                 runBuildCatching {
                     emit(BuildPhase.READING_STATIONS, 44, "ARCEP")
-                    val listingHtml = downloader.fetchText(OfficialSources.ARCEP_SITES_LAST_URL, MAX_JSON_BYTES)
-                    OfficialSources.resolveArcepSitesCsvUrls(listingHtml).forEachIndexed { index, url ->
-                        arcepQuarter = arcepQuarter ?: OfficialSources.extractQuarter(url.substringAfterLast('/'))
-                        val dest = File(arcepDir, "arcep_$index.csv")
-                        var arcepPct = -1
-                        runBuildCatching {
-                            downloader.downloadToFile(url, dest, MAX_ARCEP_BYTES, onProgress = { copied, total ->
-                                val pct = if (total > 0L) {
-                                    (copied * 100L / total).toInt().coerceIn(0, 100)
-                                } else {
-                                    0
-                                }
-                                if (pct != arcepPct) {
-                                    arcepPct = pct
-                                    emit(
-                                        phase = BuildPhase.READING_STATIONS,
-                                        percent = 44,
-                                        detail = "ARCEP",
-                                        importType = BuildImportType.QUARTERLY,
-                                        fileName = url.substringAfterLast('/').substringBefore('?')
-                                            .ifBlank { dest.name },
-                                        sourceUrl = url,
-                                        sourceLink = BuildSourceLink.STANDARD,
-                                        downloadedBytes = copied,
-                                        totalBytes = total,
+                    val quarterlyUrl = sourceConfig.effectiveQuarterlyUrl()
+                    val isQuarterlyCustom = sourceConfig.isQuarterlyCustom
+
+                    if (quarterlyUrl.lowercase().endsWith(".csv")) {
+                        arcepQuarter = arcepQuarter ?: OfficialSources.extractQuarter(quarterlyUrl.substringAfterLast('/'))
+                        val dest = File(arcepDir, "arcep_0.csv")
+                        downloader.downloadToFile(quarterlyUrl, dest, MAX_ARCEP_BYTES, allowCustomHosts = isQuarterlyCustom)
+                        if (dest.length() > 100L) arcepFiles.add(dest)
+                    } else if (quarterlyUrl.lowercase().endsWith(".zip")) {
+                        val tempZip = File(workDir, "temp_arcep.zip")
+                        try {
+                            downloader.downloadToFile(quarterlyUrl, tempZip, MAX_ARCEP_BYTES, allowCustomHosts = isQuarterlyCustom)
+                            extractAllCsvsFromZip(tempZip, arcepDir)
+                            arcepQuarter = arcepQuarter ?: OfficialSources.extractQuarter(quarterlyUrl.substringAfterLast('/'))
+                            arcepDir.listFiles { f -> f.name.endsWith(".csv") && f.length() > 100L }?.let { arcepFiles.addAll(it) }
+                        } finally {
+                            tempZip.delete()
+                        }
+                    } else {
+                        val listingHtml = downloader.fetchText(quarterlyUrl, MAX_JSON_BYTES, allowCustomHosts = isQuarterlyCustom)
+                        OfficialSources.resolveArcepSitesCsvUrls(listingHtml, quarterlyUrl, allowCustomHosts = isQuarterlyCustom)
+                            .forEachIndexed { index, url ->
+                                arcepQuarter = arcepQuarter ?: OfficialSources.extractQuarter(url.substringAfterLast('/'))
+                                val dest = File(arcepDir, "arcep_$index.csv")
+                                var arcepPct = -1
+                                runBuildCatching {
+                                    downloader.downloadToFile(
+                                        url = url,
+                                        dest = dest,
+                                        maxBytes = MAX_ARCEP_BYTES,
+                                        allowCustomHosts = isQuarterlyCustom,
+                                        onProgress = { copied, total ->
+                                            val pct = if (total > 0L) {
+                                                (copied * 100L / total).toInt().coerceIn(0, 100)
+                                            } else {
+                                                0
+                                            }
+                                            if (pct != arcepPct) {
+                                                arcepPct = pct
+                                                emit(
+                                                    phase = BuildPhase.READING_STATIONS,
+                                                    percent = 44,
+                                                    detail = "ARCEP",
+                                                    importType = BuildImportType.QUARTERLY,
+                                                    fileName = url.substringAfterLast('/').substringBefore('?')
+                                                        .ifBlank { dest.name },
+                                                    sourceUrl = url,
+                                                    sourceLink = BuildSourceLink.STANDARD,
+                                                    downloadedBytes = copied,
+                                                    totalBytes = total,
+                                                )
+                                            }
+                                        },
+                                        beforeRead = onPause,
                                     )
                                 }
-                            }, beforeRead = onPause)
-                        }
-                            .onSuccess { if (dest.length() > 100L) arcepFiles.add(dest) }
-                            .onFailure { AppLogger.w("GeoTowerDb", "ARCEP CSV download failed (non-fatal): $url", it) }
+                                    .onSuccess { if (dest.length() > 100L) arcepFiles.add(dest) }
+                                    .onFailure { AppLogger.w("GeoTowerDb", "ARCEP CSV download failed (non-fatal): $url", it) }
+                            }
                     }
                 }.onFailure { AppLogger.w("GeoTowerDb", "ARCEP resolve failed (non-fatal)", it) }
                 metrics.noteFile("arcep (${arcepFiles.size} CSV)", arcepFiles.sumOf { it.length() })

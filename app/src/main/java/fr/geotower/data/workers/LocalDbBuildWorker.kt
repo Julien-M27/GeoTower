@@ -175,6 +175,7 @@ class LocalDbBuildWorker(
                 context = context,
                 packs = packs,
                 force = force,
+                sourceConfig = fr.geotower.data.build.LocalBuildSourceStore.load(context),
                 onProgress = { update: BuildProgressUpdate ->
                     if (update.importType == BuildImportType.WEEKLY &&
                         update.sourceUrl != null && update.sourceLink != null

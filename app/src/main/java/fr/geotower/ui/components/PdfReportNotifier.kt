@@ -95,7 +95,17 @@ object PdfReportNotifier {
 
     private fun builder(context: Context): NotificationCompat.Builder {
         ensureChannel(context)
+        val openIntent = Intent(context, fr.geotower.MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            PROGRESS_NOTIFICATION_ID,
+            openIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setContentIntent(pendingIntent)
         NotificationIconResources.applyTo(builder, context)
         return builder
     }

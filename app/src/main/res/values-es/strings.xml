@@ -2704,6 +2704,21 @@
     <string name="appstrings_local_build_pack_nonmobile">No móvil (técnico)</string>
     <string name="appstrings_local_build_pack_nonmobile_desc">Radioenlaces, redes privadas, ferrocarril…</string>
     <string name="appstrings_local_build_packs_hint">El archivo ANFR (obligatorio) se comparte. Desmarcar \"Móvil\" también evita la descarga del observatorio (~500 MB).</string>
+    <string name="appstrings_local_build_sources_title">Fuentes de datos</string>
+    <string name="appstrings_local_build_sources_subtitle">Elegir las fuentes como en el panel de administración</string>
+    <string name="appstrings_local_build_source_choose">Elegir la fuente:\u0020</string>
+    <string name="appstrings_local_build_source_url_label">URL de la fuente</string>
+    <string name="appstrings_local_build_source_custom">Enlace personalizado…</string>
+    <string name="appstrings_local_build_source_weekly_header">Semanal Observatorio</string>
+    <string name="appstrings_local_build_source_weekly_opt_datagouv_zip">1. Data.gouv.fr (ZIP autoextraído)</string>
+    <string name="appstrings_local_build_source_weekly_opt_anfr_api">2. API ANFR Principal</string>
+    <string name="appstrings_local_build_source_weekly_opt_anfr_api_fallback">3. API ANFR de respaldo (refine 2G-5G)</string>
+    <string name="appstrings_local_build_source_weekly_opt_anfr_page">4. Página de exportación ANFR (detección automática)</string>
+    <string name="appstrings_local_build_source_monthly_header">Mensual ANFR (Datos SUP)</string>
+    <string name="appstrings_local_build_source_monthly_opt_datagouv">1. Data.gouv.fr (Última exportación SUP)</string>
+    <string name="appstrings_local_build_source_quarterly_header">Trimestral ARCEP</string>
+    <string name="appstrings_local_build_source_quarterly_opt_last">1. Data.arcep.fr (Último trimestre sites/last/)</string>
+    <string name="appstrings_local_build_source_reset">Restablecer fuentes predeterminadas</string>
     <string name="appstrings_local_build_phase_radio">Generando la base de datos de radio</string>
     <string name="appstrings_release_v1963_db_provenance">Los ajustes ahora distinguen una base de datos generada en el dispositivo de una descargada en línea, con la fecha de generación y un botón para reemplazar una por otra</string>
     <string name="appstrings_release_v1963_offline_maps_catalog">La lista de mapas sin conexión ahora aparece al instante (catálogo integrado en la aplicación, sin esperar al servidor)</string>
@@ -3358,6 +3373,8 @@
     <string name="database_viewer_mobile">Base de datos móvil</string>
     <string name="database_viewer_radio">Base de datos de radio</string>
     <string name="database_viewer_enb">Base de datos eNB / gNB</string>
+    <string name="database_viewer_outages_operators">Emplazamientos averiados (Operadores)</string>
+    <string name="database_viewer_outages_daily">Emplazamientos averiados (Arcep diario)</string>
     <string name="database_viewer_choose_table">Elegir una tabla</string>
     <string name="database_viewer_table_item">%1$s · %2$s filas</string>
     <string name="database_viewer_table_summary">%1$s · %2$s filas</string>
@@ -3367,6 +3384,8 @@
     <string name="database_viewer_empty_table">Esta tabla está vacía.</string>
     <string name="database_viewer_cell_title">Valor de la celda</string>
     <string name="database_viewer_missing_database">Esta base de datos no está instalada en el dispositivo.</string>
+    <string name="database_viewer_missing_outages">Archivo de averías no presente en el dispositivo. Puede descargarlo en los ajustes.</string>
+    <string name="database_viewer_missing_tag">no presente</string>
     <string name="database_viewer_read_error">No se pudo leer esta base de datos.</string>
     <string name="database_viewer_search_label">Buscar en esta tabla</string>
     <string name="database_viewer_search_hint">Buscar en todas las columnas</string>
@@ -3379,6 +3398,8 @@
     <string name="database_viewer_info_mobile">Archivo: geotower_fr.db. Es el conjunto de datos principal de redes móviles de la ANFR. localisation contiene cada sitio y sus coordenadas; technique guarda el estado del servicio, las fechas y los detalles de frecuencia; support y antenne describen los soportes físicos y los paneles de radio. Las tablas ref_* traducen códigos numéricos a etiquetas. metadata y source_versions describen la versión y las fuentes de los datos. Las tablas radio_stat_* y dept_stat_* contienen estadísticas precalculadas; room_master_table registra la identidad del esquema de Room.</string>
     <string name="database_viewer_info_radio">Archivo: geotower_fr_radio.db. Este conjunto contiene emplazamientos de radio no móviles, como radiodifusión y redes privadas. non_mobile_site resume un emplazamiento y su soporte; non_mobile_detail contiene sus detalles técnicos ampliados. Las tablas ref_* incluyen etiquetas para actores, naturaleza, propietarios y tipos de antena; metadata describe la versión de los datos.</string>
     <string name="database_viewer_info_enb">Archivo: geotower_fr_enb.db. Este conjunto asociado relaciona los identificadores de las redes móviles con celdas eNB/gNB. enb_cell contiene la tecnología, el identificador de celda, el soporte GeoTower opcional, las coordenadas y la dirección. enb_source registra el archivo de origen y los códigos de red del operador. metadata indica la versión y el origen de los datos.</string>
+    <string name="database_viewer_info_outages_operators">Archivo: sites_hs_server_operators.json. Averías de red obtenidas de los 4 flujos CSV oficiales de los operadores y geocodificadas con la base ANFR. La tabla sites_hs lista cada avería con su objeto GeoJSON.</string>
+    <string name="database_viewer_info_outages_daily">Archivo: sites_hs_server_daily.json. Averías de red consolidadas obtenidas del archivo GeoJSON diario oficial de Arcep. La tabla sites_hs lista cada avería con su objeto GeoJSON.</string>
     <string name="database_viewer_info_reading_title">Cómo leer una fila</string>
     <string name="database_viewer_info_reading">Una tabla reúne filas; cada columna es un campo. NULL significa que no se proporcionó ningún valor. TEXT es texto, INTEGER un número entero y REAL un número decimal. Las columnas llamadas *_id, id_anfr o code_insee relacionan registros con otras tablas o referencias oficiales. Algunos valores *_mask son máscaras de bits que combinan varias tecnologías o bandas de frecuencia. Las coordenadas de radio/eNB terminadas en _e6 son grados multiplicados por un millón. Toca una celda para ver su valor completo; la búsqueda encuentra texto y números en todas las columnas de la tabla seleccionada.</string>
     <string name="appstrings_version_live_db_active_desc">La base de datos en línea se utiliza actualmente en el mapa, las búsquedas y las fichas de los sitios. Estos son los datos que ofrece el servidor de GeoTower.</string>
@@ -3406,6 +3427,7 @@
     <string name="appstrings_release_v2077_summary_network_log_and_drawer_order">Registro de peticiones de red HTTP en diagnósticos y reordenación de botones del panel lateral en modo simplificado</string>
     <string name="appstrings_release_v2078_summary_map_loading_indicator">Indicador visual discreto de carga de sitios y estadísticas en la parte inferior del mapa</string>
     <string name="appstrings_release_v2079_summary_frequency_search_and_voice_assistant">Búsqueda en bandas de frecuencias, comando de voz de Assistant para antenas y notificaciones de generación local</string>
+    <string name="appstrings_release_v2080_summary_database_viewer_outages_and_sources">Inspección de datos de cortes en el visor de bases y fuentes configurables para la generación local</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registro de solicitudes de red</string>

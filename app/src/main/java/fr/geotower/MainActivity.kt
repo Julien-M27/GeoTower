@@ -612,8 +612,9 @@ class MainActivity : ComponentActivity() {
         }
 
         // 🌟 Si on vient du widget, de l'assistant, de la notification OU d'un QR CODE, on saute le Splash Screen !
+        val isUploadResultNotif = intent.getBooleanExtra(AppGlobalState.EXTRA_SHOW_UPLOAD_RESULT_POPUP, false)
         val startRoute =
-            if ((widgetDest != null || assistantFeature != null || notifSiteId != null || isDeepLink || sharedPhotoRoute != null) && !isFirstRun) destinationApresSplash else "splash"
+            if ((widgetDest != null || assistantFeature != null || notifSiteId != null || isDeepLink || sharedPhotoRoute != null || isUploadResultNotif) && !isFirstRun) destinationApresSplash else "splash"
         // ========================================================
 
         // --- LECTURE ET DÉTECTION DE LA LANGUE DÈS LE LANCEMENT ---

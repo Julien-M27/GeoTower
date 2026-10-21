@@ -1,6 +1,7 @@
 package fr.geotower.data.outages
 
 import fr.geotower.data.models.SiteHsEntity
+import fr.geotower.utils.OperatorColors
 import org.json.JSONObject
 
 /**
@@ -13,6 +14,11 @@ object SitesHsGeoJsonParser {
         val sites: List<SiteHsEntity>,
         val generatedAtIso: String? = null,
     )
+
+    fun normalizeOperator(raw: String): String {
+        val key = OperatorColors.keyFor(raw) ?: return raw
+        return OperatorColors.specForKey(key)?.label ?: raw
+    }
 
     fun parse(jsonString: String, sourceLastUpdate: String? = null): ParseResult {
         val jsonObject = JSONObject(jsonString)
@@ -33,8 +39,9 @@ object SitesHsGeoJsonParser {
             val lat = coordinates?.optDouble(1, 0.0) ?: 0.0
 
             val stationAnfr = properties.optString("station_anfr", "").trim()
-            val operateurStr = properties.optString("operateur", "").trim()
-            if (operateurStr.isEmpty()) continue
+            val rawOperateur = properties.optString("operateur", "").trim()
+            if (rawOperateur.isEmpty()) continue
+            val operateurStr = normalizeOperator(rawOperateur)
 
             val site = SiteHsEntity(
                 idAnfr = stationAnfr,
