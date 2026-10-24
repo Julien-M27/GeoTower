@@ -3430,6 +3430,7 @@
     <string name="appstrings_release_v2078_summary_map_loading_indicator">Indicateur visuel discret de chargement des sites et statistiques en bas de la carte</string>
     <string name="appstrings_release_v2079_summary_frequency_search_and_voice_assistant">Recherche dans les bandes de fréquences, commande vocale Assistant pour les antennes et notifications de génération locale</string>
     <string name="appstrings_release_v2080_summary_database_viewer_outages_and_sources">Visualisation des relevés de pannes dans l\'inspecteur de base et sélection des sources pour la génération locale</string>
+    <string name="appstrings_release_v2081_summary_bottom_navigation_bar">Nouveau mode de navigation avec barre d\'onglets en bas de l\'écran et intégration du curseur temporel sur la carte</string>
 
     <!-- Journal des requêtes réseau -->
     <string name="network_log_title">Journal des requêtes réseau</string>
@@ -3472,4 +3473,15 @@
     <string name="network_log_errors_count">%1$d erreurs</string>
     <string name="network_log_retention_badge">Conservation : %1$s</string>
     <string name="network_log_view_requests">Consulter les requêtes réseau</string>
+    <!-- Mode de navigation / Barre inferieure -->
+    <string name="bottom_nav_nearby">À proximité</string>
+    <string name="bottom_nav_map">Carte</string>
+    <string name="bottom_nav_trips">Trajet</string>
+    <string name="bottom_nav_stats">Statistiques</string>
+    <string name="bottom_nav_more">Plus</string>
+    <string name="settings_nav_mode_title">Mode de navigation</string>
+    <string name="settings_nav_mode_standard">Accueil classique</string>
+    <string name="settings_nav_mode_standard_desc">Démarre sur le menu d\'accueil avec accès à toutes les pages</string>
+    <string name="settings_nav_mode_bottom_bar">Barre de sélection en bas</string>
+    <string name="settings_nav_mode_bottom_bar_desc">Barre à 5 choix en bas : À proximité, Carte, Trajet, Statistiques, Plus</string>
 </resources>

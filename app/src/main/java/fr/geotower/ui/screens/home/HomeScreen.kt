@@ -12,10 +12,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -172,6 +175,13 @@ private data class HomeMenuButtonMetrics(
 @SuppressLint("UnusedBoxWithConstraintsScope")
 @Composable
 fun HomeScreen(navController: NavController) {
+    LaunchedEffect(Unit) {
+        if (AppConfig.isBottomNavActive()) {
+            navController.navigate("map") {
+                popUpTo("home") { inclusive = true }
+            }
+        }
+    }
     val sizing = LocalGeoTowerUiSizing.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope() // ✅ AJOUT CRUCIAL ICI
@@ -933,7 +943,7 @@ fun HomeScreen(navController: NavController) {
 
                             Spacer(modifier = Modifier.weight(1f))
 
-                            Spacer(modifier = Modifier.height(sizing.spacing(if (isFoldCompact) 16.dp else 32.dp)))
+                            Spacer(modifier = Modifier.height(sizing.spacing(if (isFoldCompact) 16.dp else 32.dp) + androidx.compose.foundation.layout.WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()))
                             AboutSection(version = appVersion)
                         }
                     } else {
@@ -967,7 +977,7 @@ fun HomeScreen(navController: NavController) {
                             Spacer(modifier = Modifier.weight(1f))
 
                             AboutSection(version = appVersion)
-                            Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
+                            Spacer(modifier = Modifier.height(sizing.spacing(24.dp) + androidx.compose.foundation.layout.WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()))
                         }
                     }
 

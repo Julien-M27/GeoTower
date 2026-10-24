@@ -770,6 +770,7 @@ fun NearEmittersScreen(
                 onBack = { safeBackNavigation.navigateBack() },
                 backgroundColor = mainBgColor,
                 backEnabled = !safeBackNavigation.isLocked,
+                showBackButton = !AppConfig.isBottomNavActive(),
                 actionsWidth = 48.dp,
                 actions = {
                     fr.geotower.ui.components.PageCustomizationHint(
@@ -939,7 +940,8 @@ fun NearEmittersScreen(
                                                 start = sizing.spacing(16.dp),
                                                 top = sizing.spacing(16.dp),
                                                 end = sizing.spacing(16.dp),
-                                                bottom = sizing.spacing(16.dp) + androidx.compose.foundation.layout.WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+                                                bottom = sizing.spacing(16.dp) + (if (AppConfig.isBottomNavActive()) sizing.component(88.dp) else 0.dp) +
+                                                    androidx.compose.foundation.layout.WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
                                             ),
                                             verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))
                                         ) {

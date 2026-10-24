@@ -12,11 +12,18 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.lifecycleScope
@@ -99,6 +106,7 @@ import fr.geotower.ui.screens.map.MapViewModel
 import fr.geotower.ui.screens.map.MapViewModelFactory
 import fr.geotower.ui.theme.AppColorPalette
 import fr.geotower.ui.theme.GeoTowerUiStyleProvider
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.ui.theme.appAccessibleDarkColorScheme
 import fr.geotower.ui.theme.appStaticColorScheme
 import java.io.File
@@ -567,12 +575,16 @@ class MainActivity : ComponentActivity() {
         val assistantFeature = intent.getStringExtra("app_feature")
 
         // --- NOUVEAU : Lecture de la page de démarrage choisie par l'utilisateur ---
-        // Le mode simplifié n'a pas d'accueil : il démarre toujours sur la carte, qui devient la
-        // racine du backstack (le retour système quitte l'app, comme depuis l'accueil).
+        // Le mode simplifié et la barre inférieure n'ont pas d'accueil : ils démarrent sur la carte (ou page choisie),
+        // qui devient la racine du backstack (le retour système quitte l'app, comme depuis l'accueil).
         val simpleModeAtLaunch = AppConfig.isSimpleModeActive(sharedPref)
+        val bottomNavAtLaunch = AppConfig.isBottomNavActive(sharedPref)
         val simpleModeHomeRoute = "map"
         val savedStartupPage = if (simpleModeAtLaunch) {
             simpleModeHomeRoute
+        } else if (bottomNavAtLaunch) {
+            val configured = sharedPref.getString("startup_page", "map") ?: "map"
+            if (configured == "home") "map" else configured
         } else {
             sharedPref.getString("startup_page", "home") ?: "home"
         }
@@ -586,7 +598,7 @@ class MainActivity : ComponentActivity() {
             mapDeepLinkRoute
         } else if (isDeepLink) {
             // ✅ On laisse le NavHost gérer la navigation profonde
-            if (simpleModeAtLaunch) simpleModeHomeRoute else "home"
+            if (simpleModeAtLaunch || bottomNavAtLaunch) simpleModeHomeRoute else "home"
         } else if (notifSiteId != null) {
             "site_detail/$notifSiteId" // 🌟 Ouvre le détail si on vient de la notif
         } else if (widgetDest == "nearby") {
@@ -607,7 +619,7 @@ class MainActivity : ComponentActivity() {
                 "map" -> "map"
                 "compass" -> "compass"
                 "stats" -> "stats"
-                else -> if (simpleModeAtLaunch) simpleModeHomeRoute else "home"
+                else -> if (simpleModeAtLaunch || bottomNavAtLaunch) simpleModeHomeRoute else "home"
             }
         }
 
@@ -783,10 +795,45 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                val navBackStackEntry by navController.currentBackStackEntryAsState()
+                val currentRoute = navBackStackEntry?.destination?.route?.substringBefore('?')
+                val isBottomNavActive = AppConfig.isBottomNavActive()
+                val bottomNavTabs = setOf("emitters", "map", "trips", "stats", "more")
+                val isRootTab = isBottomNavActive && currentRoute in bottomNavTabs
+                val bottomNavStartRoute = if (destinationApresSplash in bottomNavTabs) destinationApresSplash else "map"
+
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
-                    containerColor = MaterialTheme.colorScheme.background
+                    containerColor = MaterialTheme.colorScheme.background,
+                    contentWindowInsets = WindowInsets.statusBars,
+                    bottomBar = {
+                        if (isRootTab) {
+                            fr.geotower.ui.components.GeoTowerBottomNavBar(
+                                currentRoute = currentRoute,
+                                onNavigate = { targetRoute ->
+                                    if (currentRoute != targetRoute) {
+                                        navController.navigate(targetRoute) {
+                                            popUpTo(bottomNavStartRoute) {
+                                                saveState = true
+                                            }
+                                            launchSingleTop = true
+                                            restoreState = true
+                                        }
+                                    }
+                                }
+                            )
+                        }
+                    }
                 ) { innerPadding ->
+                    val uiStyle = LocalGeoTowerUiStyle.current
+                    val rootBottomPadding = 0.dp
+                    val layoutDirection = LocalLayoutDirection.current
+                    val screenPadding = PaddingValues(
+                        start = innerPadding.calculateStartPadding(layoutDirection),
+                        top = innerPadding.calculateTopPadding(),
+                        end = innerPadding.calculateEndPadding(layoutDirection),
+                        bottom = 0.dp
+                    )
 
                     val mapFactory = MapViewModelFactory(repository, radioRepository)
                     val sharedMapViewModel: MapViewModel = viewModel(factory = mapFactory)
@@ -809,7 +856,7 @@ class MainActivity : ComponentActivity() {
 
                             // Tuto
                             composable("first_start") {
-                                Box(modifier = Modifier.padding(innerPadding)) {
+                                Box(modifier = Modifier.padding(screenPadding)) {
                                     if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.FIRST_START)) {
                                         FirstStartScreen(
                                             repository = repository,
@@ -836,13 +883,13 @@ class MainActivity : ComponentActivity() {
 
                             // Home
                             composable("home") {
-                                Box(modifier = Modifier.padding(innerPadding)) {
+                                Box(modifier = Modifier.padding(screenPadding)) {
                                     HomeScreen(navController)
                                 }
                             }
 
                             composable("help") {
-                                Box(modifier = Modifier.padding(innerPadding)) {
+                                Box(modifier = Modifier.padding(screenPadding)) {
                                     if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.HELP)) {
                                         HelpScreen(navController)
                                     } else {
@@ -889,16 +936,31 @@ class MainActivity : ComponentActivity() {
                                 val plannedTripMode = backStackEntry.arguments?.getString("tripMode")
                                 val focusLat = backStackEntry.arguments?.getString("focusLat")?.toDoubleOrNull()
                                 val focusLon = backStackEntry.arguments?.getString("focusLon")?.toDoubleOrNull()
-                                if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.MAP)) {
-                                    // Mode simplifié : la carte est la racine, le tiroir remplace
-                                    // l'accueil. Il n'enveloppe que cette destination.
-                                    if (AppConfig.simpleModeActive()) {
-                                        val drawerState = rememberDrawerState(DrawerValue.Closed)
-                                        val drawerScope = rememberCoroutineScope()
-                                        fr.geotower.ui.components.SimpleModeDrawer(
-                                            navController = navController,
-                                            drawerState = drawerState
-                                        ) {
+                                Box(modifier = Modifier.padding(bottom = rootBottomPadding)) { // MapScreen edge-to-edge
+                                    if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.MAP)) {
+                                        // Mode simplifié : la carte est la racine, le tiroir remplace
+                                        // l'accueil. Il n'enveloppe que cette destination.
+                                        if (AppConfig.simpleModeActive()) {
+                                            val drawerState = rememberDrawerState(DrawerValue.Closed)
+                                            val drawerScope = rememberCoroutineScope()
+                                            fr.geotower.ui.components.SimpleModeDrawer(
+                                                navController = navController,
+                                                drawerState = drawerState
+                                            ) {
+                                                MapScreen(
+                                                    navController = navController,
+                                                    viewModel = sharedMapViewModel,
+                                                    photoDraftId = photoDraftId,
+                                                    plannedTripId = plannedTripId,
+                                                    plannedTripMode = plannedTripMode,
+                                                    focusLat = focusLat,
+                                                    focusLon = focusLon,
+                                                    onOpenSimpleModeMenu = {
+                                                        drawerScope.launch { drawerState.open() }
+                                                    }
+                                                )
+                                            }
+                                        } else {
                                             MapScreen(
                                                 navController = navController,
                                                 viewModel = sharedMapViewModel,
@@ -906,25 +968,12 @@ class MainActivity : ComponentActivity() {
                                                 plannedTripId = plannedTripId,
                                                 plannedTripMode = plannedTripMode,
                                                 focusLat = focusLat,
-                                                focusLon = focusLon,
-                                                onOpenSimpleModeMenu = {
-                                                    drawerScope.launch { drawerState.open() }
-                                                }
+                                                focusLon = focusLon
                                             )
                                         }
                                     } else {
-                                        MapScreen(
-                                            navController = navController,
-                                            viewModel = sharedMapViewModel,
-                                            photoDraftId = photoDraftId,
-                                            plannedTripId = plannedTripId,
-                                            plannedTripMode = plannedTripMode,
-                                            focusLat = focusLat,
-                                            focusLon = focusLon
-                                        )
+                                        DisabledFeatureRoute(navController, txtUnavailable)
                                     }
-                                } else {
-                                    DisabledFeatureRoute(navController, txtUnavailable)
                                 }
                             }
 
@@ -939,7 +988,7 @@ class MainActivity : ComponentActivity() {
                             ) {
                                 val tripsContext = androidx.compose.ui.platform.LocalContext.current
                                 val tripsLocale = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]
-                                Box(modifier = Modifier.padding(innerPadding)) {
+                                Box(modifier = Modifier.padding(screenPadding)) {
                                     if (!featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.TRIPS)) {
                                         DisabledFeatureRoute(navController, txtUnavailable)
                                         return@Box
@@ -977,7 +1026,7 @@ class MainActivity : ComponentActivity() {
 
                             // Boussole
                             composable("compass") {
-                                Box(modifier = Modifier.padding(innerPadding)) {
+                                Box(modifier = Modifier.padding(screenPadding)) {
                                     if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.COMPASS)) {
                                         CompassScreen(
                                             navController = navController,
@@ -991,7 +1040,7 @@ class MainActivity : ComponentActivity() {
 
                             // Statistiques
                             composable("stats") {
-                                Box(modifier = Modifier.padding(innerPadding)) {
+                                Box(modifier = Modifier.padding(screenPadding)) {
                                     // ✅ AJOUT DU REPOSITORY ICI 👇
                                     if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.STATS)) {
                                         StatisticsScreen(navController = navController, repository = repository)
@@ -1003,7 +1052,7 @@ class MainActivity : ComponentActivity() {
 
                             // Statistiques par département (tables dept_stat_* de la base)
                             composable(DEPARTMENT_STATS_ROUTE) {
-                                Box(modifier = Modifier.padding(innerPadding)) {
+                                Box(modifier = Modifier.padding(screenPadding)) {
                                     if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.STATS)) {
                                         DepartmentStatsScreen(navController = navController, repository = repository)
                                     } else {
@@ -1017,7 +1066,7 @@ class MainActivity : ComponentActivity() {
                                 arguments = listOf(navArgument("deptCode") { type = NavType.StringType })
                             ) { backStackEntry ->
                                 val deptCode = backStackEntry.arguments?.getString("deptCode").orEmpty()
-                                Box(modifier = Modifier.padding(innerPadding)) {
+                                Box(modifier = Modifier.padding(screenPadding)) {
                                     if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.STATS)) {
                                         DepartmentStatDetailScreen(
                                             navController = navController,
@@ -1049,7 +1098,7 @@ class MainActivity : ComponentActivity() {
                                 val section = backStackEntry.arguments?.getString("section")
                                 val targetMapFilename = backStackEntry.arguments?.getString("targetMapFilename")
                                 val profileData = backStackEntry.arguments?.getString("profileData")
-                                Box(modifier = Modifier.padding(innerPadding)) {
+                                Box(modifier = Modifier.padding(screenPadding)) {
                                     if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.SETTINGS)) {
                                         SettingsScreen(
                                             navController = navController,
@@ -1070,7 +1119,7 @@ class MainActivity : ComponentActivity() {
                                 arguments = listOf(navArgument("tech") { type = NavType.StringType })
                             ) { backStackEntry ->
                                 val tech = backStackEntry.arguments?.getString("tech").orEmpty()
-                                Box(modifier = Modifier.padding(innerPadding)) {
+                                Box(modifier = Modifier.padding(screenPadding)) {
                                     if (
                                         featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.STATS) &&
                                         featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.STATS_FREQUENCY_DETAILS)
@@ -1088,7 +1137,7 @@ class MainActivity : ComponentActivity() {
 
                             // Emetteurs
                             composable("emitters") {
-                                Box(modifier = Modifier.padding(innerPadding)) {
+                                Box(modifier = Modifier.padding(screenPadding)) {
                                     if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.NEARBY)) {
                                         NearEmittersSupportWrapperScreen(navController, repository, radioRepository)
                                     } else {
@@ -1099,7 +1148,7 @@ class MainActivity : ComponentActivity() {
 
                             // À propos
                             composable("about") {
-                                Box(modifier = Modifier.padding(innerPadding)) {
+                                Box(modifier = Modifier.padding(screenPadding)) {
                                     if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.ABOUT)) {
                                         AboutScreen(navController)
                                     } else {
@@ -1108,9 +1157,16 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
 
+                            // Plus (mode barre inférieure)
+                            composable("more") {
+                                Box(modifier = Modifier.padding(screenPadding)) {
+                                    fr.geotower.ui.screens.more.MoreScreen(navController)
+                                }
+                            }
+
                             // Conditions d'utilisation & confidentialité (toujours accessible, page légale)
                             composable("terms") {
-                                Box(modifier = Modifier.padding(innerPadding)) {
+                                Box(modifier = Modifier.padding(screenPadding)) {
                                     fr.geotower.ui.screens.terms.TermsScreen(navController)
                                 }
                             }
@@ -1119,7 +1175,7 @@ class MainActivity : ComponentActivity() {
                                 route = "diagnostic",
                                 deepLinks = listOf(navDeepLink { uriPattern = "geotower://diagnostic" })
                             ) {
-                                Box(modifier = Modifier.padding(innerPadding)) {
+                                Box(modifier = Modifier.padding(screenPadding)) {
                                     if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.DIAGNOSTIC)) {
                                         DiagnosticScreen(navController)
                                     } else {
@@ -1132,20 +1188,20 @@ class MainActivity : ComponentActivity() {
                                 route = "network_log",
                                 deepLinks = listOf(navDeepLink { uriPattern = "geotower://network_log" })
                             ) {
-                                Box(modifier = Modifier.padding(innerPadding)) {
+                                Box(modifier = Modifier.padding(screenPadding)) {
                                     NetworkLogScreen(navController)
                                 }
                             }
 
                             // Explorateur read-only des trois bases SQLite locales.
                             composable("database_viewer") {
-                                Box(modifier = Modifier.padding(innerPadding)) {
+                                Box(modifier = Modifier.padding(screenPadding)) {
                                     DatabaseViewerScreen(navController)
                                 }
                             }
 
                             composable("database_viewer_info") {
-                                Box(modifier = Modifier.padding(innerPadding)) {
+                                Box(modifier = Modifier.padding(screenPadding)) {
                                     DatabaseViewerInfoScreen(navController)
                                 }
                             }
@@ -1156,7 +1212,7 @@ class MainActivity : ComponentActivity() {
                                 route = "photo_reports",
                                 deepLinks = listOf(navDeepLink { uriPattern = "geotower://photo_reports" })
                             ) {
-                                Box(modifier = Modifier.padding(innerPadding)) {
+                                Box(modifier = Modifier.padding(screenPadding)) {
                                     fr.geotower.ui.screens.settings.PhotoReportsScreen(
                                         navController = navController,
                                         repository = repository
@@ -1170,7 +1226,7 @@ class MainActivity : ComponentActivity() {
                                 route = "backup",
                                 deepLinks = listOf(navDeepLink { uriPattern = "geotower://backup" })
                             ) {
-                                Box(modifier = Modifier.padding(innerPadding)) {
+                                Box(modifier = Modifier.padding(screenPadding)) {
                                     fr.geotower.ui.screens.settings.BackupScreen(
                                         navController = navController
                                     )
@@ -1182,7 +1238,7 @@ class MainActivity : ComponentActivity() {
                                 route = "hidden_sites",
                                 deepLinks = listOf(navDeepLink { uriPattern = "geotower://hidden_sites" })
                             ) {
-                                Box(modifier = Modifier.padding(innerPadding)) {
+                                Box(modifier = Modifier.padding(screenPadding)) {
                                     HiddenSitesScreen(
                                         navController = navController,
                                         repository = repository
@@ -1192,7 +1248,7 @@ class MainActivity : ComponentActivity() {
 
                             // Photos favorites (ouvert depuis Réglages ▸ Préférences)
                             composable("photos_favorites") {
-                                Box(modifier = Modifier.padding(innerPadding)) {
+                                Box(modifier = Modifier.padding(screenPadding)) {
                                     PhotosFavoritesScreen(
                                         navController = navController,
                                         repository = repository
@@ -1211,7 +1267,7 @@ class MainActivity : ComponentActivity() {
                                     navDeepLink { uriPattern = "geotower://outage_source" }
                                 )
                             ) {
-                                Box(modifier = Modifier.padding(innerPadding)) {
+                                Box(modifier = Modifier.padding(screenPadding)) {
                                     fr.geotower.ui.screens.settings.LocalModeScreen(
                                         navController = navController,
                                         repository = repository
@@ -1221,7 +1277,7 @@ class MainActivity : ComponentActivity() {
 
                             // Aiguillage vers les journaux locaux (photos envoyées, signalements, partages, notifications).
                             composable("histories") {
-                                Box(modifier = Modifier.padding(innerPadding)) {
+                                Box(modifier = Modifier.padding(screenPadding)) {
                                     fr.geotower.ui.screens.settings.HistoriesScreen(
                                         onNavigateBack = { navController.popBackStack() },
                                         onOpenPhotoUploadHistory = { navController.navigate("photo_upload_history") },
@@ -1234,7 +1290,7 @@ class MainActivity : ComponentActivity() {
 
                             // Historique des sites/supports partagés ou exportés (ouvert depuis Réglages).
                             composable("share_history") {
-                                Box(modifier = Modifier.padding(innerPadding)) {
+                                Box(modifier = Modifier.padding(screenPadding)) {
                                     ShareHistoryScreen(
                                         onNavigateBack = { navController.popBackStack() },
                                         onOpenEntry = { entry ->
@@ -1303,7 +1359,7 @@ class MainActivity : ComponentActivity() {
                             // Journal des notifications de l'app (ouvert depuis l'accueil, les
                             // Réglages ou « Historiques »).
                             composable("notification_history") {
-                                Box(modifier = Modifier.padding(innerPadding)) {
+                                Box(modifier = Modifier.padding(screenPadding)) {
                                     NotificationHistoryScreen(
                                         onNavigateBack = { navController.popBackStack() },
                                         onOpenEntry = { entry ->
@@ -1351,7 +1407,7 @@ class MainActivity : ComponentActivity() {
                             }
 
                             composable("photo_upload_history") {
-                                Box(modifier = Modifier.padding(innerPadding)) {
+                                Box(modifier = Modifier.padding(screenPadding)) {
                                     if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.PHOTO_UPLOAD_HISTORY)) {
                                         PhotoUploadHistoryScreen(
                                             onNavigateBack = { navController.popBackStack() },
@@ -1423,7 +1479,7 @@ class MainActivity : ComponentActivity() {
                                 val applyMapFilters = backStackEntry.arguments?.getBoolean("fromMap") ?: false
                                 val photoDraftId = backStackEntry.arguments?.getString("photoDraftId")
                                 val expandAntennaId = backStackEntry.arguments?.getString("expand")
-                                Box(modifier = Modifier.padding(innerPadding)) {
+                                Box(modifier = Modifier.padding(screenPadding)) {
                                     if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.SUPPORT_DETAIL)) {
                                         fr.geotower.ui.screens.emitters.SupportSiteWrapperScreen(
                                             navController,
@@ -1448,7 +1504,7 @@ class MainActivity : ComponentActivity() {
                                 deepLinks = listOf(navDeepLink { uriPattern = "geotower://site/{id}" })
                             ) { backStackEntry ->
                                 val id = backStackEntry.arguments?.getString("id") ?: ""
-                                Box(modifier = Modifier.padding(innerPadding)) {
+                                Box(modifier = Modifier.padding(screenPadding)) {
                                     if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.SITE_DETAIL)) {
                                         if (AppConfig.simpleModeActive()) {
                                             SiteDetailSimpleModeRoute(navController, repository, id, applyMapFilters = false)
@@ -1465,7 +1521,7 @@ class MainActivity : ComponentActivity() {
                                 arguments = listOf(navArgument("id") { type = NavType.StringType })
                             ) { backStackEntry ->
                                 val id = backStackEntry.arguments?.getString("id") ?: ""
-                                Box(modifier = Modifier.padding(innerPadding)) {
+                                Box(modifier = Modifier.padding(screenPadding)) {
                                     if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.SITE_DETAIL)) {
                                         SiteDetailToolWrapperScreen(navController, repository, id, applyMapFilters = true)
                                     } else {
@@ -1474,7 +1530,7 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                             composable(FREQUENCY_REFERENCE_ROUTE) {
-                                Box(modifier = Modifier.padding(innerPadding)) {
+                                Box(modifier = Modifier.padding(screenPadding)) {
                                     FrequencyReferenceScreen(navController = navController)
                                 }
                             }
@@ -1488,7 +1544,7 @@ class MainActivity : ComponentActivity() {
                             ) { backStackEntry ->
                                 val stationId = backStackEntry.arguments?.getString("stationId") ?: ""
                                 val supportId = backStackEntry.arguments?.getString("supportId") ?: ""
-                                Box(modifier = Modifier.padding(innerPadding)) {
+                                Box(modifier = Modifier.padding(screenPadding)) {
                                     if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.SITE_DETAIL)) {
                                         RadioSiteDetailScreen(
                                             navController = navController,
@@ -1541,7 +1597,7 @@ class MainActivity : ComponentActivity() {
                                 val market = backStackEntry.arguments?.getString("market") ?: "FR"
                                 val mcc = backStackEntry.arguments?.getString("mcc")?.toIntOrNull()
                                 val mnc = backStackEntry.arguments?.getString("mnc")?.toIntOrNull()
-                                Box(modifier = Modifier.padding(innerPadding)) {
+                                Box(modifier = Modifier.padding(screenPadding)) {
                                     if (
                                         featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.SITE_SPEEDTESTS) &&
                                         featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SITE_SPEEDTESTS) &&
@@ -1566,7 +1622,7 @@ class MainActivity : ComponentActivity() {
                                 arguments = listOf(navArgument("id") { type = NavType.StringType })
                             ) { backStackEntry ->
                                 val id = backStackEntry.arguments?.getString("id") ?: ""
-                                Box(modifier = Modifier.padding(innerPadding)) {
+                                Box(modifier = Modifier.padding(screenPadding)) {
                                     if (
                                         featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.ELEVATION_PROFILE) &&
                                         featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SITE_ELEVATION_PROFILE) &&
@@ -1584,7 +1640,7 @@ class MainActivity : ComponentActivity() {
                                 deepLinks = listOf(navDeepLink { uriPattern = "geotower://coverage/{id}" })
                             ) { backStackEntry ->
                                 val id = backStackEntry.arguments?.getString("id") ?: ""
-                                Box(modifier = Modifier.padding(innerPadding)) {
+                                Box(modifier = Modifier.padding(screenPadding)) {
                                     if (
                                         featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.THEORETICAL_COVERAGE) &&
                                         featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SITE_THEORETICAL_COVERAGE) &&
@@ -1609,7 +1665,7 @@ class MainActivity : ComponentActivity() {
                             ) { backStackEntry ->
                                 val id = backStackEntry.arguments?.getString("id") ?: ""
                                 val cfg = backStackEntry.arguments?.getString("cfg").orEmpty()
-                                Box(modifier = Modifier.padding(innerPadding)) {
+                                Box(modifier = Modifier.padding(screenPadding)) {
                                     if (
                                         featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.THROUGHPUT_CALCULATOR) &&
                                         featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SITE_THROUGHPUT_CALCULATOR)
@@ -1668,7 +1724,7 @@ class MainActivity : ComponentActivity() {
                                     if (draftId.isBlank()) emptyList() else SignalQuestUploadDraftStore.peek(draftId)
                                 }
 
-                                Box(modifier = Modifier.padding(innerPadding)) {
+                                Box(modifier = Modifier.padding(screenPadding)) {
                                     val canUploadSignalQuest =
                                         featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.SIGNALQUEST_UPLOAD) &&
                                             featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SIGNALQUEST_UPLOAD) &&

@@ -548,7 +548,7 @@ private fun splitBreadcrumbRootItems(
     onContext: () -> Unit
 ): List<GeoTowerBreadcrumbItem> {
     val items = mutableListOf<GeoTowerBreadcrumbItem>()
-    if (!AppConfig.simpleModeActive()) {
+    if (!AppConfig.simpleModeActive() && !AppConfig.isBottomNavActive()) {
         items += GeoTowerBreadcrumbItem(
             label = stringResource(R.string.help_topic_title_home),
             icon = Icons.Default.Home,

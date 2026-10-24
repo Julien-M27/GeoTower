@@ -92,6 +92,11 @@ object AppConfig {
     // support et fiches opérateurs fusionnées. Un seul interrupteur pilote l'ensemble.
     const val PREF_SIMPLE_MODE = "simple_mode"
 
+    // Mode de navigation global de l'app (0 = Accueil standard, 1 = Barre de sélection en bas avec 5 choix)
+    const val PREF_APP_NAV_MODE = "app_navigation_mode"
+    const val APP_NAV_MODE_STANDARD = 0
+    const val APP_NAV_MODE_BOTTOM_BAR = 1
+
     // --- Apparence ---
     const val PREF_LOGO_MATERIAL_WAVES = "logo_material_waves"
     var themeMode = mutableIntStateOf(0)
@@ -159,6 +164,10 @@ object AppConfig {
     // Choix de l'utilisateur. Passer par [simpleModeActive] pour l'appliquer : le kill-switch
     // distant peut le neutraliser sans effacer la préférence.
     var simpleMode = mutableStateOf(false)
+
+    // --- Mode de navigation ---
+    // 0 = Accueil standard, 1 = Barre de sélection en bas avec 5 onglets.
+    var appNavMode = mutableIntStateOf(APP_NAV_MODE_STANDARD)
 
     // --- UNITÉS DE MESURE ---
     // 0 = Kilomètres (km), 1 = Miles (mi)
@@ -240,6 +249,7 @@ object AppConfig {
     // Ephemere : non persiste (l'app ne doit pas rouvrir bloquee dans le passe).
     // Lu par le MapViewModel pour forcer le chargement detaille (pas de clustering) quand actif.
     var timeSliderActive = mutableStateOf(false)
+    var timeSliderThreshold = mutableStateOf<Int?>(null)
 
     // --- FILTRES : TECHNOLOGIES ---
     var showTechno2G = mutableStateOf(true)
@@ -705,15 +715,49 @@ object AppConfig {
     /** Applique un choix de mode simplifié : état en mémoire + persistance. */
     fun setSimpleMode(context: Context, enabled: Boolean) {
         simpleMode.value = enabled
+        if (enabled) {
+            appNavMode.intValue = APP_NAV_MODE_STANDARD
+        }
         context.applicationContext
             .getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
             .edit()
             .putBoolean(PREF_SIMPLE_MODE, enabled)
+            .apply {
+                if (enabled) {
+                    putInt(PREF_APP_NAV_MODE, APP_NAV_MODE_STANDARD)
+                }
+            }
             .apply()
     }
 
-    /** Route d'accueil : le mode simplifié n'a pas de page d'accueil, la carte en tient lieu. */
-    fun homeRoute(): String = if (simpleModeActive()) "map" else "home"
+    fun isBottomNavActive(): Boolean = appNavMode.intValue == APP_NAV_MODE_BOTTOM_BAR
+
+    fun isBottomNavActive(prefs: SharedPreferences): Boolean =
+        prefs.getInt(PREF_APP_NAV_MODE, APP_NAV_MODE_STANDARD) == APP_NAV_MODE_BOTTOM_BAR
+
+    fun setAppNavMode(context: Context, mode: Int) {
+        appNavMode.intValue = mode
+        if (mode == APP_NAV_MODE_BOTTOM_BAR) {
+            simpleMode.value = false
+        }
+        context.applicationContext
+            .getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
+            .edit()
+            .putInt(PREF_APP_NAV_MODE, mode)
+            .apply {
+                if (mode == APP_NAV_MODE_BOTTOM_BAR) {
+                    putBoolean(PREF_SIMPLE_MODE, false)
+                }
+            }
+            .apply()
+    }
+
+    /** Route d'accueil : le mode barre inférieure ou simplifié n'a pas de page d'accueil, la carte en tient lieu. */
+    fun homeRoute(): String = when {
+        isBottomNavActive() -> "map"
+        simpleModeActive() -> "map"
+        else -> "home"
+    }
 
     /** Nouvel ordre des éléments de l'accueil (réglages ou appui long sur la page). */
     fun setPagesOrder(prefs: SharedPreferences, order: List<String>) {
@@ -812,6 +856,9 @@ object AppConfig {
 
         // Mode simplifié (carte au lancement, tiroir latéral, fiches fusionnées).
         simpleMode.value = prefs.getBoolean(PREF_SIMPLE_MODE, false)
+
+        // Mode de navigation global de l'app (accueil standard ou barre inférieure).
+        appNavMode.intValue = prefs.getInt(PREF_APP_NAV_MODE, APP_NAV_MODE_STANDARD)
 
         // Style d'affichage : on ne relit QUE le choix explicite. Sans choix, on reste sur AUTO, et
         // c'est [splitDisplayEnabled] qui tranche à l'affichage — fractionné dès que la fenêtre est

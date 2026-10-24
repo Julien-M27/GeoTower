@@ -3428,6 +3428,7 @@
     <string name="appstrings_release_v2078_summary_map_loading_indicator">Discrete visual loading indicator for sites and statistics at the bottom of the map</string>
     <string name="appstrings_release_v2079_summary_frequency_search_and_voice_assistant">Search in frequency bands reference, Assistant voice command for antennas and local build notifications</string>
     <string name="appstrings_release_v2080_summary_database_viewer_outages_and_sources">Inspection of outage datasets in database viewer and configurable data sources for local builds</string>
+    <string name="appstrings_release_v2081_summary_bottom_navigation_bar">New bottom navigation bar mode with 5 tabs and time slider integration in map filters</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Network requests log</string>
@@ -3470,4 +3471,15 @@
     <string name="network_log_errors_count">%1$d errors</string>
     <string name="network_log_retention_badge">Retention: %1$s</string>
     <string name="network_log_view_requests">View network requests</string>
+    <!-- Navigation mode / Bottom bar -->
+    <string name="bottom_nav_nearby">Nearby</string>
+    <string name="bottom_nav_map">Map</string>
+    <string name="bottom_nav_trips">Trips</string>
+    <string name="bottom_nav_stats">Statistics</string>
+    <string name="bottom_nav_more">More</string>
+    <string name="settings_nav_mode_title">Navigation mode</string>
+    <string name="settings_nav_mode_standard">Standard home</string>
+    <string name="settings_nav_mode_standard_desc">Start on the main menu with direct access to all pages</string>
+    <string name="settings_nav_mode_bottom_bar">Bottom navigation bar</string>
+    <string name="settings_nav_mode_bottom_bar_desc">5-tab selection bar at the bottom: Nearby, Map, Trips, Statistics, More</string>
 </resources>

@@ -48,6 +48,7 @@ import fr.geotower.utils.formatDateToFrench // ✅ Formatage localisé des dates
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.OperatorLogos
+import fr.geotower.utils.parseServiceDateInt
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 
@@ -108,9 +109,14 @@ fun OperatorsListSection(
     val hasPriorityMatch = priorityOperatorKey != null && filteredAntennas.any { antenna ->
         priorityOperatorKey in OperatorColors.keysFor(antenna.operateur)
     }
+    val timeSliderActive = AppConfig.timeSliderActive.value
+    val timeSliderThreshold = AppConfig.timeSliderThreshold.value
     val sortedAntennas = filteredAntennas.sortedBy { antenna ->
         val operatorKeys = OperatorColors.keysFor(antenna.operateur)
+        val isTimeMuted = timeSliderActive && timeSliderThreshold != null &&
+            (parseServiceDateInt(antenna.dateService) == null || parseServiceDateInt(antenna.dateService)!! > timeSliderThreshold)
         when {
+            isTimeMuted -> 3
             activeKeys != null && operatorKeys.any { it in activeKeys } -> 0
             priorityOperatorKey != null && priorityOperatorKey in operatorKeys -> 0
             defaultOperatorKey != null && defaultOperatorKey in operatorKeys -> 1
@@ -227,6 +233,8 @@ fun OperatorsListSection(
         sortedAntennas.forEach { antenna ->
             val operatorKeys = OperatorColors.keysFor(antenna.operateur)
             val isExpanded = expandable && antenna.idAnfr in expandedAntennaIds
+            val isTimeMuted = timeSliderActive && timeSliderThreshold != null &&
+                (parseServiceDateInt(antenna.dateService) == null || parseServiceDateInt(antenna.dateService)!! > timeSliderThreshold)
             OperatorDetailItem(
                 antenna = antenna,
                 technique = techniques[antenna.idAnfr],
@@ -234,7 +242,8 @@ fun OperatorsListSection(
                 cardBgColor = cardBgColor,
                 blockShape = blockShape,
                 useOneUi = useOneUi,
-                isMuted = (activeKeys != null && operatorKeys.none { it in activeKeys }) ||
+                isMuted = isTimeMuted ||
+                    (activeKeys != null && operatorKeys.none { it in activeKeys }) ||
                     (activeKeys == null && hasPriorityMatch && priorityOperatorKey !in operatorKeys),
                 expandable = expandable,
                 isExpanded = isExpanded,

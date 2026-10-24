@@ -362,6 +362,7 @@ fun SettingsScreen(
     val featureFlags by RemoteFeatureFlags.config
     val uiStyle = LocalGeoTowerUiStyle.current
     var showUnitSheet by remember { mutableStateOf(false) }
+    var showNavModeSheet by remember { mutableStateOf(false) }
     var showColorPalettePage by rememberSaveable { mutableStateOf(false) }
     // Actualisation de la section « Base de données » : les quatre cartes relisent la base installée
     // et réinterrogent le manifeste. Deux déclencheurs selon le mode d'affichage — bouton sur le
@@ -1055,6 +1056,7 @@ fun SettingsScreen(
 
             // --- Apparence ---
             entry(context.getString(R.string.appearance_theme_title), "theme thème clair sombre systeme dark light mode nuit jour couleur apparence", SECTION_APPEARANCE)
+            entry(context.getString(R.string.settings_nav_mode_title), "mode navigation barre selection onglets bas accueil standard", SECTION_APPEARANCE) { showNavModeSheet = true }
             entry(context.getString(R.string.appstrings_color_palette_title), "palette couleur color accent teinte material", SECTION_APPEARANCE) { showColorPalettePage = true }
             entry(context.getString(R.string.appearance_oled_title), "oled noir pur black amoled sombre economie", SECTION_APPEARANCE)
             entry(context.getString(R.string.appearance_one_ui_title), "one ui oneui samsung style interface bulle", SECTION_APPEARANCE)
@@ -1639,6 +1641,22 @@ fun SettingsScreen(
                                 Spacer(Modifier.height(sizing.spacing(20.dp)))
                             }
 
+                            if (settingsSearchQuery.isBlank() && !isSectionOpen) {
+                                val isBottomNav = AppConfig.isBottomNavActive()
+                                PreferenceActionCard(
+                                    title = stringResource(R.string.settings_nav_mode_title),
+                                    desc = if (isBottomNav) stringResource(R.string.settings_nav_mode_bottom_bar) else stringResource(R.string.settings_nav_mode_standard),
+                                    onClick = { showNavModeSheet = true },
+                                    icon = Icons.Default.UnfoldMore,
+                                    shape = cardShape,
+                                    border = cardBorder,
+                                    bubbleColor = bubbleBaseColor,
+                                    useOneUi = useOneUi,
+                                    safeClick = safeClick
+                                )
+                                Spacer(Modifier.height(sizing.spacing(20.dp)))
+                            }
+
                             if (settingsSearchQuery.isNotBlank()) {
                                 SettingsSearchResults(
                                     query = settingsSearchQuery,
@@ -1707,6 +1725,7 @@ fun SettingsScreen(
                                     useOneUi = useOneUi,
                                     safeClick = safeClick,
                                     onColorPaletteClick = { showColorPalettePage = true },
+                                    onNavModeClick = { showNavModeSheet = true },
                                     repository = repository,
                                     scope = scope,
                                     appearanceSectionModifier = sectionAnchorModifiers[SECTION_APPEARANCE],
@@ -1793,6 +1812,7 @@ fun SettingsScreen(
                                         useOneUi,
                                         safeClick,
                                         { showColorPalettePage = true },
+                                        onNavModeClick = { showNavModeSheet = true },
                                         isWide = isExpanded
                                     )
                                     SECTION_MAPPING -> SectionCartographie(
@@ -2003,6 +2023,63 @@ fun SettingsScreen(
                 useOneUi = useOneUi,
                 bubbleColor = bubbleBaseColor
             )
+        }
+
+        if (showNavModeSheet) {
+            val navModeScrollState = rememberScrollState()
+            val isBottomNav = AppConfig.isBottomNavActive()
+            val navModeSheetBg = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
+            ModalBottomSheet(
+                onDismissRequest = { showNavModeSheet = false },
+                containerColor = navModeSheetBg
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .settingsPopupFadingEdge(navModeScrollState)
+                        .verticalScroll(navModeScrollState)
+                        .padding(bottom = sizing.spacing(48.dp), start = sizing.spacing(24.dp), end = sizing.spacing(24.dp))
+                ) {
+                    Text(
+                        text = stringResource(R.string.settings_nav_mode_title),
+                        style = sizing.textStyle(MaterialTheme.typography.titleLarge),
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = sizing.spacing(16.dp))
+                    )
+
+                    NavigationModeOption(
+                        title = stringResource(R.string.settings_nav_mode_standard),
+                        desc = stringResource(R.string.settings_nav_mode_standard_desc),
+                        isSelected = !isBottomNav,
+                        useOneUi = useOneUi,
+                        onClick = {
+                            showNavModeSheet = false
+                            AppConfig.setAppNavMode(context, AppConfig.APP_NAV_MODE_STANDARD)
+                            navController.navigate("home") {
+                                popUpTo(navController.graph.id) { inclusive = true }
+                            }
+                            navController.navigate("settings")
+                        }
+                    )
+
+                    Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+
+                    NavigationModeOption(
+                        title = stringResource(R.string.settings_nav_mode_bottom_bar),
+                        desc = stringResource(R.string.settings_nav_mode_bottom_bar_desc),
+                        isSelected = isBottomNav,
+                        useOneUi = useOneUi,
+                        onClick = {
+                            showNavModeSheet = false
+                            AppConfig.setAppNavMode(context, AppConfig.APP_NAV_MODE_BOTTOM_BAR)
+                            navController.navigate("more") {
+                                popUpTo(navController.graph.id) { inclusive = true }
+                            }
+                            navController.navigate("settings")
+                        }
+                    )
+                }
+            }
         }
 
         // ✅ AJOUT : Fenêtre des Fréquences
@@ -2924,6 +3001,7 @@ fun AllSettingsContent(
     useOneUi: Boolean,
     safeClick: SafeClick,
     onColorPaletteClick: () -> Unit,
+    onNavModeClick: () -> Unit = {},
     repository: AnfrRepository,
     scope: kotlinx.coroutines.CoroutineScope,
     appearanceSectionModifier: Modifier = Modifier,
@@ -2960,7 +3038,7 @@ fun AllSettingsContent(
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
     Column(modifier = appearanceSectionModifier.fillMaxWidth()) {
-        SectionApparence(theme, onTheme, oled, onOled, oneUi, onOneUi, blur, onBlur, logo, onIcon, onLogoDrawing, logoMaterialWavesEnabled, onLogoMaterialWavesChange, shape, border, bubbleColor, useOneUi, safeClick, onColorPaletteClick, isWide = isWide)
+        SectionApparence(theme, onTheme, oled, onOled, oneUi, onOneUi, blur, onBlur, logo, onIcon, onLogoDrawing, logoMaterialWavesEnabled, onLogoMaterialWavesChange, shape, border, bubbleColor, useOneUi, safeClick, onColorPaletteClick, onNavModeClick = onNavModeClick, isWide = isWide)
     }
     Spacer(Modifier.height(sizing.spacing(32.dp)))
     Column(modifier = mappingSectionModifier.fillMaxWidth()) {
@@ -3047,6 +3125,7 @@ fun SectionApparence(
     logoMaterialWavesEnabled: Boolean, onLogoMaterialWavesChange: (Boolean) -> Unit,
     shape: Shape, border: BorderStroke?, bubbleColor: Color, useOneUi: Boolean, safeClick: SafeClick,
     onColorPaletteClick: () -> Unit,
+    onNavModeClick: () -> Unit = {},
     // Grand écran : la réinitialisation est déjà dans la barre latérale, on ne la répète pas ici.
     isWide: Boolean = false
 ) {
@@ -3096,6 +3175,39 @@ fun SectionApparence(
     // appui depuis l'en-tête des grands écrans et depuis le bouton de bas de page unique, exactement
     // comme le bouton de la barre du haut sur téléphone. Trois entrées pour un interrupteur, c'était
     // deux de trop.
+
+    Spacer(Modifier.height(sizing.spacing(12.dp)))
+    val navModeCardBg = if (useOneUi) bubbleColor else Color.Transparent
+    Surface(
+        onClick = { safeClick("nav_mode_sheet") { onNavModeClick() } },
+        modifier = Modifier.fillMaxWidth(),
+        shape = shape,
+        border = border,
+        color = navModeCardBg
+    ) {
+        Row(
+            modifier = Modifier.padding(sizing.spacing(16.dp)),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    stringResource(R.string.settings_nav_mode_title),
+                    style = sizing.textStyle(MaterialTheme.typography.titleMedium),
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    if (AppConfig.isBottomNavActive()) {
+                        stringResource(R.string.settings_nav_mode_bottom_bar)
+                    } else {
+                        stringResource(R.string.settings_nav_mode_standard)
+                    },
+                    style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Icon(Icons.Default.UnfoldMore, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
 
     // Style d'affichage plein écran / fractionné : uniquement sur grand écran réel — c'est le même
     // seuil qui décide de l'affichage lui-même, donc le réglage n'apparaît que là où il agit.

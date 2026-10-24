@@ -122,6 +122,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -254,6 +255,7 @@ import fr.geotower.utils.MapProviderRules
 import fr.geotower.ui.screens.emitters.OperatorGrid
 import fr.geotower.utils.OperatorColorSpec
 import fr.geotower.utils.OperatorColors
+import fr.geotower.utils.parseServiceDateInt
 import fr.geotower.utils.filteredAzimuthsForFrequencySelection
 import fr.geotower.utils.formatSiteDistanceMeters
 import fr.geotower.utils.isNetworkAvailable
@@ -511,30 +513,6 @@ private fun hasSavedMapPosition(prefs: SharedPreferences): Boolean {
     return lat in -90.0..90.0 &&
         lon in -180.0..180.0 &&
         zoom in 0.0..25.0
-}
-
-/**
- * Parse une date ANFR en entier yyyymmdd comparable, ou null si absente/invalide.
- * L'ANFR fournit "JJ/MM/AAAA" (ex: "01/06/2012") ; on accepte aussi l'ISO "AAAA-MM-JJ" par sécurité.
- */
-private fun parseServiceDateInt(raw: String?): Int? {
-    val s = raw?.trim() ?: return null
-    if (s.length < 10) return null
-    return when {
-        (s[2] == '/' || s[2] == '-') && (s[5] == '/' || s[5] == '-') -> {
-            val d = s.substring(0, 2).toIntOrNull() ?: return null
-            val m = s.substring(3, 5).toIntOrNull() ?: return null
-            val y = s.substring(6, 10).toIntOrNull() ?: return null
-            if (m in 1..12 && d in 1..31) y * 10000 + m * 100 + d else null
-        }
-        s[4] == '-' && s[7] == '-' -> {
-            val y = s.substring(0, 4).toIntOrNull() ?: return null
-            val m = s.substring(5, 7).toIntOrNull() ?: return null
-            val d = s.substring(8, 10).toIntOrNull() ?: return null
-            if (m in 1..12 && d in 1..31) y * 10000 + m * 100 + d else null
-        }
-        else -> null
-    }
 }
 
 /**
@@ -1910,8 +1888,8 @@ fun MapScreen(
             .firstOrNull { it.isNotBlank() }
     }
 
-    var currentZoom by remember { mutableDoubleStateOf(15.0) }
-    var currentLat by remember { mutableDoubleStateOf(48.8584) }
+    var currentZoom by rememberSaveable { mutableStateOf(15.0) }
+    var currentLat by rememberSaveable { mutableStateOf(48.8584) }
     var isMeasuringMode by rememberSaveable { mutableStateOf(false) }
     var trackNearestAll by rememberSaveable { mutableStateOf(false) }
     var trackNearestFav by rememberSaveable { mutableStateOf(false) }
@@ -2751,6 +2729,17 @@ fun MapScreen(
     var timeSliderThreshold by rememberSaveable { mutableStateOf<Int?>(null) }
     var timeSliderStats by remember { mutableStateOf(TimeSliderStats(emptyMap(), 0)) }
     val timeSliderLift = if (isTimeSliderVisible) sizing.component(104.dp) else 0.dp
+
+    SideEffect {
+        AppConfig.timeSliderActive.value = isTimeSliderVisible
+        AppConfig.timeSliderThreshold.value = if (isTimeSliderVisible) timeSliderThreshold else null
+    }
+
+    LaunchedEffect(isTimeSliderVisible) {
+        if (isTimeSliderVisible) {
+            viewModel.ensureOldestServiceDateLoaded()
+        }
+    }
 
     // La barre du trajet occupe le bas de l'écran : sans ce relèvement, la colonne d'infos et les
     // boutons de zoom sont dessinés par-dessus, puisqu'ils viennent après dans le Box.
@@ -3682,7 +3671,6 @@ fun MapScreen(
         onDispose {
             smoothEngine.reset()
             restoreOperatorSearchSelection()
-            AppConfig.timeSliderActive.value = false
             viewModel.resetCityLock()
             lifecycleOwner.lifecycle.removeObserver(observer)
             searchJob?.cancel()
@@ -3761,7 +3749,8 @@ fun MapScreen(
         AppConfig.f5G_700.value, AppConfig.f5G_1400.value, AppConfig.f5G_2100.value, AppConfig.f5G_3500.value, AppConfig.f5G_4200.value, AppConfig.f5G_26000.value,
         AppConfig.showSitesInService.value, AppConfig.showSitesOutOfService.value, AppConfig.hideUndergroundSites.value, AppConfig.showOnlyZbSites.value,
         AppConfig.showProjectSites.value, sitesHs, currentCityPolygons,
-        isTimeSliderVisible, timeSliderThreshold, adminAreaStatsAntennas, hiddenSites
+        isTimeSliderVisible, timeSliderThreshold, adminAreaStatsAntennas, hiddenSites,
+        currentZoom, clusterStrength
     ) {
         val computed = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
             val selectedOperators = AppConfig.selectedOperatorKeys.value
@@ -3785,8 +3774,7 @@ fun MapScreen(
                         showProjectSites = showProjectSites,
                         selectedOperatorKeys = selectedOperators
                     )
-                    return@filter frequencyFilter.isFullyEnabled &&
-                        visibleOperators.isNotEmpty() &&
+                    return@filter visibleOperators.isNotEmpty() &&
                         (!showOnlyZbSites || antenna.isZb == 1)
                 }
 
@@ -3843,7 +3831,31 @@ fun MapScreen(
                 // Aucune date exploitable dans la zone (typiquement la base live qui ne renvoie pas
                 // les dates) : on n'efface pas la carte, le slider reste sans effet ici.
                 val finalVisible = if (datedTotal == 0) base else visible
-                Triple(finalVisible, TimeSliderStats(counts, undated), areaStats)
+                val effectiveZoom = mapViewRef?.zoomLevelDouble ?: currentZoom
+                val displayAntennas = if (effectiveZoom < 14.0 && !keepAzimuthsWhenZoomedOut && finalVisible.size > 200) {
+                    val aggregationZoom = MapClusterStrengthProfile.aggregationZoom(
+                        mapZoom = effectiveZoom,
+                        strength = clusterStrength
+                    )
+                    val clusters = viewModel.clusterDetailedAntennas(finalVisible, aggregationZoom)
+                    val clusterIsZb = if (AppConfig.showOnlyZbSites.value) 1 else 0
+                    clusters.map { cluster ->
+                        LocalisationEntity(
+                            idAnfr = "CLUSTER_${cluster.count}",
+                            operateur = OperatorColors.keysFor(cluster.operators).joinToString(", "),
+                            latitude = cluster.centerLat,
+                            longitude = cluster.centerLon,
+                            azimuts = null, codeInsee = null, azimutsFh = null,
+                            techMask = 0,
+                            bandMask = 0,
+                            isZb = clusterIsZb,
+                            hasActive = 1
+                        )
+                    }
+                } else {
+                    finalVisible
+                }
+                Triple(displayAntennas, TimeSliderStats(counts, undated), areaStats)
             }
         }
         filteredAntennas = computed.first
@@ -4839,6 +4851,8 @@ fun MapScreen(
 
     LaunchedEffect(
         sitesHs,
+        hiddenSites,
+        AppConfig.selectedOperatorKeys.value,
         AppConfig.showSitesInService.value,
         AppConfig.showSitesOutOfService.value,
         AppConfig.hideUndergroundSites.value,
@@ -5234,11 +5248,13 @@ fun MapScreen(
                         currentZoom = 18.0
                         currentLat = focusLat
                     } else {
-                        controller.setCenter(GeoPoint(
-                            prefs.getFloat("last_map_lat", 46.2276f).toDouble(),
-                            prefs.getFloat("last_map_lon", 2.2137f).toDouble()
-                        ))
-                        controller.setZoom(prefs.getFloat("last_map_zoom", 6.0f).toDouble())
+                        val lastLat = prefs.getFloat("last_map_lat", 46.2276f).toDouble()
+                        val lastLon = prefs.getFloat("last_map_lon", 2.2137f).toDouble()
+                        val lastZoom = prefs.getFloat("last_map_zoom", 6.0f).toDouble()
+                        controller.setCenter(GeoPoint(lastLat, lastLon))
+                        controller.setZoom(lastZoom)
+                        currentZoom = lastZoom
+                        currentLat = lastLat
                     }
                     // On retrouve la carte comme on l'a laissée, sauf si la rotation a été coupée
                     // entre-temps : le `update` remettra alors le nord en haut.
@@ -6270,7 +6286,32 @@ fun MapScreen(
             (if (canUseMeasureRouting) 1 else 0)
         val trackingDrawerHeight = (trackingButtonHeight * trackingRowCount.toFloat()) +
             (trackingButtonSpacing * (trackingRowCount - 1).toFloat())
-        val zoomBottomPadding = sizing.spacing(32.dp) +
+        val isBottomNavActive = AppConfig.isBottomNavActive()
+        val systemNavBars = WindowInsets.navigationBars.asPaddingValues()
+        val rawBottomNavPadding = systemNavBars.calculateBottomPadding()
+
+        val mapBottomControlsBasePadding = when {
+            isBottomNavActive && uiStyle.useOneUi -> {
+                val oneUiBottomInset = if (rawBottomNavPadding > 24.dp) {
+                    (rawBottomNavPadding * 0.4f).coerceAtMost(16.dp)
+                } else {
+                    (rawBottomNavPadding * 0.15f).coerceAtMost(4.dp)
+                }
+                sizing.component(58.dp) + sizing.spacing(28.dp) + oneUiBottomInset
+            }
+            isBottomNavActive -> {
+                val standardBottomInset = if (rawBottomNavPadding > 24.dp) {
+                    (rawBottomNavPadding * 0.4f).coerceAtMost(16.dp)
+                } else {
+                    (rawBottomNavPadding * 0.15f).coerceAtMost(3.dp)
+                }
+                sizing.component(64.dp) + standardBottomInset + sizing.spacing(12.dp)
+            }
+            else -> sizing.spacing(32.dp)
+        }
+        val applyNavBarsPadding = !isBottomNavActive
+
+        val zoomBottomPadding = mapBottomControlsBasePadding +
             if (showLocationBtn && canUseMapLocation) {
                 mapControlButtonDiameter + sizing.spacing(16.dp)
             } else {
@@ -6336,7 +6377,7 @@ fun MapScreen(
                     end = sizing.spacing(16.dp) + mapControlButtonDiameter + sizing.spacing(12.dp),
                     bottom = trackingDrawerLandscapeBottomPadding
                 )
-                .navigationBarsPadding()
+                .then(if (applyNavBarsPadding) Modifier.navigationBarsPadding() else Modifier)
         } else {
             Modifier
                 .align(Alignment.TopEnd)
@@ -6395,9 +6436,44 @@ fun MapScreen(
             }
         }
 
-        // ✅ NOUVEAU : Bouton de Partage positionné sous le bouton Retour avec animation
+        val isMi = fr.geotower.utils.AppConfig.distanceUnit.intValue == 1
+        val speedText = if (isMi) "${(currentSpeedKmH / 1.60934).toInt()} mph" else "$currentSpeedKmH km/h"
+
+        // En rendu fluide le repère de position vit dans une couche Compose au-dessus de la
+        // MapView : la capture, qui ne dessine que la MapView, doit donc le repeindre elle-même
+        // avec la même projection, sinon l'image partagée n'a pas de point de localisation.
+        val drawLocationMarker: ((android.graphics.Canvas) -> Unit)? =
+            if (smoothLocationEnabled && showLocationMarker) {
+                { canvas ->
+                    val map = mapViewRef
+                    val position = smoothEngine.sample(SystemClock.elapsedRealtime())
+                    if (map != null && position != null) {
+                        val pixel = android.graphics.Point()
+                        map.projection.toPixels(
+                            GeoPoint(position.latitude, position.longitude),
+                            pixel
+                        )
+                        // La capture rend la MapView déjà tournée : le repère, repeint par-dessus,
+                        // doit suivre la même rotation (cf. la couche fluide à l'écran).
+                        map.projectedPointToScreen(pixel)
+                        locationMarkerPainter.draw(
+                            canvas = canvas,
+                            x = pixel.x.toFloat(),
+                            y = pixel.y.toFloat(),
+                            rotationDegrees = map.screenAngleOf(if (PowerProfile.mapCompassRotation) azimuth else 0f),
+                            showDirection = AppConfig.hasCompass.value
+                        )
+                    }
+                }
+            } else {
+                null
+            }
+
+        // Bouton de Partage flottant (affiché uniquement hors mode barre de navigation,
+        // car en mode barre le bouton partager remplace directement le bouton retour dans l'en-tête).
+        val showFloatingShareButton = showShareButton && (!AppConfig.isBottomNavActive() || isSharedPhotoSelectionMode || isPlannerMode)
         AnimatedVisibility(
-            visible = showShareButton,
+            visible = showFloatingShareButton,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier
@@ -6414,39 +6490,6 @@ fun MapScreen(
                     shareButtonBottomPx = position.y + it.size.height
                 }
         ) {
-            val isMi = fr.geotower.utils.AppConfig.distanceUnit.intValue == 1
-            val speedText = if (isMi) "${(currentSpeedKmH / 1.60934).toInt()} mph" else "$currentSpeedKmH km/h"
-
-            // En rendu fluide le repère de position vit dans une couche Compose au-dessus de la
-            // MapView : la capture, qui ne dessine que la MapView, doit donc le repeindre elle-même
-            // avec la même projection, sinon l'image partagée n'a pas de point de localisation.
-            val drawLocationMarker: ((android.graphics.Canvas) -> Unit)? =
-                if (smoothLocationEnabled && showLocationMarker) {
-                    { canvas ->
-                        val map = mapViewRef
-                        val position = smoothEngine.sample(SystemClock.elapsedRealtime())
-                        if (map != null && position != null) {
-                            val pixel = android.graphics.Point()
-                            map.projection.toPixels(
-                                GeoPoint(position.latitude, position.longitude),
-                                pixel
-                            )
-                            // La capture rend la MapView déjà tournée : le repère, repeint par-dessus,
-                            // doit suivre la même rotation (cf. la couche fluide à l'écran).
-                            map.projectedPointToScreen(pixel)
-                            locationMarkerPainter.draw(
-                                canvas = canvas,
-                                x = pixel.x.toFloat(),
-                                y = pixel.y.toFloat(),
-                                rotationDegrees = map.screenAngleOf(if (PowerProfile.mapCompassRotation) azimuth else 0f),
-                                showDirection = AppConfig.hasCompass.value
-                            )
-                        }
-                    }
-                } else {
-                    null
-                }
-
             fr.geotower.ui.components.MapShareMenu(
                 useOneUi = fr.geotower.utils.AppConfig.useOneUiDesign,
                 globalMapRef = mapViewRef,
@@ -6769,23 +6812,40 @@ fun MapScreen(
                 // En mode simplifié la carte est la racine : le retour n'a plus de sens, le bouton
                 // ouvre le tiroir. La sélection de photo partagée garde en revanche son « annuler ».
                 val showSimpleModeMenuButton = onOpenSimpleModeMenu != null && !isSharedPhotoSelectionMode
-                SmallFloatingButton(
-                    icon = if (showSimpleModeMenuButton) Icons.Default.Menu else Icons.AutoMirrored.Filled.ArrowBack,
-                    desc = if (showSimpleModeMenuButton) {
-                        stringResource(R.string.simple_mode_open_menu)
-                    } else {
-                        stringResource(R.string.appstrings_back)
-                    },
-                    modifier = Modifier.align(Alignment.CenterStart)
-                ) {
-                    if (isSharedPhotoSelectionMode) {
-                        cancelSharedPhotoSelection()
-                    } else if (showSimpleModeMenuButton) {
-                        safeClick { onOpenSimpleModeMenu.invoke() }
-                    } else {
-                        restoreOperatorSearchSelection()
-                        safeBackNavigation.navigateBack()
+                val showBackButton = !AppConfig.isBottomNavActive() || isSharedPhotoSelectionMode || isPlannerMode
+                if (showSimpleModeMenuButton || showBackButton) {
+                    SmallFloatingButton(
+                        icon = if (showSimpleModeMenuButton) Icons.Default.Menu else Icons.AutoMirrored.Filled.ArrowBack,
+                        desc = if (showSimpleModeMenuButton) {
+                            stringResource(R.string.simple_mode_open_menu)
+                        } else {
+                            stringResource(R.string.appstrings_back)
+                        },
+                        modifier = Modifier.align(Alignment.CenterStart)
+                    ) {
+                        if (isSharedPhotoSelectionMode) {
+                            cancelSharedPhotoSelection()
+                        } else if (showSimpleModeMenuButton) {
+                            safeClick { onOpenSimpleModeMenu.invoke() }
+                        } else {
+                            restoreOperatorSearchSelection()
+                            safeBackNavigation.navigateBack()
+                        }
                     }
+                } else if (AppConfig.isBottomNavActive() && showShareButton) {
+                    // En mode de navigation avec barres, le bouton Partager remplace le bouton retour dans l'en-tête
+                    fr.geotower.ui.components.MapShareMenu(
+                        useOneUi = fr.geotower.utils.AppConfig.useOneUiDesign,
+                        globalMapRef = mapViewRef,
+                        currentSpeed = speedText,
+                        currentZoom = currentZoom,
+                        currentLat = currentLat,
+                        azimuth = azimuth,
+                        measureOverlay = measureOverlay,
+                        timeSliderDateLabel = if (isTimeSliderVisible) timeSliderThreshold?.let { timeSliderMonthLabel(it) } else null,
+                        drawLocationMarker = drawLocationMarker,
+                        modifier = Modifier.align(Alignment.CenterStart)
+                    )
                 }
                 Surface(modifier = Modifier.align(Alignment.Center), shape = RoundedCornerShape(32.dp), color = MaterialTheme.colorScheme.surface, shadowElevation = 4.dp, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
                     // Avec un trajet ouvert, la carte n'est plus « la carte des antennes » : elle
@@ -7037,8 +7097,8 @@ fun MapScreen(
                 .align(Alignment.BottomEnd)
                 // Même raison que la colonne d'infos : la barre du planificateur tient toute la
                 // largeur du bas, ces boutons passeraient dessous.
-                .padding(bottom = sizing.spacing(32.dp) + plannerLift, end = sizing.spacing(16.dp))
-                .navigationBarsPadding()
+                .padding(bottom = mapBottomControlsBasePadding + plannerLift, end = sizing.spacing(16.dp))
+                .then(if (applyNavBarsPadding) Modifier.navigationBarsPadding() else Modifier)
                 // Sert d'ancre au repère de position pendant le suivi : il se pose à la hauteur de
                 // ces boutons plutôt qu'à une fraction d'écran choisie au hasard.
                 .onGloballyPositioned {
@@ -7130,6 +7190,7 @@ fun MapScreen(
                         } else {
                             timeSliderThreshold = null
                         }
+                        AppConfig.timeSliderThreshold.value = if (isTimeSliderVisible) timeSliderThreshold else null
                         mapViewRef?.loadVisibleAntennas(viewModel)
                     },
                             onOpenLayers = { safeClick { if (canUseLayerSelector) showLayerSheet = true } },
@@ -7377,6 +7438,26 @@ fun MapScreen(
             }
         }
 
+        val mapBottomSliderPadding = when {
+            isBottomNavActive && uiStyle.useOneUi -> {
+                val oneUiBottomInset = if (rawBottomNavPadding > 24.dp) {
+                    (rawBottomNavPadding * 0.4f).coerceAtMost(16.dp)
+                } else {
+                    (rawBottomNavPadding * 0.15f).coerceAtMost(4.dp)
+                }
+                sizing.component(58.dp) + sizing.spacing(24.dp) + oneUiBottomInset
+            }
+            isBottomNavActive -> {
+                val standardBottomInset = if (rawBottomNavPadding > 24.dp) {
+                    (rawBottomNavPadding * 0.4f).coerceAtMost(16.dp)
+                } else {
+                    (rawBottomNavPadding * 0.15f).coerceAtMost(3.dp)
+                }
+                sizing.component(64.dp) + standardBottomInset + sizing.spacing(12.dp)
+            }
+            else -> 0.dp
+        }
+
         // Le slider temporel s'efface pendant l'édition d'un trajet : les deux barres occupent le
         // même bas d'écran, et le planificateur est un mode focalisé.
         if (isTimeSliderVisible && !isPlannerMode) {
@@ -7386,11 +7467,18 @@ fun MapScreen(
                 thresholdInt = timeSliderThreshold,
                 countsByOperator = timeSliderStats.countsByOperator,
                 undatedCount = timeSliderStats.undated,
-                onThresholdChange = { timeSliderThreshold = it },
+                onThresholdChange = {
+                    timeSliderThreshold = it
+                    AppConfig.timeSliderThreshold.value = it
+                },
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .padding(start = sizing.spacing(12.dp), end = mapControlButtonDiameter + sizing.spacing(24.dp))
-                    .navigationBarsPadding()
+                    .padding(
+                        start = sizing.spacing(12.dp),
+                        end = mapControlButtonDiameter + sizing.spacing(24.dp),
+                        bottom = mapBottomSliderPadding
+                    )
+                    .then(if (applyNavBarsPadding) Modifier.navigationBarsPadding() else Modifier)
             )
         }
 
@@ -7625,9 +7713,9 @@ fun MapScreen(
                 .align(Alignment.BottomStart)
                 .padding(
                     start = sizing.spacing(16.dp),
-                    bottom = sizing.spacing(32.dp) + timeSliderLift + plannerLift
+                    bottom = mapBottomControlsBasePadding + timeSliderLift + plannerLift
                 )
-                .navigationBarsPadding()
+                .then(if (applyNavBarsPadding) Modifier.navigationBarsPadding() else Modifier)
                 .onGloballyPositioned { infoColumnTopPx = it.positionInRoot().y }
                 .alpha(if (infoColumnMasksShare) 0f else 1f),
             horizontalAlignment = Alignment.Start,

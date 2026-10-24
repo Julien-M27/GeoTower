@@ -3428,6 +3428,7 @@
     <string name="appstrings_release_v2078_summary_map_loading_indicator">Discreto indicatore visivo di caricamento dei siti e delle statistiche in fondo alla mappa</string>
     <string name="appstrings_release_v2079_summary_frequency_search_and_voice_assistant">Ricerca nelle bande di frequenza, comando vocale Assistant per le antenne e notifiche di generazione locale</string>
     <string name="appstrings_release_v2080_summary_database_viewer_outages_and_sources">Ispezione dei dati sui disservizi nel visualizzatore database e sorgenti configurabili per le generazioni locali</string>
+    <string name="appstrings_release_v2081_summary_bottom_navigation_bar">Nuova modalità di navigazione con barra a schede inferiore e integrazione del cursore temporale sulla mappa</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registro richieste di rete</string>
@@ -3470,4 +3471,15 @@
     <string name="network_log_errors_count">%1$d errori</string>
     <string name="network_log_retention_badge">Conservazione: %1$s</string>
     <string name="network_log_view_requests">Visualizza richieste di rete</string>
+    <!-- Modalita di navigazione / Barra inferiore -->
+    <string name="bottom_nav_nearby">Vicinanze</string>
+    <string name="bottom_nav_map">Mappa</string>
+    <string name="bottom_nav_trips">Percorsi</string>
+    <string name="bottom_nav_stats">Statistiche</string>
+    <string name="bottom_nav_more">Altro</string>
+    <string name="settings_nav_mode_title">Modalità di navigazione</string>
+    <string name="settings_nav_mode_standard">Home standard</string>
+    <string name="settings_nav_mode_standard_desc">Avvia dal menu principale con accesso a tutte le pagine</string>
+    <string name="settings_nav_mode_bottom_bar">Barra di navigazione inferiore</string>
+    <string name="settings_nav_mode_bottom_bar_desc">Barra a 5 schede in basso: Vicinanze, Mappa, Percorsi, Statistiche, Altro</string>
 </resources>

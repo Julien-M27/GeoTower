@@ -37,6 +37,7 @@ fun GeoTowerBackTopBar(
     backgroundColor: Color = Color.Transparent,
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
     backEnabled: Boolean = true,
+    showBackButton: Boolean = true,
     actionsWidth: Dp = 48.dp,
     actions: (@Composable RowScope.() -> Unit)? = null
 ) {
@@ -47,6 +48,7 @@ fun GeoTowerBackTopBar(
         backgroundColor = backgroundColor,
         contentColor = contentColor,
         backEnabled = backEnabled,
+        showBackButton = showBackButton,
         actionsWidth = actionsWidth,
         actions = actions
     ) {
@@ -69,6 +71,7 @@ fun GeoTowerBackTopBar(
     backgroundColor: Color = Color.Transparent,
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
     backEnabled: Boolean = true,
+    showBackButton: Boolean = true,
     actionsWidth: Dp = 48.dp,
     actions: (@Composable RowScope.() -> Unit)? = null,
     titleContent: @Composable BoxScope.() -> Unit
@@ -91,12 +94,14 @@ fun GeoTowerBackTopBar(
             modifier = Modifier.width(slotWidth),
             contentAlignment = Alignment.CenterStart
         ) {
-            IconButton(onClick = onBack, enabled = backEnabled) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = stringResource(R.string.appstrings_back),
-                    tint = contentColor
-                )
+            if (showBackButton) {
+                IconButton(onClick = onBack, enabled = backEnabled) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = stringResource(R.string.appstrings_back),
+                        tint = contentColor
+                    )
+                }
             }
         }
         Box(

@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -185,6 +187,7 @@ fun TripsScreen(
                 title = stringResource(R.string.trips_title),
                 onBack = { safeBackNavigation.navigateBack() },
                 backEnabled = !safeBackNavigation.isLocked,
+                showBackButton = !AppConfig.isBottomNavActive(),
                 // Une seule action, de la largeur du bouton retour : la barre réserve `actionsWidth`
                 // en face de lui, et tout écart décentre le titre. « Nouveau trajet » part donc en
                 // bouton flottant, sa place naturelle pour une liste.
@@ -203,7 +206,12 @@ fun TripsScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { safeClick("add_trip") { showAddTripOptions = true } }) {
+            val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+            val fabBottom = (if (AppConfig.isBottomNavActive()) sizing.component(84.dp) else 0.dp) + navBarBottom
+            FloatingActionButton(
+                onClick = { safeClick("add_trip") { showAddTripOptions = true } },
+                modifier = Modifier.padding(bottom = fabBottom)
+            ) {
                 Icon(
                     imageVector = Icons.Default.Add,
                     contentDescription = stringResource(R.string.trips_new)
@@ -252,7 +260,8 @@ fun TripsScreen(
                         // De quoi passer sous le bouton flottant, sinon la dernière carte se
                         // retrouve dessous et son menu devient inatteignable. Pas d'encart système
                         // à ajouter ici : la route du NavHost pade déjà avec l'innerPadding racine.
-                        bottom = sizing.spacing(96.dp)
+                        bottom = sizing.spacing(96.dp) + (if (AppConfig.isBottomNavActive()) sizing.component(84.dp) else 0.dp) +
+                            WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
                     ),
                     verticalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp))
                 ) {

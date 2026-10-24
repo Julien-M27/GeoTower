@@ -167,6 +167,7 @@ import fr.geotower.utils.AppLogger
 import fr.geotower.utils.activeOperatorKeysForSiteStatusFilter
 import fr.geotower.utils.combineOperatorKeyFilters
 import fr.geotower.utils.resolveActiveOperatorKeys
+import fr.geotower.utils.parseServiceDateInt
 import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.OperatorLogos
 import fr.geotower.utils.PageScrollPrefs
@@ -1125,9 +1126,9 @@ fun SiteDetailScreen(
                         ),
                         currentRouteKeys = setOf("site_detail", "site_detail_from_map"),
                         impliedParentItems = listOfNotNull(
-                        // Le mode simplifié n'a pas d'accueil : le fil d'Ariane commence à la
+                        // Le mode simplifié et la barre inférieure n'ont pas d'accueil : le fil d'Ariane commence à la
                         // carte (ou à « À proximité »), pas sur une page qui n'existe plus.
-                        if (AppConfig.simpleModeActive()) {
+                        if (AppConfig.simpleModeActive() || AppConfig.isBottomNavActive()) {
                             null
                         } else {
                             GeoTowerBreadcrumbItem(
@@ -1209,17 +1210,23 @@ fun SiteDetailScreen(
                 AppConfig.showSitesOutOfService.value,
                 AppConfig.showProjectSites.value,
                 AppConfig.hideUndergroundSites.value,
-                AppConfig.showOnlyZbSites.value
+                AppConfig.showOnlyZbSites.value,
+                AppConfig.timeSliderActive.value,
+                AppConfig.timeSliderThreshold.value
             ) {
                 resolveActiveOperatorKeys(
                     context = context,
                     antennas = allSupportAntennas,
                     sitesHs = fullSupportHsData.values.ifEmpty { hsDataMap.values },
-                    applyFilters = true
+                    applyFilters = true,
+                    timeSliderActive = AppConfig.timeSliderActive.value,
+                    timeSliderThreshold = AppConfig.timeSliderThreshold.value
                 )
             }
-            val isOperatorMutedByFilter = activeOperatorKeys != null &&
-                OperatorColors.keysFor(info.operateur).none { operatorKey -> operatorKey in activeOperatorKeys }
+            val isTimeMuted = AppConfig.timeSliderActive.value && AppConfig.timeSliderThreshold.value != null &&
+                (parseServiceDateInt(info.dateService) == null || parseServiceDateInt(info.dateService)!! > AppConfig.timeSliderThreshold.value!!)
+            val isOperatorMutedByFilter = isTimeMuted || (activeOperatorKeys != null &&
+                OperatorColors.keysFor(info.operateur).none { operatorKey -> operatorKey in activeOperatorKeys })
 
             if (showCartoradioSheet) {
                 ModalBottomSheet(onDismissRequest = { showCartoradioSheet = false }, sheetState = sheetState, containerColor = sheetBgColor) {

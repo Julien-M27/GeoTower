@@ -25,6 +25,7 @@ import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.PhysiqueEntity
 import fr.geotower.data.models.RadioMapMarker
 import fr.geotower.data.models.TechniqueEntity
+import fr.geotower.data.models.DbCluster
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -41,6 +42,8 @@ import fr.geotower.utils.FrequencyFilterSelection
 import fr.geotower.utils.FrenchAdminAreas
 import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.PowerProfile
+import fr.geotower.utils.buildHsOperatorMap
+import fr.geotower.utils.visibleOperatorKeysForAntenna
 
 /** Contour d'une zone administrative, associé au code qui l'a demandé pour éviter tout décalage. */
 data class AdminAreaOutline(
@@ -299,16 +302,21 @@ class MapViewModel(
                 }
 
                 val frequencyFilter = FrequencyFilterSelection.fromMapConfig()
-                // Le clustering est pré-agrégé en base : il ne sait pas distinguer les statuts,
-                // donc tout décochage force le chargement détaillé.
+                val selectedOperators = AppConfig.selectedOperatorKeys.value
+                val hasOperatorFilter = !selectedOperators.map { it.uppercase() }.containsAll(OperatorColors.defaultVisibleKeys)
+                // Le clustering est pré-agrégé en base : il ne sait pas distinguer les statuts
+                // ni les filtres opérateurs / fréquences, donc tout filtrage force le chargement détaillé.
                 val hasSiteDisplayFilter = !showSitesInService || !showSitesOutOfService || !showProjectSites
                 val hasFrequencyFilter = !frequencyFilter.isFullyEnabled
+                val hasHiddenSites = repository.hasHiddenSites()
+                val isTimeSliderActive = AppConfig.timeSliderActive.value
 
-                // Les clusters sont pré-agrégés et ne peuvent pas soustraire les masquages locaux
-                // opérateur par opérateur. Dès qu'il existe une préférence de masquage, on charge
+                // Les clusters pré-agrégés ne peuvent pas soustraire les masquages locaux,
+                // les filtres d'opérateur ou de statut. Dès qu'un filtre est actif, on charge
                 // les lignes détaillées afin que la carte reste cohérente avec tous les autres écrans.
-                if (zoom < 14.0 && !keepDetailedAzimuths && cityPolygons == null && !hasSiteDisplayFilter && !hasFrequencyFilter &&
-                    !AppConfig.timeSliderActive.value && !repository.hasHiddenSites()
+                if (zoom < 14.0 && !keepDetailedAzimuths && cityPolygons == null &&
+                    !hasSiteDisplayFilter && !hasFrequencyFilter && !hasOperatorFilter &&
+                    !isTimeSliderActive && !hasHiddenSites
                 ) {
                     val aggregationZoom = MapClusterStrengthProfile.aggregationZoom(
                         mapZoom = zoom,
@@ -325,11 +333,8 @@ class MapViewModel(
 
                     // On transforme ces DbCluster en fausses LocalisationEntity
                     val fakeAntennas = clusters.map { cluster ->
-                        val singleAntennaId = cluster.singleIdAnfr
-                            ?.takeIf { cluster.count == 1 && it.isNotBlank() }
-
                         LocalisationEntity(
-                            idAnfr = singleAntennaId ?: "CLUSTER_${cluster.count}",
+                            idAnfr = "CLUSTER_${cluster.count}",
                             operateur = OperatorColors.keysFor(cluster.operators).joinToString(", "),
                             latitude = cluster.centerLat,
                             longitude = cluster.centerLon,
@@ -397,31 +402,52 @@ class MapViewModel(
                     // ✅ 3. SI UNE VILLE EST CIBLÉE, ON LA GARDE STRICTEMENT FILTRÉE !
                     if (cityPolygons != null) {
                         _antennas.value = areaAntennas.filter { isPointInPolygon(it.latitude, it.longitude, cityPolygons!!) }
-                    } else if (zoom < 14.0 && !keepDetailedAzimuths && areaAntennas.size > 200) {
-                        // En dézoom avec filtres actifs, agréger en arrière-plan pour éviter de figer le thread UI avec des milliers de marqueurs
-                        val aggregationZoom = MapClusterStrengthProfile.aggregationZoom(
-                            mapZoom = zoom,
-                            strength = AppConfig.mapClusterStrength.intValue
-                        )
-                        val clusters = repository.clusterDetailedAntennas(areaAntennas, aggregationZoom)
-                        val clusterIsZb = if (AppConfig.showOnlyZbSites.value) 1 else 0
-                        val fakeAntennas = clusters.map { cluster ->
-                            val singleAntennaId = cluster.singleIdAnfr
-                                ?.takeIf { cluster.count == 1 && it.isNotBlank() }
+                    } else if (zoom < 14.0 && !keepDetailedAzimuths && !isTimeSliderActive) {
+                        val hsOperatorMap = buildHsOperatorMap(_sitesHs.value)
+                        val hideUndergroundSites = AppConfig.hideUndergroundSites.value
+                        val showOnlyZbSites = AppConfig.showOnlyZbSites.value
 
-                            LocalisationEntity(
-                                idAnfr = singleAntennaId ?: "CLUSTER_${cluster.count}",
-                                operateur = OperatorColors.keysFor(cluster.operators).joinToString(", "),
-                                latitude = cluster.centerLat,
-                                longitude = cluster.centerLon,
-                                azimuts = null, codeInsee = null, azimutsFh = null,
-                                techMask = 0,
-                                bandMask = 0,
-                                isZb = clusterIsZb,
-                                hasActive = 1
+                        val filteredAntennas = areaAntennas.mapNotNull { antenna ->
+                            val visibleOps = visibleOperatorKeysForAntenna(
+                                antenna = antenna,
+                                hsOperatorMap = hsOperatorMap,
+                                showSitesInService = showSitesInService,
+                                showSitesOutOfService = showSitesOutOfService,
+                                showProjectSites = showProjectSites,
+                                selectedOperatorKeys = selectedOperators
                             )
+                            if (visibleOps.isEmpty()) return@mapNotNull null
+                            if (hideUndergroundSites && antenna.hasUndergroundSupport == 1) return@mapNotNull null
+                            if (showOnlyZbSites && antenna.isZb != 1) return@mapNotNull null
+                            if (!frequencyFilter.matchesAntenna(antenna)) return@mapNotNull null
+                            antenna.copy(operateur = visibleOps.joinToString(", "))
                         }
-                        _antennas.value = fakeAntennas
+
+                        if (filteredAntennas.size > 200) {
+                            // En dézoom avec filtres actifs, agréger en arrière-plan pour éviter de figer le thread UI avec des milliers de marqueurs
+                            val aggregationZoom = MapClusterStrengthProfile.aggregationZoom(
+                                mapZoom = zoom,
+                                strength = AppConfig.mapClusterStrength.intValue
+                            )
+                            val clusters = repository.clusterDetailedAntennas(filteredAntennas, aggregationZoom)
+                            val clusterIsZb = if (showOnlyZbSites) 1 else 0
+                            val fakeAntennas = clusters.map { cluster ->
+                                LocalisationEntity(
+                                    idAnfr = "CLUSTER_${cluster.count}",
+                                    operateur = OperatorColors.keysFor(cluster.operators).joinToString(", "),
+                                    latitude = cluster.centerLat,
+                                    longitude = cluster.centerLon,
+                                    azimuts = null, codeInsee = null, azimutsFh = null,
+                                    techMask = 0,
+                                    bandMask = 0,
+                                    isZb = clusterIsZb,
+                                    hasActive = 1
+                                )
+                            }
+                            _antennas.value = fakeAntennas
+                        } else {
+                            _antennas.value = filteredAntennas
+                        }
                     } else {
                         _antennas.value = areaAntennas
                     }
@@ -439,6 +465,10 @@ class MapViewModel(
                 }
             }
         }
+    }
+
+    fun clusterDetailedAntennas(sites: List<LocalisationEntity>, zoom: Double): List<DbCluster> {
+        return repository.clusterDetailedAntennas(sites, zoom)
     }
 
     /**

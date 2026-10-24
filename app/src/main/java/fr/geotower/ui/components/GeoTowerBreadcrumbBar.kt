@@ -21,6 +21,8 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Tag
@@ -45,6 +47,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
+import fr.geotower.utils.AppConfig
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavController
@@ -197,6 +200,9 @@ fun GeoTowerNavigationBreadcrumbBar(
                 navController.popBackStack(entry.destination.id, false)
             }
         }
+        .filter { item ->
+            if (AppConfig.isBottomNavActive() && item.key == "home") false else true
+        }
         .toMutableList()
 
     while (stackItems.lastOrNull()?.resolvedKey in currentRouteKeys) {
@@ -303,7 +309,9 @@ private fun rememberGeoTowerBreadcrumbLabels(): GeoTowerBreadcrumbLabels {
         notificationHistory = stringResource(R.string.notification_history_title),
         histories = stringResource(R.string.histories_title),
         departmentStats = stringResource(R.string.department_stats_title),
-        radio = stringResource(R.string.appstrings_radio_share_radio_title)
+        radio = stringResource(R.string.appstrings_radio_share_radio_title),
+        trips = stringResource(R.string.bottom_nav_trips),
+        more = stringResource(R.string.bottom_nav_more)
     )
 }
 
@@ -327,7 +335,9 @@ private data class GeoTowerBreadcrumbLabels(
     val notificationHistory: String,
     val histories: String,
     val departmentStats: String,
-    val radio: String
+    val radio: String,
+    val trips: String,
+    val more: String
 )
 
 private val GeoTowerBreadcrumbItem.resolvedKey: String
@@ -337,12 +347,15 @@ private fun NavBackStackEntry.toGeoTowerBreadcrumbItem(
     labels: GeoTowerBreadcrumbLabels,
     onClick: () -> Unit
 ): GeoTowerBreadcrumbItem? {
-    return when (destination.route) {
+    val route = destination.route ?: return null
+    if (route.substringBefore('?') == "map") {
+        return GeoTowerBreadcrumbItem(labels.map, Icons.Default.Map, onClick, "map")
+    }
+    return when (route) {
         "home" -> GeoTowerBreadcrumbItem(labels.home, Icons.Default.Home, onClick, "home")
-        "map?photoDraftId={photoDraftId}",
-        "map?photoDraftId={photoDraftId}&tripId={tripId}&tripMode={tripMode}" ->
-            GeoTowerBreadcrumbItem(labels.map, Icons.Default.Map, onClick, "map")
         "emitters" -> GeoTowerBreadcrumbItem(labels.emitters, Icons.Default.MyLocation, onClick, "emitters")
+        "trips" -> GeoTowerBreadcrumbItem(labels.trips, Icons.Default.Route, onClick, "trips")
+        "more" -> GeoTowerBreadcrumbItem(labels.more, Icons.Default.MoreHoriz, onClick, "more")
         "compass" -> GeoTowerBreadcrumbItem(labels.compass, Icons.Default.Explore, onClick, "compass")
         "stats" -> GeoTowerBreadcrumbItem(labels.stats, Icons.Default.BarChart, onClick, "stats")
         "stats/departments" -> GeoTowerBreadcrumbItem(labels.departmentStats, Icons.Default.BarChart, onClick, "stats/departments")

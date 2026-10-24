@@ -3428,6 +3428,7 @@
     <string name="appstrings_release_v2078_summary_map_loading_indicator">Indicador visual discreto de carga de sitios y estadísticas en la parte inferior del mapa</string>
     <string name="appstrings_release_v2079_summary_frequency_search_and_voice_assistant">Búsqueda en bandas de frecuencias, comando de voz de Assistant para antenas y notificaciones de generación local</string>
     <string name="appstrings_release_v2080_summary_database_viewer_outages_and_sources">Inspección de datos de cortes en el visor de bases y fuentes configurables para la generación local</string>
+    <string name="appstrings_release_v2081_summary_bottom_navigation_bar">Nuevo modo de navegación con barra de pestañas inferior e integración del control temporal en el mapa</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registro de solicitudes de red</string>
@@ -3470,4 +3471,15 @@
     <string name="network_log_errors_count">%1$d errores</string>
     <string name="network_log_retention_badge">Retención: %1$s</string>
     <string name="network_log_view_requests">Ver solicitudes de red</string>
+    <!-- Modo de navegacion / Barra inferior -->
+    <string name="bottom_nav_nearby">Cercanas</string>
+    <string name="bottom_nav_map">Mapa</string>
+    <string name="bottom_nav_trips">Ruta</string>
+    <string name="bottom_nav_stats">Estadísticas</string>
+    <string name="bottom_nav_more">Más</string>
+    <string name="settings_nav_mode_title">Modo de navegación</string>
+    <string name="settings_nav_mode_standard">Inicio estándar</string>
+    <string name="settings_nav_mode_standard_desc">Inicia en el menú principal con acceso a todas las páginas</string>
+    <string name="settings_nav_mode_bottom_bar">Barra de navegación inferior</string>
+    <string name="settings_nav_mode_bottom_bar_desc">Barra de 5 pestañas inferior: Cercanas, Mapa, Ruta, Estadísticas, Más</string>
 </resources>

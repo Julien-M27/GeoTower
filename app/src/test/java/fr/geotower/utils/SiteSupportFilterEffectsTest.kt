@@ -44,6 +44,7 @@ class SiteSupportFilterEffectsTest {
         hasUndergroundSupport: Int = 0,
         hasActive: Int = 1,
         statut: String? = "En service",
+        dateService: String? = null,
         lat: Double = 48.85,
         lon: Double = 2.35
     ) = LocalisationEntity(
@@ -58,7 +59,8 @@ class SiteSupportFilterEffectsTest {
         isZb = isZb,
         hasUndergroundSupport = hasUndergroundSupport,
         hasActive = hasActive,
-        statut = statut
+        statut = statut,
+        dateService = dateService
     )
 
     private fun declaredHs(idAnfr: String, operateur: String) = SiteHsEntity(
@@ -266,5 +268,199 @@ class SiteSupportFilterEffectsTest {
         assertEquals(RadioMapCategoryMasks.PRIVATE_MOBILE, radioCategoryMaskForKind(RadioUsageKind.PrivateMobile))
         assertEquals(RadioMapCategoryMasks.FH, radioCategoryMaskForKind(RadioUsageKind.Fh))
         assertEquals(RadioMapCategoryMasks.OTHER, radioCategoryMaskForKind(RadioUsageKind.Other))
+    }
+
+    @Test
+    fun passesSiteDisplayFiltersRespectsOperatorSelection() {
+        val orangeAntenna = antenna("1001", "Orange")
+        val freeAntenna = antenna("1002", "Free mobile")
+        val hsMap = emptyMap<String, Set<String>>()
+
+        val selected = setOf(OperatorColors.ORANGE_KEY)
+
+        assertEquals(
+            true,
+            passesSiteDisplayFilters(
+                antenna = orangeAntenna,
+                hsOperatorMap = hsMap,
+                selectedOperatorKeys = selected,
+                showSitesInService = true,
+                showSitesOutOfService = true,
+                showProjectSites = true,
+                hideUndergroundSites = false,
+                showOnlyZbSites = false,
+                frequencyFilter = fullyEnabledFilter()
+            )
+        )
+
+        assertEquals(
+            false,
+            passesSiteDisplayFilters(
+                antenna = freeAntenna,
+                hsOperatorMap = hsMap,
+                selectedOperatorKeys = selected,
+                showSitesInService = true,
+                showSitesOutOfService = true,
+                showProjectSites = true,
+                hideUndergroundSites = false,
+                showOnlyZbSites = false,
+                frequencyFilter = fullyEnabledFilter()
+            )
+        )
+    }
+
+    @Test
+    fun passesSiteDisplayFiltersRespectsProjectStatus() {
+        val projectAntenna = antenna("1001", "Orange", hasActive = 0, statut = "En projet")
+        val activeAntenna = antenna("1002", "Orange", hasActive = 1, statut = "En service")
+        val hsMap = emptyMap<String, Set<String>>()
+
+        assertEquals(
+            false,
+            passesSiteDisplayFilters(
+                antenna = projectAntenna,
+                hsOperatorMap = hsMap,
+                selectedOperatorKeys = OperatorColors.defaultVisibleKeys,
+                showSitesInService = true,
+                showSitesOutOfService = true,
+                showProjectSites = false,
+                hideUndergroundSites = false,
+                showOnlyZbSites = false,
+                frequencyFilter = fullyEnabledFilter()
+            )
+        )
+
+        assertEquals(
+            true,
+            passesSiteDisplayFilters(
+                antenna = activeAntenna,
+                hsOperatorMap = hsMap,
+                selectedOperatorKeys = OperatorColors.defaultVisibleKeys,
+                showSitesInService = true,
+                showSitesOutOfService = true,
+                showProjectSites = false,
+                hideUndergroundSites = false,
+                showOnlyZbSites = false,
+                frequencyFilter = fullyEnabledFilter()
+            )
+        )
+    }
+
+    @Test
+    fun passesSiteDisplayFiltersRespectsOutOfServiceStatus() {
+        val hsSite = antenna("1001", "Orange")
+        val normalSite = antenna("1002", "Orange")
+        val hsMap = buildHsOperatorMap(listOf(declaredHs("1001", "Orange")))
+
+        assertEquals(
+            false,
+            passesSiteDisplayFilters(
+                antenna = hsSite,
+                hsOperatorMap = hsMap,
+                selectedOperatorKeys = OperatorColors.defaultVisibleKeys,
+                showSitesInService = true,
+                showSitesOutOfService = false,
+                showProjectSites = true,
+                hideUndergroundSites = false,
+                showOnlyZbSites = false,
+                frequencyFilter = fullyEnabledFilter()
+            )
+        )
+
+        assertEquals(
+            true,
+            passesSiteDisplayFilters(
+                antenna = normalSite,
+                hsOperatorMap = hsMap,
+                selectedOperatorKeys = OperatorColors.defaultVisibleKeys,
+                showSitesInService = true,
+                showSitesOutOfService = false,
+                showProjectSites = true,
+                hideUndergroundSites = false,
+                showOnlyZbSites = false,
+                frequencyFilter = fullyEnabledFilter()
+            )
+        )
+    }
+
+    @Test
+    fun parseServiceDateIntParsesCorrectly() {
+        assertEquals(20120601, parseServiceDateInt("01/06/2012"))
+        assertEquals(20120601, parseServiceDateInt("2012-06-01"))
+        assertEquals(20120601, parseServiceDateInt("01-06-2012"))
+        assertEquals(20120601, parseServiceDateInt("2012-06-01 14:30:00"))
+        assertNull(parseServiceDateInt(null))
+        assertNull(parseServiceDateInt(""))
+        assertNull(parseServiceDateInt("invalid"))
+        assertNull(parseServiceDateInt("01/99/2012"))
+    }
+
+    @Test
+    fun resolveActiveOperatorKeysWithTimeSlider() {
+        val antennas = listOf(
+            antenna("1001", "Orange", dateService = "01/01/2012"),
+            antenna("1002", "Free mobile", dateService = "01/01/2020"),
+            antenna("1003", "SFR", dateService = null)
+        )
+
+        // Curseurs avec seuil en 2015 : seul Orange (2012) est actif, Free (2020) et SFR (sans date) sont grisés
+        val result2015 = resolveActiveOperatorKeys(
+            context = null,
+            antennas = antennas,
+            sitesHs = emptyList(),
+            selectedOperatorKeys = OperatorColors.defaultVisibleKeys,
+            frequencyFilter = fullyEnabledFilter(),
+            showSitesInService = true,
+            showSitesOutOfService = true,
+            showProjectSites = true,
+            hideUndergroundSites = false,
+            showOnlyZbSites = false,
+            timeSliderActive = true,
+            timeSliderThreshold = 20150101
+        )
+
+        assertEquals(
+            setOf(OperatorColors.ORANGE_KEY),
+            result2015
+        )
+
+        // Curseur avec seuil en 2021 : Orange (2012) et Free (2020) sont actifs
+        val result2021 = resolveActiveOperatorKeys(
+            context = null,
+            antennas = antennas,
+            sitesHs = emptyList(),
+            selectedOperatorKeys = OperatorColors.defaultVisibleKeys,
+            frequencyFilter = fullyEnabledFilter(),
+            showSitesInService = true,
+            showSitesOutOfService = true,
+            showProjectSites = true,
+            hideUndergroundSites = false,
+            showOnlyZbSites = false,
+            timeSliderActive = true,
+            timeSliderThreshold = 20210101
+        )
+
+        assertEquals(
+            setOf(OperatorColors.ORANGE_KEY, OperatorColors.FREE_KEY),
+            result2021
+        )
+
+        // Curseur inactif : aucun filtre actif donc retourne null (rien de grisé)
+        val resultInactive = resolveActiveOperatorKeys(
+            context = null,
+            antennas = antennas,
+            sitesHs = emptyList(),
+            selectedOperatorKeys = OperatorColors.defaultVisibleKeys,
+            frequencyFilter = fullyEnabledFilter(),
+            showSitesInService = true,
+            showSitesOutOfService = true,
+            showProjectSites = true,
+            hideUndergroundSites = false,
+            showOnlyZbSites = false,
+            timeSliderActive = false,
+            timeSliderThreshold = null
+        )
+
+        assertNull(resultInactive)
     }
 }

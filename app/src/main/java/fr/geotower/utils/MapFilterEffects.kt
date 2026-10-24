@@ -9,6 +9,30 @@ import fr.geotower.data.models.physicalSiteKey
 
 private const val HS_OPERATOR_WILDCARD = "*"
 
+/**
+ * Parse une date ANFR en entier yyyymmdd comparable, ou null si absente/invalide.
+ * L'ANFR fournit "JJ/MM/AAAA" (ex: "01/06/2012") ; on accepte aussi l'ISO "AAAA-MM-JJ" par sécurité.
+ */
+fun parseServiceDateInt(raw: String?): Int? {
+    val s = raw?.trim() ?: return null
+    if (s.length < 10) return null
+    return when {
+        (s[2] == '/' || s[2] == '-') && (s[5] == '/' || s[5] == '-') -> {
+            val d = s.substring(0, 2).toIntOrNull() ?: return null
+            val m = s.substring(3, 5).toIntOrNull() ?: return null
+            val y = s.substring(6, 10).toIntOrNull() ?: return null
+            if (m in 1..12 && d in 1..31) y * 10000 + m * 100 + d else null
+        }
+        s[4] == '-' && s[7] == '-' -> {
+            val y = s.substring(0, 4).toIntOrNull() ?: return null
+            val m = s.substring(5, 7).toIntOrNull() ?: return null
+            val d = s.substring(8, 10).toIntOrNull() ?: return null
+            if (m in 1..12 && d in 1..31) y * 10000 + m * 100 + d else null
+        }
+        else -> null
+    }
+}
+
 fun combineOperatorKeyFilters(vararg filters: Set<String>?): Set<String>? {
     return filters
         .filterNotNull()
@@ -24,12 +48,15 @@ fun isAnyMapFilterActive(
     showSitesOutOfService: Boolean = AppConfig.showSitesOutOfService.value,
     showProjectSites: Boolean = AppConfig.showProjectSites.value,
     hideUndergroundSites: Boolean = AppConfig.hideUndergroundSites.value,
-    showOnlyZbSites: Boolean = AppConfig.showOnlyZbSites.value
+    showOnlyZbSites: Boolean = AppConfig.showOnlyZbSites.value,
+    timeSliderActive: Boolean = AppConfig.timeSliderActive.value,
+    timeSliderThreshold: Int? = AppConfig.timeSliderThreshold.value
 ): Boolean {
     val normalizedSelectedKeys = selectedOperatorKeys.map { it.uppercase() }.toSet()
     val operatorFilterActive = !normalizedSelectedKeys.containsAll(OperatorColors.defaultVisibleKeys)
     val frequencyFilterActive = !frequencyFilter.isFullyEnabled
     val statusFilterActive = !(showSitesInService && showSitesOutOfService && showProjectSites)
+    val timeSliderFilterActive = timeSliderActive && timeSliderThreshold != null
     val hiddenFilterActive = context != null && (
         if (antennas.isNotEmpty()) {
             antennas.any { antenna ->
@@ -46,7 +73,8 @@ fun isAnyMapFilterActive(
         statusFilterActive ||
         hideUndergroundSites ||
         showOnlyZbSites ||
-        hiddenFilterActive
+        hiddenFilterActive ||
+        timeSliderFilterActive
 }
 
 fun resolveActiveOperatorKeys(
@@ -60,6 +88,8 @@ fun resolveActiveOperatorKeys(
     showProjectSites: Boolean = AppConfig.showProjectSites.value,
     hideUndergroundSites: Boolean = AppConfig.hideUndergroundSites.value,
     showOnlyZbSites: Boolean = AppConfig.showOnlyZbSites.value,
+    timeSliderActive: Boolean = AppConfig.timeSliderActive.value,
+    timeSliderThreshold: Int? = AppConfig.timeSliderThreshold.value,
     applyFilters: Boolean = true
 ): Set<String>? {
     if (!applyFilters) return null
@@ -73,7 +103,9 @@ fun resolveActiveOperatorKeys(
         showSitesOutOfService = showSitesOutOfService,
         showProjectSites = showProjectSites,
         hideUndergroundSites = hideUndergroundSites,
-        showOnlyZbSites = showOnlyZbSites
+        showOnlyZbSites = showOnlyZbSites,
+        timeSliderActive = timeSliderActive,
+        timeSliderThreshold = timeSliderThreshold
     )
 
     if (!isFilterActive) return null
@@ -86,6 +118,13 @@ fun resolveActiveOperatorKeys(
         if (hideUndergroundSites && antenna.hasUndergroundSupport == 1) return@forEach
         if (showOnlyZbSites && antenna.isZb != 1) return@forEach
         if (!frequencyFilter.matchesAntenna(antenna)) return@forEach
+
+        if (timeSliderActive && timeSliderThreshold != null) {
+            val serviceInt = parseServiceDateInt(antenna.dateService)
+            if (serviceInt == null || serviceInt > timeSliderThreshold) {
+                return@forEach
+            }
+        }
 
         val isProjectSite = !antenna.isDeclaredActive()
         val opKeys = OperatorColors.keysFor(antenna.operateur)
@@ -136,7 +175,7 @@ fun activeOperatorKeysForSiteStatusFilter(
         .toSet()
 }
 
-private fun buildHsOperatorMap(sitesHs: Collection<SiteHsEntity>): Map<String, Set<String>> {
+fun buildHsOperatorMap(sitesHs: Collection<SiteHsEntity>): Map<String, Set<String>> {
     val result = mutableMapOf<String, MutableSet<String>>()
 
     sitesHs.forEach { hs ->
@@ -155,13 +194,60 @@ private fun buildHsOperatorMap(sitesHs: Collection<SiteHsEntity>): Map<String, S
     return result
 }
 
-private fun isOperatorDeclaredHs(
+fun isOperatorDeclaredHs(
     antenna: LocalisationEntity,
     operatorKey: String,
     hsOperatorMap: Map<String, Set<String>>
 ): Boolean {
     val hsOperators = hsOperatorMap[normalizedAnfrId(antenna.idAnfr)] ?: return false
     return HS_OPERATOR_WILDCARD in hsOperators || operatorKey in hsOperators
+}
+
+fun visibleOperatorKeysForAntenna(
+    antenna: LocalisationEntity,
+    hsOperatorMap: Map<String, Set<String>>,
+    showSitesInService: Boolean,
+    showSitesOutOfService: Boolean,
+    showProjectSites: Boolean,
+    selectedOperatorKeys: Set<String>
+): List<String> {
+    val isProjectSite = !antenna.isDeclaredActive()
+    return OperatorColors.keysFor(antenna.operateur).filter { operatorKey ->
+        if (operatorKey !in selectedOperatorKeys) {
+            false
+        } else if (isProjectSite) {
+            showProjectSites
+        } else if (isOperatorDeclaredHs(antenna, operatorKey, hsOperatorMap)) {
+            showSitesOutOfService
+        } else {
+            showSitesInService
+        }
+    }
+}
+
+fun passesSiteDisplayFilters(
+    antenna: LocalisationEntity,
+    hsOperatorMap: Map<String, Set<String>>,
+    selectedOperatorKeys: Set<String>,
+    showSitesInService: Boolean,
+    showSitesOutOfService: Boolean,
+    showProjectSites: Boolean,
+    hideUndergroundSites: Boolean,
+    showOnlyZbSites: Boolean,
+    frequencyFilter: FrequencyFilterSelection
+): Boolean {
+    val visibleOperators = visibleOperatorKeysForAntenna(
+        antenna = antenna,
+        hsOperatorMap = hsOperatorMap,
+        showSitesInService = showSitesInService,
+        showSitesOutOfService = showSitesOutOfService,
+        showProjectSites = showProjectSites,
+        selectedOperatorKeys = selectedOperatorKeys
+    )
+    if (visibleOperators.isEmpty()) return false
+    if (hideUndergroundSites && antenna.hasUndergroundSupport == 1) return false
+    if (showOnlyZbSites && antenna.isZb != 1) return false
+    return frequencyFilter.matchesAntenna(antenna)
 }
 
 private fun normalizedAnfrId(value: String): String {

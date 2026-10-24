@@ -32,11 +32,20 @@ fun rememberSafeBackNavigation(
     fallbackRoute: String? = ROOT_FALLBACK_ROUTE
 ): SafeBackNavigation {
     var isLocked by remember { mutableStateOf(false) }
-    // Le mode simplifié n'a pas d'accueil : la carte en tient lieu. Un repli codé en dur sur
+    // Le mode simplifié et le mode barre inférieure n'ont pas d'accueil : un repli codé en dur sur
     // « home » y ressuscitait la page d'accueil dès que la pile était vide (retour depuis la
-    // carte racine, par exemple).
+    // carte racine ou les onglets).
     val wantsRootFallback = fallbackRoute == ROOT_FALLBACK_ROUTE
-    val resolvedFallback = if (wantsRootFallback) AppConfig.homeRoute() else fallbackRoute
+    val resolvedFallback = if (wantsRootFallback) {
+        if (AppConfig.isBottomNavActive()) {
+            when (navController.currentDestination?.route?.routeBase()) {
+                "settings", "about", "help" -> "more"
+                else -> "map"
+            }
+        } else {
+            AppConfig.homeRoute()
+        }
+    } else fallbackRoute
     val latestFallbackRoute by rememberUpdatedState(resolvedFallback)
     val latestWantsRootFallback by rememberUpdatedState(wantsRootFallback)
     // NB : on passe par LocalActivity et non par un cast de LocalContext (le GeoTowerLocaleProvider
@@ -52,9 +61,13 @@ fun rememberSafeBackNavigation(
                 val didNavigate = runCatching {
                     if (!navController.popBackStack()) {
                         val fallback = latestFallbackRoute
-                        val wasAtRoot = latestWantsRootFallback &&
+                        val isBottomNav = AppConfig.isBottomNavActive()
+                        val isRootTab = isBottomNav && routeBeforePop?.routeBase() in setOf("emitters", "map", "trips", "stats", "more")
+                        val wasAtRoot = isRootTab || (
+                            latestWantsRootFallback &&
                             fallback != null &&
                             routeBeforePop?.routeBase() == fallback.routeBase()
+                        )
                         when {
                             // On était déjà sur la racine de l'app : le retour doit quitter,
                             // exactement comme le retour système depuis l'accueil.

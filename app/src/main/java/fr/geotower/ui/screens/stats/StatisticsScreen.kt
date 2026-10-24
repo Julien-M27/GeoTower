@@ -505,6 +505,7 @@ fun StatisticsScreen(navController: NavController, repository: AnfrRepository) {
                 onBack = { safeBackNavigation.navigateBack() },
                 backgroundColor = mainBgColor,
                 backEnabled = !safeBackNavigation.isLocked,
+                showBackButton = !AppConfig.isBottomNavActive(),
                 actions = {
                     fr.geotower.ui.components.PageCustomizationHint(
                         page = fr.geotower.utils.PageScrollPrefs.STATS,
@@ -618,7 +619,9 @@ fun StatisticsScreen(navController: NavController, repository: AnfrRepository) {
                 modifier = Modifier.padding(horizontal = sizing.spacing(16.dp))
             )
 
-            Spacer(modifier = Modifier.height(sizing.spacing(32.dp)))
+            val bottomSpace = (if (AppConfig.isBottomNavActive()) sizing.component(96.dp) else sizing.spacing(32.dp)) +
+                WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+            Spacer(modifier = Modifier.height(bottomSpace))
         }
         PageScrollEdgeButtons(PageScrollPrefs.STATS, scrollState)
         }

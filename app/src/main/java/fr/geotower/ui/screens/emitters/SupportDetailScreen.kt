@@ -569,13 +569,17 @@ fun SupportDetailScreen(
         AppConfig.showSitesOutOfService.value,
         AppConfig.showProjectSites.value,
         AppConfig.hideUndergroundSites.value,
-        AppConfig.showOnlyZbSites.value
+        AppConfig.showOnlyZbSites.value,
+        AppConfig.timeSliderActive.value,
+        AppConfig.timeSliderThreshold.value
     ) {
         resolveActiveOperatorKeys(
             context = context,
             antennas = antennas,
             sitesHs = hsDataMap.values,
-            applyFilters = true
+            applyFilters = true,
+            timeSliderActive = AppConfig.timeSliderActive.value,
+            timeSliderThreshold = AppConfig.timeSliderThreshold.value
         )
     }
     val priorityOperatorKey = effectiveHighlightedOperatorKey ?: activeOperatorKeys?.singleOrNull()
@@ -839,9 +843,9 @@ fun SupportDetailScreen(
                         ),
                         currentRouteKeys = setOf("support_detail", "site_detail", "site_detail_from_map"),
                         impliedParentItems = listOfNotNull(
-                        // Le mode simplifié n'a pas d'accueil : le fil d'Ariane commence à la
+                        // Le mode simplifié et la barre inférieure n'ont pas d'accueil : le fil d'Ariane commence à la
                         // carte (ou à « À proximité »), pas sur une page qui n'existe plus.
-                        if (AppConfig.simpleModeActive()) {
+                        if (AppConfig.simpleModeActive() || AppConfig.isBottomNavActive()) {
                             null
                         } else {
                             GeoTowerBreadcrumbItem(

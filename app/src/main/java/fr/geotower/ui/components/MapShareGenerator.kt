@@ -399,7 +399,8 @@ fun MapShareMenu(
      * rendu fluide est actif : dans ce mode le calque osmdroid ne dessine plus rien (le repère est
      * peint au-dessus de la carte), donc map.draw() rendrait une image sans point de localisation.
      */
-    drawLocationMarker: ((Canvas) -> Unit)? = null
+    drawLocationMarker: ((Canvas) -> Unit)? = null,
+    modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val currentView = LocalView.current
@@ -476,7 +477,7 @@ fun MapShareMenu(
         color = MaterialTheme.colorScheme.surface,
         shadowElevation = 4.dp,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        modifier = Modifier.size(sizing.component(54.dp))
+        modifier = modifier.size(sizing.component(54.dp))
     ) {
         Box(contentAlignment = Alignment.Center) {
             Icon(Icons.Default.Share, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(sizing.component(24.dp)))
