@@ -94,8 +94,67 @@ object AppConfig {
 
     // Mode de navigation global de l'app (0 = Accueil standard, 1 = Barre de sélection en bas avec 5 choix)
     const val PREF_APP_NAV_MODE = "app_navigation_mode"
+    const val PREF_PREVIOUS_NAV_MODE = "previous_nav_mode"
     const val APP_NAV_MODE_STANDARD = 0
     const val APP_NAV_MODE_BOTTOM_BAR = 1
+
+    // Onglets de la barre de navigation inférieure (max 4 onglets en plus de « Plus »)
+    const val PREF_BOTTOM_NAV_TABS = "bottom_nav_tabs_order"
+    const val DEFAULT_BOTTOM_NAV_TABS = "nearby,map,trips,stats"
+    val bottomNavTabs = mutableStateOf<List<String>>(listOf("nearby", "map", "trips", "stats"))
+
+    // Transparence et opacité de la barre de navigation inférieure (0 = transparent, 100 = opaque)
+    const val PREF_BOTTOM_NAV_OPACITY = "bottom_nav_opacity"
+    const val DEFAULT_BOTTOM_NAV_OPACITY = 100
+    val bottomNavOpacity = mutableIntStateOf(DEFAULT_BOTTOM_NAV_OPACITY)
+
+    val allAvailableBottomNavTabs = listOf(
+        "nearby",
+        "map",
+        "trips",
+        "compass",
+        "stats",
+        "settings",
+        "about",
+        "help"
+    )
+
+    // Menu « Plus » pour le mode barre inférieure
+    const val PREF_MORE_ORDER = "more_order"
+    const val DEFAULT_MORE_ORDER = "nearby,map,trips,compass,stats,settings,about,help,logo"
+    val moreOrder = mutableStateOf<List<String>>(listOf("compass", "settings", "about", "help", "logo"))
+
+    const val PREF_MORE_SHOW_LOGO = "more_show_logo"
+    const val PREF_MORE_SHOW_ABOUT = "more_show_about"
+    const val PREF_MORE_SHOW_HELP = "more_show_help"
+    const val PREF_MORE_SHOW_COMPASS = "more_show_compass"
+    const val PREF_MORE_SHOW_NEARBY = "more_show_nearby"
+    const val PREF_MORE_SHOW_MAP = "more_show_map"
+    const val PREF_MORE_SHOW_TRIPS = "more_show_trips"
+    const val PREF_MORE_SHOW_STATS = "more_show_stats"
+    const val PREF_MORE_LONG_PRESS_REORDER = "more_long_press_reorder"
+
+    val moreShowLogo = mutableStateOf(true)
+    val moreShowAbout = mutableStateOf(true)
+    val moreShowHelp = mutableStateOf(true)
+    val moreShowCompass = mutableStateOf(true)
+    val moreShowNearby = mutableStateOf(true)
+    val moreShowMap = mutableStateOf(true)
+    val moreShowTrips = mutableStateOf(true)
+    val moreShowStats = mutableStateOf(true)
+    val moreLongPressReorder = mutableStateOf(true)
+
+    val allAvailableMoreElements = listOf(
+        "nearby",
+        "map",
+        "trips",
+        "compass",
+        "stats",
+        "settings",
+        "about",
+        "help",
+        "logo"
+    )
 
     // --- Apparence ---
     const val PREF_LOGO_MATERIAL_WAVES = "logo_material_waves"
@@ -714,20 +773,25 @@ object AppConfig {
 
     /** Applique un choix de mode simplifié : état en mémoire + persistance. */
     fun setSimpleMode(context: Context, enabled: Boolean) {
+        val prefs = context.applicationContext
+            .getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
         simpleMode.value = enabled
         if (enabled) {
+            val currentMode = appNavMode.intValue
+            prefs.edit()
+                .putInt(PREF_PREVIOUS_NAV_MODE, currentMode)
+                .putBoolean(PREF_SIMPLE_MODE, true)
+                .putInt(PREF_APP_NAV_MODE, APP_NAV_MODE_STANDARD)
+                .apply()
             appNavMode.intValue = APP_NAV_MODE_STANDARD
+        } else {
+            val restoredMode = prefs.getInt(PREF_PREVIOUS_NAV_MODE, APP_NAV_MODE_STANDARD)
+            appNavMode.intValue = restoredMode
+            prefs.edit()
+                .putBoolean(PREF_SIMPLE_MODE, false)
+                .putInt(PREF_APP_NAV_MODE, restoredMode)
+                .apply()
         }
-        context.applicationContext
-            .getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
-            .edit()
-            .putBoolean(PREF_SIMPLE_MODE, enabled)
-            .apply {
-                if (enabled) {
-                    putInt(PREF_APP_NAV_MODE, APP_NAV_MODE_STANDARD)
-                }
-            }
-            .apply()
     }
 
     fun isBottomNavActive(): Boolean = appNavMode.intValue == APP_NAV_MODE_BOTTOM_BAR
@@ -744,12 +808,124 @@ object AppConfig {
             .getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
             .edit()
             .putInt(PREF_APP_NAV_MODE, mode)
+            .putInt(PREF_PREVIOUS_NAV_MODE, mode)
             .apply {
                 if (mode == APP_NAV_MODE_BOTTOM_BAR) {
                     putBoolean(PREF_SIMPLE_MODE, false)
                 }
             }
             .apply()
+    }
+
+    fun normalizeBottomNavTabs(tabs: List<String>): List<String> {
+        val valid = tabs.filter { it in allAvailableBottomNavTabs }.distinct().take(4)
+        return if (valid.isEmpty()) listOf("nearby", "map", "trips", "stats") else valid
+    }
+
+    fun setBottomNavTabs(prefs: SharedPreferences, tabs: List<String>) {
+        val normalized = normalizeBottomNavTabs(tabs)
+        bottomNavTabs.value = normalized
+        prefs.edit().putString(PREF_BOTTOM_NAV_TABS, normalized.joinToString(",")).apply()
+
+        // Synchronise automatiquement la page Plus : les menus retirés de la barre y sont ajoutés
+        val syncedMoreOrder = normalizeMoreOrder(moreOrder.value)
+        moreOrder.value = syncedMoreOrder
+        prefs.edit().putString(PREF_MORE_ORDER, syncedMoreOrder.joinToString(",")).apply()
+    }
+
+    fun setBottomNavOpacity(prefs: SharedPreferences, opacity: Int) {
+        val clamped = opacity.coerceIn(0, 100)
+        bottomNavOpacity.intValue = clamped
+        prefs.edit().putInt(PREF_BOTTOM_NAV_OPACITY, clamped).apply()
+    }
+
+    fun normalizeMoreOrder(order: List<String>): List<String> {
+        val currentTabs = bottomNavTabs.value
+        val allowedElements = allAvailableMoreElements.filter { it == "logo" || it !in currentTabs }
+        val filtered = order.filter { it in allowedElements }.distinct().toMutableList()
+
+        // Si des éléments de la barre (nearby, map, trips, stats) avaient été ajoutés à la fin après settings/about/help,
+        // on les repositionne à leur place logique selon allAvailableMoreElements (ordre de la page d'accueil)
+        val bottomNavCandidates = setOf("nearby", "map", "trips", "stats")
+        val helpIndex = filtered.indexOf("help")
+        val aboutIndex = filtered.indexOf("about")
+        val settingsIndex = filtered.indexOf("settings")
+        val cutOff = listOf(settingsIndex, aboutIndex, helpIndex).filter { it >= 0 }.minOrNull() ?: -1
+        if (cutOff >= 0) {
+            val misplaced = filtered.filterIndexed { index, item ->
+                index > cutOff && item in bottomNavCandidates
+            }
+            if (misplaced.isNotEmpty()) {
+                filtered.removeAll(misplaced.toSet())
+            }
+        }
+
+        allowedElements.forEach { item ->
+            if (!filtered.contains(item)) {
+                val targetIndex = allowedElements.indexOf(item)
+                val insertIndex = filtered.indexOfFirst {
+                    allowedElements.indexOf(it) > targetIndex
+                }
+                if (insertIndex >= 0) {
+                    filtered.add(insertIndex, item)
+                } else {
+                    val logoIndex = filtered.indexOf("logo")
+                    if (logoIndex >= 0) filtered.add(logoIndex, item) else filtered.add(item)
+                }
+            }
+        }
+        return filtered
+    }
+
+    fun setMoreOrder(prefs: SharedPreferences, order: List<String>) {
+        val normalized = normalizeMoreOrder(order)
+        moreOrder.value = normalized
+        prefs.edit().putString(PREF_MORE_ORDER, normalized.joinToString(",")).apply()
+    }
+
+    fun setMoreShowLogo(prefs: SharedPreferences, enabled: Boolean) {
+        moreShowLogo.value = enabled
+        prefs.edit().putBoolean(PREF_MORE_SHOW_LOGO, enabled).apply()
+    }
+
+    fun setMoreShowAbout(prefs: SharedPreferences, enabled: Boolean) {
+        moreShowAbout.value = enabled
+        prefs.edit().putBoolean(PREF_MORE_SHOW_ABOUT, enabled).apply()
+    }
+
+    fun setMoreShowHelp(prefs: SharedPreferences, enabled: Boolean) {
+        moreShowHelp.value = enabled
+        prefs.edit().putBoolean(PREF_MORE_SHOW_HELP, enabled).apply()
+    }
+
+    fun setMoreShowCompass(prefs: SharedPreferences, enabled: Boolean) {
+        moreShowCompass.value = enabled
+        prefs.edit().putBoolean(PREF_MORE_SHOW_COMPASS, enabled).apply()
+    }
+
+    fun setMoreShowNearby(prefs: SharedPreferences, enabled: Boolean) {
+        moreShowNearby.value = enabled
+        prefs.edit().putBoolean(PREF_MORE_SHOW_NEARBY, enabled).apply()
+    }
+
+    fun setMoreShowMap(prefs: SharedPreferences, enabled: Boolean) {
+        moreShowMap.value = enabled
+        prefs.edit().putBoolean(PREF_MORE_SHOW_MAP, enabled).apply()
+    }
+
+    fun setMoreShowTrips(prefs: SharedPreferences, enabled: Boolean) {
+        moreShowTrips.value = enabled
+        prefs.edit().putBoolean(PREF_MORE_SHOW_TRIPS, enabled).apply()
+    }
+
+    fun setMoreShowStats(prefs: SharedPreferences, enabled: Boolean) {
+        moreShowStats.value = enabled
+        prefs.edit().putBoolean(PREF_MORE_SHOW_STATS, enabled).apply()
+    }
+
+    fun setMoreLongPressReorder(prefs: SharedPreferences, enabled: Boolean) {
+        moreLongPressReorder.value = enabled
+        prefs.edit().putBoolean(PREF_MORE_LONG_PRESS_REORDER, enabled).apply()
     }
 
     /** Route d'accueil : le mode barre inférieure ou simplifié n'a pas de page d'accueil, la carte en tient lieu. */
@@ -859,6 +1035,24 @@ object AppConfig {
 
         // Mode de navigation global de l'app (accueil standard ou barre inférieure).
         appNavMode.intValue = prefs.getInt(PREF_APP_NAV_MODE, APP_NAV_MODE_STANDARD)
+
+        // Onglets personnalisés de la barre inférieure
+        val savedNavTabs = prefs.getString(PREF_BOTTOM_NAV_TABS, DEFAULT_BOTTOM_NAV_TABS) ?: DEFAULT_BOTTOM_NAV_TABS
+        bottomNavTabs.value = normalizeBottomNavTabs(savedNavTabs.split(",").filter { it.isNotBlank() })
+        bottomNavOpacity.intValue = prefs.getInt(PREF_BOTTOM_NAV_OPACITY, DEFAULT_BOTTOM_NAV_OPACITY).coerceIn(0, 100)
+
+        // Menu « Plus » pour le mode barre inférieure
+        val savedMoreOrder = prefs.getString(PREF_MORE_ORDER, DEFAULT_MORE_ORDER) ?: DEFAULT_MORE_ORDER
+        moreOrder.value = normalizeMoreOrder(savedMoreOrder.split(",").filter { it.isNotBlank() })
+        moreShowLogo.value = prefs.getBoolean(PREF_MORE_SHOW_LOGO, true)
+        moreShowAbout.value = prefs.getBoolean(PREF_MORE_SHOW_ABOUT, true)
+        moreShowHelp.value = prefs.getBoolean(PREF_MORE_SHOW_HELP, true)
+        moreShowCompass.value = prefs.getBoolean(PREF_MORE_SHOW_COMPASS, true)
+        moreShowNearby.value = prefs.getBoolean(PREF_MORE_SHOW_NEARBY, true)
+        moreShowMap.value = prefs.getBoolean(PREF_MORE_SHOW_MAP, true)
+        moreShowTrips.value = prefs.getBoolean(PREF_MORE_SHOW_TRIPS, true)
+        moreShowStats.value = prefs.getBoolean(PREF_MORE_SHOW_STATS, true)
+        moreLongPressReorder.value = prefs.getBoolean(PREF_MORE_LONG_PRESS_REORDER, true)
 
         // Style d'affichage : on ne relit QUE le choix explicite. Sans choix, on reste sur AUTO, et
         // c'est [splitDisplayEnabled] qui tranche à l'affichage — fractionné dès que la fenêtre est

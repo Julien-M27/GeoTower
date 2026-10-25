@@ -2728,7 +2728,7 @@ fun MapScreen(
     var isTimeSliderVisible by rememberSaveable { mutableStateOf(false) }
     var timeSliderThreshold by rememberSaveable { mutableStateOf<Int?>(null) }
     var timeSliderStats by remember { mutableStateOf(TimeSliderStats(emptyMap(), 0)) }
-    val timeSliderLift = if (isTimeSliderVisible) sizing.component(104.dp) else 0.dp
+    var timeSliderBarHeightPx by remember { mutableIntStateOf(0) }
 
     SideEffect {
         AppConfig.timeSliderActive.value = isTimeSliderVisible
@@ -7479,6 +7479,7 @@ fun MapScreen(
                         bottom = mapBottomSliderPadding
                     )
                     .then(if (applyNavBarsPadding) Modifier.navigationBarsPadding() else Modifier)
+                    .onGloballyPositioned { timeSliderBarHeightPx = it.size.height }
             )
         }
 
@@ -7707,6 +7708,18 @@ fun MapScreen(
             shareButtonBottomPx > 0f &&
             infoColumnTopPx > 0f &&
             infoColumnTopPx < shareButtonBottomPx
+
+        val timeSliderLift = when {
+            !isTimeSliderVisible || isPlannerMode -> 0.dp
+            timeSliderBarHeightPx > 0 -> {
+                val measuredHeight = with(androidx.compose.ui.platform.LocalDensity.current) {
+                    timeSliderBarHeightPx.toDp()
+                }
+                (mapBottomSliderPadding + measuredHeight + sizing.spacing(8.dp) - mapBottomControlsBasePadding)
+                    .coerceAtLeast(0.dp)
+            }
+            else -> sizing.component(140.dp)
+        }
 
         Column(
             modifier = Modifier

@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -999,7 +1000,30 @@ fun NearEmittersScreen(
 
                                         // Pastille « haut / bas de page » : les deux boutons sont
                                         // désormais réglables séparément (Perso. des pages).
-                                        PageScrollEdgeButtons(PageScrollPrefs.NEARBY, lazyListState)
+                                        val isBottomNavActive = AppConfig.isBottomNavActive()
+                                        val rawBottomNavPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+                                        val scrollButtonsBottomPadding = when {
+                                            isBottomNavActive && uiStyle.useOneUi -> {
+                                                val oneUiBottomInset = if (rawBottomNavPadding > 24.dp) {
+                                                    (rawBottomNavPadding * 0.4f).coerceAtMost(16.dp)
+                                                } else {
+                                                    (rawBottomNavPadding * 0.15f).coerceAtMost(4.dp)
+                                                }
+                                                sizing.component(58.dp) + sizing.spacing(28.dp) + oneUiBottomInset
+                                            }
+                                            isBottomNavActive -> {
+                                                sizing.component(64.dp) + rawBottomNavPadding + sizing.spacing(16.dp)
+                                            }
+                                            else -> {
+                                                sizing.spacing(24.dp) + rawBottomNavPadding
+                                            }
+                                        }
+
+                                        PageScrollEdgeButtons(
+                                            page = PageScrollPrefs.NEARBY,
+                                            listState = lazyListState,
+                                            bottomPadding = scrollButtonsBottomPadding
+                                        )
                                     }
                                 }
                             }

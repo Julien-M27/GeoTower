@@ -3429,6 +3429,7 @@
     <string name="appstrings_release_v2079_summary_frequency_search_and_voice_assistant">Suche in Frequenzbändern, Assistant-Sprachbefehl für Antennen und Benachrichtigungen zur lokalen Generierung</string>
     <string name="appstrings_release_v2080_summary_database_viewer_outages_and_sources">Inspektion von Ausfalldaten im Datenbank-Viewer und konfigurierbare Datenquellen für lokale Builds</string>
     <string name="appstrings_release_v2081_summary_bottom_navigation_bar">Neuer Navigationsmodus mit unterer Tableiste und Integration des Zeitreglers in die Kartenfilter</string>
+    <string name="appstrings_release_v2084_summary_bottom_nav_customization">Anpassung der Tabs der unteren Navigationsleiste, Transparenzeinstellung und Neuordnung des Mehr-Menüs</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Netzwerkanfragen-Protokoll</string>
@@ -3482,4 +3483,16 @@
     <string name="settings_nav_mode_standard_desc">Startet im Hauptmenü mit Zugriff auf alle Seiten</string>
     <string name="settings_nav_mode_bottom_bar">Untere Navigationsleiste</string>
     <string name="settings_nav_mode_bottom_bar_desc">5-Reiter-Leiste unten: In der Nähe, Karte, Routen, Statistiken, Mehr</string>
+    <string name="settings_page_more_title">Mehr-Menü</string>
+    <string name="settings_page_more_desc">Elemente und Reihenfolge des Mehr-Menüs anpassen</string>
+    <string name="settings_page_bottom_nav_title">Navigationsleiste</string>
+    <string name="settings_page_bottom_nav_desc">Registerkarten der unteren Leiste anpassen</string>
+    <string name="appstrings_bottom_nav_add_tab">Tab hinzufügen</string>
+    <string name="appstrings_bottom_nav_max_reached">Maximal 4 Tabs erreicht</string>
+    <string name="appstrings_bottom_nav_fixed_more">Der Tab „Mehr“ bleibt immer an letzter Position fixiert.</string>
+    <string name="appstrings_more_long_press_reorder">Durch langes Drücken neu anordnen</string>
+    <string name="settings_bottom_nav_opacity_title">Transparenz und Unschärfe der Leiste</string>
+    <string name="settings_bottom_nav_opacity_desc">Passt die Deckkraft und Transparenz der unteren Leiste an</string>
+    <string name="settings_bottom_nav_opacity_transparent">Transparent (0%)</string>
+    <string name="settings_bottom_nav_opacity_opaque">Deckend (100%)</string>
 </resources>

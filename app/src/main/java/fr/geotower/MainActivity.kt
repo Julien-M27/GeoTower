@@ -617,8 +617,10 @@ class MainActivity : ComponentActivity() {
                 "home" -> "home"
                 "nearby" -> "emitters"
                 "map" -> "map"
+                "trips" -> "trips"
                 "compass" -> "compass"
                 "stats" -> "stats"
+                "more" -> "more"
                 else -> if (simpleModeAtLaunch || bottomNavAtLaunch) simpleModeHomeRoute else "home"
             }
         }
@@ -798,9 +800,14 @@ class MainActivity : ComponentActivity() {
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentRoute = navBackStackEntry?.destination?.route?.substringBefore('?')
                 val isBottomNavActive = AppConfig.isBottomNavActive()
-                val bottomNavTabs = setOf("emitters", "map", "trips", "stats", "more")
+                val bottomNavTabs = AppConfig.bottomNavTabs.value.mapNotNull { fr.geotower.ui.components.BottomNavTab.fromId(it)?.route }.toSet() + "more"
                 val isRootTab = isBottomNavActive && currentRoute in bottomNavTabs
                 val bottomNavStartRoute = if (destinationApresSplash in bottomNavTabs) destinationApresSplash else "map"
+                val resolvedPopUpRoute = if (bottomNavStartRoute == "map") {
+                    "map?photoDraftId={photoDraftId}&tripId={tripId}&tripMode={tripMode}&focusLat={focusLat}&focusLon={focusLon}"
+                } else {
+                    bottomNavStartRoute
+                }
 
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
@@ -812,12 +819,20 @@ class MainActivity : ComponentActivity() {
                                 currentRoute = currentRoute,
                                 onNavigate = { targetRoute ->
                                     if (currentRoute != targetRoute) {
-                                        navController.navigate(targetRoute) {
-                                            popUpTo(bottomNavStartRoute) {
-                                                saveState = true
+                                        try {
+                                            navController.navigate(targetRoute) {
+                                                popUpTo(resolvedPopUpRoute) {
+                                                    saveState = true
+                                                }
+                                                launchSingleTop = true
+                                                restoreState = true
                                             }
-                                            launchSingleTop = true
-                                            restoreState = true
+                                        } catch (e: Exception) {
+                                            runCatching {
+                                                navController.navigate(targetRoute) {
+                                                    launchSingleTop = true
+                                                }
+                                            }
                                         }
                                     }
                                 }

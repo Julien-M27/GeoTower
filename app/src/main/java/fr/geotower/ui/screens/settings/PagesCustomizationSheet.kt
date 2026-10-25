@@ -26,8 +26,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.automirrored.filled.Launch
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.FilterList
@@ -36,11 +39,16 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.NearMe
 import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Route
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.VerticalAlignTop
+import androidx.compose.material.icons.filled.ViewColumn
 import androidx.compose.material.icons.filled.WifiTethering
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
@@ -606,6 +614,8 @@ fun FrequencyReferenceSettingsSheet(
 class PagesSectionActions(
     val onStartupPage: () -> Unit = {},
     val onHome: () -> Unit = {},
+    val onMore: () -> Unit = {},
+    val onBottomNav: () -> Unit = {},
     val onSimpleDrawer: () -> Unit = {},
     val onNearby: () -> Unit = {},
     val onMap: () -> Unit = {},
@@ -721,13 +731,30 @@ fun SectionPages(
                 onClick = actions.onStartupPage,
                 shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi, safeClick = safeClick
             )
-            PageSettingsCard(
-                title = stringResource(R.string.appstrings_page_home_settings),
-                desc = stringResource(R.string.settings_page_home_desc),
-                icon = Icons.Default.Home,
-                onClick = actions.onHome,
-                shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi, safeClick = safeClick
-            )
+            if (!AppConfig.isBottomNavActive()) {
+                PageSettingsCard(
+                    title = stringResource(R.string.appstrings_page_home_settings),
+                    desc = stringResource(R.string.settings_page_home_desc),
+                    icon = Icons.Default.Home,
+                    onClick = actions.onHome,
+                    shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi, safeClick = safeClick
+                )
+            } else {
+                PageSettingsCard(
+                    title = stringResource(R.string.settings_page_more_title),
+                    desc = stringResource(R.string.settings_page_more_desc),
+                    icon = Icons.Default.MoreHoriz,
+                    onClick = actions.onMore,
+                    shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi, safeClick = safeClick
+                )
+                PageSettingsCard(
+                    title = stringResource(R.string.settings_page_bottom_nav_title),
+                    desc = stringResource(R.string.settings_page_bottom_nav_desc),
+                    icon = Icons.Default.ViewColumn,
+                    onClick = actions.onBottomNav,
+                    shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi, safeClick = safeClick
+                )
+            }
         } else {
             PageSettingsCard(
                 title = stringResource(R.string.settings_page_simple_drawer_title),
@@ -899,13 +926,17 @@ fun StartupPageSelectionSheet(
     bubbleColor: Color
 ) {
     val featureFlags by RemoteFeatureFlags.config
-    val safeStartupPage = remember(currentStartupPage, featureFlags) {
+    val isBottomNav = AppConfig.isBottomNavActive()
+    val safeStartupPage = remember(currentStartupPage, featureFlags, isBottomNav) {
         when {
             currentStartupPage == "nearby" && featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.NEARBY) -> currentStartupPage
             currentStartupPage == "map" && featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.MAP) -> currentStartupPage
+            currentStartupPage == "trips" && featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.TRIPS) -> currentStartupPage
             currentStartupPage == "compass" && featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.COMPASS) -> currentStartupPage
             currentStartupPage == "stats" && featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.STATS) -> currentStartupPage
-            currentStartupPage == "home" -> currentStartupPage
+            isBottomNav && currentStartupPage == "more" -> currentStartupPage
+            !isBottomNav && currentStartupPage == "home" -> currentStartupPage
+            isBottomNav -> "map"
             else -> "home"
         }
     }
@@ -935,12 +966,17 @@ fun StartupPageSelectionSheet(
             Spacer(Modifier.height(sizing.spacing(24.dp)))
 
             Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))) {
-                SettingsRadioItem(stringResource(R.string.appstrings_page_home_settings), tempPage == "home", useOneUi, bubbleColor) { tempPage = "home" }
+                if (!isBottomNav) {
+                    SettingsRadioItem(stringResource(R.string.appstrings_page_home_settings), tempPage == "home", useOneUi, bubbleColor) { tempPage = "home" }
+                }
                 if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.NEARBY)) {
                     SettingsRadioItem(stringResource(R.string.appstrings_page_nearby_settings), tempPage == "nearby", useOneUi, bubbleColor) { tempPage = "nearby" }
                 }
                 if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.MAP)) {
                     SettingsRadioItem(stringResource(R.string.appstrings_page_map_settings), tempPage == "map", useOneUi, bubbleColor) { tempPage = "map" }
+                }
+                if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.TRIPS)) {
+                    SettingsRadioItem(stringResource(R.string.trips_title), tempPage == "trips", useOneUi, bubbleColor) { tempPage = "trips" }
                 }
                 if (AppConfig.hasCompass.value && featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.COMPASS)) {
                     SettingsRadioItem(stringResource(R.string.appstrings_page_compass_settings), tempPage == "compass", useOneUi, bubbleColor) { tempPage = "compass" }
@@ -950,12 +986,16 @@ fun StartupPageSelectionSheet(
                     SettingsRadioItem(stringResource(R.string.appstrings_stats_title), tempPage == "stats", useOneUi, bubbleColor) { tempPage = "stats" }
                 }
 
+                if (isBottomNav) {
+                    SettingsRadioItem(stringResource(R.string.bottom_nav_more), tempPage == "more", useOneUi, bubbleColor) { tempPage = "more" }
+                }
+
                 // --- NOUVEAU BOUTON RÉINITIALISER ---
                 Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
                 TextButton(
                     onClick = {
-                        // On valide directement le choix par défaut et on ferme la fenêtre
-                        onPageSelected("home")
+                        val defaultPage = if (isBottomNav) "map" else "home"
+                        onPageSelected(defaultPage)
                         onDismiss()
                     },
                     modifier = Modifier.align(Alignment.CenterHorizontally)
@@ -1266,6 +1306,545 @@ fun HomeSettingsSheet(
         }
     }
 }
+}
+
+// === LE SOUS-MENU POUR LE MENU PLUS (MODE BARRE DE NAVIGATION) ===
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MoreSettingsSheet(
+    moreOrder: List<String>,
+    onOrderChange: (List<String>) -> Unit,
+    onDismiss: () -> Unit,
+    onBack: () -> Unit,
+    sheetState: SheetState,
+    useOneUi: Boolean,
+    bubbleColor: Color
+) {
+    val context = LocalContext.current
+    val prefs = context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
+    var showLogo by remember { mutableStateOf(AppConfig.moreShowLogo.value) }
+    var showAbout by remember { mutableStateOf(AppConfig.moreShowAbout.value) }
+    var showHelp by remember { mutableStateOf(AppConfig.moreShowHelp.value) }
+    var showCompass by remember { mutableStateOf(AppConfig.moreShowCompass.value) }
+    var showNearby by remember { mutableStateOf(AppConfig.moreShowNearby.value) }
+    var showMap by remember { mutableStateOf(AppConfig.moreShowMap.value) }
+    var showTrips by remember { mutableStateOf(AppConfig.moreShowTrips.value) }
+    var showStats by remember { mutableStateOf(AppConfig.moreShowStats.value) }
+    var longPressReorder by remember { mutableStateOf(AppConfig.moreLongPressReorder.value) }
+
+    var showLogoSettings by remember { mutableStateOf(false) }
+    var logoSelectorResetKey by remember { mutableStateOf(0) }
+    val safeClick = rememberSafeClick()
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+
+    val safeOrder = remember(moreOrder) {
+        AppConfig.normalizeMoreOrder(moreOrder)
+    }
+    val currentOrder by rememberUpdatedState(safeOrder)
+
+    val themeMode by AppConfig.themeMode
+    val isOledMode by AppConfig.isOledMode
+    val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
+    val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
+    val scrollState = rememberScrollState()
+
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
+        BackHandler {
+            if (showLogoSettings) showLogoSettings = false else onBack()
+        }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .settingsPopupFadingEdge(scrollState)
+                .verticalScroll(scrollState)
+                .padding(bottom = sizing.spacing(48.dp), start = sizing.spacing(24.dp), end = sizing.spacing(24.dp)),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            if (showLogoSettings) {
+                Row(modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(24.dp)), verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = { showLogoSettings = false }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
+                    Text(stringResource(R.string.appstrings_page_home_logo_settings), style = sizing.textStyle(MaterialTheme.typography.titleLarge), fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                    Spacer(Modifier.width(sizing.spacing(48.dp)))
+                }
+
+                key(logoSelectorResetKey) {
+                    fr.geotower.ui.components.HomeLogoSelectorBlock(
+                        safeClick = safeClick
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
+                TextButton(
+                    onClick = {
+                        prefs.edit().putString("home_logo_choice", "app").apply()
+                        logoSelectorResetKey++
+                    }
+                ) {
+                    Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(sizing.spacing(8.dp)))
+                    Text(stringResource(R.string.appstrings_reset_to_default), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                }
+
+                Spacer(modifier = Modifier.height(sizing.spacing(32.dp)).navigationBarsPadding())
+            } else {
+                Row(modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(4.dp)), verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
+                    Text(stringResource(R.string.settings_page_more_title), style = sizing.textStyle(MaterialTheme.typography.titleLarge), fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                    Spacer(Modifier.width(sizing.spacing(48.dp)))
+                }
+                Text(stringResource(R.string.appstrings_drag_to_reorder_hint), style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = sizing.spacing(24.dp)), textAlign = TextAlign.Center)
+
+                val cardHeight = sizing.component(64.dp)
+                val spacing = sizing.spacing(12.dp)
+                val reorderState = rememberReorderableDragState(currentOrder, cardHeight, spacing, onOrderChange)
+
+                val shape = oneUiActionButtonShape(useOneUi)
+                val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
+
+                Column(verticalArrangement = Arrangement.spacedBy(spacing)) {
+                    currentOrder.forEach { itemId ->
+                        key(itemId) {
+                            val isDragged = reorderState.isDragged(itemId)
+                            val dragModifier = reorderState.dragModifier(itemId)
+                            val dragOffset = reorderState.offsetFor(itemId)
+
+                            when (itemId) {
+                                "logo" -> DraggableSwitchCard(
+                                    stringResource(R.string.appstrings_page_home_logo_settings), showLogo,
+                                    {
+                                        showLogo = it
+                                        AppConfig.setMoreShowLogo(prefs, it)
+                                    },
+                                    shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight,
+                                    onSettingsClick = { showLogoSettings = true }
+                                )
+                                "settings" -> DraggableSwitchCard(
+                                    stringResource(R.string.appstrings_settings_title), true, {},
+                                    shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight,
+                                    hideSwitch = true
+                                )
+                                "about" -> DraggableSwitchCard(
+                                    stringResource(R.string.nav_about), showAbout,
+                                    {
+                                        showAbout = it
+                                        AppConfig.setMoreShowAbout(prefs, it)
+                                    },
+                                    shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight
+                                )
+                                "help" -> DraggableSwitchCard(
+                                    stringResource(R.string.appstrings_help_title), showHelp,
+                                    {
+                                        showHelp = it
+                                        AppConfig.setMoreShowHelp(prefs, it)
+                                    },
+                                    shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight
+                                )
+                                "compass" -> {
+                                    if (AppConfig.hasCompass.value) {
+                                        DraggableSwitchCard(
+                                            stringResource(R.string.nav_compass), showCompass,
+                                            {
+                                                showCompass = it
+                                                AppConfig.setMoreShowCompass(prefs, it)
+                                            },
+                                            shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight
+                                        )
+                                    }
+                                }
+                                "nearby" -> DraggableSwitchCard(
+                                    stringResource(R.string.bottom_nav_nearby), showNearby,
+                                    {
+                                        showNearby = it
+                                        AppConfig.setMoreShowNearby(prefs, it)
+                                    },
+                                    shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight
+                                )
+                                "map" -> DraggableSwitchCard(
+                                    stringResource(R.string.bottom_nav_map), showMap,
+                                    {
+                                        showMap = it
+                                        AppConfig.setMoreShowMap(prefs, it)
+                                    },
+                                    shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight
+                                )
+                                "trips" -> DraggableSwitchCard(
+                                    stringResource(R.string.bottom_nav_trips), showTrips,
+                                    {
+                                        showTrips = it
+                                        AppConfig.setMoreShowTrips(prefs, it)
+                                    },
+                                    shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight
+                                )
+                                "stats" -> DraggableSwitchCard(
+                                    stringResource(R.string.bottom_nav_stats), showStats,
+                                    {
+                                        showStats = it
+                                        AppConfig.setMoreShowStats(prefs, it)
+                                    },
+                                    shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight
+                                )
+                            }
+                        }
+                    }
+                    HorizontalDivider(modifier = Modifier.padding(vertical = sizing.spacing(8.dp)), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                    SimpleSwitchCard(
+                        title = stringResource(R.string.appstrings_more_long_press_reorder),
+                        showMapLocation = longPressReorder,
+                        onLocationChange = {
+                            longPressReorder = it
+                            AppConfig.setMoreLongPressReorder(prefs, it)
+                        },
+                        shape = shape,
+                        border = border,
+                        bubbleColor = bubbleColor,
+                        useOneUi = useOneUi
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
+                TextButton(onClick = {
+                    val currentTabs = AppConfig.bottomNavTabs.value
+                    val defaultOrder = AppConfig.allAvailableMoreElements.filter { it == "logo" || it !in currentTabs }
+                    onOrderChange(defaultOrder)
+                    showLogo = true
+                    showAbout = true
+                    showHelp = true
+                    showCompass = true
+                    showNearby = true
+                    showMap = true
+                    showTrips = true
+                    showStats = true
+                    longPressReorder = true
+                    AppConfig.setMoreShowLogo(prefs, true)
+                    AppConfig.setMoreShowAbout(prefs, true)
+                    AppConfig.setMoreShowHelp(prefs, true)
+                    AppConfig.setMoreShowCompass(prefs, true)
+                    AppConfig.setMoreShowNearby(prefs, true)
+                    AppConfig.setMoreShowMap(prefs, true)
+                    AppConfig.setMoreShowTrips(prefs, true)
+                    AppConfig.setMoreShowStats(prefs, true)
+                    AppConfig.setMoreLongPressReorder(prefs, true)
+                    prefs.edit().putString("home_logo_choice", "app").apply()
+                    logoSelectorResetKey++
+                }) {
+                    Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(sizing.spacing(8.dp)))
+                    Text(stringResource(R.string.appstrings_reset_to_default), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                }
+                Spacer(modifier = Modifier.height(sizing.spacing(32.dp)).navigationBarsPadding())
+            }
+        }
+    }
+}
+
+// === LE SOUS-MENU POUR LA BARRE DE NAVIGATION INFÉRIEURE ===
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun BottomNavSettingsSheet(
+    tabs: List<String>,
+    onTabsChange: (List<String>) -> Unit,
+    onDismiss: () -> Unit,
+    onBack: () -> Unit,
+    sheetState: SheetState,
+    useOneUi: Boolean,
+    bubbleColor: Color
+) {
+    val context = LocalContext.current
+    val prefs = remember(context) { context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE) }
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+
+    val safeTabs = remember(tabs) {
+        AppConfig.normalizeBottomNavTabs(tabs)
+    }
+    val currentTabs by rememberUpdatedState(safeTabs)
+
+    val availableToAdd = remember(currentTabs) {
+        AppConfig.allAvailableBottomNavTabs.filter { tabId ->
+            tabId !in currentTabs && (tabId != "compass" || AppConfig.hasCompass.value)
+        }
+    }
+
+    val themeMode by AppConfig.themeMode
+    val isOledMode by AppConfig.isOledMode
+    val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
+    val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
+    val scrollState = rememberScrollState()
+
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
+        BackHandler { onBack() }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .settingsPopupFadingEdge(scrollState)
+                .verticalScroll(scrollState)
+                .padding(bottom = sizing.spacing(48.dp), start = sizing.spacing(24.dp), end = sizing.spacing(24.dp)),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Row(modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(4.dp)), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
+                Text(stringResource(R.string.settings_page_bottom_nav_title), style = sizing.textStyle(MaterialTheme.typography.titleLarge), fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                Spacer(Modifier.width(sizing.spacing(48.dp)))
+            }
+            Text(
+                stringResource(R.string.settings_page_bottom_nav_desc),
+                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = sizing.spacing(24.dp)),
+                textAlign = TextAlign.Center
+            )
+
+            val cardHeight = sizing.component(60.dp)
+            val spacing = sizing.spacing(12.dp)
+            val reorderState = rememberReorderableDragState(currentTabs, cardHeight, spacing, onTabsChange)
+
+            val shape = oneUiActionButtonShape(useOneUi)
+            val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
+
+            // Liste des onglets actifs
+            Column(verticalArrangement = Arrangement.spacedBy(spacing)) {
+                currentTabs.forEach { tabId ->
+                    key(tabId) {
+                        val isDragged = reorderState.isDragged(tabId)
+                        val dragModifier = reorderState.dragModifier(tabId)
+                        val dragOffset = reorderState.offsetFor(tabId)
+                        val tabInfo = getBottomNavTabInfo(tabId)
+
+                        DraggableRemovableTabCard(
+                            title = stringResource(tabInfo.titleRes),
+                            icon = tabInfo.icon,
+                            canDelete = currentTabs.size > 1,
+                            onDelete = {
+                                val updated = currentTabs.filter { it != tabId }
+                                onTabsChange(updated)
+                            },
+                            shape = shape,
+                            border = border,
+                            bubbleColor = bubbleColor,
+                            useOneUi = useOneUi,
+                            dragModifier = dragModifier,
+                            isDragged = isDragged,
+                            dragOffset = dragOffset,
+                            cardHeight = cardHeight
+                        )
+                    }
+                }
+
+                // Onglet « Plus » fixe à la fin
+                Surface(
+                    modifier = Modifier.fillMaxWidth().height(cardHeight),
+                    shape = shape,
+                    border = border,
+                    color = if (useOneUi) bubbleColor.copy(alpha = 0.6f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxSize().padding(horizontal = sizing.spacing(16.dp)),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Lock,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.size(sizing.component(20.dp)).padding(end = sizing.spacing(4.dp))
+                        )
+                        Spacer(Modifier.width(sizing.spacing(8.dp)))
+                        Icon(
+                            imageVector = Icons.Default.MoreHoriz,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(sizing.component(22.dp))
+                        )
+                        Spacer(Modifier.width(sizing.spacing(12.dp)))
+                        Text(
+                            text = stringResource(R.string.bottom_nav_more),
+                            style = sizing.textStyle(MaterialTheme.typography.bodyLarge),
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
+
+            // Section Ajouter un onglet
+            if (currentTabs.size < 4 && availableToAdd.isNotEmpty()) {
+                HorizontalDivider(modifier = Modifier.padding(vertical = sizing.spacing(8.dp)), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                Text(
+                    text = stringResource(R.string.appstrings_bottom_nav_add_tab),
+                    style = sizing.textStyle(MaterialTheme.typography.titleMedium),
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(12.dp))
+                )
+
+                Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))) {
+                    availableToAdd.forEach { tabId ->
+                        val tabInfo = getBottomNavTabInfo(tabId)
+                        Surface(
+                            onClick = {
+                                if (currentTabs.size < 4) {
+                                    onTabsChange(currentTabs + tabId)
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth().height(sizing.component(52.dp)),
+                            shape = shape,
+                            border = border,
+                            color = if (useOneUi) bubbleColor else MaterialTheme.colorScheme.surfaceContainerHigh
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxSize().padding(horizontal = sizing.spacing(16.dp)),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = tabInfo.icon,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(sizing.component(20.dp))
+                                )
+                                Spacer(Modifier.width(sizing.spacing(12.dp)))
+                                Text(
+                                    text = stringResource(tabInfo.titleRes),
+                                    style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(sizing.component(22.dp))
+                                )
+                            }
+                        }
+                    }
+                }
+            } else if (currentTabs.size >= 4) {
+                Text(
+                    text = stringResource(R.string.appstrings_bottom_nav_max_reached),
+                    style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    modifier = Modifier.padding(vertical = sizing.spacing(8.dp))
+                )
+            }
+
+            Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
+            HorizontalDivider(modifier = Modifier.padding(vertical = sizing.spacing(8.dp)), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+            fr.geotower.ui.components.BottomNavOpacityCard(
+                shape = shape,
+                border = border,
+                bubbleColor = bubbleColor,
+                useOneUi = useOneUi
+            )
+
+            Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
+            TextButton(onClick = {
+                val defaultTabs = listOf("nearby", "map", "trips", "stats")
+                onTabsChange(defaultTabs)
+                AppConfig.setBottomNavOpacity(prefs, AppConfig.DEFAULT_BOTTOM_NAV_OPACITY)
+            }) {
+                Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(sizing.spacing(8.dp)))
+                Text(stringResource(R.string.appstrings_reset_to_default), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            }
+            Spacer(modifier = Modifier.height(sizing.spacing(32.dp)).navigationBarsPadding())
+        }
+    }
+}
+
+private data class BottomNavTabInfo(
+    val id: String,
+    val titleRes: Int,
+    val icon: ImageVector
+)
+
+private fun getBottomNavTabInfo(id: String): BottomNavTabInfo = when (id) {
+    "nearby" -> BottomNavTabInfo("nearby", R.string.bottom_nav_nearby, Icons.Default.MyLocation)
+    "map" -> BottomNavTabInfo("map", R.string.bottom_nav_map, Icons.Default.Map)
+    "trips" -> BottomNavTabInfo("trips", R.string.bottom_nav_trips, Icons.Default.Route)
+    "compass" -> BottomNavTabInfo("compass", R.string.nav_compass, Icons.Default.Explore)
+    "stats" -> BottomNavTabInfo("stats", R.string.bottom_nav_stats, Icons.Default.BarChart)
+    "settings" -> BottomNavTabInfo("settings", R.string.nav_settings, Icons.Default.Settings)
+    "about" -> BottomNavTabInfo("about", R.string.nav_about, Icons.Default.Info)
+    "help" -> BottomNavTabInfo("help", R.string.appstrings_help_title, Icons.AutoMirrored.Filled.Help)
+    else -> BottomNavTabInfo(id, R.string.bottom_nav_more, Icons.Default.MoreHoriz)
+}
+
+@Composable
+private fun DraggableRemovableTabCard(
+    title: String,
+    icon: ImageVector,
+    canDelete: Boolean,
+    onDelete: () -> Unit,
+    shape: androidx.compose.ui.graphics.Shape,
+    border: BorderStroke?,
+    bubbleColor: Color,
+    useOneUi: Boolean,
+    dragModifier: Modifier,
+    isDragged: Boolean,
+    dragOffset: Float,
+    cardHeight: androidx.compose.ui.unit.Dp
+) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    val containerColor = if (useOneUi) bubbleColor else MaterialTheme.colorScheme.surfaceVariant
+    val elevation = if (isDragged) 8.dp else 0.dp
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(cardHeight)
+            .graphicsLayer {
+                translationY = dragOffset
+                scaleX = if (isDragged) 1.03f else 1f
+                scaleY = if (isDragged) 1.03f else 1f
+                shadowElevation = if (isDragged) 16f else 0f
+            },
+        shape = shape,
+        border = border,
+        color = containerColor,
+        shadowElevation = elevation
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = sizing.spacing(16.dp)),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .then(dragModifier)
+                    .padding(end = sizing.spacing(12.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.DragHandle,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    modifier = Modifier.size(sizing.component(24.dp))
+                )
+            }
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(sizing.component(22.dp))
+            )
+            Spacer(modifier = Modifier.width(sizing.spacing(12.dp)))
+            Text(
+                text = title,
+                style = sizing.textStyle(MaterialTheme.typography.bodyLarge),
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f)
+            )
+            if (canDelete) {
+                IconButton(onClick = onDelete) {
+                    Icon(
+                        imageVector = Icons.Default.DeleteOutline,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f)
+                    )
+                }
+            }
+        }
+    }
 }
 
 // === LE SOUS-MENU POUR LE VOLET LATÉRAL (MODE SIMPLIFIÉ) ===

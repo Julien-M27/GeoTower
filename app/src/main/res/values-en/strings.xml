@@ -3429,6 +3429,7 @@
     <string name="appstrings_release_v2079_summary_frequency_search_and_voice_assistant">Search in frequency bands reference, Assistant voice command for antennas and local build notifications</string>
     <string name="appstrings_release_v2080_summary_database_viewer_outages_and_sources">Inspection of outage datasets in database viewer and configurable data sources for local builds</string>
     <string name="appstrings_release_v2081_summary_bottom_navigation_bar">New bottom navigation bar mode with 5 tabs and time slider integration in map filters</string>
+    <string name="appstrings_release_v2084_summary_bottom_nav_customization">Bottom navigation bar tabs customization, transparency adjustment and More menu reordering</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Network requests log</string>
@@ -3482,4 +3483,16 @@
     <string name="settings_nav_mode_standard_desc">Start on the main menu with direct access to all pages</string>
     <string name="settings_nav_mode_bottom_bar">Bottom navigation bar</string>
     <string name="settings_nav_mode_bottom_bar_desc">5-tab selection bar at the bottom: Nearby, Map, Trips, Statistics, More</string>
+    <string name="settings_page_more_title">More menu</string>
+    <string name="settings_page_more_desc">Customize elements and order of the More menu</string>
+    <string name="settings_page_bottom_nav_title">Navigation bar</string>
+    <string name="settings_page_bottom_nav_desc">Customize the tabs of the bottom bar</string>
+    <string name="appstrings_bottom_nav_add_tab">Add a tab</string>
+    <string name="appstrings_bottom_nav_max_reached">Maximum 4 tabs reached</string>
+    <string name="appstrings_bottom_nav_fixed_more">The \"More\" tab is always fixed at the end of the bar.</string>
+    <string name="appstrings_more_long_press_reorder">Reorder by long press</string>
+    <string name="settings_bottom_nav_opacity_title">Bar transparency and blur</string>
+    <string name="settings_bottom_nav_opacity_desc">Adjust the opacity and transparency level of the bottom bar</string>
+    <string name="settings_bottom_nav_opacity_transparent">Transparent (0%)</string>
+    <string name="settings_bottom_nav_opacity_opaque">Opaque (100%)</string>
 </resources>

@@ -3429,6 +3429,7 @@
     <string name="appstrings_release_v2079_summary_frequency_search_and_voice_assistant">Pesquisa nas faixas de frequências, comando de voz do Assistant para antenas e notificações de geração local</string>
     <string name="appstrings_release_v2080_summary_database_viewer_outages_and_sources">Inspeção de dados de falhas no visualizador de bases e fontes configuráveis para as compilações locais</string>
     <string name="appstrings_release_v2081_summary_bottom_navigation_bar">Novo modo de navegação com barra de separadores inferior e integração do controlo deslizante temporal no mapa</string>
+    <string name="appstrings_release_v2084_summary_bottom_nav_customization">Personalização dos separadores da barra de navegação, ajuste de transparência e reorganização do menu Mais</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registo de pedidos de rede</string>
@@ -3482,4 +3483,16 @@
     <string name="settings_nav_mode_standard_desc">Inicia no menu principal com acesso a todas as páginas</string>
     <string name="settings_nav_mode_bottom_bar">Barra de navegação inferior</string>
     <string name="settings_nav_mode_bottom_bar_desc">Barra de 5 abas inferior: Por perto, Mapa, Viagens, Estatísticas, Mais</string>
+    <string name="settings_page_more_title">Menu Mais</string>
+    <string name="settings_page_more_desc">Personalizar itens e ordem do menu Mais</string>
+    <string name="settings_page_bottom_nav_title">Barra de navegação</string>
+    <string name="settings_page_bottom_nav_desc">Personalizar abas da barra inferior</string>
+    <string name="appstrings_bottom_nav_add_tab">Adicionar uma aba</string>
+    <string name="appstrings_bottom_nav_max_reached">Máximo de 4 abas atingido</string>
+    <string name="appstrings_bottom_nav_fixed_more">A aba «Mais» permanece sempre fixa na última posição.</string>
+    <string name="appstrings_more_long_press_reorder">Reordenar mantendo pressionado</string>
+    <string name="settings_bottom_nav_opacity_title">Transparência e desfoque da barra</string>
+    <string name="settings_bottom_nav_opacity_desc">Ajusta o nível de opacidade e transparência da barra inferior</string>
+    <string name="settings_bottom_nav_opacity_transparent">Transparente (0%)</string>
+    <string name="settings_bottom_nav_opacity_opaque">Opaco (100%)</string>
 </resources>

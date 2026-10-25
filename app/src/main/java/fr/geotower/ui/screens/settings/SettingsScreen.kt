@@ -204,6 +204,7 @@ import fr.geotower.ui.components.PageScrollEdgeButtons
 import fr.geotower.ui.components.GeoTowerFadingEdgeHeight
 import fr.geotower.ui.components.geoTowerFadingEdge
 import fr.geotower.ui.components.isGeoTowerFadingEdgeActive
+import fr.geotower.ui.components.oneUiActionButtonShape
 import fr.geotower.ui.components.pageScrollbar
 import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.ui.components.settingsPopupFadingEdge
@@ -1057,6 +1058,7 @@ fun SettingsScreen(
             // --- Apparence ---
             entry(context.getString(R.string.appearance_theme_title), "theme thème clair sombre systeme dark light mode nuit jour couleur apparence", SECTION_APPEARANCE)
             entry(context.getString(R.string.settings_nav_mode_title), "mode navigation barre selection onglets bas accueil standard", SECTION_APPEARANCE) { showNavModeSheet = true }
+            entry(context.getString(R.string.settings_bottom_nav_opacity_title), "transparence flou blur opacite barre navigation bas selection", SECTION_APPEARANCE)
             entry(context.getString(R.string.appstrings_color_palette_title), "palette couleur color accent teinte material", SECTION_APPEARANCE) { showColorPalettePage = true }
             entry(context.getString(R.string.appearance_oled_title), "oled noir pur black amoled sombre economie", SECTION_APPEARANCE)
             entry(context.getString(R.string.appearance_one_ui_title), "one ui oneui samsung style interface bulle", SECTION_APPEARANCE)
@@ -2040,6 +2042,9 @@ fun SettingsScreen(
                         .verticalScroll(navModeScrollState)
                         .padding(bottom = sizing.spacing(48.dp), start = sizing.spacing(24.dp), end = sizing.spacing(24.dp))
                 ) {
+                    val shape = oneUiActionButtonShape(useOneUi)
+                    val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
+
                     Text(
                         text = stringResource(R.string.settings_nav_mode_title),
                         style = sizing.textStyle(MaterialTheme.typography.titleLarge),
@@ -2078,6 +2083,16 @@ fun SettingsScreen(
                             navController.navigate("settings")
                         }
                     )
+
+                    if (isBottomNav) {
+                        Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
+                        fr.geotower.ui.components.BottomNavOpacityCard(
+                            shape = shape,
+                            border = border,
+                            bubbleColor = bubbleBaseColor,
+                            useOneUi = useOneUi
+                        )
+                    }
                 }
             }
         }
@@ -3207,6 +3222,16 @@ fun SectionApparence(
             }
             Icon(Icons.Default.UnfoldMore, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
+    }
+
+    if (AppConfig.isBottomNavActive()) {
+        Spacer(Modifier.height(sizing.spacing(12.dp)))
+        fr.geotower.ui.components.BottomNavOpacityCard(
+            shape = shape,
+            border = border,
+            bubbleColor = bubbleColor,
+            useOneUi = useOneUi
+        )
     }
 
     // Style d'affichage plein écran / fractionné : uniquement sur grand écran réel — c'est le même

@@ -79,8 +79,16 @@ fun SplashScreen(
         // Temps d'affichage pour laisser le LoadingIndicator s'animer (raccourci en mode faible conso).
         delay(if (fr.geotower.utils.PowerProfile.richAnimations) 2200L else 600L)
 
-        navController.navigate(nextDestination) {
-            popUpTo("splash") { inclusive = true }
+        runCatching {
+            navController.navigate(nextDestination) {
+                popUpTo("splash") { inclusive = true }
+            }
+        }.onFailure {
+            runCatching {
+                navController.navigate(fr.geotower.utils.AppConfig.homeRoute()) {
+                    popUpTo("splash") { inclusive = true }
+                }
+            }
         }
     }
 
