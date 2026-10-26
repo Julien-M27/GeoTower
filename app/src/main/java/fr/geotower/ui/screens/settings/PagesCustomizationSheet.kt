@@ -936,7 +936,7 @@ fun StartupPageSelectionSheet(
             currentStartupPage == "stats" && featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.STATS) -> currentStartupPage
             isBottomNav && currentStartupPage == "more" -> currentStartupPage
             !isBottomNav && currentStartupPage == "home" -> currentStartupPage
-            isBottomNav -> "map"
+            isBottomNav -> "nearby"
             else -> "home"
         }
     }
@@ -994,7 +994,7 @@ fun StartupPageSelectionSheet(
                 Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
                 TextButton(
                     onClick = {
-                        val defaultPage = if (isBottomNav) "map" else "home"
+                        val defaultPage = if (isBottomNav) "nearby" else "home"
                         onPageSelected(defaultPage)
                         onDismiss()
                     },
@@ -1270,16 +1270,12 @@ fun HomeSettingsSheet(
 
             Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
             TextButton(onClick = {
-                val defaultHomeOrder = if (AppConfig.hasCompass.value) {
-                    listOf("nearby", "map", "compass", "stats", "settings", "logo", "about") // Logo puis « À propos » à la fin
-                } else {
-                    listOf("nearby", "map", "stats", "settings", "logo", "about") // Logo puis « À propos » à la fin
-                }
+                val defaultHomeOrder = listOf("nearby", "map", "trips", "stats", "settings", "logo", "about")
 
                 onOrderChange(defaultHomeOrder)
                 onNearbyChange(true)
                 onMapChange(true)
-                if (AppConfig.hasCompass.value) onCompassChange(true)
+                onCompassChange(false)
                 onStatsChange(true)
 
                 // Réinitialise le logo

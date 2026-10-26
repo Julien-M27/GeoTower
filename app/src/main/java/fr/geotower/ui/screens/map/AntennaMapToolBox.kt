@@ -75,7 +75,7 @@ fun AntennaMapToolBox(
             modifier = Modifier.height(buttonDiameter),
             shape = RoundedCornerShape(buttonDiameter / 2f),
             color = MaterialTheme.colorScheme.surface.copy(alpha = toolboxAlpha),
-            shadowElevation = 0.dp,
+            shadowElevation = fr.geotower.utils.AppConfig.floatingUiShadowElevation(6.dp),
             border = BorderStroke(1.dp, fr.geotower.utils.AppConfig.floatingUiBorderColor())
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -198,7 +198,7 @@ fun AntennaMapToolBox(
         modifier = Modifier.width(buttonDiameter),
         shape = RoundedCornerShape(buttonDiameter / 2f),
         color = MaterialTheme.colorScheme.surface.copy(alpha = toolboxAlpha),
-        shadowElevation = 0.dp,
+        shadowElevation = fr.geotower.utils.AppConfig.floatingUiShadowElevation(6.dp),
         border = BorderStroke(1.dp, fr.geotower.utils.AppConfig.floatingUiBorderColor())
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {

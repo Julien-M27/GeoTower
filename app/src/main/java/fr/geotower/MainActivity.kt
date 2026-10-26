@@ -731,11 +731,12 @@ class MainActivity : ComponentActivity() {
         val simpleModeAtLaunch = AppConfig.isSimpleModeActive(sharedPref)
         val bottomNavAtLaunch = AppConfig.isBottomNavActive(sharedPref)
         val simpleModeHomeRoute = "map"
+        val bottomNavDefaultStartupRoute = "emitters"
         val savedStartupPage = if (simpleModeAtLaunch) {
             simpleModeHomeRoute
         } else if (bottomNavAtLaunch) {
-            val configured = sharedPref.getString("startup_page", "map") ?: "map"
-            if (configured == "home") "map" else configured
+            val configured = sharedPref.getString("startup_page", "nearby") ?: "nearby"
+            if (configured == "home") "nearby" else configured
         } else {
             sharedPref.getString("startup_page", "home") ?: "home"
         }
@@ -749,7 +750,11 @@ class MainActivity : ComponentActivity() {
             mapDeepLinkRoute
         } else if (isDeepLink) {
             // ✅ On laisse le NavHost gérer la navigation profonde
-            if (simpleModeAtLaunch || bottomNavAtLaunch) simpleModeHomeRoute else "home"
+            when {
+                simpleModeAtLaunch -> simpleModeHomeRoute
+                bottomNavAtLaunch -> bottomNavDefaultStartupRoute
+                else -> "home"
+            }
         } else if (notifSiteId != null) {
             "site_detail/$notifSiteId" // 🌟 Ouvre le détail si on vient de la notif
         } else if (widgetDest == "nearby") {
@@ -772,7 +777,11 @@ class MainActivity : ComponentActivity() {
                 "compass" -> "compass"
                 "stats" -> "stats"
                 "more" -> "more"
-                else -> if (simpleModeAtLaunch || bottomNavAtLaunch) simpleModeHomeRoute else "home"
+                else -> when {
+                    simpleModeAtLaunch -> simpleModeHomeRoute
+                    bottomNavAtLaunch -> bottomNavDefaultStartupRoute
+                    else -> "home"
+                }
             }
         }
 

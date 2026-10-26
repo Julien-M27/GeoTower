@@ -475,7 +475,7 @@ fun MapShareMenu(
         onClick = { safeClick { showShareSheet = true } },
         shape = CircleShape,
         color = MaterialTheme.colorScheme.surface.copy(alpha = AppConfig.floatingUiAlpha),
-        shadowElevation = 0.dp,
+        shadowElevation = AppConfig.floatingUiShadowElevation(4.dp),
         border = BorderStroke(1.dp, AppConfig.floatingUiBorderColor()),
         modifier = modifier.size(sizing.component(54.dp))
     ) {

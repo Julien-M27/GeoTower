@@ -64,6 +64,7 @@ import fr.geotower.utils.CommuneNameMatching
 import fr.geotower.utils.DepartmentCodes
 import fr.geotower.utils.FrenchAdminAreas
 import fr.geotower.utils.FrequencyFilterSelection
+import fr.geotower.utils.OperatorColors
 import fr.geotower.data.models.toDepartmentOperatorTechRow
 import fr.geotower.data.models.toDepartmentStatRow
 import fr.geotower.data.models.toLocalisationEntity
@@ -939,10 +940,17 @@ class AnfrRepository(
         lonEast: Double,
         latSouth: Double,
         lonWest: Double,
-        detailBackedBandMask: Int = DETAIL_BACKED_5G_BANDS
+        detailBackedBandMask: Int = 0,
+        selectedOperatorKeys: Set<String>? = null
     ): List<LocalisationEntity> {
+        val operatorNames = selectedOperatorKeys?.takeIf { it.isNotEmpty() }?.let { normalizeOperatorKeys(it) }
         if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_BBOX)) {
-            return hideHiddenSites(getLiveSitesInBox(latNorth, lonEast, latSouth, lonWest))
+            val liveSites = hideHiddenSites(getLiveSitesInBox(latNorth, lonEast, latSouth, lonWest))
+            return if (operatorNames != null && operatorNames.isNotEmpty()) {
+                liveSites.filter { site -> site.operateur?.trim()?.uppercase(Locale.ROOT) in operatorNames }
+            } else {
+                liveSites
+            }
         }
 
         val hideUnderground = AppConfig.hideUndergroundSites.value
@@ -950,23 +958,41 @@ class AnfrRepository(
         val localisations = queryLocalDatabase(emptyList()) {
             bounds.longitudeRanges
                 .flatMap { range ->
-                    if (hideUnderground) {
-                        getLocalisationsInBox(
-                            minLat = bounds.minLat,
-                            maxLat = bounds.maxLat,
-                            minLon = range.min,
-                            maxLon = range.max
-                        )
+                    if (operatorNames != null && operatorNames.isNotEmpty()) {
+                        if (hideUnderground) {
+                            getLocalisationsInBoxForOperators(
+                                minLat = bounds.minLat,
+                                maxLat = bounds.maxLat,
+                                minLon = range.min,
+                                maxLon = range.max,
+                                operatorNames = operatorNames
+                            )
+                        } else {
+                            getLocalisationsInBoxFastForOperators(
+                                minLat = bounds.minLat,
+                                maxLat = bounds.maxLat,
+                                minLon = range.min,
+                                maxLon = range.max,
+                                operatorNames = operatorNames
+                            )
+                        }
                     } else {
-                        getLocalisationsInBoxFast(
-                            minLat = bounds.minLat,
-                            maxLat = bounds.maxLat,
-                            minLon = range.min,
-                            maxLon = range.max
-                        )
+                        if (hideUnderground) {
+                            getLocalisationsInBox(
+                                minLat = bounds.minLat,
+                                maxLat = bounds.maxLat,
+                                minLon = range.min,
+                                maxLon = range.max
+                            )
+                        } else {
+                            getLocalisationsInBoxFast(
+                                minLat = bounds.minLat,
+                                maxLat = bounds.maxLat,
+                                minLon = range.min,
+                                maxLon = range.max
+                            )
+                        }
                     }
-
-
                 }
                 .distinctBy { it.idAnfr }
         }
@@ -1059,7 +1085,7 @@ class AnfrRepository(
      */
     suspend fun getAntennasInAdminArea(
         departmentCodes: List<String>,
-        detailBackedBandMask: Int = DETAIL_BACKED_5G_BANDS,
+        detailBackedBandMask: Int = 0,
         fallbackExtent: AdminAreaExtent? = null
     ): List<LocalisationEntity> {
         if (departmentCodes.isEmpty()) return emptyList()
@@ -1123,25 +1149,33 @@ class AnfrRepository(
         lonEast: Double,
         latSouth: Double,
         lonWest: Double,
-        frequencyFilter: FrequencyFilterSelection
+        frequencyFilter: FrequencyFilterSelection,
+        detailBackedBandMask: Int = frequencyFilter.detailBackedBandMaskForEnrichment(),
+        selectedOperatorKeys: Set<String>? = null
     ): List<LocalisationEntity> {
-        val detailBackedBandMask = frequencyFilter.detailBackedBandMaskForEnrichment()
+        val operatorNames = selectedOperatorKeys?.takeIf { it.isNotEmpty() }?.let { normalizeOperatorKeys(it) }
         if (frequencyFilter.isFullyEnabled) {
             return getAntennasInBox(
                 latNorth = latNorth,
                 lonEast = lonEast,
                 latSouth = latSouth,
                 lonWest = lonWest,
-                detailBackedBandMask = detailBackedBandMask
+                detailBackedBandMask = detailBackedBandMask,
+                selectedOperatorKeys = selectedOperatorKeys
             )
         }
 
         if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_BBOX)) {
             val liveSites = getLiveSitesInBox(latNorth, lonEast, latSouth, lonWest)
-            return if (detailBackedBandMask != 0 && liveSites.size <= LIVE_DETAIL_LOOKUP_LIMIT) {
-                hideHiddenSites(enrichRadioBandMasksFromDetails(liveSites, detailBackedBandMask))
+            val filteredLive = if (operatorNames != null && operatorNames.isNotEmpty()) {
+                liveSites.filter { site -> site.operateur?.trim()?.uppercase(Locale.ROOT) in operatorNames }
             } else {
-                hideHiddenSites(liveSites)
+                liveSites
+            }
+            return if (detailBackedBandMask != 0 && filteredLive.size <= LIVE_DETAIL_LOOKUP_LIMIT) {
+                hideHiddenSites(enrichRadioBandMasksFromDetails(filteredLive, detailBackedBandMask))
+            } else {
+                hideHiddenSites(filteredLive)
             }
         }
 
@@ -1156,29 +1190,53 @@ class AnfrRepository(
         val localisations = queryLocalDatabase(emptyList()) {
             bounds.longitudeRanges
                 .flatMap { range ->
-                    if (hideUnderground) {
-                        getLocalisationsInBoxForRadioFilter(
-                            minLat = bounds.minLat,
-                            maxLat = bounds.maxLat,
-                            minLon = range.min,
-                            maxLon = range.max,
-                            selectedBandMask = selectedBandMask,
-                            detailBackedBandMask = detailBackedBandMask,
-                            includeFh = includeFh
-                        )
+                    if (operatorNames != null && operatorNames.isNotEmpty()) {
+                        if (hideUnderground) {
+                            getLocalisationsInBoxForRadioFilterForOperators(
+                                minLat = bounds.minLat,
+                                maxLat = bounds.maxLat,
+                                minLon = range.min,
+                                maxLon = range.max,
+                                selectedBandMask = selectedBandMask,
+                                detailBackedBandMask = detailBackedBandMask,
+                                includeFh = includeFh,
+                                operatorNames = operatorNames
+                            )
+                        } else {
+                            getLocalisationsInBoxForRadioFilterFastForOperators(
+                                minLat = bounds.minLat,
+                                maxLat = bounds.maxLat,
+                                minLon = range.min,
+                                maxLon = range.max,
+                                selectedBandMask = selectedBandMask,
+                                detailBackedBandMask = detailBackedBandMask,
+                                includeFh = includeFh,
+                                operatorNames = operatorNames
+                            )
+                        }
                     } else {
-                        getLocalisationsInBoxForRadioFilterFast(
-                            minLat = bounds.minLat,
-                            maxLat = bounds.maxLat,
-                            minLon = range.min,
-                            maxLon = range.max,
-                            selectedBandMask = selectedBandMask,
-                            detailBackedBandMask = detailBackedBandMask,
-                            includeFh = includeFh
-                        )
+                        if (hideUnderground) {
+                            getLocalisationsInBoxForRadioFilter(
+                                minLat = bounds.minLat,
+                                maxLat = bounds.maxLat,
+                                minLon = range.min,
+                                maxLon = range.max,
+                                selectedBandMask = selectedBandMask,
+                                detailBackedBandMask = detailBackedBandMask,
+                                includeFh = includeFh
+                            )
+                        } else {
+                            getLocalisationsInBoxForRadioFilterFast(
+                                minLat = bounds.minLat,
+                                maxLat = bounds.maxLat,
+                                minLon = range.min,
+                                maxLon = range.max,
+                                selectedBandMask = selectedBandMask,
+                                detailBackedBandMask = detailBackedBandMask,
+                                includeFh = includeFh
+                            )
+                        }
                     }
-
-
                 }
                 .distinctBy { it.idAnfr }
         }
@@ -1543,21 +1601,21 @@ class AnfrRepository(
         val results = queryLocalDatabase(emptyList()) {
             searchAntennasById(query)
         }
-        return hideHiddenSites(enrichRadioBandMasksFromDetails(results))
+        return hideHiddenSites(enrichRadioBandMasksFromDetails(results, 0))
     }
 
     suspend fun searchAntennasByText(query: String, limit: Int = 200): List<LocalisationEntity> {
         val results = queryLocalDatabase(emptyList()) {
             searchAntennasByText(query, limit)
         }
-        return hideHiddenSites(enrichRadioBandMasksFromDetails(results))
+        return hideHiddenSites(enrichRadioBandMasksFromDetails(results, 0))
     }
 
     suspend fun searchAntennasByAddress(query: String, limit: Int = 5000): List<LocalisationEntity> {
         val results = queryLocalDatabase(emptyList()) {
             searchAntennasByAddress(query, limit)
         }
-        return hideHiddenSites(enrichRadioBandMasksFromDetails(results))
+        return hideHiddenSites(enrichRadioBandMasksFromDetails(results, 0))
     }
 
     suspend fun getAntennasByExactId(exactId: String): List<LocalisationEntity> {
@@ -1636,6 +1694,15 @@ class AnfrRepository(
                 }
             }
         }
+    }
+
+    fun normalizeOperatorKeys(keysOrNames: Collection<String>): List<String> {
+        return keysOrNames
+            .map { it.trim().uppercase(Locale.ROOT) }
+            .flatMap { OperatorColors.searchLabelsFor(it) }
+            .map { it.trim().uppercase(Locale.ROOT) }
+            .filter { it.isNotBlank() }
+            .distinct()
     }
 
     private fun normalizeOperatorNames(operatorNames: List<String>): List<String> {

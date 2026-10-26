@@ -351,7 +351,8 @@ class MapViewModel(
                     _antennas.value = filterClustersToAdminArea(fakeAntennas)
                 } else {
                     // Si on a zoomé, on charge les vraies antennes détaillées de la zone
-                    val detailBackedBandMask = frequencyFilter.detailBackedBandMaskForEnrichment()
+                    val detailBackedBandMask = if (zoom < 14.0) 0 else frequencyFilter.detailBackedBandMaskForEnrichment()
+                    val effectiveOperatorKeys = if (hasOperatorFilter) selectedOperators else null
                     val rawAntennas = if (loadsStatusSubsetsOnly) {
                         // Union des sous-ensembles cochés. Le filtre fréquences reste appliqué
                         // côté carte : inutile de passer par la variante SQL par bandes ici.
@@ -385,7 +386,9 @@ class MapViewModel(
                             lonEast = lonEast,
                             latSouth = latSouth,
                             lonWest = lonWest,
-                            frequencyFilter = frequencyFilter
+                            frequencyFilter = frequencyFilter,
+                            detailBackedBandMask = detailBackedBandMask,
+                            selectedOperatorKeys = effectiveOperatorKeys
                         )
                     } else {
                         repository.getAntennasInBox(
@@ -393,7 +396,8 @@ class MapViewModel(
                             lonEast,
                             latSouth,
                             lonWest,
-                            detailBackedBandMask = detailBackedBandMask
+                            detailBackedBandMask = detailBackedBandMask,
+                            selectedOperatorKeys = effectiveOperatorKeys
                         )
                     }
 

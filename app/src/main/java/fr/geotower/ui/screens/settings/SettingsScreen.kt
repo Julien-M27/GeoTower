@@ -3261,7 +3261,7 @@ fun SectionApparence(
         }
     }
 
-    if (AppConfig.isBottomNavActive() && useOneUi) {
+    if (AppConfig.isBottomNavActive()) {
         Spacer(Modifier.height(sizing.spacing(12.dp)))
         fr.geotower.ui.components.BottomNavOpacityCard(
             shape = shape,

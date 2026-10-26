@@ -6854,7 +6854,7 @@ fun MapScreen(
                     modifier = Modifier.align(Alignment.Center),
                     shape = RoundedCornerShape(32.dp),
                     color = MaterialTheme.colorScheme.surface.copy(alpha = AppConfig.floatingUiAlpha),
-                    shadowElevation = 0.dp,
+                    shadowElevation = AppConfig.floatingUiShadowElevation(4.dp),
                     border = BorderStroke(1.dp, AppConfig.floatingUiBorderColor())
                 ) {
                     // Avec un trajet ouvert, la carte n'est plus « la carte des antennes » : elle
@@ -7276,7 +7276,7 @@ fun MapScreen(
                         .clip(zoomControlShape),
                     shape = zoomControlShape,
                     color = MaterialTheme.colorScheme.surface.copy(alpha = AppConfig.floatingUiAlpha),
-                    shadowElevation = 0.dp,
+                    shadowElevation = AppConfig.floatingUiShadowElevation(6.dp),
                     border = BorderStroke(1.dp, AppConfig.floatingUiBorderColor())
                 ) {
                     Column(
@@ -7407,9 +7407,8 @@ fun MapScreen(
                             }
                         },
                         shape = CircleShape,
-                        color = (if (isLocTracking) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface)
-                            .copy(alpha = AppConfig.floatingUiAlpha),
-                        shadowElevation = 0.dp,
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = AppConfig.floatingUiAlpha),
+                        shadowElevation = AppConfig.floatingUiShadowElevation(6.dp),
                         border = BorderStroke(
                             width = if (isLocTracking) 2.dp else 1.dp,
                             color = if (isLocTracking) MaterialTheme.colorScheme.primary else AppConfig.floatingUiBorderColor()
@@ -7428,7 +7427,7 @@ fun MapScreen(
                             Icon(
                                 imageVector = locationIcon,
                                 contentDescription = stringResource(R.string.appstrings_locate),
-                                tint = if (isLocTracking) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                tint = if (isLocTracking) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimaryContainer,
                                 modifier = Modifier.size(sizing.component(24.dp))
                             )
                         }
@@ -8616,7 +8615,7 @@ private fun SmallFloatingButton(icon: ImageVector, desc: String, modifier: Modif
         onClick = onClick,
         shape = CircleShape,
         color = MaterialTheme.colorScheme.surface.copy(alpha = AppConfig.floatingUiAlpha),
-        shadowElevation = 0.dp,
+        shadowElevation = AppConfig.floatingUiShadowElevation(4.dp),
         border = BorderStroke(1.dp, AppConfig.floatingUiBorderColor()),
         modifier = modifier.size(mapControlButtonDiameter)
     ) {
@@ -8827,7 +8826,7 @@ private fun MapCompassButton(
         modifier = modifier.combinedClickable(onClick = onReset, onLongClick = longPress),
         shape = CircleShape,
         color = MaterialTheme.colorScheme.surface.copy(alpha = AppConfig.floatingUiAlpha),
-        shadowElevation = 0.dp,
+        shadowElevation = AppConfig.floatingUiShadowElevation(4.dp),
         border = if (followActive) {
             BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
         } else {

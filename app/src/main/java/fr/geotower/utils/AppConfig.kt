@@ -3,10 +3,13 @@ package fr.geotower.utils
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import fr.geotower.data.api.RouteApi
 import fr.geotower.data.build.LocalBuildCapability
 import fr.geotower.data.config.RemoteFeatureFlags
@@ -113,25 +116,39 @@ object AppConfig {
 
     /**
      * Progression d'opacité normalisée entre 0f et 1f pour les éléments flottants de l'UI.
+     * N'est active que si le mode barre de navigation inférieure est activé. Sinon, 1f (opaque).
      */
     val floatingUiOpacityProgress: Float
-        get() = (bottomNavOpacity.intValue / 100f).coerceIn(0f, 1f)
+        get() = if (isBottomNavActive()) {
+            (bottomNavOpacity.intValue / 100f).coerceIn(0f, 1f)
+        } else {
+            1f
+        }
 
     /**
      * Alpha effectif pour les éléments et boutons flottants (barre de navigation, boutons carte, boutons de défilement).
-     * Maintient un plancher d'opacité minimal de 55% afin que les surfaces filtrent efficacement le fond de la carte
-     * (routes, forêts, labels) et que le contenu reste parfaitement contrasté et lisible même à 0% de réglage.
+     * En mode classique (sans barre inférieure), l'interface reste totalement opaque (1f).
+     * En mode barre inférieure, applique le réglage d'opacité avec un plancher minimal de 55%
+     * pour garantir un contraste et une lisibilité parfaits.
      */
     val floatingUiAlpha: Float
-        get() = (0.55f + 0.45f * floatingUiOpacityProgress).coerceIn(0f, 1f)
+        get() = if (isBottomNavActive()) {
+            (0.55f + 0.45f * floatingUiOpacityProgress).coerceIn(0f, 1f)
+        } else {
+            1f
+        }
 
     /**
      * Couleur de bordure contrastée pour les éléments flottants selon le thème clair / sombre.
-     * En thème sombre, un blanc fin et lumineux délimite la forme face aux fonds sombres ou forêts.
-     * En thème clair, un noir/gris foncé fin assure la délimitation sur les fonds clairs ou routes.
+     * En mode classique (sans barre inférieure), renvoie la bordure Material 3 standard [outlineVariant].
+     * En mode barre inférieure, un blanc fin et lumineux délimite la forme face aux fonds sombres ou forêts,
+     * et un noir/gris foncé fin assure la délimitation sur les fonds clairs ou routes.
      */
     @Composable
     fun floatingUiBorderColor(): Color {
+        if (!isBottomNavActive()) {
+            return MaterialTheme.colorScheme.outlineVariant
+        }
         val mode = themeMode.intValue
         val isDark = mode == 2 || (mode == 0 && isSystemInDarkTheme())
         val progress = floatingUiOpacityProgress
@@ -140,6 +157,15 @@ object AppConfig {
         } else {
             Color.Black.copy(alpha = 0.22f + 0.14f * progress)
         }
+    }
+
+    /**
+     * Élévation de l'ombre pour les surfaces flottantes.
+     * En mode barre inférieure, l'élévation est à 0.dp pour éviter que les ombres ne transparaissent
+     * à travers le verre dépoli. En mode classique opaque, l'élévation standard Material 3 est conservée.
+     */
+    fun floatingUiShadowElevation(classicElevation: Dp): Dp {
+        return if (isBottomNavActive()) 0.dp else classicElevation
     }
 
     val allAvailableBottomNavTabs = listOf(
@@ -969,9 +995,9 @@ object AppConfig {
         prefs.edit().putBoolean(PREF_MORE_LONG_PRESS_REORDER, enabled).apply()
     }
 
-    /** Route d'accueil : le mode barre inférieure ou simplifié n'a pas de page d'accueil, la carte en tient lieu. */
+    /** Route d'accueil : en mode barre inférieure, la page d'accueil par défaut est la liste des émetteurs à proximité. */
     fun homeRoute(): String = when {
-        isBottomNavActive() -> "map"
+        isBottomNavActive() -> "emitters"
         simpleModeActive() -> "map"
         else -> "home"
     }

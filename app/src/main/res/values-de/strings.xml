@@ -3433,6 +3433,7 @@
     <string name="appstrings_release_v2085_summary_bottom_nav_gestures">Wisch-Navigation mit haptischem Feedback auf der unteren Leiste und direkter Zugriff auf Tab-Einstellungen</string>
     <string name="appstrings_release_v2086_summary_interactive_tab_swipe">Interaktive Wischgesten zwischen den Hauptseiten und direkte Fingerverfolgung auf der Navigationsleiste</string>
     <string name="appstrings_release_v2087_summary_floating_ui_and_stats">Einheitliche Transparenz schwebender Steuerelemente, flüssigere Statistiken und erweitertes Mehr-Menü</string>
+    <string name="appstrings_release_v2088_summary_sql_operator_filters">Optimierte Datenbankfilterung nach Betreibern für schnellere Kartenladezeiten und klassischer Stil bewahrt</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Netzwerkanfragen-Protokoll</string>
