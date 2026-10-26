@@ -3431,6 +3431,7 @@
     <string name="appstrings_release_v2081_summary_bottom_navigation_bar">Nuevo modo de navegación con barra de pestañas inferior e integración del control temporal en el mapa</string>
     <string name="appstrings_release_v2084_summary_bottom_nav_customization">Personalización de las pestañas de la barra de navegación, ajuste de transparencia y reorganización del menú Más</string>
     <string name="appstrings_release_v2085_summary_bottom_nav_gestures">Navegación por deslizamiento continuo con respuesta háptica en la barra inferior y acceso directo a los ajustes de pestañas</string>
+    <string name="appstrings_release_v2086_summary_interactive_tab_swipe">Deslizamiento táctil interactivo entre páginas principales y seguimiento táctil en vivo en la barra de navegación</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registro de solicitudes de red</string>

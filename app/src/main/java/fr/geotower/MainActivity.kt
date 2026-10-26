@@ -17,17 +17,44 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
@@ -40,13 +67,17 @@ import fr.geotower.data.upload.SignalQuestUploadTarget
 import fr.geotower.data.upload.SignalQuestUploadTargets
 import fr.geotower.data.workers.SignalQuestUploadScheduler
 import fr.geotower.data.workers.UpdateCheckScheduler
+import fr.geotower.utils.PowerProfile
 import fr.geotower.widget.AntennaWidgetWorker
 import android.content.Intent
 import android.widget.Toast
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.roundToInt
 
 // --- DONNÉES ---
 import fr.geotower.data.AnfrRepository
@@ -227,6 +258,263 @@ private fun DisabledFeatureRoute(navController: NavHostController, message: Stri
 // contiennent aucun « % ».
 private fun decodeUploadTargets(raw: String?): List<SignalQuestUploadTarget> {
     return SignalQuestUploadTargets.decode(Uri.decode(raw.orEmpty()))
+}
+
+/**
+ * Permet un glissement interactif (swipe horizontal fluide) entre les onglets principaux.
+ * Pendant le mouvement du doigt, l'écran courant et l'écran adjacent se déplacent
+ * de façon synchrone en temps réel (1:1), permettant de glisser lentement, de s'arrêter
+ * et d'observer la transition.
+ * Au relâchement, si la distance ou la vitesse est suffisante, la transition se termine
+ * en douceur vers le nouvel onglet ; sinon, elle revient à la position initiale.
+ * Complètement désactivé sur la carte ("map") pour préserver le déplacement (pan / zoom).
+ */
+@Composable
+private fun Modifier.rootTabInteractiveSwipe(
+    enabled: Boolean,
+    screenWidthPx: Float,
+    isRtl: Boolean,
+    rootTabsList: List<String>,
+    currentRoute: String?,
+    onDragUpdate: (dragOffsetPx: Float, targetRoute: String?, baseOffsetPx: Float) -> Unit,
+    onRelease: (commit: Boolean, targetRoute: String?, targetEndOffset: Float, velocityX: Float) -> Unit
+): Modifier {
+    if (!enabled || screenWidthPx <= 0f) return this
+
+    val currentOnDragUpdate by rememberUpdatedState(onDragUpdate)
+    val currentOnRelease by rememberUpdatedState(onRelease)
+    val currentTabsList by rememberUpdatedState(rootTabsList)
+    val currentActiveRoute by rememberUpdatedState(currentRoute)
+    val currentIsRtl by rememberUpdatedState(isRtl)
+    val currentScreenWidth by rememberUpdatedState(screenWidthPx)
+
+    return this.pointerInput(enabled, isRtl, screenWidthPx, currentRoute) {
+        val touchSlop = viewConfiguration.touchSlop
+        val commitThreshold = currentScreenWidth * 0.28f
+        val flingVelocityThreshold = 750f
+        val velocityTracker = VelocityTracker()
+
+        awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false)
+            velocityTracker.resetTracking()
+            velocityTracker.addPosition(down.uptimeMillis, down.position)
+
+            var totalDiffX = 0f
+            var totalDiffY = 0f
+            var isHorizontalDrag: Boolean? = null
+            var gestureStartOffset = 0f
+
+            var activeTargetRoute: String? = null
+            var activeBaseOffset = 0f
+
+            while (true) {
+                val event = awaitPointerEvent()
+                val pointer = event.changes.firstOrNull { it.id == down.id } ?: break
+
+                velocityTracker.addPosition(pointer.uptimeMillis, pointer.position)
+
+                if (!pointer.pressed) {
+                    if (isHorizontalDrag == true) {
+                        pointer.consume()
+                        val velocityX = velocityTracker.calculateVelocity().x
+                        val effectiveDiffX = totalDiffX - gestureStartOffset
+
+                        val forward = if (currentIsRtl) effectiveDiffX > 0 else effectiveDiffX < 0
+                        val flingMatches = if (forward) {
+                            if (currentIsRtl) velocityX > flingVelocityThreshold else velocityX < -flingVelocityThreshold
+                        } else {
+                            if (currentIsRtl) velocityX < -flingVelocityThreshold else velocityX > flingVelocityThreshold
+                        }
+                        val distanceMatches = kotlin.math.abs(effectiveDiffX) >= commitThreshold
+                        val shouldCommit = activeTargetRoute != null && (distanceMatches || flingMatches)
+
+                        val targetEnd = if (shouldCommit) -activeBaseOffset else 0f
+                        currentOnRelease(shouldCommit, activeTargetRoute, targetEnd, velocityX)
+                    }
+                    break
+                }
+
+                val dx = pointer.position.x - pointer.previousPosition.x
+                val dy = pointer.position.y - pointer.previousPosition.y
+                totalDiffX += dx
+                totalDiffY += dy
+
+                val absX = kotlin.math.abs(totalDiffX)
+                val absY = kotlin.math.abs(totalDiffY)
+
+                if (isHorizontalDrag == null) {
+                    if (absX > touchSlop || absY > touchSlop) {
+                        if (absX > absY * 1.2f) {
+                            isHorizontalDrag = true
+                            pointer.consume()
+                            gestureStartOffset = if (totalDiffX > 0) touchSlop else -touchSlop
+                        } else {
+                            isHorizontalDrag = false
+                            break
+                        }
+                    }
+                } else if (isHorizontalDrag == true) {
+                    pointer.consume()
+
+                    if (gestureStartOffset != 0f && totalDiffX * gestureStartOffset <= 0f) {
+                        gestureStartOffset = 0f
+                    }
+                    val effectiveDiffX = totalDiffX - gestureStartOffset
+
+                    val currentIdx = currentTabsList.indexOf(currentActiveRoute)
+                    if (currentIdx != -1) {
+                        val forward = if (currentIsRtl) effectiveDiffX > 0 else effectiveDiffX < 0
+                        val targetIdx = if (forward) currentIdx + 1 else currentIdx - 1
+                        val hasTarget = targetIdx in currentTabsList.indices
+
+                        if (hasTarget) {
+                            val targetRoute = currentTabsList[targetIdx]
+                            val baseOffset = if (forward) {
+                                if (currentIsRtl) -currentScreenWidth else currentScreenWidth
+                            } else {
+                                if (currentIsRtl) currentScreenWidth else -currentScreenWidth
+                            }
+                            activeTargetRoute = targetRoute
+                            activeBaseOffset = baseOffset
+                            val clampedX = effectiveDiffX.coerceIn(-currentScreenWidth, currentScreenWidth)
+                            currentOnDragUpdate(clampedX, targetRoute, baseOffset)
+                        } else {
+                            activeTargetRoute = null
+                            activeBaseOffset = 0f
+                            val rubberX = (effectiveDiffX * 0.2f).coerceIn(-currentScreenWidth * 0.15f, currentScreenWidth * 0.15f)
+                            currentOnDragUpdate(rubberX, null, 0f)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Affiche l'écran correspondant à un onglet racine lors de l'aperçu du glissement interactif.
+ */
+@Composable
+private fun RenderRootTabScreen(
+    route: String,
+    navController: NavHostController,
+    repository: AnfrRepository,
+    radioRepository: RadioRepository,
+    sharedMapViewModel: MapViewModel,
+    featureFlags: fr.geotower.data.config.RemoteFeatureFlagConfig,
+    txtUnavailable: String
+) {
+    when (route) {
+        "emitters" -> {
+            if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.NEARBY)) {
+                NearEmittersSupportWrapperScreen(navController, repository, radioRepository)
+            } else {
+                DisabledFeatureRoute(navController, txtUnavailable)
+            }
+        }
+        "map" -> {
+            if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.MAP)) {
+                MapScreen(
+                    navController = navController,
+                    viewModel = sharedMapViewModel
+                )
+            } else {
+                DisabledFeatureRoute(navController, txtUnavailable)
+            }
+        }
+        "trips" -> {
+            if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.TRIPS)) {
+                val tripsContext = LocalContext.current
+                val tripsLocale = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]
+                fr.geotower.ui.screens.trips.TripsScreen(
+                    navController = navController,
+                    onCreateTrip = {
+                        val plan = fr.geotower.data.trip.TripPlanStore.newPlan(
+                            name = fr.geotower.ui.screens.trips.defaultTripName(
+                                context = tripsContext,
+                                millis = System.currentTimeMillis(),
+                                locale = tripsLocale
+                            )
+                        )
+                        fr.geotower.data.trip.TripPlanStore.save(tripsContext, plan)
+                        navController.navigate("map?tripId=${Uri.encode(plan.id)}&tripMode=edit")
+                    },
+                    onOpenTrip = { id ->
+                        navController.navigate("map?tripId=${Uri.encode(id)}")
+                    },
+                    onFollowTrip = { id ->
+                        navController.navigate("map?tripId=${Uri.encode(id)}&tripMode=follow")
+                    }
+                )
+            } else {
+                DisabledFeatureRoute(navController, txtUnavailable)
+            }
+        }
+        "compass" -> {
+            if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.COMPASS)) {
+                CompassScreen(navController = navController, viewModel = sharedMapViewModel)
+            } else {
+                DisabledFeatureRoute(navController, txtUnavailable)
+            }
+        }
+        "stats" -> {
+            if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.STATS)) {
+                StatisticsScreen(navController = navController, repository = repository)
+            } else {
+                DisabledFeatureRoute(navController, txtUnavailable)
+            }
+        }
+        "settings" -> {
+            if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.SETTINGS)) {
+                SettingsScreen(navController = navController, repository = repository)
+            } else {
+                DisabledFeatureRoute(navController, txtUnavailable)
+            }
+        }
+        "about" -> {
+            if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.ABOUT)) {
+                AboutScreen(navController = navController)
+            } else {
+                DisabledFeatureRoute(navController, txtUnavailable)
+            }
+        }
+        "help" -> {
+            if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.HELP)) {
+                HelpScreen(navController = navController)
+            } else {
+                DisabledFeatureRoute(navController, txtUnavailable)
+            }
+        }
+        "more" -> {
+            fr.geotower.ui.screens.more.MoreScreen(navController = navController)
+        }
+        "home" -> {
+            HomeScreen(navController = navController)
+        }
+    }
+}
+
+/**
+ * Calcule la direction de glissement (-1 vers la gauche, 1 vers la droite) entre deux onglets
+ * pour animer la transition de page comme un ruban continu qui se décale.
+ */
+private fun getTabSlideDirection(
+    initial: NavBackStackEntry,
+    target: NavBackStackEntry,
+    tabs: List<String>,
+    isRtl: Boolean
+): Int? {
+    val fromRoute = initial.destination.route?.substringBefore('?') ?: return null
+    val toRoute = target.destination.route?.substringBefore('?') ?: return null
+    val fromIdx = tabs.indexOf(fromRoute)
+    val toIdx = tabs.indexOf(toRoute)
+    if (fromIdx == -1 || toIdx == -1 || fromIdx == toIdx) return null
+    val forward = toIdx > fromIdx
+    return if (isRtl) {
+        if (forward) -1 else 1
+    } else {
+        if (forward) 1 else -1
+    }
 }
 
 class MainActivity : ComponentActivity() {
@@ -800,13 +1088,48 @@ class MainActivity : ComponentActivity() {
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentRoute = navBackStackEntry?.destination?.route?.substringBefore('?')
                 val isBottomNavActive = AppConfig.isBottomNavActive()
-                val bottomNavTabs = AppConfig.bottomNavTabs.value.mapNotNull { fr.geotower.ui.components.BottomNavTab.fromId(it)?.route }.toSet() + "more"
+                val configuredTabs = remember(AppConfig.bottomNavTabs.value) {
+                    AppConfig.bottomNavTabs.value.mapNotNull { fr.geotower.ui.components.BottomNavTab.fromId(it) }
+                }
+                val rootTabsList = remember(configuredTabs) {
+                    if (configuredTabs.isEmpty()) {
+                        listOf("emitters", "map", "trips", "stats", "more")
+                    } else {
+                        configuredTabs.map { it.route } + "more"
+                    }
+                }
+                val bottomNavTabs = remember(rootTabsList) { rootTabsList.toSet() }
                 val isRootTab = isBottomNavActive && currentRoute in bottomNavTabs
+                val isMapRoute = currentRoute == "map" || currentRoute?.startsWith("map") == true
+                val isSwipeBetweenTabsEnabled = isRootTab && !isMapRoute
                 val bottomNavStartRoute = if (destinationApresSplash in bottomNavTabs) destinationApresSplash else "map"
                 val resolvedPopUpRoute = if (bottomNavStartRoute == "map") {
                     "map?photoDraftId={photoDraftId}&tripId={tripId}&tripMode={tripMode}&focusLat={focusLat}&focusLon={focusLon}"
                 } else {
                     bottomNavStartRoute
+                }
+
+                val onNavigateTab: (String) -> Unit = remember(navController, resolvedPopUpRoute) {
+                    { targetRoute ->
+                        val currentDest = navController.currentDestination?.route?.substringBefore('?')
+                        if (currentDest != targetRoute) {
+                            try {
+                                navController.navigate(targetRoute) {
+                                    popUpTo(resolvedPopUpRoute) {
+                                        saveState = true
+                                    }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
+                            } catch (_: Exception) {
+                                runCatching {
+                                    navController.navigate(targetRoute) {
+                                        launchSingleTop = true
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
 
                 Scaffold(
@@ -817,25 +1140,7 @@ class MainActivity : ComponentActivity() {
                         if (isRootTab) {
                             fr.geotower.ui.components.GeoTowerBottomNavBar(
                                 currentRoute = currentRoute,
-                                onNavigate = { targetRoute ->
-                                    if (currentRoute != targetRoute) {
-                                        try {
-                                            navController.navigate(targetRoute) {
-                                                popUpTo(resolvedPopUpRoute) {
-                                                    saveState = true
-                                                }
-                                                launchSingleTop = true
-                                                restoreState = true
-                                            }
-                                        } catch (e: Exception) {
-                                            runCatching {
-                                                navController.navigate(targetRoute) {
-                                                    launchSingleTop = true
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
+                                onNavigate = onNavigateTab
                             )
                         }
                     }
@@ -853,13 +1158,151 @@ class MainActivity : ComponentActivity() {
                     val mapFactory = MapViewModelFactory(repository, radioRepository)
                     val sharedMapViewModel: MapViewModel = viewModel(factory = mapFactory)
 
-                    // ---> 2. ON ENVELOPPE TOUT DANS UNE BOX POUR SUPERPOSER <---
-                    Box(modifier = Modifier.fillMaxSize()) {
+                    val haptic = LocalHapticFeedback.current
+                    val isRtl = layoutDirection == LayoutDirection.Rtl
+                    val coroutineScope = rememberCoroutineScope()
 
-                        NavHost(
-                            navController = navController,
-                            startDestination = startRoute
+                    var dragOffsetPx by remember { mutableFloatStateOf(0f) }
+                    var adjacentRoute by remember { mutableStateOf<String?>(null) }
+                    var adjacentBaseOffset by remember { mutableFloatStateOf(0f) }
+                    var skipNavTransition by remember { mutableStateOf(false) }
+                    var animJob by remember { mutableStateOf<Job?>(null) }
+
+                    // ---> 2. ON ENVELOPPE TOUT DANS UNE BOX POUR SUPERPOSER <---
+                    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                        val screenWidthPx = with(LocalDensity.current) { maxWidth.toPx() }
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clipToBounds()
+                                .rootTabInteractiveSwipe(
+                                    enabled = isSwipeBetweenTabsEnabled,
+                                    screenWidthPx = screenWidthPx,
+                                    isRtl = isRtl,
+                                    rootTabsList = rootTabsList,
+                                    currentRoute = currentRoute,
+                                    onDragUpdate = { offset, targetRoute, baseOffset ->
+                                        animJob?.cancel()
+                                        animJob = null
+                                        dragOffsetPx = offset
+                                        if (adjacentRoute != targetRoute) {
+                                            adjacentRoute = targetRoute
+                                        }
+                                        if (adjacentBaseOffset != baseOffset) {
+                                            adjacentBaseOffset = baseOffset
+                                        }
+                                    },
+                                    onRelease = { commit, targetRoute, targetEndOffset, velocityX ->
+                                        animJob?.cancel()
+                                        animJob = coroutineScope.launch {
+                                            if (commit && targetRoute != null) {
+                                                if (PowerProfile.isEcoPlus) {
+                                                    dragOffsetPx = targetEndOffset
+                                                } else {
+                                                    animate(
+                                                        initialValue = dragOffsetPx,
+                                                        targetValue = targetEndOffset,
+                                                        initialVelocity = velocityX,
+                                                        animationSpec = spring(
+                                                            dampingRatio = 0.92f,
+                                                            stiffness = 500f
+                                                        )
+                                                    ) { value, _ ->
+                                                        dragOffsetPx = value
+                                                    }
+                                                }
+                                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                skipNavTransition = true
+                                                onNavigateTab(targetRoute)
+                                                dragOffsetPx = 0f
+                                                adjacentRoute = null
+                                                delay(120)
+                                                skipNavTransition = false
+                                            } else {
+                                                if (PowerProfile.isEcoPlus) {
+                                                    dragOffsetPx = 0f
+                                                } else {
+                                                    animate(
+                                                        initialValue = dragOffsetPx,
+                                                        targetValue = 0f,
+                                                        initialVelocity = velocityX,
+                                                        animationSpec = spring(
+                                                            dampingRatio = Spring.DampingRatioNoBouncy,
+                                                            stiffness = 500f
+                                                        )
+                                                    ) { value, _ ->
+                                                        dragOffsetPx = value
+                                                    }
+                                                }
+                                                adjacentRoute = null
+                                            }
+                                        }
+                                    }
+                                )
                         ) {
+                            // Page active dans le NavHost (décalée avec le doigt en temps réel via GPU)
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .graphicsLayer { translationX = dragOffsetPx }
+                                    .background(MaterialTheme.colorScheme.background)
+                            ) {
+                                val slideSpec = if (PowerProfile.isEcoPlus) snap<IntOffset>() else tween<IntOffset>(durationMillis = 300, easing = FastOutSlowInEasing)
+                                val fadeSpec = if (PowerProfile.isEcoPlus) snap<Float>() else tween<Float>(durationMillis = 200)
+
+                                NavHost(
+                                    navController = navController,
+                                    startDestination = startRoute,
+                                    enterTransition = {
+                                        if (skipNavTransition) {
+                                            EnterTransition.None
+                                        } else {
+                                            val dir = getTabSlideDirection(initialState, targetState, rootTabsList, isRtl)
+                                            if (dir != null) {
+                                                slideInHorizontally(slideSpec) { width -> width * dir }
+                                            } else {
+                                                fadeIn(fadeSpec)
+                                            }
+                                        }
+                                    },
+                                    exitTransition = {
+                                        if (skipNavTransition) {
+                                            ExitTransition.None
+                                        } else {
+                                            val dir = getTabSlideDirection(initialState, targetState, rootTabsList, isRtl)
+                                            if (dir != null) {
+                                                slideOutHorizontally(slideSpec) { width -> -width * dir }
+                                            } else {
+                                                fadeOut(fadeSpec)
+                                            }
+                                        }
+                                    },
+                                    popEnterTransition = {
+                                        if (skipNavTransition) {
+                                            EnterTransition.None
+                                        } else {
+                                            val dir = getTabSlideDirection(initialState, targetState, rootTabsList, isRtl)
+                                            if (dir != null) {
+                                                slideInHorizontally(slideSpec) { width -> width * dir }
+                                            } else {
+                                                fadeIn(fadeSpec)
+                                            }
+                                        }
+                                    },
+                                    popExitTransition = {
+                                        if (skipNavTransition) {
+                                            ExitTransition.None
+                                        } else {
+                                            val dir = getTabSlideDirection(initialState, targetState, rootTabsList, isRtl)
+                                            if (dir != null) {
+                                                slideOutHorizontally(slideSpec) { width -> -width * dir }
+                                            } else {
+                                                fadeOut(fadeSpec)
+                                            }
+                                        }
+                                    }
+                                ) {
 
                             // Splash
                             composable("splash") {
@@ -1826,7 +2269,34 @@ class MainActivity : ComponentActivity() {
                             }
 
                         }
-                        fr.geotower.ui.components.GlobalUploadOverlay(
+                    }
+
+                    // Page adjacente aperçue pendant le glissement interactif
+                    val peekRoute = adjacentRoute
+                    if (peekRoute != null) {
+                        val peekPadding = if (peekRoute == "map") PaddingValues(bottom = rootBottomPadding) else screenPadding
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer { translationX = adjacentBaseOffset + dragOffsetPx }
+                                .background(MaterialTheme.colorScheme.background)
+                                .padding(peekPadding)
+                                .pointerInput(Unit) {}
+                        ) {
+                            RenderRootTabScreen(
+                                route = peekRoute,
+                                navController = navController,
+                                repository = repository,
+                                radioRepository = radioRepository,
+                                sharedMapViewModel = sharedMapViewModel,
+                                featureFlags = featureFlags,
+                                txtUnavailable = txtUnavailable
+                            )
+                        }
+                    }
+                }
+
+                fr.geotower.ui.components.GlobalUploadOverlay(
                             onOpenUploadHistory = {
                                 if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.PHOTO_UPLOAD_HISTORY)) {
                                     navController.navigate("photo_upload_history") {

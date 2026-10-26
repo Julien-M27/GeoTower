@@ -3431,6 +3431,7 @@
     <string name="appstrings_release_v2081_summary_bottom_navigation_bar">New bottom navigation bar mode with 5 tabs and time slider integration in map filters</string>
     <string name="appstrings_release_v2084_summary_bottom_nav_customization">Bottom navigation bar tabs customization, transparency adjustment and More menu reordering</string>
     <string name="appstrings_release_v2085_summary_bottom_nav_gestures">Continuous swipe navigation with haptic feedback on the bottom bar and direct access to tab settings</string>
+    <string name="appstrings_release_v2086_summary_interactive_tab_swipe">Interactive swipe transitions between main pages and real-time touch tracking on the navigation bar</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Network requests log</string>

@@ -3433,6 +3433,7 @@
     <string name="appstrings_release_v2081_summary_bottom_navigation_bar">Nouveau mode de navigation avec barre d\'onglets en bas de l\'écran et intégration du curseur temporel sur la carte</string>
     <string name="appstrings_release_v2084_summary_bottom_nav_customization">Personnalisation des onglets de la barre de navigation, réglage de transparence et réorganisation du menu Plus</string>
     <string name="appstrings_release_v2085_summary_bottom_nav_gestures">Navigation par glissement continu avec retour haptique sur la barre inférieure et accès direct aux réglages des onglets</string>
+    <string name="appstrings_release_v2086_summary_interactive_tab_swipe">Balayage tactile interactif entre les pages principales et suivi en direct du doigt sur la barre de navigation</string>
 
     <!-- Journal des requêtes réseau -->
     <string name="network_log_title">Journal des requêtes réseau</string>

@@ -46,6 +46,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -188,6 +192,8 @@ private fun OneUiFloatingBottomNavBar(
     // En mode One UI, la capsule adapte sa largeur au nombre d'onglets au lieu de s'étirer
     val itemWidth = sizing.component(72.dp)
     val targetBarWidth = itemWidth * tabs.size + uniformMargin * 2
+    var hoveredTab by remember { mutableStateOf<BottomNavTab?>(null) }
+    val displayTab = hoveredTab ?: activeTab
     val animatedBarWidth by animateDpAsState(
         targetValue = targetBarWidth,
         animationSpec = if (PowerProfile.isEcoPlus) snap() else spring(
@@ -228,12 +234,13 @@ private fun OneUiFloatingBottomNavBar(
                         activeTab = activeTab,
                         onNavigate = onNavigate,
                         haptic = haptic,
-                        isRtl = isRtl
+                        isRtl = isRtl,
+                        onTabHovered = { hoveredTab = it }
                     )
             ) {
                 val tabCount = tabs.size
                 val tabWidth = maxWidth / tabCount
-                val activeIndex = tabs.indexOf(activeTab)
+                val activeIndex = tabs.indexOf(displayTab)
 
                 val activeItemBgColor = if (isDark) {
                     Color(0xFF424046).copy(alpha = (opacity * 0.6f + 0.4f).coerceAtMost(1f))
@@ -269,7 +276,7 @@ private fun OneUiFloatingBottomNavBar(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     tabs.forEach { tab ->
-                        val isSelected = activeTab == tab
+                        val isSelected = displayTab == tab
                         OneUiBottomNavItem(
                             tab = tab,
                             isSelected = isSelected,
@@ -385,6 +392,9 @@ private fun StandardBottomNavBar(
         bottom = bottomInset
     )
 
+    var hoveredTab by remember { mutableStateOf<BottomNavTab?>(null) }
+    val displayTab = hoveredTab ?: activeTab
+
     Surface(
         modifier = modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.surfaceContainer,
@@ -402,12 +412,13 @@ private fun StandardBottomNavBar(
                     activeTab = activeTab,
                     onNavigate = onNavigate,
                     haptic = haptic,
-                    isRtl = isRtl
+                    isRtl = isRtl,
+                    onTabHovered = { hoveredTab = it }
                 )
         ) {
             val tabCount = tabs.size
             val tabWidth = maxWidth / tabCount
-            val activeIndex = tabs.indexOf(activeTab)
+            val activeIndex = tabs.indexOf(displayTab)
             val indicatorWidth = sizing.component(48.dp)
             val indicatorHeight = sizing.component(28.dp)
             val indicatorTop = sizing.spacing(8.dp)
@@ -440,7 +451,7 @@ private fun StandardBottomNavBar(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 tabs.forEach { tab ->
-                    val isSelected = activeTab == tab
+                    val isSelected = displayTab == tab
                     StandardBottomNavItem(
                         tab = tab,
                         isSelected = isSelected,
@@ -518,84 +529,106 @@ private fun StandardBottomNavItem(
 
 /**
  * Gestionnaire de geste fluide pour la barre de navigation :
- * - Permet de faire glisser son doigt horizontalement sur la barre pour changer de page en continu
+ * - Permet de faire glisser son doigt horizontalement sur la barre pour changer de page en continu et à la volée
  * - Déclenche un retour haptique à chaque transition d'onglet franchie
  * - Gère le balayage rapide (swipe / flick)
  * - Maintient le clic / tap direct
+ * - Ne s'interrompt jamais pendant le glissement grâce à rememberUpdatedState
  */
+@Composable
 private fun Modifier.bottomNavDraggable(
     tabs: List<BottomNavTab>,
     activeTab: BottomNavTab?,
     onNavigate: (String) -> Unit,
     haptic: HapticFeedback,
-    isRtl: Boolean
-): Modifier = this.pointerInput(tabs, activeTab) {
-    val tabCount = tabs.size
-    if (tabCount <= 1) return@pointerInput
+    isRtl: Boolean,
+    onTabHovered: (BottomNavTab?) -> Unit = {}
+): Modifier {
+    val currentTabs by rememberUpdatedState(tabs)
+    val currentActiveTab by rememberUpdatedState(activeTab)
+    val currentOnNavigate by rememberUpdatedState(onNavigate)
+    val currentHaptic by rememberUpdatedState(haptic)
+    val currentIsRtl by rememberUpdatedState(isRtl)
+    val currentOnTabHovered by rememberUpdatedState(onTabHovered)
 
-    awaitEachGesture {
-        val down = awaitFirstDown(requireUnconsumed = false)
-        val tabWidthPx = size.width.toFloat() / tabCount
-        val startX = down.position.x
-        val rawStartIndex = kotlin.math.floor(startX / tabWidthPx).toInt().coerceIn(0, tabCount - 1)
-        val startIndex = if (isRtl) (tabCount - 1 - rawStartIndex) else rawStartIndex
-        val startTab = tabs.getOrNull(startIndex)
-        var lastDispatchedRoute = activeTab?.route
-        var hasDragged = false
+    return this.pointerInput(Unit) {
+        val tabCountProvider = { currentTabs.size }
+        awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false)
+            val tabCount = tabCountProvider()
+            if (tabCount <= 1) return@awaitEachGesture
 
-        while (true) {
-            val event = awaitPointerEvent()
-            val pointer = event.changes.firstOrNull { it.id == down.id } ?: break
+            val tabWidthPx = size.width.toFloat() / tabCount
+            val startX = down.position.x
+            val rawStartIndex = kotlin.math.floor(startX / tabWidthPx).toInt().coerceIn(0, tabCount - 1)
+            val startIndex = if (currentIsRtl) (tabCount - 1 - rawStartIndex) else rawStartIndex
+            val startTab = currentTabs.getOrNull(startIndex)
+            var lastDispatchedRoute = currentActiveTab?.route
+            var hasDragged = false
 
-            if (!pointer.pressed) {
-                val currentX = pointer.position.x
-                val diffX = currentX - startX
-                val swipeThreshold = viewConfiguration.touchSlop * 1.5f
+            try {
+                while (true) {
+                    val event = awaitPointerEvent()
+                    val pointer = event.changes.firstOrNull { it.id == down.id } ?: break
 
-                if (!hasDragged) {
-                    // Tap simple sur un onglet
-                    if (startTab != null) {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        onNavigate(startTab.route)
+                    if (!pointer.pressed) {
+                        val currentX = pointer.position.x
+                        val diffX = currentX - startX
+                        val swipeThreshold = viewConfiguration.touchSlop * 1.5f
+
+                        if (!hasDragged) {
+                            // Tap simple sur un onglet
+                            if (startTab != null) {
+                                currentHaptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                currentOnNavigate(startTab.route)
+                            }
+                        } else if (lastDispatchedRoute == currentActiveTab?.route) {
+                            // Balayage rapide (swipe / flick) n'ayant pas atteint le seuil d'un onglet complet
+                            val forward = if (currentIsRtl) diffX < -swipeThreshold else diffX > swipeThreshold
+                            val backward = if (currentIsRtl) diffX > swipeThreshold else diffX < -swipeThreshold
+                            val currentIdx = currentTabs.indexOf(currentActiveTab).coerceAtLeast(0)
+                            if (forward && currentIdx < tabCount - 1) {
+                                currentHaptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                currentOnNavigate(currentTabs[currentIdx + 1].route)
+                            } else if (backward && currentIdx > 0) {
+                                currentHaptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                currentOnNavigate(currentTabs[currentIdx - 1].route)
+                            }
+                        }
+                        break
                     }
-                } else if (lastDispatchedRoute == activeTab?.route) {
-                    // Balayage rapide (swipe / flick) n'ayant pas atteint le seuil d'un onglet complet
-                    val forward = if (isRtl) diffX < -swipeThreshold else diffX > swipeThreshold
-                    val backward = if (isRtl) diffX > swipeThreshold else diffX < -swipeThreshold
-                    val currentIdx = tabs.indexOf(activeTab).coerceAtLeast(0)
-                    if (forward && currentIdx < tabCount - 1) {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        onNavigate(tabs[currentIdx + 1].route)
-                    } else if (backward && currentIdx > 0) {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        onNavigate(tabs[currentIdx - 1].route)
+
+                    val currentX = pointer.position.x
+                    val diffX = currentX - startX
+                    val diffY = pointer.position.y - down.position.y
+
+                    if (!hasDragged) {
+                        val absX = kotlin.math.abs(diffX)
+                        val absY = kotlin.math.abs(diffY)
+                        if (absX > viewConfiguration.touchSlop && absX > absY) {
+                            hasDragged = true
+                        }
+                    }
+
+                    if (hasDragged) {
+                        pointer.consume()
+                        val currentTabCount = tabCountProvider()
+                        val currentWidthPx = size.width.toFloat() / currentTabCount
+                        val rawTargetIndex = kotlin.math.floor(currentX / currentWidthPx).toInt().coerceIn(0, currentTabCount - 1)
+                        val targetIndex = if (currentIsRtl) (currentTabCount - 1 - rawTargetIndex) else rawTargetIndex
+                        val targetTab = currentTabs.getOrNull(targetIndex)
+                        if (targetTab != null) {
+                            currentOnTabHovered(targetTab)
+                            if (targetTab.route != lastDispatchedRoute) {
+                                lastDispatchedRoute = targetTab.route
+                                currentHaptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                currentOnNavigate(targetTab.route)
+                            }
+                        }
                     }
                 }
-                break
-            }
-
-            val currentX = pointer.position.x
-            val diffX = currentX - startX
-            val diffY = pointer.position.y - down.position.y
-
-            if (!hasDragged) {
-                val absX = kotlin.math.abs(diffX)
-                val absY = kotlin.math.abs(diffY)
-                if (absX > viewConfiguration.touchSlop && absX > absY) {
-                    hasDragged = true
-                }
-            }
-
-            if (hasDragged) {
-                pointer.consume()
-                val rawTargetIndex = kotlin.math.floor(currentX / tabWidthPx).toInt().coerceIn(0, tabCount - 1)
-                val targetIndex = if (isRtl) (tabCount - 1 - rawTargetIndex) else rawTargetIndex
-                val targetTab = tabs.getOrNull(targetIndex)
-                if (targetTab != null && targetTab.route != lastDispatchedRoute) {
-                    lastDispatchedRoute = targetTab.route
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    onNavigate(targetTab.route)
-                }
+            } finally {
+                currentOnTabHovered(null)
             }
         }
     }
