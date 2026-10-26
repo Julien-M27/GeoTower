@@ -45,6 +45,9 @@ import fr.geotower.utils.AppConfig
 import fr.geotower.utils.PreferenceStores
 import kotlin.math.roundToInt
 
+private const val OPACITY_STEP = 5
+private const val OPACITY_STEPS_COUNT = (100 / OPACITY_STEP) - 1 // 19 pas discrets entre 0 et 100
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BottomNavOpacitySlider(
@@ -58,14 +61,16 @@ fun BottomNavOpacitySlider(
         context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
     }
     val currentOpacity = AppConfig.bottomNavOpacity.intValue.coerceIn(0, 100)
-    var sliderValue by remember(currentOpacity) {
-        mutableFloatStateOf(currentOpacity.toFloat())
+    val snappedInitial = (Math.round(currentOpacity.toFloat() / OPACITY_STEP.toFloat()) * OPACITY_STEP).coerceIn(0, 100)
+    var sliderValue by remember(snappedInitial) {
+        mutableFloatStateOf(snappedInitial.toFloat())
     }
     val displayedOpacity = sliderValue.roundToInt().coerceIn(0, 100)
 
     fun updateOpacity(value: Float) {
-        sliderValue = value
-        AppConfig.bottomNavOpacity.intValue = value.roundToInt().coerceIn(0, 100)
+        val snapped = (Math.round(value / OPACITY_STEP.toFloat()) * OPACITY_STEP).coerceIn(0, 100)
+        sliderValue = snapped.toFloat()
+        AppConfig.bottomNavOpacity.intValue = snapped
     }
 
     fun persistOpacity() {
@@ -130,7 +135,7 @@ fun BottomNavOpacitySlider(
                 onValueChange = ::updateOpacity,
                 onValueChangeFinished = ::persistOpacity,
                 valueRange = 0f..100f,
-                steps = 0,
+                steps = OPACITY_STEPS_COUNT,
                 modifier = Modifier.fillMaxWidth(),
                 thumb = {
                     Box(
@@ -172,7 +177,7 @@ fun BottomNavOpacitySlider(
                 onValueChange = ::updateOpacity,
                 onValueChangeFinished = ::persistOpacity,
                 valueRange = 0f..100f,
-                steps = 0,
+                steps = OPACITY_STEPS_COUNT,
                 modifier = Modifier.fillMaxWidth()
             )
         }

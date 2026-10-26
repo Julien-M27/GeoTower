@@ -3434,6 +3434,7 @@
     <string name="appstrings_release_v2084_summary_bottom_nav_customization">Personnalisation des onglets de la barre de navigation, réglage de transparence et réorganisation du menu Plus</string>
     <string name="appstrings_release_v2085_summary_bottom_nav_gestures">Navigation par glissement continu avec retour haptique sur la barre inférieure et accès direct aux réglages des onglets</string>
     <string name="appstrings_release_v2086_summary_interactive_tab_swipe">Balayage tactile interactif entre les pages principales et suivi en direct du doigt sur la barre de navigation</string>
+    <string name="appstrings_release_v2087_summary_floating_ui_and_stats">Harmonisation de la transparence des boutons flottants, fluidité des statistiques et enrichissement du menu Plus</string>
 
     <!-- Journal des requêtes réseau -->
     <string name="network_log_title">Journal des requêtes réseau</string>

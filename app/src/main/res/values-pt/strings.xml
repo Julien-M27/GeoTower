@@ -3432,6 +3432,7 @@
     <string name="appstrings_release_v2084_summary_bottom_nav_customization">Personalização dos separadores da barra de navegação, ajuste de transparência e reorganização do menu Mais</string>
     <string name="appstrings_release_v2085_summary_bottom_nav_gestures">Navegação por deslize contínuo com feedback háptico na barra inferior e acesso direto às definições de separadores</string>
     <string name="appstrings_release_v2086_summary_interactive_tab_swipe">Deslize tátil interativo entre as páginas principais e rastreio em tempo real na barra de navegação</string>
+    <string name="appstrings_release_v2087_summary_floating_ui_and_stats">Transparência unificada dos controlos flutuantes, estatísticas mais fluidas e menu Mais enriquecido</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registo de pedidos de rede</string>

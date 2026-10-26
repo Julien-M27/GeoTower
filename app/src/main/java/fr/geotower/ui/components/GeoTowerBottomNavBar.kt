@@ -41,6 +41,7 @@ import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -54,6 +55,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -168,19 +170,16 @@ private fun OneUiFloatingBottomNavBar(
     val leftInset = systemNavBars.calculateLeftPadding(layoutDirection)
     val rightInset = systemNavBars.calculateRightPadding(layoutDirection)
 
-    val opacity = (AppConfig.bottomNavOpacity.intValue / 100f).coerceIn(0f, 1f)
+    val opacity = AppConfig.floatingUiOpacityProgress
+    val effectiveBarAlpha = AppConfig.floatingUiAlpha
 
     val floatingBarBgColor = when {
         isDark && isOled -> Color(0xFF201F23)
         isDark -> Color(0xFF28272C)
         else -> Color(0xFFF3F4F7)
-    }.copy(alpha = opacity)
+    }.copy(alpha = effectiveBarAlpha)
 
-    val floatingBarBorderColor = if (isDark) {
-        Color.White.copy(alpha = 0.10f * (opacity * 0.7f + 0.3f))
-    } else {
-        Color.Black.copy(alpha = 0.07f * (opacity * 0.7f + 0.3f))
-    }
+    val floatingBarBorderColor = AppConfig.floatingUiBorderColor()
 
     // Géométrie concentrique exacte :
     // Hauteur totale H = 58.dp => Rayon extérieur R_outer = 29.dp.
@@ -222,7 +221,7 @@ private fun OneUiFloatingBottomNavBar(
             shape = CircleShape,
             color = floatingBarBgColor,
             border = BorderStroke(1.dp, floatingBarBorderColor),
-            shadowElevation = if (opacity <= 0.05f) 0.dp else (8.dp * opacity),
+            shadowElevation = sizing.component(4.dp * opacity),
             tonalElevation = if (opacity < 1f) 0.dp else 4.dp
         ) {
             BoxWithConstraints(
@@ -243,9 +242,9 @@ private fun OneUiFloatingBottomNavBar(
                 val activeIndex = tabs.indexOf(displayTab)
 
                 val activeItemBgColor = if (isDark) {
-                    Color(0xFF424046).copy(alpha = (opacity * 0.6f + 0.4f).coerceAtMost(1f))
+                    Color(0xFF48464E).copy(alpha = (0.55f + 0.45f * opacity).coerceAtMost(1f))
                 } else {
-                    Color(0xFFDFE1E8).copy(alpha = (opacity * 0.6f + 0.4f).coerceAtMost(1f))
+                    Color(0xFFD6D8E2).copy(alpha = (0.60f + 0.40f * opacity).coerceAtMost(1f))
                 }
 
                 // Animation de glissement entre chaque bouton (désactivée en mode éco +)
@@ -280,6 +279,7 @@ private fun OneUiFloatingBottomNavBar(
                         OneUiBottomNavItem(
                             tab = tab,
                             isSelected = isSelected,
+                            opacity = opacity,
                             onNavigate = onNavigate,
                             modifier = Modifier
                                 .weight(1f)
@@ -299,6 +299,7 @@ private fun OneUiFloatingBottomNavBar(
 private fun OneUiBottomNavItem(
     tab: BottomNavTab,
     isSelected: Boolean,
+    opacity: Float,
     onNavigate: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -306,8 +307,12 @@ private fun OneUiBottomNavItem(
     val sizing = uiStyle.sizing
     val isDark = uiStyle.isDark
 
-    val selectedContentColor = if (isDark) Color.White else Color(0xFF1B1B1E)
-    val unselectedContentColor = if (isDark) Color(0xFFC4C3C8) else Color(0xFF6B6C72)
+    val selectedContentColor = if (isDark) Color.White else Color(0xFF141416)
+    val unselectedContentColor = if (isDark) {
+        Color(0xFFE2E2E8)
+    } else {
+        Color(0xFF28292E)
+    }
 
     val animatedContentColor by animateColorAsState(
         targetValue = if (isSelected) selectedContentColor else unselectedContentColor,
@@ -397,7 +402,7 @@ private fun StandardBottomNavBar(
 
     Surface(
         modifier = modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = AppConfig.floatingUiAlpha),
         contentColor = MaterialTheme.colorScheme.onSurface,
         tonalElevation = 3.dp
     ) {

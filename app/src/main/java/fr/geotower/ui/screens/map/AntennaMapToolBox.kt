@@ -67,14 +67,16 @@ fun AntennaMapToolBox(
     // bouton de la toolbox (comme les boutons internes) pour le signaler.
     val hasActiveFunction = isSearchActive || isMeasuringMode || isTimeSliderActive
     val highlightCollapsed = hasActiveFunction && !isToolboxExpanded
+    val toolboxAlpha = fr.geotower.utils.AppConfig.floatingUiAlpha
+    val toolboxProgress = fr.geotower.utils.AppConfig.floatingUiOpacityProgress
 
     if (expandLeft) {
         Surface(
             modifier = Modifier.height(buttonDiameter),
             shape = RoundedCornerShape(buttonDiameter / 2f),
-            color = MaterialTheme.colorScheme.surface,
-            shadowElevation = 6.dp,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            color = MaterialTheme.colorScheme.surface.copy(alpha = toolboxAlpha),
+            shadowElevation = 0.dp,
+            border = BorderStroke(1.dp, fr.geotower.utils.AppConfig.floatingUiBorderColor())
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 AnimatedVisibility(
@@ -195,9 +197,9 @@ fun AntennaMapToolBox(
     Surface(
         modifier = Modifier.width(buttonDiameter),
         shape = RoundedCornerShape(buttonDiameter / 2f),
-        color = MaterialTheme.colorScheme.surface,
-        shadowElevation = 6.dp,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        color = MaterialTheme.colorScheme.surface.copy(alpha = toolboxAlpha),
+        shadowElevation = 0.dp,
+        border = BorderStroke(1.dp, fr.geotower.utils.AppConfig.floatingUiBorderColor())
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             AnimatedVisibility(visible = isToolboxExpanded, enter = expandVertically(), exit = shrinkVertically()) {

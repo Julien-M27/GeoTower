@@ -3432,6 +3432,7 @@
     <string name="appstrings_release_v2084_summary_bottom_nav_customization">Anpassung der Tabs der unteren Navigationsleiste, Transparenzeinstellung und Neuordnung des Mehr-Menüs</string>
     <string name="appstrings_release_v2085_summary_bottom_nav_gestures">Wisch-Navigation mit haptischem Feedback auf der unteren Leiste und direkter Zugriff auf Tab-Einstellungen</string>
     <string name="appstrings_release_v2086_summary_interactive_tab_swipe">Interaktive Wischgesten zwischen den Hauptseiten und direkte Fingerverfolgung auf der Navigationsleiste</string>
+    <string name="appstrings_release_v2087_summary_floating_ui_and_stats">Einheitliche Transparenz schwebender Steuerelemente, flüssigere Statistiken und erweitertes Mehr-Menü</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Netzwerkanfragen-Protokoll</string>

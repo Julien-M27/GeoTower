@@ -1333,6 +1333,9 @@ fun MoreSettingsSheet(
     var longPressReorder by remember { mutableStateOf(AppConfig.moreLongPressReorder.value) }
 
     var showLogoSettings by remember { mutableStateOf(false) }
+    var showHelpPositionSettings by remember { mutableStateOf(false) }
+    val helpButtonPosition by AppConfig.homeHelpPosition
+    var showQuitButton by remember { mutableStateOf(AppConfig.homeShowQuitButton.value) }
     var logoSelectorResetKey by remember { mutableStateOf(0) }
     val safeClick = rememberSafeClick()
     val sizing = LocalGeoTowerUiStyle.current.sizing
@@ -1350,7 +1353,7 @@ fun MoreSettingsSheet(
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
         BackHandler {
-            if (showLogoSettings) showLogoSettings = false else onBack()
+            if (showLogoSettings) showLogoSettings = false else if (showHelpPositionSettings) showHelpPositionSettings = false else onBack()
         }
         Column(
             modifier = Modifier
@@ -1383,6 +1386,25 @@ fun MoreSettingsSheet(
                     Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.width(sizing.spacing(8.dp)))
                     Text(stringResource(R.string.appstrings_reset_to_default), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                }
+
+                Spacer(modifier = Modifier.height(sizing.spacing(32.dp)).navigationBarsPadding())
+            } else if (showHelpPositionSettings) {
+                Row(modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(24.dp)), verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = { showHelpPositionSettings = false }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
+                    Text(stringResource(R.string.appstrings_home_help_position_settings), style = sizing.textStyle(MaterialTheme.typography.titleLarge), fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                    Spacer(Modifier.width(sizing.spacing(48.dp)))
+                }
+
+                Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))) {
+                    val savePosition = { position: String ->
+                        AppConfig.setHomeHelpPosition(prefs, position)
+                    }
+
+                    SettingsRadioItem(stringResource(R.string.appstrings_position_top_left), helpButtonPosition == "top_start", useOneUi, bubbleColor) { savePosition("top_start") }
+                    SettingsRadioItem(stringResource(R.string.appstrings_position_top_right), helpButtonPosition == "top_end", useOneUi, bubbleColor) { savePosition("top_end") }
+                    SettingsRadioItem(stringResource(R.string.appstrings_position_bottom_left), helpButtonPosition == "bottom_start", useOneUi, bubbleColor) { savePosition("bottom_start") }
+                    SettingsRadioItem(stringResource(R.string.appstrings_position_bottom_right), helpButtonPosition == "bottom_end", useOneUi, bubbleColor) { savePosition("bottom_end") }
                 }
 
                 Spacer(modifier = Modifier.height(sizing.spacing(32.dp)).navigationBarsPadding())
@@ -1428,14 +1450,6 @@ fun MoreSettingsSheet(
                                     {
                                         showAbout = it
                                         AppConfig.setMoreShowAbout(prefs, it)
-                                    },
-                                    shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight
-                                )
-                                "help" -> DraggableSwitchCard(
-                                    stringResource(R.string.appstrings_help_title), showHelp,
-                                    {
-                                        showHelp = it
-                                        AppConfig.setMoreShowHelp(prefs, it)
                                     },
                                     shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight
                                 )
@@ -1499,6 +1513,31 @@ fun MoreSettingsSheet(
                         bubbleColor = bubbleColor,
                         useOneUi = useOneUi
                     )
+                    ConfigurableSwitchCard(
+                        title = stringResource(R.string.appstrings_home_help_settings),
+                        checked = showHelp,
+                        onCheckedChange = {
+                            showHelp = it
+                            AppConfig.setMoreShowHelp(prefs, it)
+                        },
+                        onSettingsClick = { showHelpPositionSettings = true },
+                        shape = shape,
+                        border = border,
+                        bubbleColor = bubbleColor,
+                        useOneUi = useOneUi
+                    )
+                    SimpleSwitchCard(
+                        title = stringResource(R.string.appstrings_home_quit_app),
+                        showMapLocation = showQuitButton,
+                        onLocationChange = {
+                            showQuitButton = it
+                            AppConfig.setHomeShowQuitButton(prefs, it)
+                        },
+                        shape = shape,
+                        border = border,
+                        bubbleColor = bubbleColor,
+                        useOneUi = useOneUi
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
@@ -1515,6 +1554,7 @@ fun MoreSettingsSheet(
                     showTrips = true
                     showStats = true
                     longPressReorder = true
+                    showQuitButton = true
                     AppConfig.setMoreShowLogo(prefs, true)
                     AppConfig.setMoreShowAbout(prefs, true)
                     AppConfig.setMoreShowHelp(prefs, true)
@@ -1524,6 +1564,8 @@ fun MoreSettingsSheet(
                     AppConfig.setMoreShowTrips(prefs, true)
                     AppConfig.setMoreShowStats(prefs, true)
                     AppConfig.setMoreLongPressReorder(prefs, true)
+                    AppConfig.setHomeHelpPosition(prefs, AppConfig.DEFAULT_HOME_HELP_POSITION)
+                    AppConfig.setHomeShowQuitButton(prefs, true)
                     prefs.edit().putString("home_logo_choice", "app").apply()
                     logoSelectorResetKey++
                 }) {

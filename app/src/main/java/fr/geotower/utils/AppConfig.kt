@@ -2,8 +2,11 @@ package fr.geotower.utils
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.graphics.Color
 import fr.geotower.data.api.RouteApi
 import fr.geotower.data.build.LocalBuildCapability
 import fr.geotower.data.config.RemoteFeatureFlags
@@ -108,6 +111,37 @@ object AppConfig {
     const val DEFAULT_BOTTOM_NAV_OPACITY = 100
     val bottomNavOpacity = mutableIntStateOf(DEFAULT_BOTTOM_NAV_OPACITY)
 
+    /**
+     * Progression d'opacité normalisée entre 0f et 1f pour les éléments flottants de l'UI.
+     */
+    val floatingUiOpacityProgress: Float
+        get() = (bottomNavOpacity.intValue / 100f).coerceIn(0f, 1f)
+
+    /**
+     * Alpha effectif pour les éléments et boutons flottants (barre de navigation, boutons carte, boutons de défilement).
+     * Maintient un plancher d'opacité minimal de 55% afin que les surfaces filtrent efficacement le fond de la carte
+     * (routes, forêts, labels) et que le contenu reste parfaitement contrasté et lisible même à 0% de réglage.
+     */
+    val floatingUiAlpha: Float
+        get() = (0.55f + 0.45f * floatingUiOpacityProgress).coerceIn(0f, 1f)
+
+    /**
+     * Couleur de bordure contrastée pour les éléments flottants selon le thème clair / sombre.
+     * En thème sombre, un blanc fin et lumineux délimite la forme face aux fonds sombres ou forêts.
+     * En thème clair, un noir/gris foncé fin assure la délimitation sur les fonds clairs ou routes.
+     */
+    @Composable
+    fun floatingUiBorderColor(): Color {
+        val mode = themeMode.intValue
+        val isDark = mode == 2 || (mode == 0 && isSystemInDarkTheme())
+        val progress = floatingUiOpacityProgress
+        return if (isDark) {
+            Color.White.copy(alpha = 0.28f + 0.14f * progress)
+        } else {
+            Color.Black.copy(alpha = 0.22f + 0.14f * progress)
+        }
+    }
+
     val allAvailableBottomNavTabs = listOf(
         "nearby",
         "map",
@@ -121,8 +155,8 @@ object AppConfig {
 
     // Menu « Plus » pour le mode barre inférieure
     const val PREF_MORE_ORDER = "more_order"
-    const val DEFAULT_MORE_ORDER = "nearby,map,trips,compass,stats,settings,about,help,logo"
-    val moreOrder = mutableStateOf<List<String>>(listOf("compass", "settings", "about", "help", "logo"))
+    const val DEFAULT_MORE_ORDER = "nearby,map,trips,compass,stats,settings,logo,about"
+    val moreOrder = mutableStateOf<List<String>>(listOf("compass", "settings", "logo", "about"))
 
     const val PREF_MORE_SHOW_LOGO = "more_show_logo"
     const val PREF_MORE_SHOW_ABOUT = "more_show_about"
@@ -151,9 +185,8 @@ object AppConfig {
         "compass",
         "stats",
         "settings",
-        "about",
-        "help",
-        "logo"
+        "logo",
+        "about"
     )
 
     // --- Apparence ---
@@ -844,13 +877,21 @@ object AppConfig {
         val allowedElements = allAvailableMoreElements.filter { it == "logo" || it !in currentTabs }
         val filtered = order.filter { it in allowedElements }.distinct().toMutableList()
 
-        // Si des éléments de la barre (nearby, map, trips, stats) avaient été ajoutés à la fin après settings/about/help,
+        // Si l'ancien ordre par défaut avait placé "about" avant "logo", on rétablit la disposition de l'accueil
+        val logoPos = filtered.indexOf("logo")
+        val aboutPos = filtered.indexOf("about")
+        if (logoPos >= 0 && aboutPos >= 0 && aboutPos < logoPos) {
+            filtered.removeAt(logoPos)
+            filtered.add(aboutPos, "logo")
+        }
+
+        // Si des éléments de la barre (nearby, map, trips, stats) avaient été ajoutés à la fin après settings/logo/about,
         // on les repositionne à leur place logique selon allAvailableMoreElements (ordre de la page d'accueil)
         val bottomNavCandidates = setOf("nearby", "map", "trips", "stats")
-        val helpIndex = filtered.indexOf("help")
         val aboutIndex = filtered.indexOf("about")
+        val logoIndex = filtered.indexOf("logo")
         val settingsIndex = filtered.indexOf("settings")
-        val cutOff = listOf(settingsIndex, aboutIndex, helpIndex).filter { it >= 0 }.minOrNull() ?: -1
+        val cutOff = listOf(settingsIndex, logoIndex, aboutIndex).filter { it >= 0 }.minOrNull() ?: -1
         if (cutOff >= 0) {
             val misplaced = filtered.filterIndexed { index, item ->
                 index > cutOff && item in bottomNavCandidates
@@ -869,8 +910,8 @@ object AppConfig {
                 if (insertIndex >= 0) {
                     filtered.add(insertIndex, item)
                 } else {
-                    val logoIndex = filtered.indexOf("logo")
-                    if (logoIndex >= 0) filtered.add(logoIndex, item) else filtered.add(item)
+                    val aboutIndexPos = filtered.indexOf("about")
+                    if (aboutIndexPos >= 0) filtered.add(aboutIndexPos, item) else filtered.add(item)
                 }
             }
         }
@@ -1042,7 +1083,16 @@ object AppConfig {
         bottomNavOpacity.intValue = prefs.getInt(PREF_BOTTOM_NAV_OPACITY, DEFAULT_BOTTOM_NAV_OPACITY).coerceIn(0, 100)
 
         // Menu « Plus » pour le mode barre inférieure
-        val savedMoreOrder = prefs.getString(PREF_MORE_ORDER, DEFAULT_MORE_ORDER) ?: DEFAULT_MORE_ORDER
+        val rawSavedMoreOrder = prefs.getString(PREF_MORE_ORDER, null)
+        val savedMoreOrder = if (
+            rawSavedMoreOrder == null ||
+            rawSavedMoreOrder == "nearby,map,trips,compass,stats,settings,about,help,logo" ||
+            rawSavedMoreOrder == "compass,settings,about,help,logo"
+        ) {
+            DEFAULT_MORE_ORDER
+        } else {
+            rawSavedMoreOrder
+        }
         moreOrder.value = normalizeMoreOrder(savedMoreOrder.split(",").filter { it.isNotBlank() })
         moreShowLogo.value = prefs.getBoolean(PREF_MORE_SHOW_LOGO, true)
         moreShowAbout.value = prefs.getBoolean(PREF_MORE_SHOW_ABOUT, true)

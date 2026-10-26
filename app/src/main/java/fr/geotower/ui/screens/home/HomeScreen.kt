@@ -1017,7 +1017,7 @@ fun HomeScreen(navController: NavController) {
 // --- SOUS-COMPOSANTS ---
 
 @Composable
-private fun HomeQuitButton(
+internal fun HomeQuitButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -1039,7 +1039,7 @@ private fun HomeQuitButton(
  * et le journal ne serait jamais consulté.
  */
 @Composable
-private fun HomeNotificationsButton(
+internal fun HomeNotificationsButton(
     unreadCount: Int,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -1448,7 +1448,7 @@ private fun HomeMenuGrid(
  * courant, et le transformer en gros bouton changerait l'allure de l'accueil pour tout le monde.
  */
 @Composable
-private fun HomeAboutLink(fillWidth: Boolean, onClick: () -> Unit) {
+internal fun HomeAboutLink(fillWidth: Boolean = false, onClick: () -> Unit) {
     val sizing = LocalGeoTowerUiSizing.current
     TextButton(
         onClick = onClick,

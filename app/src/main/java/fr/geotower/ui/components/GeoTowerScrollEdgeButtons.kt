@@ -9,7 +9,9 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListState
@@ -161,10 +163,12 @@ private fun ScrollEdgePill(
     val sizing = LocalGeoTowerUiSizing.current
     val themeMode by AppConfig.themeMode
     val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
+    val alpha = AppConfig.floatingUiAlpha
+    val progress = AppConfig.floatingUiOpacityProgress
     val pillColor = if (isDark) {
-        Color(0xFF2C2C2C).copy(alpha = 0.85f)
+        Color(0xFF2C2C2C).copy(alpha = alpha)
     } else {
-        Color(0xFFF2F2F2).copy(alpha = 0.85f)
+        Color(0xFFF2F2F2).copy(alpha = alpha)
     }
     val iconColor = MaterialTheme.colorScheme.onSurface
 
@@ -178,7 +182,7 @@ private fun ScrollEdgePill(
             shape = RoundedCornerShape(sizing.component(32.dp)),
             color = pillColor,
             shadowElevation = 0.dp,
-            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+            border = BorderStroke(1.dp, AppConfig.floatingUiBorderColor())
         ) {
             Row(
                 modifier = Modifier.padding(

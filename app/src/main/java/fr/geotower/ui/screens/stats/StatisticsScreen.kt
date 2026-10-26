@@ -3,13 +3,19 @@ package fr.geotower.ui.screens.stats
 import android.content.Context
 import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -23,6 +29,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -39,6 +47,7 @@ import fr.geotower.ui.components.GeoTowerBackTopBar
 import androidx.compose.foundation.layout.Box
 import fr.geotower.ui.components.PageScrollEdgeButtons
 import fr.geotower.ui.components.geoTowerFadingEdge
+import fr.geotower.ui.components.geoTowerLazyListFadingEdge
 import fr.geotower.ui.components.pageScrollbar
 import fr.geotower.utils.PageScrollPrefs
 import fr.geotower.ui.navigation.ROOT_FALLBACK_ROUTE
@@ -48,11 +57,14 @@ import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.OperatorRegion
+import fr.geotower.utils.PowerProfile
 import fr.geotower.utils.StatsDisplayMode
 import fr.geotower.utils.StatsPreferences
 import fr.geotower.utils.radioFrequencyLabel
 import androidx.compose.ui.res.stringResource
 import fr.geotower.R
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.util.Locale
 
 private const val STATS_FREQUENCIES_ROUTE = "stats/frequencies"
@@ -319,7 +331,7 @@ private fun frequencyDetailTitle(tech: String): String {
 private suspend fun loadStatisticsData(
     repository: AnfrRepository,
     defaultOp: String
-): StatisticsData {
+): StatisticsData = withContext(Dispatchers.IO) {
     val totalMap = mutableMapOf<String, StatCount>()
     val counts2GMap = mutableMapOf<String, StatCount>()
     val counts3GMap = mutableMapOf<String, StatCount>()
@@ -371,7 +383,7 @@ private suspend fun loadStatisticsData(
         aggregateWeeklyStats(repository.getWeeklyRadioStatsByOperator(operatorQueryNames(operator.key)), weeklyAccumulator)
     }
 
-    return StatisticsData(
+    StatisticsData(
         supports = formatOperatorData(totalMap, targets),
         supports2G = formatOperatorData(counts2GMap, targets),
         supports3G = formatOperatorData(counts3GMap, targets),
@@ -385,7 +397,7 @@ private suspend fun loadFrequencyStatsData(
     repository: AnfrRepository,
     defaultOp: String,
     tech: String
-): List<FrequencyBandStats> {
+): List<FrequencyBandStats> = withContext(Dispatchers.IO) {
     val normalizedTech = normalizeTech(tech)
     val targets = operatorStatsTargets(defaultOp)
     val bands = frequencyBandsForTech(normalizedTech)
@@ -434,7 +446,7 @@ private suspend fun loadFrequencyStatsData(
         )
     }
 
-    return stats.filter { band -> band.data.any { it.totalCount > 0 || it.activeCount > 0 } }.ifEmpty { stats }
+    stats.filter { band -> band.data.any { it.totalCount > 0 || it.activeCount > 0 } }.ifEmpty { stats }
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -473,7 +485,7 @@ fun StatisticsScreen(navController: NavController, repository: AnfrRepository) {
     var weeklyByItem by remember { mutableStateOf(cachedStats?.weeklyByItem ?: emptyMap()) }
     var isLoading by remember { mutableStateOf(cachedStats == null) }
     val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = ROOT_FALLBACK_ROUTE)
-    val scrollState = rememberScrollState()
+    val lazyListState = rememberLazyListState()
 
     BackHandler(enabled = !safeBackNavigation.isLocked) {
         safeBackNavigation.navigateBack()
@@ -522,108 +534,120 @@ fun StatisticsScreen(navController: NavController, repository: AnfrRepository) {
             )
         }
     ) { padding ->
-        Box(modifier = Modifier.fillMaxSize().padding(padding).background(mainBgColor)) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .geoTowerFadingEdge(scrollState)
-                .pageScrollbar(PageScrollPrefs.STATS, scrollState)
-                .verticalScroll(scrollState)
-        ) {
-            Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
-
-            StatsDisplayModeSelector(
-                displayMode = displayMode,
-                onDisplayModeChange = { newMode ->
-                    displayMode = newMode
-                    prefs.edit().putString(StatsPreferences.PREF_DISPLAY_MODE, newMode.storageKey).apply()
-                },
-                bgColor = cardBgColor
+        val cards = listOf(
+            StatsCardSpec(
+                blockId = "supports",
+                title = stringResource(R.string.appstrings_stats_supports_title),
+                description = stringResource(R.string.appstrings_stats_supports_desc),
+                data = supportCounts,
+                weeklyData = weeklyByItem[statsKey(CATEGORY_SUPPORT, ITEM_ALL)].orEmpty()
+            ),
+            StatsCardSpec(
+                blockId = "5G",
+                title = stringResource(R.string.appstrings_stats5_g_title),
+                description = stringResource(R.string.appstrings_stats5_g_desc),
+                data = support5GCounts,
+                weeklyData = weeklyByItem[statsKey(CATEGORY_TECH, "5G")].orEmpty(),
+                onClick = { navController.navigate(statsFrequenciesRoute("5G")) }
+            ),
+            StatsCardSpec(
+                blockId = "4G",
+                title = stringResource(R.string.appstrings_stats4_g_title),
+                description = stringResource(R.string.appstrings_stats4_g_desc),
+                data = support4GCounts,
+                weeklyData = weeklyByItem[statsKey(CATEGORY_TECH, "4G")].orEmpty(),
+                onClick = { navController.navigate(statsFrequenciesRoute("4G")) }
+            ),
+            StatsCardSpec(
+                blockId = "3G",
+                title = stringResource(R.string.appstrings_stats3_g_title),
+                description = stringResource(R.string.appstrings_stats3_g_desc),
+                data = support3GCounts,
+                weeklyData = weeklyByItem[statsKey(CATEGORY_TECH, "3G")].orEmpty(),
+                onClick = { navController.navigate(statsFrequenciesRoute("3G")) }
+            ),
+            StatsCardSpec(
+                blockId = "2G",
+                title = stringResource(R.string.appstrings_stats2_g_title),
+                description = stringResource(R.string.appstrings_stats2_g_desc),
+                data = support2GCounts,
+                weeklyData = weeklyByItem[statsKey(CATEGORY_TECH, "2G")].orEmpty(),
+                onClick = { navController.navigate(statsFrequenciesRoute("2G")) }
             )
+        ).associateBy { it.blockId }
 
-            val cards = listOf(
-                StatsCardSpec(
-                    blockId = "supports",
-                    title = stringResource(R.string.appstrings_stats_supports_title),
-                    description = stringResource(R.string.appstrings_stats_supports_desc),
-                    data = supportCounts,
-                    weeklyData = weeklyByItem[statsKey(CATEGORY_SUPPORT, ITEM_ALL)].orEmpty()
-                ),
-                StatsCardSpec(
-                    blockId = "5G",
-                    title = stringResource(R.string.appstrings_stats5_g_title),
-                    description = stringResource(R.string.appstrings_stats5_g_desc),
-                    data = support5GCounts,
-                    weeklyData = weeklyByItem[statsKey(CATEGORY_TECH, "5G")].orEmpty(),
-                    onClick = { navController.navigate(statsFrequenciesRoute("5G")) }
-                ),
-                StatsCardSpec(
-                    blockId = "4G",
-                    title = stringResource(R.string.appstrings_stats4_g_title),
-                    description = stringResource(R.string.appstrings_stats4_g_desc),
-                    data = support4GCounts,
-                    weeklyData = weeklyByItem[statsKey(CATEGORY_TECH, "4G")].orEmpty(),
-                    onClick = { navController.navigate(statsFrequenciesRoute("4G")) }
-                ),
-                StatsCardSpec(
-                    blockId = "3G",
-                    title = stringResource(R.string.appstrings_stats3_g_title),
-                    description = stringResource(R.string.appstrings_stats3_g_desc),
-                    data = support3GCounts,
-                    weeklyData = weeklyByItem[statsKey(CATEGORY_TECH, "3G")].orEmpty(),
-                    onClick = { navController.navigate(statsFrequenciesRoute("3G")) }
-                ),
-                StatsCardSpec(
-                    blockId = "2G",
-                    title = stringResource(R.string.appstrings_stats2_g_title),
-                    description = stringResource(R.string.appstrings_stats2_g_desc),
-                    data = support2GCounts,
-                    weeklyData = weeklyByItem[statsKey(CATEGORY_TECH, "2G")].orEmpty(),
-                    onClick = { navController.navigate(statsFrequenciesRoute("2G")) }
-                )
-            ).associateBy { it.blockId }
+        val visibleCards = StatsPreferences.statsBlockOrder(prefs)
+            .mapNotNull { blockId -> cards[blockId] }
+            .filter { card -> StatsPreferences.isStatsBlockVisible(prefs, card.blockId) }
 
-            val visibleCards = StatsPreferences.statsBlockOrder(prefs)
-                .mapNotNull { blockId -> cards[blockId] }
-                .filter { card -> StatsPreferences.isStatsBlockVisible(prefs, card.blockId) }
-
-            visibleCards.forEach { card ->
-                // spacing = 0 : l'espacement est déjà porté par le Spacer de chaque carte.
-                fr.geotower.ui.components.CustomizableBlock(card.blockId, onCustomizeBlock, spacing = 0.dp) {
+        Box(modifier = Modifier.fillMaxSize().padding(padding).background(mainBgColor)) {
+            LazyColumn(
+                state = lazyListState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .geoTowerLazyListFadingEdge(lazyListState)
+                    .pageScrollbar(PageScrollPrefs.STATS, lazyListState)
+            ) {
+                item(key = "header_space") {
                     Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
-                    StatCard(
-                        title = card.title,
-                        desc = card.description,
-                        data = card.data,
-                        isLoading = isLoading,
-                        bgColor = cardBgColor,
+                }
+
+                item(key = "display_mode_selector") {
+                    StatsDisplayModeSelector(
                         displayMode = displayMode,
-                        weeklyData = card.weeklyData,
-                        onClick = card.onClick
+                        onDisplayModeChange = { newMode ->
+                            displayMode = newMode
+                            prefs.edit().putString(StatsPreferences.PREF_DISPLAY_MODE, newMode.storageKey).apply()
+                        },
+                        bgColor = cardBgColor
                     )
                 }
+
+                items(
+                    items = visibleCards,
+                    key = { it.blockId }
+                ) { card ->
+                    fr.geotower.ui.components.CustomizableBlock(card.blockId, onCustomizeBlock, spacing = 0.dp) {
+                        Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
+                        StatCard(
+                            title = card.title,
+                            desc = card.description,
+                            data = card.data,
+                            isLoading = isLoading,
+                            bgColor = cardBgColor,
+                            displayMode = displayMode,
+                            weeklyData = card.weeklyData,
+                            onClick = card.onClick
+                        )
+                    }
+                }
+
+                item(key = "department_stats_entry") {
+                    Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
+                    DepartmentStatsEntryCard(
+                        bgColor = cardBgColor,
+                        onClick = { navController.navigate(DEPARTMENT_STATS_ROUTE) }
+                    )
+                }
+
+                item(key = "customization_footer") {
+                    Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
+                    fr.geotower.ui.components.PageCustomizationFooter(
+                        onClick = {
+                            settingsHighlightBlock = null
+                            showStatsSettingsSheet = true
+                        },
+                        modifier = Modifier.padding(horizontal = sizing.spacing(16.dp))
+                    )
+                }
+
+                item(key = "bottom_space") {
+                    val bottomSpace = (if (AppConfig.isBottomNavActive()) sizing.component(96.dp) else sizing.spacing(32.dp)) +
+                        WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+                    Spacer(modifier = Modifier.height(bottomSpace))
+                }
             }
-
-            Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
-            DepartmentStatsEntryCard(
-                bgColor = cardBgColor,
-                onClick = { navController.navigate(DEPARTMENT_STATS_ROUTE) }
-            )
-
-            Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
-            fr.geotower.ui.components.PageCustomizationFooter(
-                onClick = {
-                    settingsHighlightBlock = null
-                    showStatsSettingsSheet = true
-                },
-                modifier = Modifier.padding(horizontal = sizing.spacing(16.dp))
-            )
-
-            val bottomSpace = (if (AppConfig.isBottomNavActive()) sizing.component(96.dp) else sizing.spacing(32.dp)) +
-                WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-            Spacer(modifier = Modifier.height(bottomSpace))
-        }
-        PageScrollEdgeButtons(PageScrollPrefs.STATS, scrollState)
+            PageScrollEdgeButtons(PageScrollPrefs.STATS, lazyListState)
         }
     }
 
@@ -660,7 +684,7 @@ fun FrequencyStatsDetailScreen(navController: NavController, repository: AnfrRep
     var frequencyStats by remember(normalizedTech) { mutableStateOf(cachedStats ?: emptyList()) }
     var isLoading by remember(normalizedTech) { mutableStateOf(cachedStats == null) }
     val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = "stats")
-    val scrollState = rememberScrollState()
+    val lazyListState = rememberLazyListState()
 
     BackHandler(enabled = !safeBackNavigation.isLocked) {
         safeBackNavigation.navigateBack()
@@ -695,73 +719,85 @@ fun FrequencyStatsDetailScreen(navController: NavController, repository: AnfrRep
             )
         }
     ) { padding ->
+        val orderedFrequencyStats = visibleFrequencyStats(prefs, normalizedTech, frequencyStats)
+
         Box(modifier = Modifier.fillMaxSize().padding(padding).background(mainBgColor)) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .geoTowerFadingEdge(scrollState)
-                .pageScrollbar(PageScrollPrefs.STATS, scrollState)
-                .verticalScroll(scrollState)
-        ) {
-            Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
+            LazyColumn(
+                state = lazyListState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .geoTowerLazyListFadingEdge(lazyListState)
+                    .pageScrollbar(PageScrollPrefs.STATS, lazyListState)
+            ) {
+                item(key = "header_space") {
+                    Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
+                }
 
-            StatsDisplayModeSelector(
-                displayMode = displayMode,
-                onDisplayModeChange = ::updateDisplayMode,
-                bgColor = cardBgColor
-            )
-            Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
-
-            val orderedFrequencyStats = visibleFrequencyStats(prefs, normalizedTech, frequencyStats)
-
-            when {
-                isLoading && frequencyStats.isEmpty() -> {
-                    StatCard(
-                        title = frequencyDetailTitle(normalizedTech),
-                        desc = stringResource(R.string.appstrings_stats_frequency_detail_loading_desc),
-                        data = emptyList(),
-                        isLoading = true,
-                        bgColor = cardBgColor,
-                        displayMode = displayMode
+                item(key = "display_mode_selector") {
+                    StatsDisplayModeSelector(
+                        displayMode = displayMode,
+                        onDisplayModeChange = ::updateDisplayMode,
+                        bgColor = cardBgColor
                     )
                 }
-                orderedFrequencyStats.isEmpty() -> {
-                    Card(
-                        shape = RoundedCornerShape(20.dp),
-                        colors = CardDefaults.cardColors(containerColor = cardBgColor.copy(alpha = 0.58f)),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = sizing.spacing(16.dp))
-                    ) {
-                        Text(
-                            text = stringResource(R.string.appstrings_stats_no_frequency_available_for, normalizedTech),
-                            style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
-                            modifier = Modifier.padding(sizing.spacing(16.dp)),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+
+                when {
+                    isLoading && frequencyStats.isEmpty() -> {
+                        item(key = "loading_card") {
+                            Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
+                            StatCard(
+                                title = frequencyDetailTitle(normalizedTech),
+                                desc = stringResource(R.string.appstrings_stats_frequency_detail_loading_desc),
+                                data = emptyList(),
+                                isLoading = true,
+                                bgColor = cardBgColor,
+                                displayMode = displayMode
+                            )
+                        }
+                    }
+                    orderedFrequencyStats.isEmpty() -> {
+                        item(key = "empty_card") {
+                            Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
+                            Card(
+                                shape = RoundedCornerShape(20.dp),
+                                colors = CardDefaults.cardColors(containerColor = cardBgColor.copy(alpha = 0.58f)),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = sizing.spacing(16.dp))
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.appstrings_stats_no_frequency_available_for, normalizedTech),
+                                    style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
+                                    modifier = Modifier.padding(sizing.spacing(16.dp)),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                    else -> {
+                        items(
+                            items = orderedFrequencyStats,
+                            key = { it.frequencyId }
+                        ) { band ->
+                            Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
+                            StatCard(
+                                title = band.title,
+                                desc = stringResource(band.descriptionRes),
+                                data = band.data,
+                                isLoading = false,
+                                bgColor = cardBgColor,
+                                displayMode = displayMode,
+                                weeklyData = band.weeklyData
+                            )
+                        }
                     }
                 }
-                else -> {
-                    orderedFrequencyStats.forEachIndexed { index, band ->
-                        if (index > 0) {
-                            Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
-                        }
-                        StatCard(
-                            title = band.title,
-                            desc = stringResource(band.descriptionRes),
-                            data = band.data,
-                            isLoading = false,
-                            bgColor = cardBgColor,
-                            displayMode = displayMode,
-                            weeklyData = band.weeklyData
-                        )
-                    }
+
+                item(key = "bottom_space") {
+                    Spacer(modifier = Modifier.height(sizing.spacing(32.dp)))
                 }
             }
-
-            Spacer(modifier = Modifier.height(sizing.spacing(32.dp)))
-        }
-        PageScrollEdgeButtons(PageScrollPrefs.STATS, scrollState)
+            PageScrollEdgeButtons(PageScrollPrefs.STATS, lazyListState)
         }
     }
 }
@@ -931,8 +967,12 @@ private fun SupportBarChart(data: List<OperatorStatValue>, displayMode: StatsDis
         }
     }
 
-    val maxCount = (data.maxOfOrNull(::displayCount) ?: 0).coerceAtLeast(1)
-    val rows = data.sortedWith(compareByDescending<OperatorStatValue> { displayCount(it) }.thenBy { it.name }.thenBy { it.regionSuffixRes ?: 0 })
+    val maxCount = remember(data, displayMode) {
+        (data.maxOfOrNull(::displayCount) ?: 0).coerceAtLeast(1)
+    }
+    val rows = remember(data, displayMode) {
+        data.sortedWith(compareByDescending<OperatorStatValue> { displayCount(it) }.thenBy { it.name }.thenBy { it.regionSuffixRes ?: 0 })
+    }
     val chartScrollState = rememberScrollState()
     val sizing = LocalGeoTowerUiStyle.current.sizing
 
@@ -947,7 +987,6 @@ private fun SupportBarChart(data: List<OperatorStatValue>, displayMode: StatsDis
         rows.forEach { stat ->
             val barColor = Color(OperatorColors.colorArgbForKey(stat.colorKey))
             val targetFraction = (displayCount(stat).toFloat() / maxCount.toFloat()).coerceIn(0f, 1f)
-            val animatedFraction by animateFloatAsState(targetValue = targetFraction, label = "statsBar")
             val operatorName = stat.regionSuffixRes?.let { suffixRes ->
                 stringResource(
                     R.string.appstrings_operator_display_with_region,
@@ -960,7 +999,7 @@ private fun SupportBarChart(data: List<OperatorStatValue>, displayMode: StatsDis
                 operatorName = operatorName,
                 totalCount = stat.totalCount,
                 activeCount = stat.activeCount,
-                fraction = animatedFraction,
+                fraction = targetFraction,
                 color = barColor,
                 displayMode = displayMode
             )
@@ -978,10 +1017,10 @@ private fun WeeklyTrendChart(data: List<WeeklyStatValue>, displayMode: StatsDisp
         }
     }
 
-    val points = data.filter { displayCount(it) > 0 }
+    val points = remember(data, displayMode) { data.filter { displayCount(it) > 0 } }
     if (points.size < 2) return
 
-    val maxCount = points.maxOf(::displayCount).coerceAtLeast(1)
+    val maxCount = remember(points, displayMode) { points.maxOf(::displayCount).coerceAtLeast(1) }
     val activeColor = MaterialTheme.colorScheme.primary
     val totalColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
     val sizing = LocalGeoTowerUiStyle.current.sizing
@@ -1141,6 +1180,12 @@ private fun OperatorStatBar(
         StatsDisplayMode.Both -> if (totalCount == 0) "0" else "${activeCount.coerceIn(0, totalCount)}/$totalCount"
     }
 
+    val animatedScale by animateFloatAsState(
+        targetValue = if (primaryCount > 0) 1f else 0f,
+        animationSpec = if (PowerProfile.isEcoPlus) snap() else tween(durationMillis = 350, easing = FastOutSlowInEasing),
+        label = "statsBarScale"
+    )
+
     Column(
         modifier = Modifier.width(sizing.component(176.dp)),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -1162,6 +1207,10 @@ private fun OperatorStatBar(
                 modifier = Modifier
                     .width(sizing.component(46.dp))
                     .height(primaryBarHeight)
+                    .graphicsLayer {
+                        scaleY = animatedScale
+                        transformOrigin = TransformOrigin(0.5f, 1f)
+                    }
                     .clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomStart = 6.dp, bottomEnd = 6.dp))
                     .background(if (displayMode == StatsDisplayMode.Active) color else color.copy(alpha = 0.36f))
             )
@@ -1170,6 +1219,10 @@ private fun OperatorStatBar(
                     modifier = Modifier
                         .width(sizing.component(46.dp))
                         .height(activeBarHeight)
+                        .graphicsLayer {
+                            scaleY = animatedScale
+                            transformOrigin = TransformOrigin(0.5f, 1f)
+                        }
                         .clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomStart = 6.dp, bottomEnd = 6.dp))
                         .background(color)
                 )

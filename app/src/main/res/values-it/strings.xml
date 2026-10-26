@@ -3432,6 +3432,7 @@
     <string name="appstrings_release_v2084_summary_bottom_nav_customization">Personalizzazione delle schede della barra di navigazione, regolazione della trasparenza e riorganizzazione del menu Altro</string>
     <string name="appstrings_release_v2085_summary_bottom_nav_gestures">Navigazione tramite scorrimento continuo con feedback tattile sulla barra inferiore e accesso diretto alle impostazioni delle schede</string>
     <string name="appstrings_release_v2086_summary_interactive_tab_swipe">Scorrimento tattile interattivo tra le pagine principali e tracciamento in tempo reale sulla barra di navigazione</string>
+    <string name="appstrings_release_v2087_summary_floating_ui_and_stats">Trasparenza unificata dei controlli fluttuanti, statistiche più fluide e menu Altro arricchito</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registro richieste di rete</string>

@@ -39,6 +39,7 @@ fun GeoTowerBackTopBar(
     backEnabled: Boolean = true,
     showBackButton: Boolean = true,
     actionsWidth: Dp = 48.dp,
+    navigationIcon: (@Composable () -> Unit)? = null,
     actions: (@Composable RowScope.() -> Unit)? = null
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
@@ -50,6 +51,7 @@ fun GeoTowerBackTopBar(
         backEnabled = backEnabled,
         showBackButton = showBackButton,
         actionsWidth = actionsWidth,
+        navigationIcon = navigationIcon,
         actions = actions
     ) {
         Text(
@@ -73,15 +75,11 @@ fun GeoTowerBackTopBar(
     backEnabled: Boolean = true,
     showBackButton: Boolean = true,
     actionsWidth: Dp = 48.dp,
+    navigationIcon: (@Composable () -> Unit)? = null,
     actions: (@Composable RowScope.() -> Unit)? = null,
     titleContent: @Composable BoxScope.() -> Unit
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
-    // Le titre est centre dans l'espace QUI RESTE entre les deux cotes : les deux reserves
-    // doivent donc faire exactement la meme largeur, sinon il tombe a cote du centre de l'ecran.
-    // La reserve ne suit PAS l'echelle de l'interface : un IconButton Material garde sa zone
-    // tactile de 48.dp quel que soit le reglage de taille, donc mettre le seul cote droit a
-    // l'echelle (44.dp a 100 %) decalait le titre vers la droite.
     val slotWidth = maxOf(actionsWidth, TOP_BAR_SLOT_MIN_WIDTH)
     Row(
         modifier = modifier
@@ -94,7 +92,9 @@ fun GeoTowerBackTopBar(
             modifier = Modifier.width(slotWidth),
             contentAlignment = Alignment.CenterStart
         ) {
-            if (showBackButton) {
+            if (navigationIcon != null) {
+                navigationIcon()
+            } else if (showBackButton) {
                 IconButton(onClick = onBack, enabled = backEnabled) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,

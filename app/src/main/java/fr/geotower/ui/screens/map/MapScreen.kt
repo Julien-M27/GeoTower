@@ -63,6 +63,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -103,6 +104,7 @@ import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -147,6 +149,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
@@ -6769,9 +6772,9 @@ fun MapScreen(
                             )
                         },
                     shape = RoundedCornerShape(24.dp),
-                    color = MaterialTheme.colorScheme.surface,
-                    shadowElevation = 4.dp,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = AppConfig.floatingUiAlpha),
+                    shadowElevation = sizing.component(2.dp + 3.dp * AppConfig.floatingUiOpacityProgress),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.20f + 0.20f * AppConfig.floatingUiOpacityProgress))
                 ) {
                     Row(
                         modifier = Modifier.padding(
@@ -6847,7 +6850,13 @@ fun MapScreen(
                         modifier = Modifier.align(Alignment.CenterStart)
                     )
                 }
-                Surface(modifier = Modifier.align(Alignment.Center), shape = RoundedCornerShape(32.dp), color = MaterialTheme.colorScheme.surface, shadowElevation = 4.dp, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
+                Surface(
+                    modifier = Modifier.align(Alignment.Center),
+                    shape = RoundedCornerShape(32.dp),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = AppConfig.floatingUiAlpha),
+                    shadowElevation = 0.dp,
+                    border = BorderStroke(1.dp, AppConfig.floatingUiBorderColor())
+                ) {
                     // Avec un trajet ouvert, la carte n'est plus « la carte des antennes » : elle
                     // sert la tournée, et son en-tête doit le dire.
                     Text(
@@ -6967,9 +6976,9 @@ fun MapScreen(
                     Surface(
                         modifier = Modifier.padding(bottom = sizing.spacing(10.dp)),
                         shape = RoundedCornerShape(32.dp),
-                        color = MaterialTheme.colorScheme.surface,
-                        shadowElevation = 4.dp,
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = AppConfig.floatingUiAlpha),
+                        shadowElevation = sizing.component(2.dp + 3.dp * AppConfig.floatingUiOpacityProgress),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.20f + 0.20f * AppConfig.floatingUiOpacityProgress))
                     ) {
                         Row(
                             modifier = Modifier
@@ -7266,12 +7275,9 @@ fun MapScreen(
                         .width(mapControlButtonDiameter)
                         .clip(zoomControlShape),
                     shape = zoomControlShape,
-                    color = MaterialTheme.colorScheme.surface,
-                    shadowElevation = 6.dp,
-                    border = BorderStroke(
-                        1.dp,
-                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                    )
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = AppConfig.floatingUiAlpha),
+                    shadowElevation = 0.dp,
+                    border = BorderStroke(1.dp, AppConfig.floatingUiBorderColor())
                 ) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -7313,128 +7319,120 @@ fun MapScreen(
                 }
             }
             if (showLocationBtn && canUseMapLocation) {
-                FloatingActionButton(
-                    onClick = {
-                        safeClick {
-                            // Localisation indisponible (permission coupée OU GPS éteint) : au lieu de tenter
-                            // un recentrage qui échouerait en silence, on invite à la réactiver.
-                            if (!isLocationReady) {
-                                onFixLocation()
-                                return@safeClick
-                            }
-
-                            val map = mapViewRef
-                            val locationOverlay = locationOverlayRef
-
-                            if (map == null || locationOverlay == null) {
-                                Toast.makeText(context, txtLocationNotFound, Toast.LENGTH_SHORT).show()
-                                return@safeClick
-                            }
-
-                            fun centerOnLocation(location: GeoPoint) {
-                                val zoom = preferredLocationZoom()
-                                currentZoom = zoom
-                                currentLat = location.latitude
-                                // Survol plutôt que saut : on voit d'où l'on vient, et l'appui sur
-                                // le bouton se lit même quand on est déjà à peu près au bon endroit.
-                                if (swoopMapTo(map, location.latitude, location.longitude, zoom)) {
-                                    return
+                    val isLocTracking = isTrackingActive || (tripMode == TRIP_MODE_FOLLOW && navCameraLocked)
+                    Surface(
+                        onClick = {
+                            safeClick {
+                                // Localisation indisponible (permission coupée OU GPS éteint) : au lieu de tenter
+                                // un recentrage qui échouerait en silence, on invite à la réactiver.
+                                if (!isLocationReady) {
+                                    onFixLocation()
+                                    return@safeClick
                                 }
-                                map.controller.stopAnimation(false)
-                                map.controller.setZoom(zoom)
-                                map.controller.setCenter(location)
-                            }
 
-                            // Suivi de tournée : c'est notre caméra qui tient la vue (cap de marche
-                            // en haut, position en bas). Le bouton se contente de la rattacher —
-                            // lancer en plus la poursuite d'osmdroid recentrerait au milieu de
-                            // l'écran et écraserait ce cadrage.
-                            if (tripMode == TRIP_MODE_FOLLOW) {
-                                navCameraLocked = true
-                                // Poser la caméra ICI, tout de suite. Se contenter de la rattacher
-                                // laissait la vue là où le doigt l'avait emmenée quand la boucle
-                                // d'images dort — c'est-à-dire dès qu'on est à l'arrêt. Le survol
-                                // ramène en montrant le chemin, au lieu de téléporter.
-                                val known = myCurrentLoc ?: locationOverlay.myLocation
+                                val map = mapViewRef
+                                val locationOverlay = locationOverlayRef
+
+                                if (map == null || locationOverlay == null) {
+                                    Toast.makeText(context, txtLocationNotFound, Toast.LENGTH_SHORT).show()
+                                    return@safeClick
+                                }
+
+                                fun centerOnLocation(location: GeoPoint) {
+                                    val zoom = preferredLocationZoom()
+                                    currentZoom = zoom
+                                    currentLat = location.latitude
+                                    // Survol plutôt que saut : on voit d'où l'on vient, et l'appui sur
+                                    // le bouton se lit même quand on est déjà à peu près au bon endroit.
+                                    if (swoopMapTo(map, location.latitude, location.longitude, zoom)) {
+                                        return
+                                    }
+                                    map.controller.stopAnimation(false)
+                                    map.controller.setZoom(zoom)
+                                    map.controller.setCenter(location)
+                                }
+
+                                // Suivi de tournée : c'est notre caméra qui tient la vue (cap de marche
+                                // en haut, position en bas). Le bouton se contente de la rattacher —
+                                // lancer en plus la poursuite d'osmdroid recentrerait au milieu de
+                                // l'écran et écraserait ce cadrage.
+                                if (tripMode == TRIP_MODE_FOLLOW) {
+                                    navCameraLocked = true
+                                    // Poser la caméra ICI, tout de suite. Se contenter de la rattacher
+                                    // laissait la vue là où le doigt l'avait emmenée quand la boucle
+                                    // d'images dort — c'est-à-dire dès qu'on est à l'arrêt. Le survol
+                                    // ramène en montrant le chemin, au lieu de téléporter.
+                                    val known = myCurrentLoc ?: locationOverlay.myLocation
+                                    if (known != null) {
+                                        applyNavigationCamera(
+                                            map = map,
+                                            latitude = known.latitude,
+                                            longitude = known.longitude,
+                                            snapOrientation = true,
+                                            zoom = NAV_FOLLOW_ZOOM,
+                                            swoop = true
+                                        )
+                                    } else {
+                                        map.controller.setZoom(NAV_FOLLOW_ZOOM)
+                                    }
+                                    return@safeClick
+                                }
+
+                                // Un seul effet : le bouton lance la poursuite, il ne l'arrête jamais.
+                                // C'est le glissement du doigt sur la carte qui rend la main (cf.
+                                // `onUserPan`) : on n'est plus bloqué sur sa position jusqu'à un second
+                                // appui. Rappuyer pendant la poursuite se contente donc de recadrer.
+                                isTrackingActive = true
+                                locationOverlay.setEnableAutoStop(false)
+                                locationOverlay.enableMyLocation()
+                                // En mode fluide, le recentrage est piloté image par image par la couche
+                                // de rendu : laisser en plus osmdroid animer la carte à chaque relevé
+                                // ferait tourner deux poursuites concurrentes.
+                                if (!smoothLocationEnabled) {
+                                    locationOverlay.enableFollowLocation()
+                                }
+
+                                val known = locationOverlay.myLocation ?: myCurrentLoc
                                 if (known != null) {
-                                    applyNavigationCamera(
-                                        map = map,
-                                        latitude = known.latitude,
-                                        longitude = known.longitude,
-                                        snapOrientation = true,
-                                        zoom = NAV_FOLLOW_ZOOM,
-                                        swoop = true
-                                    )
+                                    centerOnLocation(known)
                                 } else {
-                                    map.controller.setZoom(NAV_FOLLOW_ZOOM)
-                                }
-                                return@safeClick
-                            }
-
-                            // Un seul effet : le bouton lance la poursuite, il ne l'arrête jamais.
-                            // C'est le glissement du doigt sur la carte qui rend la main (cf.
-                            // `onUserPan`) : on n'est plus bloqué sur sa position jusqu'à un second
-                            // appui. Rappuyer pendant la poursuite se contente donc de recadrer.
-                            isTrackingActive = true
-                            locationOverlay.setEnableAutoStop(false)
-                            locationOverlay.enableMyLocation()
-                            // En mode fluide, le recentrage est piloté image par image par la couche
-                            // de rendu : laisser en plus osmdroid animer la carte à chaque relevé
-                            // ferait tourner deux poursuites concurrentes.
-                            if (!smoothLocationEnabled) {
-                                locationOverlay.enableFollowLocation()
-                            }
-
-                            val known = locationOverlay.myLocation ?: myCurrentLoc
-                            if (known != null) {
-                                centerOnLocation(known)
-                            } else {
-                                // Pas encore de relevé : on cadre au premier qui tombe plutôt que de
-                                // laisser l'appui sans effet visible.
-                                locationOverlay.runOnFirstFix {
-                                    locationOverlay.myLocation?.let { firstLocation ->
-                                        map.post { centerOnLocation(firstLocation) }
+                                    // Pas encore de relevé : on cadre au premier qui tombe plutôt que de
+                                    // laisser l'appui sans effet visible.
+                                    locationOverlay.runOnFirstFix {
+                                        locationOverlay.myLocation?.let { firstLocation ->
+                                            map.post { centerOnLocation(firstLocation) }
+                                        }
                                     }
                                 }
                             }
-                        }
-                    },
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    shape = CircleShape,
-                    modifier = Modifier.size(mapControlButtonDiameter)
-                ) {
-                    // ✅ On ajoute le cercle très fin autour de l'icône si actif
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .then(
-                                // En suivi de tournée, c'est l'accrochage de NOTRE caméra qui compte.
-                                if (isTrackingActive ||
-                                    (tripMode == TRIP_MODE_FOLLOW && navCameraLocked)
-                                ) {
-                                    Modifier.border(
-                                        width = 1.5.dp, // Cercle très fin
-                                        color = MaterialTheme.colorScheme.primary, // Couleur principale
-                                        shape = CircleShape
-                                    ).padding(sizing.spacing(2.dp)) // Petit espacement pour ne pas coller au bord
-                                } else {
-                                    Modifier
-                                }
-                            ),
-                        contentAlignment = Alignment.Center
+                        },
+                        shape = CircleShape,
+                        color = (if (isLocTracking) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface)
+                            .copy(alpha = AppConfig.floatingUiAlpha),
+                        shadowElevation = 0.dp,
+                        border = BorderStroke(
+                            width = if (isLocTracking) 2.dp else 1.dp,
+                            color = if (isLocTracking) MaterialTheme.colorScheme.primary else AppConfig.floatingUiBorderColor()
+                        ),
+                        modifier = Modifier.size(mapControlButtonDiameter)
                     ) {
-                        Icon(
-                            imageVector = when {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            val locationIcon = when {
                                 !isLocationReady -> Icons.Default.LocationDisabled // Localisation coupée : icône barrée
-                                isTrackingActive -> Icons.Default.MyLocation
+                                isLocTracking -> Icons.Default.MyLocation
                                 else -> Icons.Outlined.MyLocation
-                            },
-                            contentDescription = stringResource(R.string.appstrings_locate),
-                            tint = if (isTrackingActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.size(sizing.component(24.dp))
-                        )
+                            }
+                            Icon(
+                                imageVector = locationIcon,
+                                contentDescription = stringResource(R.string.appstrings_locate),
+                                tint = if (isLocTracking) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(sizing.component(24.dp))
+                            )
+                        }
                     }
-                }
             }
         }
 
@@ -8434,9 +8432,9 @@ private fun MapSearchBar(
     Surface(
         modifier = modifier.height(mapSearchBarHeight),
         shape = RoundedCornerShape(mapSearchBarHeight / 2f),
-        color = MaterialTheme.colorScheme.surface,
-        shadowElevation = 8.dp,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        color = MaterialTheme.colorScheme.surface.copy(alpha = AppConfig.floatingUiAlpha),
+        shadowElevation = sizing.component(3.dp + 5.dp * AppConfig.floatingUiOpacityProgress),
+        border = BorderStroke(1.dp, AppConfig.floatingUiBorderColor())
     ) {
         Row(
             modifier = Modifier.fillMaxSize(),
@@ -8513,9 +8511,9 @@ private fun MapSearchSuggestionList(
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(sizing.component(20.dp)),
-        color = MaterialTheme.colorScheme.surface,
-        shadowElevation = 8.dp,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        color = MaterialTheme.colorScheme.surface.copy(alpha = AppConfig.floatingUiAlpha),
+        shadowElevation = sizing.component(3.dp + 5.dp * AppConfig.floatingUiOpacityProgress),
+        border = BorderStroke(1.dp, AppConfig.floatingUiBorderColor())
     ) {
         Column(modifier = Modifier.padding(vertical = sizing.spacing(6.dp))) {
             suggestions.forEachIndexed { index, suggestion ->
@@ -8614,10 +8612,19 @@ private fun MapSearchSuggestionRow(suggestion: MapSearchSuggestion, onClick: () 
 @Composable
 private fun SmallFloatingButton(icon: ImageVector, desc: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val sizing = LocalGeoTowerUiSizing.current
-    Surface(onClick = onClick, shape = CircleShape, color = MaterialTheme.colorScheme.surface, shadowElevation = 4.dp, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), modifier = modifier.size(mapControlButtonDiameter)) {
+    Surface(
+        onClick = onClick,
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surface.copy(alpha = AppConfig.floatingUiAlpha),
+        shadowElevation = 0.dp,
+        border = BorderStroke(1.dp, AppConfig.floatingUiBorderColor()),
+        modifier = modifier.size(mapControlButtonDiameter)
+    ) {
         // Taille explicite : sans ca l'icone garde le 24.dp par defaut de Material et ne suit
         // pas le bouton quand le slider grossit.
-        Box(contentAlignment = Alignment.Center) { Icon(icon, desc, modifier = Modifier.size(sizing.component(24.dp))) }
+        Box(contentAlignment = Alignment.Center) {
+            Icon(icon, desc, modifier = Modifier.size(sizing.component(24.dp)))
+        }
     }
 }
 
@@ -8819,12 +8826,12 @@ private fun MapCompassButton(
     Surface(
         modifier = modifier.combinedClickable(onClick = onReset, onLongClick = longPress),
         shape = CircleShape,
-        color = MaterialTheme.colorScheme.surface,
-        shadowElevation = 4.dp,
+        color = MaterialTheme.colorScheme.surface.copy(alpha = AppConfig.floatingUiAlpha),
+        shadowElevation = 0.dp,
         border = if (followActive) {
             BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
         } else {
-            BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            BorderStroke(1.dp, AppConfig.floatingUiBorderColor())
         }
     ) {
         Box(
