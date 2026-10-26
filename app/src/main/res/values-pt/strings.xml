@@ -3430,6 +3430,7 @@
     <string name="appstrings_release_v2080_summary_database_viewer_outages_and_sources">Inspeção de dados de falhas no visualizador de bases e fontes configuráveis para as compilações locais</string>
     <string name="appstrings_release_v2081_summary_bottom_navigation_bar">Novo modo de navegação com barra de separadores inferior e integração do controlo deslizante temporal no mapa</string>
     <string name="appstrings_release_v2084_summary_bottom_nav_customization">Personalização dos separadores da barra de navegação, ajuste de transparência e reorganização do menu Mais</string>
+    <string name="appstrings_release_v2085_summary_bottom_nav_gestures">Navegação por deslize contínuo com feedback háptico na barra inferior e acesso direto às definições de separadores</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registo de pedidos de rede</string>

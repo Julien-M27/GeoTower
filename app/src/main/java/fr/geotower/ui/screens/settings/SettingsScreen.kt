@@ -804,10 +804,14 @@ fun SettingsScreen(
     // La sauvegarde de la page de démarrage
     var startupPage by remember { mutableStateOf(HomePrefs.startupPage(prefs)) }
     var showHomeSettingsSheet by remember { mutableStateOf(false) }
+    var showMoreSettingsSheet by remember { mutableStateOf(false) }
+    var showBottomNavSettingsSheet by remember { mutableStateOf(false) }
     var showSimpleDrawerSettingsSheet by remember { mutableStateOf(false) }
     // Ordre partagé avec la page d'accueil, qui se réordonne aussi par appui long : chacun doit
     // voir tout de suite ce que l'autre a déplacé, d'où l'état commun plutôt qu'une copie locale.
     val pagesOrder by AppConfig.pagesOrder
+    val moreOrder by AppConfig.moreOrder
+    val bottomNavTabs by AppConfig.bottomNavTabs
     val simpleDrawerOrder by AppConfig.simpleDrawerOrder
     var showNearbySettingsSheet by remember { mutableStateOf(false) }
     var pageSpeedtestsFilterMajorEnb by remember { mutableStateOf(prefs.getBoolean(SiteSpeedtestsPagePreferences.FILTER_MAJOR_ENB, SiteSpeedtestsPagePreferences.DEFAULT_FILTER_MAJOR_ENB)) }
@@ -977,6 +981,8 @@ fun SettingsScreen(
     val pagesSectionActions = PagesSectionActions(
         onStartupPage = { safeClick { showStartupPageSheet = true } },
         onHome = { safeClick { showHomeSettingsSheet = true } },
+        onMore = { safeClick { showMoreSettingsSheet = true } },
+        onBottomNav = { safeClick { showBottomNavSettingsSheet = true } },
         onSimpleDrawer = { safeClick { showSimpleDrawerSettingsSheet = true } },
         onNearby = { safeClick { showNearbySettingsSheet = true } },
         onMap = { safeClick { showMapSettingsSheet = true } },
@@ -1058,7 +1064,9 @@ fun SettingsScreen(
             // --- Apparence ---
             entry(context.getString(R.string.appearance_theme_title), "theme thème clair sombre systeme dark light mode nuit jour couleur apparence", SECTION_APPEARANCE)
             entry(context.getString(R.string.settings_nav_mode_title), "mode navigation barre selection onglets bas accueil standard", SECTION_APPEARANCE) { showNavModeSheet = true }
-            entry(context.getString(R.string.settings_bottom_nav_opacity_title), "transparence flou blur opacite barre navigation bas selection", SECTION_APPEARANCE)
+            if (useOneUi) {
+                entry(context.getString(R.string.settings_bottom_nav_opacity_title), "transparence flou blur opacite barre navigation bas selection one ui", SECTION_APPEARANCE)
+            }
             entry(context.getString(R.string.appstrings_color_palette_title), "palette couleur color accent teinte material", SECTION_APPEARANCE) { showColorPalettePage = true }
             entry(context.getString(R.string.appearance_oled_title), "oled noir pur black amoled sombre economie", SECTION_APPEARANCE)
             entry(context.getString(R.string.appearance_one_ui_title), "one ui oneui samsung style interface bulle", SECTION_APPEARANCE)
@@ -1097,7 +1105,12 @@ fun SettingsScreen(
                 entry(context.getString(R.string.settings_pages_customization_title), "pages personnalisation blocs reorganiser masquer astuces bulle rappel appui long defilement", SECTION_PAGES)
                 if (!AppConfig.simpleModeActive()) {
                     entry(context.getString(R.string.appstrings_startup_page_settings), "demarrage startup page ouverture lancement", SECTION_PAGES) { showStartupPageSheet = true }
-                    entry(context.getString(R.string.appstrings_page_home_settings), "accueil home menu ordre pages bouton aide reorganiser appui long", SECTION_PAGES) { showHomeSettingsSheet = true }
+                    if (!AppConfig.isBottomNavActive()) {
+                        entry(context.getString(R.string.appstrings_page_home_settings), "accueil home menu ordre pages bouton aide reorganiser appui long", SECTION_PAGES) { showHomeSettingsSheet = true }
+                    } else {
+                        entry(context.getString(R.string.settings_page_more_title), "plus menu ordre pages reorganiser appui long", SECTION_PAGES) { showMoreSettingsSheet = true }
+                        entry(context.getString(R.string.settings_page_bottom_nav_title), "barre navigation onglets ordre bas", SECTION_PAGES) { showBottomNavSettingsSheet = true }
+                    }
                 } else {
                     entry(context.getString(R.string.settings_page_simple_drawer_title), "volet lateral tiroir drawer mode simplifie ordre boutons reorganiser appui long", SECTION_PAGES) { showSimpleDrawerSettingsSheet = true }
                 }
@@ -2084,7 +2097,7 @@ fun SettingsScreen(
                         }
                     )
 
-                    if (isBottomNav) {
+                    if (isBottomNav && useOneUi) {
                         Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
                         fr.geotower.ui.components.BottomNavOpacityCard(
                             shape = shape,
@@ -2240,6 +2253,30 @@ fun SettingsScreen(
                 },
                 onDismiss = { showHomeSettingsSheet = false },
                 onBack = { safeClick { showHomeSettingsSheet = false } },
+                sheetState = sheetState,
+                useOneUi = useOneUi,
+                bubbleColor = bubbleBaseColor
+            )
+        }
+        // --- SOUS-MENU : MENU PLUS (MODE BARRE DE NAVIGATION) ---
+        if (showMoreSettingsSheet) {
+            MoreSettingsSheet(
+                moreOrder = moreOrder,
+                onOrderChange = { newOrder -> AppConfig.setMoreOrder(prefs, newOrder) },
+                onDismiss = { showMoreSettingsSheet = false },
+                onBack = { safeClick { showMoreSettingsSheet = false } },
+                sheetState = sheetState,
+                useOneUi = useOneUi,
+                bubbleColor = bubbleBaseColor
+            )
+        }
+        // --- SOUS-MENU : BARRE DE NAVIGATION INFÉRIEURE ---
+        if (showBottomNavSettingsSheet) {
+            BottomNavSettingsSheet(
+                tabs = bottomNavTabs,
+                onTabsChange = { newTabs -> AppConfig.setBottomNavTabs(prefs, newTabs) },
+                onDismiss = { showBottomNavSettingsSheet = false },
+                onBack = { safeClick { showBottomNavSettingsSheet = false } },
                 sheetState = sheetState,
                 useOneUi = useOneUi,
                 bubbleColor = bubbleBaseColor
@@ -3224,7 +3261,7 @@ fun SectionApparence(
         }
     }
 
-    if (AppConfig.isBottomNavActive()) {
+    if (AppConfig.isBottomNavActive() && useOneUi) {
         Spacer(Modifier.height(sizing.spacing(12.dp)))
         fr.geotower.ui.components.BottomNavOpacityCard(
             shape = shape,

@@ -3430,6 +3430,7 @@
     <string name="appstrings_release_v2080_summary_database_viewer_outages_and_sources">Inspección de datos de cortes en el visor de bases y fuentes configurables para la generación local</string>
     <string name="appstrings_release_v2081_summary_bottom_navigation_bar">Nuevo modo de navegación con barra de pestañas inferior e integración del control temporal en el mapa</string>
     <string name="appstrings_release_v2084_summary_bottom_nav_customization">Personalización de las pestañas de la barra de navegación, ajuste de transparencia y reorganización del menú Más</string>
+    <string name="appstrings_release_v2085_summary_bottom_nav_gestures">Navegación por deslizamiento continuo con respuesta háptica en la barra inferior y acceso directo a los ajustes de pestañas</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registro de solicitudes de red</string>
@@ -3475,14 +3476,14 @@
     <!-- Modo de navegacion / Barra inferior -->
     <string name="bottom_nav_nearby">Cercanas</string>
     <string name="bottom_nav_map">Mapa</string>
-    <string name="bottom_nav_trips">Ruta</string>
+    <string name="bottom_nav_trips">Rutas</string>
     <string name="bottom_nav_stats">Estadísticas</string>
     <string name="bottom_nav_more">Más</string>
     <string name="settings_nav_mode_title">Modo de navegación</string>
     <string name="settings_nav_mode_standard">Inicio estándar</string>
     <string name="settings_nav_mode_standard_desc">Inicia en el menú principal con acceso a todas las páginas</string>
     <string name="settings_nav_mode_bottom_bar">Barra de navegación inferior</string>
-    <string name="settings_nav_mode_bottom_bar_desc">Barra de 5 pestañas inferior: Cercanas, Mapa, Ruta, Estadísticas, Más</string>
+    <string name="settings_nav_mode_bottom_bar_desc">Barra de 5 pestañas inferior: Cercanas, Mapa, Rutas, Estadísticas, Más</string>
     <string name="settings_page_more_title">Menú Más</string>
     <string name="settings_page_more_desc">Personalizar elementos y orden del menú Más</string>
     <string name="settings_page_bottom_nav_title">Barra de navegación</string>

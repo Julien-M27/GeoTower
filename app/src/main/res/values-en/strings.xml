@@ -3430,6 +3430,7 @@
     <string name="appstrings_release_v2080_summary_database_viewer_outages_and_sources">Inspection of outage datasets in database viewer and configurable data sources for local builds</string>
     <string name="appstrings_release_v2081_summary_bottom_navigation_bar">New bottom navigation bar mode with 5 tabs and time slider integration in map filters</string>
     <string name="appstrings_release_v2084_summary_bottom_nav_customization">Bottom navigation bar tabs customization, transparency adjustment and More menu reordering</string>
+    <string name="appstrings_release_v2085_summary_bottom_nav_gestures">Continuous swipe navigation with haptic feedback on the bottom bar and direct access to tab settings</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Network requests log</string>

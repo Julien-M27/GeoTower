@@ -3432,6 +3432,7 @@
     <string name="appstrings_release_v2080_summary_database_viewer_outages_and_sources">Visualisation des relevés de pannes dans l\'inspecteur de base et sélection des sources pour la génération locale</string>
     <string name="appstrings_release_v2081_summary_bottom_navigation_bar">Nouveau mode de navigation avec barre d\'onglets en bas de l\'écran et intégration du curseur temporel sur la carte</string>
     <string name="appstrings_release_v2084_summary_bottom_nav_customization">Personnalisation des onglets de la barre de navigation, réglage de transparence et réorganisation du menu Plus</string>
+    <string name="appstrings_release_v2085_summary_bottom_nav_gestures">Navigation par glissement continu avec retour haptique sur la barre inférieure et accès direct aux réglages des onglets</string>
 
     <!-- Journal des requêtes réseau -->
     <string name="network_log_title">Journal des requêtes réseau</string>
@@ -3477,14 +3478,14 @@
     <!-- Mode de navigation / Barre inferieure -->
     <string name="bottom_nav_nearby">À proximité</string>
     <string name="bottom_nav_map">Carte</string>
-    <string name="bottom_nav_trips">Trajet</string>
+    <string name="bottom_nav_trips">Trajets</string>
     <string name="bottom_nav_stats">Statistiques</string>
     <string name="bottom_nav_more">Plus</string>
     <string name="settings_nav_mode_title">Mode de navigation</string>
     <string name="settings_nav_mode_standard">Accueil classique</string>
     <string name="settings_nav_mode_standard_desc">Démarre sur le menu d\'accueil avec accès à toutes les pages</string>
     <string name="settings_nav_mode_bottom_bar">Barre de sélection en bas</string>
-    <string name="settings_nav_mode_bottom_bar_desc">Barre à 5 choix en bas : À proximité, Carte, Trajet, Statistiques, Plus</string>
+    <string name="settings_nav_mode_bottom_bar_desc">Barre à 5 choix en bas : À proximité, Carte, Trajets, Statistiques, Plus</string>
     <string name="settings_page_more_title">Menu Plus</string>
     <string name="settings_page_more_desc">Personnalisation des éléments et de l\'ordre du menu Plus</string>
     <string name="settings_page_bottom_nav_title">Barre de navigation</string>

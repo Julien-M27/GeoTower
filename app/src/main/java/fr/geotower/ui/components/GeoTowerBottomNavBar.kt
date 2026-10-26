@@ -7,7 +7,8 @@ import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -50,11 +51,22 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.geotower.R
@@ -138,6 +150,8 @@ private fun OneUiFloatingBottomNavBar(
     val isDark = uiStyle.isDark
     val isOled = uiStyle.isOled
     val layoutDirection = LocalLayoutDirection.current
+    val haptic = LocalHapticFeedback.current
+    val isRtl = layoutDirection == LayoutDirection.Rtl
     val systemNavBars = WindowInsets.navigationBars.asPaddingValues()
     val rawBottomPadding = systemNavBars.calculateBottomPadding()
 
@@ -209,6 +223,13 @@ private fun OneUiFloatingBottomNavBar(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(uniformMargin)
+                    .bottomNavDraggable(
+                        tabs = tabs,
+                        activeTab = activeTab,
+                        onNavigate = onNavigate,
+                        haptic = haptic,
+                        isRtl = isRtl
+                    )
             ) {
                 val tabCount = tabs.size
                 val tabWidth = maxWidth / tabCount
@@ -293,7 +314,14 @@ private fun OneUiBottomNavItem(
     Box(
         modifier = modifier
             .clip(CircleShape)
-            .clickable { onNavigate(tab.route) },
+            .semantics {
+                role = Role.Tab
+                selected = isSelected
+                onClick {
+                    onNavigate(tab.route)
+                    true
+                }
+            },
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -339,6 +367,8 @@ private fun StandardBottomNavBar(
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
     val layoutDirection = LocalLayoutDirection.current
+    val haptic = LocalHapticFeedback.current
+    val isRtl = layoutDirection == LayoutDirection.Rtl
     val systemNavBars = WindowInsets.navigationBars.asPaddingValues()
     val rawBottomPadding = systemNavBars.calculateBottomPadding()
 
@@ -355,13 +385,11 @@ private fun StandardBottomNavBar(
         bottom = bottomInset
     )
 
-    val opacity = (AppConfig.bottomNavOpacity.intValue / 100f).coerceIn(0f, 1f)
-
     Surface(
         modifier = modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = opacity),
+        color = MaterialTheme.colorScheme.surfaceContainer,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        tonalElevation = if (opacity < 1f) 0.dp else 3.dp
+        tonalElevation = 3.dp
     ) {
         BoxWithConstraints(
             modifier = Modifier
@@ -369,12 +397,20 @@ private fun StandardBottomNavBar(
                 .windowInsetsPadding(customInsets)
                 .height(sizing.component(64.dp))
                 .padding(horizontal = sizing.spacing(8.dp))
+                .bottomNavDraggable(
+                    tabs = tabs,
+                    activeTab = activeTab,
+                    onNavigate = onNavigate,
+                    haptic = haptic,
+                    isRtl = isRtl
+                )
         ) {
             val tabCount = tabs.size
             val tabWidth = maxWidth / tabCount
             val activeIndex = tabs.indexOf(activeTab)
-            val indicatorWidth = sizing.component(44.dp)
-            val indicatorHeight = sizing.component(26.dp)
+            val indicatorWidth = sizing.component(48.dp)
+            val indicatorHeight = sizing.component(28.dp)
+            val indicatorTop = sizing.spacing(8.dp)
 
             // Animation de glissement entre chaque bouton (désactivée en mode éco +)
             if (activeIndex >= 0) {
@@ -390,11 +426,11 @@ private fun StandardBottomNavBar(
 
                 Box(
                     modifier = Modifier
-                        .offset(x = animatedOffset, y = sizing.spacing(6.dp))
+                        .offset(x = animatedOffset, y = indicatorTop)
                         .width(indicatorWidth)
                         .height(indicatorHeight)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = (opacity * 0.6f + 0.4f).coerceAtMost(1f)))
+                        .background(MaterialTheme.colorScheme.secondaryContainer)
                 )
             }
 
@@ -408,6 +444,9 @@ private fun StandardBottomNavBar(
                     StandardBottomNavItem(
                         tab = tab,
                         isSelected = isSelected,
+                        indicatorWidth = indicatorWidth,
+                        indicatorHeight = indicatorHeight,
+                        indicatorTop = indicatorTop,
                         onNavigate = onNavigate,
                         modifier = Modifier.weight(1f)
                     )
@@ -424,6 +463,9 @@ private fun StandardBottomNavBar(
 private fun StandardBottomNavItem(
     tab: BottomNavTab,
     isSelected: Boolean,
+    indicatorWidth: Dp,
+    indicatorHeight: Dp,
+    indicatorTop: Dp,
     onNavigate: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -433,15 +475,22 @@ private fun StandardBottomNavItem(
         modifier = modifier
             .fillMaxHeight()
             .clip(RoundedCornerShape(12.dp))
-            .clickable { onNavigate(tab.route) }
-            .padding(horizontal = sizing.spacing(1.dp), vertical = sizing.spacing(4.dp)),
+            .semantics {
+                role = Role.Tab
+                selected = isSelected
+                onClick {
+                    onNavigate(tab.route)
+                    true
+                }
+            }
+            .padding(top = indicatorTop, bottom = sizing.spacing(4.dp)),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = Arrangement.Top
     ) {
         Box(
             modifier = Modifier
-                .height(sizing.component(26.dp))
-                .width(sizing.component(44.dp)),
+                .height(indicatorHeight)
+                .width(indicatorWidth),
             contentAlignment = Alignment.Center
         ) {
             Icon(
@@ -451,7 +500,7 @@ private fun StandardBottomNavItem(
                 modifier = Modifier.size(sizing.component(19.dp))
             )
         }
-        Spacer(modifier = Modifier.height(sizing.spacing(2.dp)))
+        Spacer(modifier = Modifier.height(sizing.spacing(3.dp)))
         Text(
             text = stringResource(tab.labelRes),
             fontSize = sizing.text(9.sp),
@@ -464,5 +513,90 @@ private fun StandardBottomNavItem(
             softWrap = false,
             textAlign = TextAlign.Center
         )
+    }
+}
+
+/**
+ * Gestionnaire de geste fluide pour la barre de navigation :
+ * - Permet de faire glisser son doigt horizontalement sur la barre pour changer de page en continu
+ * - Déclenche un retour haptique à chaque transition d'onglet franchie
+ * - Gère le balayage rapide (swipe / flick)
+ * - Maintient le clic / tap direct
+ */
+private fun Modifier.bottomNavDraggable(
+    tabs: List<BottomNavTab>,
+    activeTab: BottomNavTab?,
+    onNavigate: (String) -> Unit,
+    haptic: HapticFeedback,
+    isRtl: Boolean
+): Modifier = this.pointerInput(tabs, activeTab) {
+    val tabCount = tabs.size
+    if (tabCount <= 1) return@pointerInput
+
+    awaitEachGesture {
+        val down = awaitFirstDown(requireUnconsumed = false)
+        val tabWidthPx = size.width.toFloat() / tabCount
+        val startX = down.position.x
+        val rawStartIndex = kotlin.math.floor(startX / tabWidthPx).toInt().coerceIn(0, tabCount - 1)
+        val startIndex = if (isRtl) (tabCount - 1 - rawStartIndex) else rawStartIndex
+        val startTab = tabs.getOrNull(startIndex)
+        var lastDispatchedRoute = activeTab?.route
+        var hasDragged = false
+
+        while (true) {
+            val event = awaitPointerEvent()
+            val pointer = event.changes.firstOrNull { it.id == down.id } ?: break
+
+            if (!pointer.pressed) {
+                val currentX = pointer.position.x
+                val diffX = currentX - startX
+                val swipeThreshold = viewConfiguration.touchSlop * 1.5f
+
+                if (!hasDragged) {
+                    // Tap simple sur un onglet
+                    if (startTab != null) {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onNavigate(startTab.route)
+                    }
+                } else if (lastDispatchedRoute == activeTab?.route) {
+                    // Balayage rapide (swipe / flick) n'ayant pas atteint le seuil d'un onglet complet
+                    val forward = if (isRtl) diffX < -swipeThreshold else diffX > swipeThreshold
+                    val backward = if (isRtl) diffX > swipeThreshold else diffX < -swipeThreshold
+                    val currentIdx = tabs.indexOf(activeTab).coerceAtLeast(0)
+                    if (forward && currentIdx < tabCount - 1) {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onNavigate(tabs[currentIdx + 1].route)
+                    } else if (backward && currentIdx > 0) {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onNavigate(tabs[currentIdx - 1].route)
+                    }
+                }
+                break
+            }
+
+            val currentX = pointer.position.x
+            val diffX = currentX - startX
+            val diffY = pointer.position.y - down.position.y
+
+            if (!hasDragged) {
+                val absX = kotlin.math.abs(diffX)
+                val absY = kotlin.math.abs(diffY)
+                if (absX > viewConfiguration.touchSlop && absX > absY) {
+                    hasDragged = true
+                }
+            }
+
+            if (hasDragged) {
+                pointer.consume()
+                val rawTargetIndex = kotlin.math.floor(currentX / tabWidthPx).toInt().coerceIn(0, tabCount - 1)
+                val targetIndex = if (isRtl) (tabCount - 1 - rawTargetIndex) else rawTargetIndex
+                val targetTab = tabs.getOrNull(targetIndex)
+                if (targetTab != null && targetTab.route != lastDispatchedRoute) {
+                    lastDispatchedRoute = targetTab.route
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onNavigate(targetTab.route)
+                }
+            }
+        }
     }
 }

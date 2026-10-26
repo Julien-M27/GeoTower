@@ -3430,6 +3430,7 @@
     <string name="appstrings_release_v2080_summary_database_viewer_outages_and_sources">Ispezione dei dati sui disservizi nel visualizzatore database e sorgenti configurabili per le generazioni locali</string>
     <string name="appstrings_release_v2081_summary_bottom_navigation_bar">Nuova modalità di navigazione con barra a schede inferiore e integrazione del cursore temporale sulla mappa</string>
     <string name="appstrings_release_v2084_summary_bottom_nav_customization">Personalizzazione delle schede della barra di navigazione, regolazione della trasparenza e riorganizzazione del menu Altro</string>
+    <string name="appstrings_release_v2085_summary_bottom_nav_gestures">Navigazione tramite scorrimento continuo con feedback tattile sulla barra inferiore e accesso diretto alle impostazioni delle schede</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registro richieste di rete</string>

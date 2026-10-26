@@ -3430,6 +3430,7 @@
     <string name="appstrings_release_v2080_summary_database_viewer_outages_and_sources">Inspektion von Ausfalldaten im Datenbank-Viewer und konfigurierbare Datenquellen für lokale Builds</string>
     <string name="appstrings_release_v2081_summary_bottom_navigation_bar">Neuer Navigationsmodus mit unterer Tableiste und Integration des Zeitreglers in die Kartenfilter</string>
     <string name="appstrings_release_v2084_summary_bottom_nav_customization">Anpassung der Tabs der unteren Navigationsleiste, Transparenzeinstellung und Neuordnung des Mehr-Menüs</string>
+    <string name="appstrings_release_v2085_summary_bottom_nav_gestures">Wisch-Navigation mit haptischem Feedback auf der unteren Leiste und direkter Zugriff auf Tab-Einstellungen</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Netzwerkanfragen-Protokoll</string>
