@@ -3436,6 +3436,7 @@
     <string name="appstrings_release_v2086_summary_interactive_tab_swipe">Balayage tactile interactif entre les pages principales et suivi en direct du doigt sur la barre de navigation</string>
     <string name="appstrings_release_v2087_summary_floating_ui_and_stats">Harmonisation de la transparence des boutons flottants, fluidité des statistiques et enrichissement du menu Plus</string>
     <string name="appstrings_release_v2088_summary_sql_operator_filters">Filtrage optimisé des opérateurs en base de données pour la carte et préservation du style classique</string>
+    <string name="appstrings_release_v2089_summary_persistent_map_cache">Cache persistant des tuiles cartographiques pour un affichage instantané de la carte sans clignotement</string>
 
     <!-- Journal des requêtes réseau -->
     <string name="network_log_title">Journal des requêtes réseau</string>

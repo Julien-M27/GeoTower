@@ -80,7 +80,7 @@ fun GeoTowerBackTopBar(
     titleContent: @Composable BoxScope.() -> Unit
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
-    val slotWidth = maxOf(actionsWidth, TOP_BAR_SLOT_MIN_WIDTH)
+    val slotWidth = maxOf(actionsWidth, sizing.component(TOP_BAR_SLOT_MIN_WIDTH))
     Row(
         modifier = modifier
             .fillMaxWidth()

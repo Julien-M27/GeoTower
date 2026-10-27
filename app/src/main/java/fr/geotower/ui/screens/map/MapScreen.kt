@@ -254,6 +254,7 @@ import fr.geotower.utils.openLocationSourceSettings
 import fr.geotower.utils.rememberLocationReadinessState
 import fr.geotower.utils.MapDisplayPrefs
 import fr.geotower.utils.MapUtils
+import fr.geotower.utils.PersistentMapTileProvider
 import fr.geotower.utils.MapProviderRules
 import fr.geotower.ui.screens.emitters.OperatorGrid
 import fr.geotower.utils.OperatorColorSpec
@@ -3672,6 +3673,15 @@ fun MapScreen(
         lifecycleOwner.lifecycle.addObserver(observer)
 
         onDispose {
+            mapViewRef?.let { map ->
+                val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+                prefs.edit()
+                    .putFloat("last_map_lat", map.mapCenter.latitude.toFloat())
+                    .putFloat("last_map_lon", map.mapCenter.longitude.toFloat())
+                    .putFloat("last_map_zoom", map.zoomLevelDouble.toFloat())
+                    .putFloat(PREF_LAST_MAP_ORIENTATION, map.mapOrientation)
+                    .apply()
+            }
             smoothEngine.reset()
             restoreOperatorSearchSelection()
             viewModel.resetCityLock()
@@ -5215,7 +5225,16 @@ fun MapScreen(
                 // carte — deux repères différents, donc un repère posé trop bas.
                 .onGloballyPositioned { mapTopInRootPx = it.positionInRoot().y.toInt() },
             factory = { ctx ->
-                MapView(ctx).apply {
+                val initialTileSource = when (effectiveProvider) {
+                    1 -> if (ignStyle == 2) MapUtils.EsriSource.SATELLITE else MapUtils.OSM_Source
+                    3 -> org.osmdroid.tileprovider.tilesource.TileSourceFactory.OpenTopo
+                    else -> if (ignStyle == 2) MapUtils.IgnSource.SATELLITE else MapUtils.IgnSource.PLAN_IGN
+                }
+                val initialProvider = if (effectiveProvider != 4) {
+                    PersistentMapTileProvider(ctx, initialTileSource)
+                } else null
+
+                (if (initialProvider != null) MapView(ctx, initialProvider) else MapView(ctx)).apply {
                     mapViewUsable.set(true)
                     addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
                         override fun onViewAttachedToWindow(v: View) {
@@ -5492,7 +5511,7 @@ fun MapScreen(
                                 prefs.edit().putInt("map_provider", 1).apply()
                                 if (map.tileProvider is MapsForgeTileProvider) {
                                     runCatching { (map.tileProvider as? MapsForgeTileProvider)?.detach() }
-                                    map.tileProvider = MapTileProviderBasic(context)
+                                    map.tileProvider = PersistentMapTileProvider(context, MapUtils.OSM_Source)
                                     shouldInvalidateMap = true
                                 }
                                 runCatching {
@@ -5508,8 +5527,8 @@ fun MapScreen(
                         prefs.edit().putInt("map_provider", 1).apply()
                         if (map.tileProvider is MapsForgeTileProvider) {
                             runCatching { (map.tileProvider as? MapsForgeTileProvider)?.detach() }
-                            map.tileProvider = MapTileProviderBasic(context)
                             val newSource = if (ignStyle == 2) MapUtils.EsriSource.SATELLITE else MapUtils.OSM_Source
+                            map.tileProvider = PersistentMapTileProvider(context, newSource)
                             map.setTileSource(newSource)
                             shouldInvalidateMap = true
                         }
@@ -5517,17 +5536,17 @@ fun MapScreen(
                     }
                 } else {
                     // 🌐 LOGIQUE EN LIGNE
-                    if (map.tileProvider is MapsForgeTileProvider) {
-                        runCatching { (map.tileProvider as? MapsForgeTileProvider)?.detach() }
-                        map.tileProvider = MapTileProviderBasic(context)
-                        shouldInvalidateMap = true
-                    }
-
                     // ⚠️ ATTENTION : on utilise bien "effectiveProvider" ici !
                     val newSource = when (effectiveProvider) {
                         1 -> if (ignStyle == 2) MapUtils.EsriSource.SATELLITE else MapUtils.OSM_Source
                         3 -> org.osmdroid.tileprovider.tilesource.TileSourceFactory.OpenTopo
                         else -> if (ignStyle == 2) MapUtils.IgnSource.SATELLITE else MapUtils.IgnSource.PLAN_IGN
+                    }
+
+                    if (map.tileProvider is MapsForgeTileProvider) {
+                        runCatching { (map.tileProvider as? MapsForgeTileProvider)?.detach() }
+                        map.tileProvider = PersistentMapTileProvider(context, newSource)
+                        shouldInvalidateMap = true
                     }
 
                     if (map.tileProvider.tileSource.name() != newSource.name()) {

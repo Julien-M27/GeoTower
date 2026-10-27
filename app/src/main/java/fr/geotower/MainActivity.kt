@@ -686,6 +686,11 @@ class MainActivity : ComponentActivity() {
         // 2. Cache RAM : on garde davantage de tuiles chaudes pendant les zooms/dezooms.
         osmdroidConfig.cacheMapTileCount = 160.toShort()
         osmdroidConfig.cacheMapTileOvershoot = 80.toShort()
+
+        // 3. Cache disque persistant (30 jours) : évite le retéléchargement des tuiles déjà
+        // présentes dans le cache SQLite quand les serveurs (ex: IGN) n'envoient pas d'en-tête Cache-Control.
+        osmdroidConfig.expirationExtendedDuration = 30L * 24 * 3600 * 1000L
+        osmdroidConfig.expirationOverrideDuration = 30L * 24 * 3600 * 1000L
         // =====================================================================
 
 

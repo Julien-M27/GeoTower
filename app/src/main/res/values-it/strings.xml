@@ -3434,6 +3434,7 @@
     <string name="appstrings_release_v2086_summary_interactive_tab_swipe">Scorrimento tattile interattivo tra le pagine principali e tracciamento in tempo reale sulla barra di navigazione</string>
     <string name="appstrings_release_v2087_summary_floating_ui_and_stats">Trasparenza unificata dei controlli fluttuanti, statistiche più fluide e menu Altro arricchito</string>
     <string name="appstrings_release_v2088_summary_sql_operator_filters">Filtraggio ottimizzato degli operatori nel database per la mappa e preservazione dello stile classico</string>
+    <string name="appstrings_release_v2089_summary_persistent_map_cache">Cache persistente delle tessere per una visualizzazione istantanea e senza sfarfallio della mappa</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registro richieste di rete</string>

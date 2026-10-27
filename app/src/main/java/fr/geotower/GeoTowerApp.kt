@@ -35,11 +35,17 @@ class GeoTowerApp : Application() {
         // Choix principal / miroir : doit précéder la première requête, sinon un appareil réglé sur
         // le miroir repartirait sur le serveur principal le temps du démarrage.
         fr.geotower.data.api.ApiEndpoints.init(applicationContext)
-        Configuration.getInstance().load(
+        val osmdroidConfig = Configuration.getInstance()
+        osmdroidConfig.load(
             applicationContext,
             PreferenceManager.getDefaultSharedPreferences(applicationContext)
         )
-        Configuration.getInstance().userAgentValue = packageName
+        osmdroidConfig.userAgentValue = packageName
+        val osmdroidBasePath = java.io.File(cacheDir, "osmdroid")
+        osmdroidConfig.osmdroidBasePath = osmdroidBasePath
+        osmdroidConfig.osmdroidTileCache = java.io.File(osmdroidBasePath, "tiles")
+        osmdroidConfig.expirationExtendedDuration = 30L * 24 * 3600 * 1000L
+        osmdroidConfig.expirationOverrideDuration = 30L * 24 * 3600 * 1000L
         RemoteFeatureFlags.loadCached(applicationContext)
         // Origine de l'installation : doit précéder AppUpdateState, qui s'en sert pour ne jamais
         // afficher de bandeau « nouvelle version » sur une installation venue du Play Store.
@@ -77,5 +83,18 @@ class GeoTowerApp : Application() {
             runCatching { AppDatabase.getDatabase(applicationContext) }
         }
         SignalQuestUploadQueue.cleanupStaleFiles(applicationContext)
+    }
+
+    @Suppress("DEPRECATION")
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (level >= TRIM_MEMORY_MODERATE) {
+            fr.geotower.utils.SharedMapTileCacheHolder.clear()
+        }
+    }
+
+    override fun onLowMemory() {
+        super.onLowMemory()
+        fr.geotower.utils.SharedMapTileCacheHolder.clear()
     }
 }
