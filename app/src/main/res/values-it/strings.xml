@@ -3458,6 +3458,7 @@
     <string name="appstrings_release_v2089_summary_persistent_map_cache">Cache persistente delle tessere per una visualizzazione istantanea e senza sfarfallio della mappa</string>
     <string name="appstrings_release_v2090_summary_map_split_screen">Pannello laterale per i dettagli del supporto su schermi grandi (tablet e pieghevoli) direttamente dalla mappa con centraggio stabile</string>
     <string name="appstrings_release_v2091_summary_api_versions_table_and_antenna_cache">Tabella comparativa delle versioni dei database per server API in «Informazioni» e memorizzazione immediata delle antenne sulla mappa durante la navigazione</string>
+    <string name="appstrings_release_v2092_summary_home_status_banners_in_more_menu">Banner di stato, connettività e download armonizzati nel menu Altro e nella schermata iniziale</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registro richieste di rete</string>

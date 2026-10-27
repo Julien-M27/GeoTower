@@ -330,64 +330,72 @@ fun MoreScreen(navController: NavController) {
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
-        BoxWithConstraints(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .onGloballyPositioned { helpDragState.onContentPositioned(it) }
                 .padding(top = innerPadding.calculateTopPadding(), bottom = sizing.component(88.dp))
-                .padding(horizontal = sizing.spacing(20.dp), vertical = sizing.spacing(16.dp))
         ) {
-            val minHeight = maxHeight
-            HomeHelpCornerTargets(helpDragState)
+            fr.geotower.ui.components.HomeStatusBanners(navController = navController)
 
-            val scrollState = rememberScrollState()
-            Column(
+            BoxWithConstraints(
                 modifier = Modifier
+                    .weight(1f)
                     .fillMaxWidth()
-                    .heightIn(min = minHeight)
-                    .verticalScroll(scrollState),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .onGloballyPositioned { helpDragState.onContentPositioned(it) }
+                    .padding(horizontal = sizing.spacing(20.dp), vertical = sizing.spacing(16.dp))
             ) {
-                Spacer(modifier = Modifier.weight(1f))
+                val minHeight = maxHeight
+                HomeHelpCornerTargets(helpDragState)
 
+                val scrollState = rememberScrollState()
                 Column(
                     modifier = Modifier
-                        .widthIn(max = 500.dp)
-                        .fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(sizing.spacing(16.dp)),
+                        .fillMaxWidth()
+                        .heightIn(min = minHeight)
+                        .verticalScroll(scrollState),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    entries.forEach { entry ->
-                        key(entry.id) {
-                            HomeMenuSlot(
-                                state = reorderState,
-                                id = entry.id,
-                                enabled = reorderEnabled && entries.size > 1
-                            ) {
-                                entry.content()
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    Column(
+                        modifier = Modifier
+                            .widthIn(max = 500.dp)
+                            .fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(sizing.spacing(16.dp)),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        entries.forEach { entry ->
+                            key(entry.id) {
+                                HomeMenuSlot(
+                                    state = reorderState,
+                                    id = entry.id,
+                                    enabled = reorderEnabled && entries.size > 1
+                                ) {
+                                    entry.content()
+                                }
                             }
                         }
                     }
+
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    AboutSection(version = appVersion)
+                    Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
                 }
 
-                Spacer(modifier = Modifier.weight(1f))
-
-                AboutSection(version = appVersion)
-                Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
-            }
-
-            if (showHelp) {
-                HomeHelpFab(
-                    state = helpDragState,
-                    draggable = canDragHelpButton,
-                    containerColor = paleColor,
-                    contentColor = onPaleColor,
-                    onClick = { safeClick { navController.navigate("help") { launchSingleTop = true } } },
-                    modifier = Modifier
-                        .align(helpButtonAlignment)
-                        .padding(helpButtonPadding)
-                        .zIndex(2f)
-                )
+                if (showHelp) {
+                    HomeHelpFab(
+                        state = helpDragState,
+                        draggable = canDragHelpButton,
+                        containerColor = paleColor,
+                        contentColor = onPaleColor,
+                        onClick = { safeClick { navController.navigate("help") { launchSingleTop = true } } },
+                        modifier = Modifier
+                            .align(helpButtonAlignment)
+                            .padding(helpButtonPadding)
+                            .zIndex(2f)
+                    )
+                }
             }
         }
     }

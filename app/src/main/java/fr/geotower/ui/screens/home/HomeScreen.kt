@@ -139,27 +139,6 @@ import fr.geotower.utils.AppLogger
 import fr.geotower.utils.OperatorLogos
 import kotlinx.coroutines.launch
 
-private const val TAG_HOME = "GeoTowerDb"
-private const val PREF_HOME_ANNOUNCEMENT_DISMISSED = "home_announcement_dismissed_key"
-
-private fun databaseProgressKey(target: DatabaseBulkUpdate.Target): String = when (target) {
-    DatabaseBulkUpdate.Target.MOBILE -> DatabaseDownloadWorker.KEY_PROGRESS
-    DatabaseBulkUpdate.Target.RADIO -> RadioDatabaseDownloadWorker.KEY_PROGRESS
-    DatabaseBulkUpdate.Target.ENB -> EnbDatabaseDownloadWorker.KEY_PROGRESS
-}
-
-private fun databasePauseKey(target: DatabaseBulkUpdate.Target): String = when (target) {
-    DatabaseBulkUpdate.Target.MOBILE -> OperationPauseStore.MOBILE_DB_DOWNLOAD
-    DatabaseBulkUpdate.Target.RADIO -> OperationPauseStore.RADIO_DB_DOWNLOAD
-    DatabaseBulkUpdate.Target.ENB -> OperationPauseStore.ENB_DB_DOWNLOAD
-}
-
-private fun databaseSettingsSection(target: DatabaseBulkUpdate.Target): String = when (target) {
-    DatabaseBulkUpdate.Target.MOBILE -> "db_mobile"
-    DatabaseBulkUpdate.Target.RADIO -> "db_radio"
-    DatabaseBulkUpdate.Target.ENB -> "db_enb"
-}
-
 private data class HomeMenuButtonMetrics(
     val width: Dp,
     val height: Dp,
@@ -200,54 +179,13 @@ fun HomeScreen(navController: NavController) {
         }
     }
 
-    // ---> DÉTECTION DE LA DISPONIBILITÉ DE LA LOCALISATION <---
-    // Réévaluée en continu : permission coupée OU localisation (GPS) désactivée au niveau système.
-    // Si l'un des deux manque, on affiche un bandeau d'alerte en haut de l'accueil.
-    val locationReadinessState = rememberLocationReadinessState()
-    val readiness by locationReadinessState
-    val locationPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestMultiplePermissions()
-    ) { result ->
-        val granted = result[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
-            result[Manifest.permission.ACCESS_COARSE_LOCATION] == true
-        // Recalcule tout de suite le verdict complet (permission + services).
-        locationReadinessState.value = locationReadiness(context)
-        if (!granted) {
-            // Refus définitif (« Ne plus demander ») : la boîte système ne s'affiche plus,
-            // on renvoie donc vers les réglages de l'app.
-            val canAskAgain = activity?.let {
-                ActivityCompat.shouldShowRequestPermissionRationale(it, Manifest.permission.ACCESS_FINE_LOCATION) ||
-                    ActivityCompat.shouldShowRequestPermissionRationale(it, Manifest.permission.ACCESS_COARSE_LOCATION)
-            } ?: false
-            if (!canAskAgain) openAppLocationSettings(context)
-        }
-    }
-    // Action du bouton : selon la cause, on demande la permission OU on ouvre les réglages de localisation.
-    val onFixLocation: () -> Unit = {
-        safeClick {
-            when (readiness) {
-                LocationReadiness.PermissionMissing -> locationPermissionLauncher.launch(
-                    arrayOf(
-                        Manifest.permission.ACCESS_FINE_LOCATION,
-                        Manifest.permission.ACCESS_COARSE_LOCATION
-                    )
-                )
-                LocationReadiness.ServicesOff -> openLocationSourceSettings(context)
-                LocationReadiness.Ready -> {}
-            }
-        }
-    }
+    var hideHomeLogo by remember { mutableStateOf(false) }
+    var hasHomeBannerFromComponent by remember { mutableStateOf(false) }
 
     // ---> 1. LECTURE DU CHOIX DU LOGO D'ACCUEIL <---
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
     val homeLogoChoice = prefs.getString("home_logo_choice", "app") ?: "app"
     val featureFlags by RemoteFeatureFlags.config
-    val canStartDatabaseDownload =
-        featureFlags.isDatabaseDownloadAllowed(RemoteFeatureFlags.DatabaseTarget.MOBILE)
-    var dismissedHomeAnnouncementKey by remember {
-        mutableStateOf(prefs.getString(PREF_HOME_ANNOUNCEMENT_DISMISSED, "") ?: "")
-    }
-
 
     // --- 1. LECTURE RÉACTIVE DU THÈME ET DESIGN ---
     val uiStyle = LocalGeoTowerUiStyle.current
@@ -277,78 +215,11 @@ fun HomeScreen(navController: NavController) {
     // ---> 1. AJOUT : ON ÉCOUTE LE RÉSEAU ICI <---
     val isOnline by fr.geotower.utils.rememberNetworkConnectivityState()
 
-    // ---> ÉTAT DU SERVEUR GEOTOWER (réseau présent mais API muette : maintenance, panne, blocage) <---
-    // Distinct du bandeau hors-ligne : on ne l'affiche que si l'appareil a bien du réseau.
-    val serverStatus by rememberServerReachabilityState(isOnline)
-    val isServerUnreachable = isOnline && serverStatus == ServerStatus.UNREACHABLE
-
     LaunchedEffect(Unit) {
         if (logoResId == 0) AppIconManager.getLogoResId(context)
     }
-    // ---> LOGIQUE DE VÉRIFICATION DE LA BASE DE DONNÉES <---
-    val workManager = remember { androidx.work.WorkManager.getInstance(context) }
 
-    // ✅ On écoute les trois téléchargements : une mise à jour groupée peut enchaîner la base
-    // mobile, la base radio et la base eNB/gNB dans une seule file WorkManager.
-    val mobileWorkInfos by workManager
-        .getWorkInfosByTagFlow(DatabaseDownloadWorker.WORK_TAG)
-        .collectAsState(initial = emptyList())
-    val radioWorkInfos by workManager
-        .getWorkInfosByTagFlow(RadioDatabaseDownloadWorker.WORK_TAG)
-        .collectAsState(initial = emptyList())
-    val enbWorkInfos by workManager
-        .getWorkInfosByTagFlow(EnbDatabaseDownloadWorker.WORK_TAG)
-        .collectAsState(initial = emptyList())
-    val activeDatabaseWork = listOf(
-        mobileWorkInfos.map { workInfo -> workInfo to DatabaseBulkUpdate.Target.MOBILE },
-        radioWorkInfos.map { workInfo -> workInfo to DatabaseBulkUpdate.Target.RADIO },
-        enbWorkInfos.map { workInfo -> workInfo to DatabaseBulkUpdate.Target.ENB }
-    ).flatten().firstOrNull { (workInfo, _) ->
-        workInfo.state == androidx.work.WorkInfo.State.RUNNING ||
-            workInfo.state == androidx.work.WorkInfo.State.ENQUEUED ||
-            workInfo.state == androidx.work.WorkInfo.State.BLOCKED
-    }
-    val currentWork = activeDatabaseWork?.first
-    val currentWorkTarget = activeDatabaseWork?.second
-    val isSyncing = currentWork != null
-    // ✅ NOUVEAU : On récupère la progression de 0 à 100
-    val downloadProgress = if (currentWork != null && currentWorkTarget != null) {
-        currentWork.progress.getInt(databaseProgressKey(currentWorkTarget), 0)
-    } else {
-        0
-    }
-
-    // ✅ Retour visuel immédiat au clic « Télécharger » : WorkManager met un court instant à passer
-    // le worker à ENQUEUED/RUNNING. Ce latch bascule le bandeau en mode « téléchargement » dès le
-    // clic, puis est relâché quand isSyncing prend le relais (voir LaunchedEffect plus bas). Sans lui,
-    // le bandeau clignoterait (disparition « Mise à jour disponible » → réapparition « Téléchargement en cours »).
-    var isDownloadStarting by remember { mutableStateOf(false) }
-    val isDownloading = isSyncing || isDownloadStarting
-
-    // Même latch, côté génération locale : le bandeau bascule sur « génération en cours » dès le
-    // clic sur « Régénérer », sans attendre que WorkManager passe le worker à ENQUEUED.
-    var isRebuildStarting by remember { mutableStateOf(false) }
-
-    // Génération locale en cours : la base mobile est construite dans un fichier à part et n'est
-    // installée qu'à la toute fin. Pendant ce temps elle est bel et bien absente du disque — le
-    // bandeau doit dire « génération en cours », surtout pas « base manquante ».
-    val localBuild = rememberLocalDbBuildStatus()
-    val isGeneratingDb = localBuild.running || isRebuildStarting
-
-    val localDbState by AppConfig.localDatabaseState
-    var wasSyncing by remember { mutableStateOf(isSyncing) }
-    var isUpdateAvailable by remember { mutableStateOf(false) }
-    var availableDatabaseUpdates by remember {
-        mutableStateOf<List<DatabaseBulkUpdate.TargetAction>>(emptyList())
-    }
-    // La base installée a été GÉNÉRÉE sur l'appareil : une nouvelle version se propose alors en
-    // régénération, pas en téléchargement (vérifié en même temps que la version distante).
-    var isRebuildOffer by remember { mutableStateOf(false) }
-    val isDbChecked = localDbState != null
-    val isDbMissing = localDbState == GeoTowerDatabaseValidator.LocalDatabaseState.MISSING
-    val isDbInvalid = localDbState == GeoTowerDatabaseValidator.LocalDatabaseState.INVALID
-
-    val lifecycleOwner = LocalLifecycleOwner.current // À ajouter avant les Effects
+    val lifecycleOwner = LocalLifecycleOwner.current
 
     // Pastille du bouton « Notifications ». Relue à chaque ON_RESUME, ce qui couvre les deux cas :
     // le retour du journal (l'ouvrir vaut lecture, la pastille doit retomber) et le retour
@@ -371,145 +242,6 @@ fun HomeScreen(navController: NavController) {
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    // ✅ BLOC 1 : On réutilise l'état validé au splash/onboarding et on ne rescane qu'en fallback ou après téléchargement.
-    LaunchedEffect(isOnline) {
-        if (isOnline) {
-            AppUpdateNotifier.checkAndNotify(context.applicationContext)
-        }
-    }
-
-    DisposableEffect(lifecycleOwner, isOnline) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME && isOnline) {
-                scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                    AppUpdateNotifier.checkAndNotify(context.applicationContext)
-                }
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
-        }
-    }
-
-    LaunchedEffect(localBuild.mobileRunning) {
-        // Idem côté génération : le worker tourne, le latch a fait son office.
-        if (localBuild.mobileRunning) isRebuildStarting = false
-    }
-
-    LaunchedEffect(isSyncing) {
-        // Le worker a démarré (ENQUEUED/RUNNING) : on relâche le latch de retour visuel immédiat.
-        if (isSyncing) isDownloadStarting = false
-        if (!isSyncing && (AppConfig.localDatabaseState.value == null || wasSyncing)) {
-            AppConfig.localDatabaseState.value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                GeoTowerDatabaseValidator.getInstalledDatabaseStatus(context).state
-            }
-        }
-        wasSyncing = isSyncing
-    }
-
-    // ✅ BLOC 2 : Vérification réseau à CHAQUE retour sur l'écran (ON_RESUME)
-    DisposableEffect(lifecycleOwner, isOnline, isSyncing, localDbState) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (
-                event == Lifecycle.Event.ON_RESUME &&
-                isOnline &&
-                !isSyncing &&
-                localDbState == GeoTowerDatabaseValidator.LocalDatabaseState.VALID
-            ) {
-                scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                    try {
-                        val remote = fr.geotower.data.api.DatabaseDownloader.getLatestDatabaseUpdateInfo()
-
-                        val localVersion = GeoTowerDatabaseValidator.getInstalledDatabaseVersion(context)
-                        val hasRemoteUpdate = fr.geotower.data.api.DatabaseDownloader
-                            .isRemoteDatabaseUpdateAvailable(context, remote, localVersion)
-                        // Base générée sur l'appareil : la nouvelle version se propose en
-                        // régénération, la même donnée ANFR étant à portée de build local.
-                        val rebuildOffer = hasRemoteUpdate && LocalDbRebuildOffer.forMobile(context)
-                        // La base mobile est déjà connue : ne la masque pas derrière les
-                        // vérifications radio/eNB restantes. Le bandeau peut donc proposer
-                        // immédiatement l'action, sans lancer le téléchargement tout seul.
-                        val mobileUpdateActions = if (hasRemoteUpdate) {
-                            listOf(
-                                DatabaseBulkUpdate.TargetAction(
-                                    DatabaseBulkUpdate.Target.MOBILE,
-                                    DatabaseBulkUpdate.Action.UPDATE
-                                )
-                            )
-                        } else {
-                            emptyList()
-                        }
-                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                            isRebuildOffer = rebuildOffer
-                            availableDatabaseUpdates = mobileUpdateActions
-                            isUpdateAvailable = mobileUpdateActions.isNotEmpty()
-                            fr.geotower.utils.AppConfig.isDbUpdateAvailable.value =
-                                mobileUpdateActions.isNotEmpty()
-                        }
-                        // La vérification groupée ajoute les bases radio et eNB/gNB. La base mobile
-                        // reste calculée ci-dessus afin de conserver le cas particulier de la
-                        // régénération locale, que la file de téléchargements ignore volontairement.
-                        val additionalUpdates = DatabaseBulkUpdate
-                            .checkAvailableUpdates(context, workManager) { partialResult ->
-                                val partialAdditionalUpdates = partialResult.targetActions.filter {
-                                    it.action == DatabaseBulkUpdate.Action.UPDATE &&
-                                        it.target != DatabaseBulkUpdate.Target.MOBILE
-                                }
-                                val partialUpdateActions = buildList {
-                                    if (hasRemoteUpdate) {
-                                        add(
-                                            DatabaseBulkUpdate.TargetAction(
-                                                DatabaseBulkUpdate.Target.MOBILE,
-                                                DatabaseBulkUpdate.Action.UPDATE
-                                            )
-                                        )
-                                    }
-                                    addAll(partialAdditionalUpdates)
-                                }.distinctBy { it.target }
-                                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                                    isRebuildOffer = rebuildOffer
-                                    availableDatabaseUpdates = partialUpdateActions
-                                    isUpdateAvailable = partialUpdateActions.isNotEmpty()
-                                    fr.geotower.utils.AppConfig.isDbUpdateAvailable.value =
-                                        partialUpdateActions.isNotEmpty()
-                                }
-                            }
-                            .targetActions
-                            .filter {
-                                it.action == DatabaseBulkUpdate.Action.UPDATE &&
-                                    it.target != DatabaseBulkUpdate.Target.MOBILE
-                            }
-                        val updateActions = buildList {
-                            if (hasRemoteUpdate) {
-                                add(
-                                    DatabaseBulkUpdate.TargetAction(
-                                        DatabaseBulkUpdate.Target.MOBILE,
-                                        DatabaseBulkUpdate.Action.UPDATE
-                                    )
-                                )
-                            }
-                            addAll(additionalUpdates)
-                        }.distinctBy { it.target }
-
-                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                            isRebuildOffer = rebuildOffer
-                            availableDatabaseUpdates = updateActions
-                            isUpdateAvailable = updateActions.isNotEmpty()
-                            fr.geotower.utils.AppConfig.isDbUpdateAvailable.value = updateActions.isNotEmpty()
-                        }
-                    } catch (e: Exception) {
-                        AppLogger.w(TAG_HOME, "Database update check failed", e)
-                    }
-                }
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
-        }
-    }
-
     // 1. On récupère juste le chiffre de la version dans le try/catch
     val rawVersion = remember {
         try {
@@ -530,170 +262,11 @@ fun HomeScreen(navController: NavController) {
     ) {
         // NOUVEAU : Une colonne principale qui contient le bandeau EN HAUT, puis le reste
         Column(modifier = Modifier.fillMaxSize()) {
-            HomeAnnouncementBanner(
-                announcement = featureFlags.homeAnnouncement,
-                dismissedKey = dismissedHomeAnnouncementKey,
-                onDismiss = { dismissKey ->
-                    dismissedHomeAnnouncementKey = dismissKey
-                    prefs.edit().putString(PREF_HOME_ANNOUNCEMENT_DISMISSED, dismissKey).apply()
-                }
-            )
-
-            // ---> 1. LE BANDEAU HORS-LIGNE (Pousse le contenu vers le bas au lieu de le cacher) <---
-            androidx.compose.animation.AnimatedVisibility(
-                visible = !isOnline,
-                // On utilise expand/shrink pour que ça écarte la page doucement
-                enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
-                exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut(),
-                modifier = Modifier.fillMaxWidth().padding(top = sizing.spacing(16.dp), start = sizing.spacing(16.dp), end = sizing.spacing(16.dp))
-            ) {
-                Surface(
-                    color = MaterialTheme.colorScheme.errorContainer,
-                    shape = RoundedCornerShape(16.dp),
-                    shadowElevation = 2.dp,
-                    modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(8.dp)) // Petite marge sous le bandeau
-                ) {
-                    Row(
-                        modifier = Modifier.padding(sizing.spacing(16.dp)),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.WifiOff,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onErrorContainer
-                        )
-                        Spacer(modifier = Modifier.width(sizing.spacing(12.dp)))
-                        Text(
-                            text = stringResource(R.string.appstrings_offline_message),
-                            color = MaterialTheme.colorScheme.onErrorContainer,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
-
-            // ---> LE BANDEAU « SERVEUR INJOIGNABLE » (réseau OK, mais l'API GeoTower ne répond pas) <---
-            ServerUnreachableBanner(visible = isServerUnreachable)
-
-            // ---> LE BANDEAU DE LOCALISATION DÉSACTIVÉE (permission coupée OU GPS éteint) <---
-            LocationUnavailableBanner(
-                readiness = readiness,
-                onFixClick = onFixLocation
-            )
-
-            // ---> 2. LE BANDEAU DE BASE DE DONNÉES (S'affiche juste en dessous si besoin) <---
-            val isDbUnavailable = isDbChecked && localDbState != GeoTowerDatabaseValidator.LocalDatabaseState.VALID
-            val isDbBannerVisible = isDbUnavailable || isUpdateAvailable || isDownloading || isGeneratingDb
-            // Un bandeau occupe le haut de l'écran : on masque le logo (et on passe en grille sur
-            // grand écran) comme le font déjà le hors-ligne et le bandeau base de données.
-            val hideHomeLogo = isDbBannerVisible || isServerUnreachable
-
-            // Une base générée sur l'appareil se met à jour en la régénérant : le bandeau propose
-            // « Régénérer » au lieu de « Télécharger ». Seulement quand la base installée est
-            // valide (mise à jour disponible) — manquante ou invalide, on repart du téléchargement.
-            val isRebuildBanner = isRebuildOffer && isUpdateAvailable && !isDbMissing && !isDbInvalid
-            // Le bandeau est un résumé de l'état de la base : son appui doit retrouver la carte
-            // qui porte réellement cet état dans les réglages, pas seulement ouvrir leur accueil.
-            // Une génération/régénération vise la carte de génération locale. Pour un téléchargement
-            // ou une mise à jour unique, on vise la carte de la base concernée ; une file groupée
-            // revient au titre de la section pour laisser voir toutes les bases concernées.
-            val databaseBannerTargetSection = when {
-                isGeneratingDb -> "db_local_build"
-                isDownloading -> currentWorkTarget?.let(::databaseSettingsSection) ?: "database"
-                isRebuildBanner || AppConfig.dbForcedLocal() -> "db_local_build"
-                availableDatabaseUpdates.size == 1 ->
-                    databaseSettingsSection(availableDatabaseUpdates.first().target)
-                else -> "database"
-            }
-
-            val databaseNamesByTarget = mapOf(
-                DatabaseBulkUpdate.Target.MOBILE to stringResource(R.string.notification_history_type_db_mobile),
-                DatabaseBulkUpdate.Target.RADIO to stringResource(R.string.notification_history_type_db_radio),
-                DatabaseBulkUpdate.Target.ENB to stringResource(R.string.notification_history_type_db_enb)
-            )
-            val displayedDatabaseTargets = buildList {
-                if (isDbUnavailable) add(DatabaseBulkUpdate.Target.MOBILE)
-                if (isGeneratingDb) {
-                    if (localBuild.mobileRunning) add(DatabaseBulkUpdate.Target.MOBILE)
-                    if (localBuild.radioRunning) add(DatabaseBulkUpdate.Target.RADIO)
-                }
-                addAll(availableDatabaseUpdates.map { it.target })
-                currentWorkTarget?.let(::add)
-            }.distinct()
-            val displayedDatabaseNames = displayedDatabaseTargets.mapNotNull(databaseNamesByTarget::get)
-
-            DatabaseWarningBanner(
-                isMissing = isDbMissing,
-                isInvalid = isDbInvalid,
-                isUpdateAvailable = isUpdateAvailable,
-                isDownloading = isDownloading,
-                isGenerating = isGeneratingDb,
-                isRebuildOffer = isRebuildBanner,
-                databaseNames = displayedDatabaseNames,
-                downloadProgress = if (isGeneratingDb) localBuild.progress else downloadProgress,
-                onBannerClick = {
-                    safeClick("home_database_banner") {
-                        navController.navigate("settings?section=$databaseBannerTargetSection") {
-                            launchSingleTop = true
-                        }
-                    }
-                },
-                onDownloadClick = {
-                    // On cache le bandeau et on lance le téléchargement (ou la régénération) manuel
-                    val updatesToProcess = availableDatabaseUpdates
-                    isUpdateAvailable = false
-                    AppConfig.isDbUpdateAvailable.value = false
-
-                    if (isRebuildBanner) {
-                        // La base mobile générée localement doit être reconstruite. Les autres bases
-                        // obsolètes éventuelles suivent ensuite leur propre téléchargement groupé.
-                        isRebuildStarting = true
-                        OperationPauseStore.clear(context, OperationPauseStore.LOCAL_DB_BUILD)
-                        LocalDbBuildWorker.enqueue(
-                            workManager,
-                            mobile = true,
-                            radioBroadcast = false,
-                            nonMobileTech = false
-                        )
-                        val otherUpdates = updatesToProcess.filter {
-                            it.target != DatabaseBulkUpdate.Target.MOBILE
-                        }
-                        if (otherUpdates.isNotEmpty()) {
-                            otherUpdates.forEach { update ->
-                                OperationPauseStore.clear(context, databasePauseKey(update.target))
-                            }
-                            DatabaseBulkUpdate.enqueueDetailed(workManager, otherUpdates)
-                        }
-                    } else if (updatesToProcess.isNotEmpty() && canStartDatabaseDownload &&
-                        RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.DATABASE_DOWNLOAD) &&
-                        RemoteFeatureFlags.isActionEnabled(RemoteFeatureFlags.Actions.START_DATABASE_DOWNLOAD) &&
-                        RemoteFeatureFlags.isWorkerEnabled(RemoteFeatureFlags.Workers.DATABASE_DOWNLOAD)
-                    ) {
-                        updatesToProcess.forEach { update ->
-                            OperationPauseStore.clear(context, databasePauseKey(update.target))
-                        }
-                        // Une seule mise à jour mobile garde son chemin historique ; dès qu'une
-                        // autre base est concernée, on utilise la file séquentielle commune.
-                        isDownloadStarting = true
-                        if (updatesToProcess.size == 1 &&
-                            updatesToProcess.first().target == DatabaseBulkUpdate.Target.MOBILE
-                        ) {
-                            DatabaseDownloadWorker.enqueue(workManager)
-                        } else {
-                            DatabaseBulkUpdate.enqueueDetailed(workManager, updatesToProcess)
-                        }
-                    } else if (canStartDatabaseDownload &&
-                        RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.DATABASE_DOWNLOAD) &&
-                        RemoteFeatureFlags.isActionEnabled(RemoteFeatureFlags.Actions.START_DATABASE_DOWNLOAD) &&
-                        RemoteFeatureFlags.isWorkerEnabled(RemoteFeatureFlags.Workers.DATABASE_DOWNLOAD)
-                    ) {
-                        // Retour visuel immédiat : on bascule le bandeau en « Téléchargement en cours »
-                        // sans attendre que WorkManager passe le worker à ENQUEUED.
-                        isDownloadStarting = true
-                        OperationPauseStore.clear(context, OperationPauseStore.MOBILE_DB_DOWNLOAD)
-                        DatabaseDownloadWorker.enqueue(workManager)
-                    }
+            fr.geotower.ui.components.HomeStatusBanners(
+                navController = navController,
+                onBannerVisibilityChange = { hideLogo, hasBanner ->
+                    hideHomeLogo = hideLogo
+                    hasHomeBannerFromComponent = hasBanner
                 }
             )
 
@@ -710,15 +283,17 @@ fun HomeScreen(navController: NavController) {
                 // arrivait « zoomé » et ne tenait plus dans la hauteur. On garde donc les métriques
                 // compactes, comme le fait déjà le paysage court.
                 val isCompactExpanded = !isLandscape && (maxWidth < 720.dp || maxHeight < 900.dp)
+                val isSideBySide = isLandscape || isExpanded
+                val isCompactSideBySide = isCompactLandscape || isCompactExpanded
                 // Hauteur minimale pour forcer l'espace entre le titre, les boutons et le "À propos"
                 val minHeight = maxHeight
-                val hasHomeBanner = !isOnline || hideHomeLogo
-                val landscapeFallbackMinHeight = sizing.component(if (isCompactLandscape) 520.dp else 680.dp)
-                val landscapeMenuUsesGrid = hasHomeBanner && minHeight < landscapeFallbackMinHeight
+                val hasHomeBanner = !isOnline || hideHomeLogo || hasHomeBannerFromComponent
+                val sideBySideFallbackMinHeight = sizing.component(if (isCompactSideBySide) 520.dp else 680.dp)
+                val sideBySideMenuUsesGrid = hasHomeBanner && minHeight < sideBySideFallbackMinHeight
                 val showHelpButton = prefs.getBoolean("show_home_help", true)
                 // Le lien « À propos » est un élément du menu (voir MenuButtonsList) sauf en
-                // paysage, où il garde sa place sous le titre : la disposition n'y a pas de pied de
-                // page. Le réglage vaut pour les deux.
+                // disposition côte à côte (paysage, tablettes et folds), où il garde sa place
+                // sous le titre : la disposition n'y a pas de pied de page. Le réglage vaut pour les deux.
                 val showAboutLink = HomePrefs.showAboutLink.read(prefs) &&
                     featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.ABOUT)
                 val helpButtonPosition by AppConfig.homeHelpPosition
@@ -728,11 +303,11 @@ fun HomeScreen(navController: NavController) {
                 // atterrit exactement là où la pastille l'annonçait.
                 val helpButtonPadding = homeHelpCornerPadding(helpButtonPosition, sizing)
                 // Le bouton « Aides » se déplace aussi par appui long, entre ses quatre coins. Pas
-                // en paysage : cette disposition a son propre bouton d'aide, sous le titre.
+                // en côte à côte : cette disposition a son propre bouton d'aide, sous le titre.
                 val helpDragState = rememberHomeHelpDragState { corner ->
                     AppConfig.setHomeHelpPosition(prefs, corner)
                 }
-                val canDragHelpButton = AppConfig.homeLongPressReorder.value && !isLandscape
+                val canDragHelpButton = AppConfig.homeLongPressReorder.value && !isSideBySide
 
                 Box(
                     modifier = Modifier
@@ -743,10 +318,8 @@ fun HomeScreen(navController: NavController) {
                     // donc sous le bouton qu'on déplace au-dessus d'elles.
                     HomeHelpCornerTargets(helpDragState)
 
-                    // Une seule disposition est composée à la fois ; les trois états sont
-                    // déclarés ici pour que la pastille « haut / bas » sache laquelle piloter.
+                    // Deux états de défilement : côte à côte (paysage, tablettes, folds) ou smartphone portrait.
                     val menuScrollState = rememberScrollState()
-                    val foldScrollState = rememberScrollState()
                     val phoneScrollState = rememberScrollState()
 
                     val showQuitButton by AppConfig.homeShowQuitButton
@@ -774,24 +347,23 @@ fun HomeScreen(navController: NavController) {
                             .zIndex(3f)
                     )
 
-                    // Un Fold compact peut avoir une largeur légèrement supérieure à sa hauteur
-                    // tout en restant un grand écran. Il doit conserver la disposition Fold
-                    // (logo à gauche + colonne), contrairement au vrai paysage d'un téléphone.
-                    if (isLandscape && (!isExpanded || !isCompactLandscape)) {
+                    // Disposition côte à côte : paysage ainsi que folds et tablettes (vertical comme horizontal).
+                    // Le logo, le titre, le lien « À propos », l'aide et la version sont à gauche ; le menu est à droite.
+                    if (isSideBySide) {
                         Row(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .padding(
-                                    horizontal = if (isCompactLandscape) 28.dp else 48.dp,
-                                    vertical = if (isCompactLandscape) 12.dp else 24.dp
+                                    horizontal = if (isCompactSideBySide) 28.dp else 48.dp,
+                                    vertical = if (isCompactSideBySide) 12.dp else 24.dp
                                 )
                                 .navigationBarsPadding(),
-                            horizontalArrangement = Arrangement.spacedBy(if (isCompactLandscape) 24.dp else 40.dp),
+                            horizontalArrangement = Arrangement.spacedBy(if (isCompactSideBySide) 24.dp else 40.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(
                                 modifier = Modifier
-                                    .weight(if (isCompactLandscape) 0.9f else 1f)
+                                    .weight(if (isCompactSideBySide) 0.9f else 1f)
                                     .fillMaxHeight(),
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.Center
@@ -799,20 +371,20 @@ fun HomeScreen(navController: NavController) {
                                 DrawableImage(
                                     resId = displayLogoResId,
                                     modifier = Modifier
-                                        .size(sizing.component(if (isCompactLandscape) 128.dp else 220.dp))
-                                        .clip(RoundedCornerShape(if (isCompactLandscape) 24.dp else 36.dp))
+                                        .size(sizing.component(if (isCompactSideBySide) 128.dp else 220.dp))
+                                        .clip(RoundedCornerShape(if (isCompactSideBySide) 24.dp else 36.dp))
                                 )
-                                Spacer(modifier = Modifier.height(sizing.spacing(if (isCompactLandscape) 14.dp else 24.dp)))
+                                Spacer(modifier = Modifier.height(sizing.spacing(if (isCompactSideBySide) 14.dp else 24.dp)))
                                 Text(
                                     text = "GeoTower",
                                     style = sizing.textStyle(MaterialTheme.typography.displayLarge),
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.primary,
-                                    fontSize = sizing.text(if (isCompactLandscape) 44.sp else 64.sp),
+                                    fontSize = sizing.text(if (isCompactSideBySide) 44.sp else 64.sp),
                                     textAlign = TextAlign.Center,
                                     modifier = Modifier.fillMaxWidth()
                                 )
-                                Spacer(modifier = Modifier.height(sizing.spacing(if (isCompactLandscape) 10.dp else 18.dp)))
+                                Spacer(modifier = Modifier.height(sizing.spacing(if (isCompactSideBySide) 10.dp else 18.dp)))
                                 LandscapeHomeInfoActions(
                                     navController = navController,
                                     version = appVersion,
@@ -824,13 +396,13 @@ fun HomeScreen(navController: NavController) {
 
                             Box(
                                 modifier = Modifier
-                                    .weight(if (isCompactLandscape) 1.35f else 1.25f)
+                                    .weight(if (isCompactSideBySide) 1.35f else 1.25f)
                                     .fillMaxHeight(),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Column(
                                     modifier = Modifier
-                                        .widthIn(max = if (isCompactLandscape) 620.dp else 700.dp)
+                                        .widthIn(max = if (isCompactSideBySide) 620.dp else 700.dp)
                                         .pageScrollbar(PageScrollPrefs.HOME, menuScrollState)
                                         .verticalScroll(menuScrollState),
                                     horizontalAlignment = Alignment.CenterHorizontally
@@ -844,107 +416,13 @@ fun HomeScreen(navController: NavController) {
                                         isOnline = isOnline && !hideHomeLogo,
                                         logoResId = displayLogoResId,
                                         isExpanded = true,
-                                         isGrid = landscapeMenuUsesGrid,
-                                        compact = true,
+                                        isGrid = sideBySideMenuUsesGrid,
+                                        compact = isCompactSideBySide,
                                         // Le lien « À propos » est déjà sous le titre, à gauche.
                                         includeAbout = false
                                     )
-
                                 }
                             }
-                        }
-                    } else if (isExpanded) {
-                        // --- DISPOSITION FOLD (TABLETTE) ---
-                        val prefsFold = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
-                        val showLogo = prefsFold.getBoolean("show_home_logo", true)
-                        val isFoldCompact = isCompactExpanded || isCompactLandscape
-                        val foldViewportHeight = minHeight
-                        val hasFoldBanner = hasHomeBanner
-                        // La disposition latérale normale tient avec une marge confortable sur un
-                        // Fold. On ne revient à la grille que si un bandeau laisse réellement une
-                        // hauteur trop faible ; la simple présence fugace d'un bandeau ne suffit pas.
-                        val foldFallbackMinHeight = sizing.component(if (isFoldCompact) 640.dp else 760.dp)
-                        val bannerActuallyCrowdsFold = hasFoldBanner &&
-                            foldViewportHeight < foldFallbackMinHeight
-
-                        // Disposition par défaut : logo à gauche, tous les menus en colonne à droite.
-                        // Le logo reste optionnel : s'il est masqué, le menu reprend simplement la
-                        // colonne centrée du téléphone. La grille est réservée au seul cas où un
-                        // bandeau gêne réellement la hauteur de la disposition normale.
-                        val isGrid = bannerActuallyCrowdsFold
-                        val hasFoldSideContent = showLogo && !isGrid
-
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = minHeight)
-                                .pageScrollbar(PageScrollPrefs.HOME, foldScrollState)
-                                .verticalScroll(foldScrollState)
-                                .padding(
-                                    horizontal = sizing.spacing(if (isCompactExpanded) 24.dp else 32.dp),
-                                    vertical = sizing.spacing(if (isFoldCompact) 12.dp else 24.dp)
-                                ),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Spacer(modifier = Modifier.weight(1f))
-
-                            // 📦 BLOC CENTRAL "SOUDÉ" (Titre + Menu)
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(
-                                    text = "GeoTower",
-                                    style = sizing.textStyle(MaterialTheme.typography.displayLarge),
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    fontSize = sizing.text(if (isFoldCompact) 46.sp else 64.sp),
-                                    textAlign = TextAlign.Center,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(bottom = sizing.spacing(if (isFoldCompact) 20.dp else 32.dp))
-                                )
-
-                                if (isGrid) {
-                                    // --- DISPOSITION EN GRILLE ---
-                                    MenuButtonsList(navController, useOneUi, buttonBgColor, paleColor, onPaleColor, isOnline && !hideHomeLogo, displayLogoResId, isExpanded, isGrid = true, compact = isCompactExpanded)
-                                } else if (hasFoldSideContent) {
-                                    // --- DISPOSITION CÔTE À CÔTE (Classique) ---
-                                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                                        // Sur Fold, les colonnes ne sont pas à 50/50 : les boutons ont une
-                                        // largeur fixe (métriques compactes) qui ne rentre pas dans la moitié
-                                        // d'un écran de ~674.dp, on donne donc la part large au menu.
-                                        Column(modifier = Modifier.weight(if (isFoldCompact) 0.75f else 1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                                            DrawableImage(
-                                                resId = displayLogoResId,
-                                                modifier = Modifier
-                                                    .size(sizing.component(if (isFoldCompact) 190.dp else 280.dp))
-                                                    .clip(RoundedCornerShape(if (isFoldCompact) 24.dp else 32.dp))
-                                            )
-                                        }
-                                        Column(modifier = Modifier.weight(if (isFoldCompact) 1.25f else 1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                                            // ✅ CORRECTION : On passe "isOnline && !hideHomeLogo" pour forcer le masquage du logo sur tous les appareils si besoin
-                                            MenuButtonsList(navController, useOneUi, buttonBgColor, paleColor, onPaleColor, isOnline && !hideHomeLogo, displayLogoResId, isExpanded, isGrid = false, compact = isCompactExpanded)
-                                        }
-                                    }
-                                } else {
-                                    // --- DISPOSITION EN COLONNE (logo masqué) ---
-                                    MenuButtonsList(
-                                        navController,
-                                        useOneUi,
-                                        buttonBgColor,
-                                        paleColor,
-                                        onPaleColor,
-                                        isOnline && !hideHomeLogo,
-                                        displayLogoResId,
-                                        isExpanded,
-                                        isGrid = false,
-                                        compact = isFoldCompact
-                                    )
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.weight(1f))
-
-                            Spacer(modifier = Modifier.height(sizing.spacing(if (isFoldCompact) 16.dp else 32.dp) + androidx.compose.foundation.layout.WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()))
-                            AboutSection(version = appVersion)
                         }
                     } else {
                         // --- DISPOSITION SMARTPHONE ---
@@ -984,9 +462,9 @@ fun HomeScreen(navController: NavController) {
                     // Les quatre coins sont posés sur la page, y compris ceux du bas : dans le pied
                     // de page ils suivaient le défilement et se retrouvaient à moitié sous le bord
                     // bas dès que l'accueil dépassait d'un cheveu la hauteur de l'écran.
-                    // En paysage, seuls les coins du haut : cette disposition a déjà son bouton
+                    // En mode côte à côte, seuls les coins du haut : cette disposition a déjà son bouton
                     // d'aide sous le titre, et son pied de page tient sur une ligne.
-                    if (showHelpButton && !(isLandscape && isHelpButtonAtBottom)) {
+                    if (showHelpButton && !(isSideBySide && isHelpButtonAtBottom)) {
                         HomeHelpFab(
                             state = helpDragState,
                             draggable = canDragHelpButton,
@@ -1002,11 +480,7 @@ fun HomeScreen(navController: NavController) {
 
                     PageScrollEdgeButtons(
                         page = PageScrollPrefs.HOME,
-                        scrollState = when {
-                            isLandscape -> menuScrollState
-                            isExpanded -> foldScrollState
-                            else -> phoneScrollState
-                        }
+                        scrollState = if (isSideBySide) menuScrollState else phoneScrollState
                     )
                 }
             }
@@ -1071,113 +545,6 @@ internal fun HomeNotificationsButton(
 
 internal fun notificationBadgeText(unreadCount: Int): String =
     if (unreadCount > 99) "99+" else unreadCount.toString()
-
-@Composable
-private fun HomeAnnouncementBanner(
-    announcement: RemoteHomeAnnouncement,
-    dismissedKey: String,
-    onDismiss: (String) -> Unit
-) {
-    val sizing = LocalGeoTowerUiSizing.current
-    val languageTag = LocalConfiguration.current.locales[0]?.toLanguageTag()
-    val localizedText = announcement.localizedText(languageTag)
-    val currentDismissKey = announcement.dismissKey()
-    val isVisible = announcement.enabled &&
-        announcement.isVisibleForAppVersion(BuildConfig.VERSION_NAME) &&
-        localizedText.hasContent() &&
-        (!announcement.dismissible || dismissedKey != currentDismissKey)
-    val actionUrl = announcement.httpActionUrlOrNull()
-    val uriHandler = LocalUriHandler.current
-    val closeLabel = stringResource(R.string.appstrings_close)
-    val openLabel = localizedText.actionLabel.ifBlank { stringResource(R.string.appstrings_open) }
-
-    androidx.compose.animation.AnimatedVisibility(
-        visible = isVisible,
-        enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
-        exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut(),
-        modifier = Modifier.fillMaxWidth().padding(top = sizing.spacing(16.dp), start = sizing.spacing(16.dp), end = sizing.spacing(16.dp))
-    ) {
-        val containerColor = when (announcement.severity) {
-            "error" -> MaterialTheme.colorScheme.errorContainer
-            "warning" -> MaterialTheme.colorScheme.tertiaryContainer
-            "success" -> MaterialTheme.colorScheme.primaryContainer
-            else -> MaterialTheme.colorScheme.primaryContainer
-        }
-        val contentColor = when (announcement.severity) {
-            "error" -> MaterialTheme.colorScheme.onErrorContainer
-            "warning" -> MaterialTheme.colorScheme.onTertiaryContainer
-            "success" -> MaterialTheme.colorScheme.onPrimaryContainer
-            else -> MaterialTheme.colorScheme.onPrimaryContainer
-        }
-        val icon = when (announcement.severity) {
-            "error" -> Icons.Default.Error
-            "warning" -> Icons.Default.Warning
-            "success" -> Icons.Default.CheckCircle
-            else -> Icons.Default.Info
-        }
-
-        Surface(
-            color = containerColor,
-            shape = RoundedCornerShape(16.dp),
-            shadowElevation = 2.dp,
-            modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(8.dp))
-        ) {
-            Row(
-                modifier = Modifier.padding(sizing.spacing(16.dp)),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = contentColor,
-                    modifier = Modifier.size(sizing.component(24.dp))
-                )
-                Spacer(modifier = Modifier.width(sizing.spacing(12.dp)))
-                Column(modifier = Modifier.weight(1f)) {
-                    if (localizedText.title.isNotBlank()) {
-                        Text(
-                            text = localizedText.title,
-                            color = contentColor,
-                            fontWeight = FontWeight.Bold,
-                            style = sizing.textStyle(MaterialTheme.typography.titleSmall)
-                        )
-                    }
-                    if (localizedText.message.isNotBlank()) {
-                        Text(
-                            text = localizedText.message,
-                            color = contentColor,
-                            style = sizing.textStyle(MaterialTheme.typography.bodySmall)
-                        )
-                    }
-                    if (actionUrl != null) {
-                        TextButton(
-                            onClick = { uriHandler.openUri(actionUrl) },
-                            colors = ButtonDefaults.textButtonColors(contentColor = contentColor),
-                            contentPadding = PaddingValues(horizontal = sizing.spacing(0.dp), vertical = sizing.spacing(4.dp))
-                        ) {
-                            Text(openLabel, fontWeight = FontWeight.Bold)
-                            Spacer(modifier = Modifier.width(sizing.spacing(6.dp)))
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.OpenInNew,
-                                contentDescription = null,
-                                modifier = Modifier.size(sizing.component(16.dp))
-                            )
-                        }
-                    }
-                }
-                if (announcement.dismissible) {
-                    IconButton(onClick = { onDismiss(currentDismissKey) }) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = closeLabel,
-                            tint = contentColor
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
 
 @Composable
 private fun LandscapeHomeInfoActions(
@@ -1553,230 +920,4 @@ fun MenuButton(
 @Composable
 fun DrawableImage(resId: Int, modifier: Modifier = Modifier) {
     AppLogoImage(resId = resId, modifier = modifier)
-}
-
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-fun DatabaseWarningBanner(
-    isMissing: Boolean,
-    isInvalid: Boolean,
-    isUpdateAvailable: Boolean,
-    isDownloading: Boolean,
-    // Génération locale de la base en cours : prime sur « manquante » / « invalide », puisque la
-    // base absente est précisément celle en train d'être construite sur l'appareil.
-    isGenerating: Boolean,
-    // La base installée a été générée sur l'appareil : la mise à jour se propose en « Régénérer »
-    // plutôt qu'en « Télécharger » (le bouton lance alors la génération locale).
-    isRebuildOffer: Boolean = false,
-    // Les libellés des bases concernées. La liste permet au composant d'afficher plusieurs bases
-    // si le bandeau est réutilisé pour une mise à jour groupée.
-    databaseNames: List<String> = emptyList(),
-    downloadProgress: Int, // ✅ NOUVEAU PARAMÈTRE (progression du téléchargement OU de la génération)
-    onBannerClick: () -> Unit,
-    onDownloadClick: () -> Unit
-) {
-    val sizing = LocalGeoTowerUiSizing.current
-    val normalizedDatabaseNames = databaseNames
-        .map(String::trim)
-        .filter(String::isNotEmpty)
-        .distinct()
-    val databaseNamesText = normalizedDatabaseNames
-        .joinToString(separator = " • ")
-    val databaseCount = normalizedDatabaseNames.size
-    val databaseSummary = when {
-        !isDownloading && isUpdateAvailable && databaseCount > 0 ->
-            pluralStringResource(
-                R.plurals.appstrings_update_db_banner_summary,
-                databaseCount,
-                databaseCount
-            )
-        !isDownloading && (isMissing || isInvalid) && databaseCount > 0 ->
-            pluralStringResource(
-                R.plurals.appstrings_download_db_banner_summary,
-                databaseCount,
-                databaseCount
-            )
-        else -> null
-    }
-    androidx.compose.animation.AnimatedVisibility(
-        visible = isMissing || isInvalid || isUpdateAvailable || isDownloading || isGenerating,
-        enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
-        exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut(),
-        modifier = androidx.compose.ui.Modifier
-            .fillMaxWidth()
-            .padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(6.dp))
-    ) {
-        // Une génération en cours n'est pas un problème : ni rouge, ni icône d'erreur.
-        val isProblem = (isMissing || isInvalid) && !isGenerating
-        val containerColor = if (isProblem) {
-            androidx.compose.material3.MaterialTheme.colorScheme.errorContainer
-        } else {
-            androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.78f)
-        }
-        val contentColor = if (isProblem) {
-            androidx.compose.material3.MaterialTheme.colorScheme.onErrorContainer
-        } else {
-            androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
-        }
-        val accentColor = if (isProblem) {
-            androidx.compose.material3.MaterialTheme.colorScheme.error
-        } else {
-            androidx.compose.material3.MaterialTheme.colorScheme.primary
-        }
-        val actionContentColor = if (isProblem) {
-            androidx.compose.material3.MaterialTheme.colorScheme.onError
-        } else {
-            androidx.compose.material3.MaterialTheme.colorScheme.onPrimary
-        }
-        val icon = when {
-            // La régénération proposée porte la même icône que la génération elle-même : rien ne
-            // sera téléchargé depuis le serveur.
-            isGenerating || isRebuildOffer -> Icons.Default.Memory
-            isProblem -> Icons.Default.Error
-            else -> Icons.Default.CloudDownload
-        }
-
-        androidx.compose.material3.Surface(
-            onClick = onBannerClick,
-            color = containerColor,
-            shape = RoundedCornerShape(16.dp), // ✅ AJOUT DE LA FORME ARRONDIE
-            tonalElevation = 2.dp,
-            modifier = androidx.compose.ui.Modifier.fillMaxWidth()
-        ) {
-            androidx.compose.foundation.layout.Row(
-                modifier = androidx.compose.ui.Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(12.dp)),
-                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
-            ) {
-                androidx.compose.material3.Surface(
-                    color = accentColor.copy(alpha = 0.14f),
-                    contentColor = accentColor,
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = androidx.compose.ui.Modifier.size(sizing.component(40.dp))
-                ) {
-                    androidx.compose.material3.Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = accentColor,
-                        modifier = androidx.compose.ui.Modifier.padding(sizing.spacing(8.dp))
-                    )
-                }
-
-                androidx.compose.foundation.layout.Spacer(androidx.compose.ui.Modifier.width(sizing.component(12.dp)))
-
-                androidx.compose.foundation.layout.Column(
-                    modifier = androidx.compose.ui.Modifier.weight(1f),
-                    verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center
-                ) {
-                    androidx.compose.material3.Text(
-                        text = when {
-                            isGenerating -> stringResource(R.string.appstrings_generating_db_banner_title)
-                            isDownloading -> stringResource(R.string.appstrings_downloading_db_banner_title)
-                            isInvalid -> stringResource(R.string.appstrings_invalid_db_banner_title)
-                            isMissing -> stringResource(R.string.appstrings_missing_db_banner_title)
-                            else -> if (databaseCount > 0) {
-                                pluralStringResource(
-                                    R.plurals.appstrings_update_db_banner_title_plural,
-                                    databaseCount,
-                                    databaseCount
-                                )
-                            } else {
-                                stringResource(R.string.appstrings_update_db_banner_title)
-                            }
-                        },
-                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                        color = contentColor,
-                        style = androidx.compose.material3.MaterialTheme.typography.titleSmall
-                    )
-
-                    databaseSummary?.let { summary ->
-                        androidx.compose.material3.Text(
-                            text = summary,
-                            color = contentColor,
-                            style = androidx.compose.material3.MaterialTheme.typography.bodySmall
-                        )
-                    } ?: databaseNamesText.takeIf { it.isNotBlank() }?.let { names ->
-                        androidx.compose.material3.Text(
-                            text = names,
-                            color = contentColor,
-                            style = androidx.compose.material3.MaterialTheme.typography.bodySmall
-                        )
-                    }
-
-                    if (isGenerating) {
-                        androidx.compose.material3.Text(
-                            text = stringResource(R.string.appstrings_generating_db_banner_desc),
-                            color = contentColor,
-                            style = androidx.compose.material3.MaterialTheme.typography.bodySmall
-                        )
-                    } else if (isRebuildOffer && !isDownloading) {
-                        androidx.compose.material3.Text(
-                            text = stringResource(R.string.appstrings_update_db_banner_desc_rebuild),
-                            color = contentColor,
-                            style = androidx.compose.material3.MaterialTheme.typography.bodySmall
-                        )
-                    } else if ((isMissing || isInvalid) && !isDownloading) {
-                        androidx.compose.material3.Text(
-                            text = if (isInvalid) {
-                                stringResource(R.string.appstrings_invalid_db_banner_desc)
-                            } else {
-                                stringResource(R.string.appstrings_missing_db_banner_desc)
-                            },
-                            color = contentColor,
-                            style = androidx.compose.material3.MaterialTheme.typography.bodySmall
-                        )
-                    }
-                }
-
-                    if (isDownloading || isGenerating) {
-                        androidx.compose.foundation.layout.Row(
-                            modifier = androidx.compose.ui.Modifier
-                                .height(sizing.component(36.dp))
-                                .width(sizing.component(100.dp)),
-                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-                            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.End
-                        ) {
-                            CircularWavyProgressIndicator(
-                                modifier = androidx.compose.ui.Modifier.size(sizing.component(24.dp)),
-                                color = contentColor
-                            )
-                            androidx.compose.foundation.layout.Spacer(
-                                androidx.compose.ui.Modifier.width(sizing.component(8.dp))
-                            )
-                            androidx.compose.material3.Text(
-                                text = "$downloadProgress %",
-                                color = contentColor,
-                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                                fontSize = sizing.text(13.sp)
-                            )
-                        }
-                    } else {
-                        androidx.compose.material3.Button(
-                            onClick = onDownloadClick,
-                            colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                                containerColor = accentColor,
-                                contentColor = actionContentColor
-                            ),
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                                horizontal = sizing.spacing(12.dp),
-                                vertical = sizing.spacing(4.dp)
-                            ),
-                            modifier = androidx.compose.ui.Modifier.height(sizing.component(36.dp))
-                        ) {
-                            androidx.compose.material3.Text(
-                                text = stringResource(
-                                    if (isRebuildOffer) R.string.appstrings_btn_rebuild_banner
-                                    else if (isUpdateAvailable) R.string.appstrings_btn_update_banner
-                                    else R.string.appstrings_btn_download_banner
-                                ),
-                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                                fontSize = sizing.text(12.sp)
-                            )
-                        }
-                    }
-            }
-
-        }
-    }
 }

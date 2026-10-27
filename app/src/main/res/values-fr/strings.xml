@@ -3460,6 +3460,7 @@
     <string name="appstrings_release_v2089_summary_persistent_map_cache">Cache persistant des tuiles cartographiques pour un affichage instantané de la carte sans clignotement</string>
     <string name="appstrings_release_v2090_summary_map_split_screen">Affichage des supports en volet latéral sur grands écrans (tablettes et pliables) directement depuis la carte, avec maintien du centrage de la vue</string>
     <string name="appstrings_release_v2091_summary_api_versions_table_and_antenna_cache">Tableau comparatif des versions de bases par serveur API dans À propos et maintien des antennes visibles en mémoire lors de la navigation</string>
+    <string name="appstrings_release_v2092_summary_home_status_banners_in_more_menu">Affichage harmonisé des bandeaux d\'état, de connectivité et de téléchargement dans le menu Plus et sur l\'accueil</string>
 
     <!-- Journal des requêtes réseau -->
     <string name="network_log_title">Journal des requêtes réseau</string>
