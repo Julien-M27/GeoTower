@@ -3458,6 +3458,7 @@
     <string name="appstrings_release_v2087_summary_floating_ui_and_stats">Unified floating controls transparency, smoother statistics and enriched More menu with notifications</string>
     <string name="appstrings_release_v2088_summary_sql_operator_filters">Optimized database operator filtering for faster map loading and preserved classic style</string>
     <string name="appstrings_release_v2089_summary_persistent_map_cache">Persistent map tile caching for instant, flicker-free map display when switching tabs</string>
+    <string name="appstrings_release_v2090_summary_map_split_screen">Side pane view for support sites on large screens (tablets and foldables) directly from the map, with stable map centering</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Network requests log</string>

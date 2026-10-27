@@ -2055,9 +2055,6 @@ fun SettingsScreen(
                         .verticalScroll(navModeScrollState)
                         .padding(bottom = sizing.spacing(48.dp), start = sizing.spacing(24.dp), end = sizing.spacing(24.dp))
                 ) {
-                    val shape = oneUiActionButtonShape(useOneUi)
-                    val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
-
                     Text(
                         text = stringResource(R.string.settings_nav_mode_title),
                         style = sizing.textStyle(MaterialTheme.typography.titleLarge),
@@ -2096,16 +2093,6 @@ fun SettingsScreen(
                             navController.navigate("settings")
                         }
                     )
-
-                    if (isBottomNav && useOneUi) {
-                        Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
-                        fr.geotower.ui.components.BottomNavOpacityCard(
-                            shape = shape,
-                            border = border,
-                            bubbleColor = bubbleBaseColor,
-                            useOneUi = useOneUi
-                        )
-                    }
                 }
             }
         }

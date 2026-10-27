@@ -133,6 +133,7 @@ import android.net.Uri
 
 // --- IMPORT MAP ---
 import fr.geotower.ui.screens.map.MapScreen
+import fr.geotower.ui.screens.map.MapSupportWrapperScreen
 import fr.geotower.ui.screens.map.MapViewModel
 import fr.geotower.ui.screens.map.MapViewModelFactory
 import fr.geotower.ui.theme.AppColorPalette
@@ -1190,9 +1191,11 @@ class MainActivity : ComponentActivity() {
                                                 navController = navController,
                                                 drawerState = drawerState
                                             ) {
-                                                MapScreen(
+                                                MapSupportWrapperScreen(
                                                     navController = navController,
                                                     viewModel = sharedMapViewModel,
+                                                    repository = repository,
+                                                    radioRepository = radioRepository,
                                                     photoDraftId = photoDraftId,
                                                     plannedTripId = plannedTripId,
                                                     plannedTripMode = plannedTripMode,
@@ -1204,9 +1207,11 @@ class MainActivity : ComponentActivity() {
                                                 )
                                             }
                                         } else {
-                                            MapScreen(
+                                            MapSupportWrapperScreen(
                                                 navController = navController,
                                                 viewModel = sharedMapViewModel,
+                                                repository = repository,
+                                                radioRepository = radioRepository,
                                                 photoDraftId = photoDraftId,
                                                 plannedTripId = plannedTripId,
                                                 plannedTripMode = plannedTripMode,

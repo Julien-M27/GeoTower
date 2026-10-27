@@ -1648,7 +1648,9 @@ fun MapScreen(
     focusLon: Double? = null,
     // Mode simplifié : fourni par l'hôte qui porte le tiroir. Non nul ⇒ le bouton en haut à
     // gauche ouvre le menu au lieu de revenir en arrière (la carte est la racine du backstack).
-    onOpenSimpleModeMenu: (() -> Unit)? = null
+    onOpenSimpleModeMenu: (() -> Unit)? = null,
+    // Grand écran (tablette / pliable) : interception du clic pour afficher la fiche dans un volet latéral.
+    onSupportClick: ((supportId: String, operatorKey: String?, lat: Double, lon: Double) -> Boolean)? = null
 ) {
     SecureScreenEffect(RemoteFeatureFlags.SecureScreens.MAP)
     val context = LocalContext.current
@@ -1866,6 +1868,7 @@ fun MapScreen(
     var showLayerSheet by rememberSaveable { mutableStateOf(false) }
     val pageSettingsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var mapViewRef by remember { mutableStateOf<MapView?>(null) }
+    var lastStableMapCenter by remember { mutableStateOf<GeoPoint?>(null) }
     var locationOverlayRef by remember { mutableStateOf<MyLocationNewOverlay?>(null) }
     var rotationOverlayRef by remember { mutableStateOf<MapRotationGestureOverlay?>(null) }
     val mapViewUsable = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
@@ -2986,6 +2989,7 @@ fun MapScreen(
 
     fun triggerSiteFocusAnimation(target: GeoPoint) {
         val map = mapViewRef ?: return
+        lastStableMapCenter = target
         map.controller.stopAnimation(false)
         map.controller.setCenter(target)
         map.controller.setZoom(18.0)
@@ -4186,6 +4190,16 @@ fun MapScreen(
             .putFloat("clicked_lon", antenna.longitude.toFloat())
             .apply()
 
+        val targetPoint = GeoPoint(antenna.latitude, antenna.longitude)
+        lastStableMapCenter = targetPoint
+
+        if (onSupportClick?.invoke(supportId, antenna.operateur, antenna.latitude, antenna.longitude) == true) {
+            map.post {
+                map.controller.setCenter(targetPoint)
+            }
+            return
+        }
+
         map.post {
             try {
                 val photoDraftParam = pendingSharedPhotoDraftId
@@ -4240,6 +4254,16 @@ fun MapScreen(
             .putFloat("last_map_lon", marker.longitude.toFloat())
             .putFloat("last_map_zoom", 18f)
             .apply()
+
+        val targetPoint = GeoPoint(marker.latitude, marker.longitude)
+        lastStableMapCenter = targetPoint
+
+        if (onSupportClick?.invoke(marker.supportId, null, marker.latitude, marker.longitude) == true) {
+            map.post {
+                map.controller.setCenter(targetPoint)
+            }
+            return
+        }
 
         map.post {
             try {
@@ -5256,8 +5280,18 @@ fun MapScreen(
                     enableMouseWheelZoom(onUserZoom = ::releaseNavCameraForManualZoom)
                     applyWorldMapBounds()
                     addOnLayoutChangeListener { view, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
-                        if (right - left != oldRight - oldLeft || bottom - top != oldBottom - oldTop) {
-                            (view as? MapView)?.applyWorldMapBounds()
+                        val newWidth = right - left
+                        val oldWidth = oldRight - oldLeft
+                        val newHeight = bottom - top
+                        val oldHeight = oldBottom - oldTop
+                        if (newWidth != oldWidth || newHeight != oldHeight) {
+                            val map = view as? MapView
+                            map?.applyWorldMapBounds()
+                            if (oldWidth > 0 && oldHeight > 0 && newWidth > 0 && newHeight > 0) {
+                                lastStableMapCenter?.let { stableCenter ->
+                                    map?.controller?.setCenter(stableCenter)
+                                }
+                            }
                         }
                     }
                     zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
@@ -5265,18 +5299,22 @@ fun MapScreen(
                     val hasSavedPosition = hasSavedMapPosition(prefs)
 
                     if (focusLat != null && focusLon != null) {
-                        controller.setCenter(GeoPoint(focusLat, focusLon))
+                        val initialCenter = GeoPoint(focusLat, focusLon)
+                        controller.setCenter(initialCenter)
                         controller.setZoom(18.0)
                         currentZoom = 18.0
                         currentLat = focusLat
+                        lastStableMapCenter = initialCenter
                     } else {
                         val lastLat = prefs.getFloat("last_map_lat", 46.2276f).toDouble()
                         val lastLon = prefs.getFloat("last_map_lon", 2.2137f).toDouble()
                         val lastZoom = prefs.getFloat("last_map_zoom", 6.0f).toDouble()
-                        controller.setCenter(GeoPoint(lastLat, lastLon))
+                        val initialCenter = GeoPoint(lastLat, lastLon)
+                        controller.setCenter(initialCenter)
                         controller.setZoom(lastZoom)
                         currentZoom = lastZoom
                         currentLat = lastLat
+                        lastStableMapCenter = initialCenter
                     }
                     // On retrouve la carte comme on l'a laissée, sauf si la rotation a été coupée
                     // entre-temps : le `update` remettra alors le nord en haut.
@@ -5392,10 +5430,21 @@ fun MapScreen(
                     addMapListener(object : MapListener {
                         override fun onScroll(event: ScrollEvent?): Boolean {
                             // La poursuite GPS garde le controle pendant les scrolls generes par le suivi.
+                            val center = mapCenter
+                            if (center != null) {
+                                lastStableMapCenter = GeoPoint(center.latitude, center.longitude)
+                            }
                             updateInfo()
                             return true
                         }
-                        override fun onZoom(event: ZoomEvent?): Boolean { updateInfo(isZoom = true); return true }
+                        override fun onZoom(event: ZoomEvent?): Boolean {
+                            val center = mapCenter
+                            if (center != null) {
+                                lastStableMapCenter = GeoPoint(center.latitude, center.longitude)
+                            }
+                            updateInfo(isZoom = true)
+                            return true
+                        }
                         private fun updateInfo(isZoom: Boolean = false) {
                             // ✅ 1. MISE À JOUR INSTANTANÉE POUR L'ÉCHELLE (Avant le delay !)
                             // ✅ 2. LE RESTE DU CALCUL AVEC SON PETIT DÉLAI ANTI-LAG

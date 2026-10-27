@@ -3435,6 +3435,7 @@
     <string name="appstrings_release_v2087_summary_floating_ui_and_stats">Transparência unificada dos controlos flutuantes, estatísticas mais fluidas e menu Mais enriquecido</string>
     <string name="appstrings_release_v2088_summary_sql_operator_filters">Filtragem otimizada de operadores na base de dados para o mapa e preservação do estilo clássico</string>
     <string name="appstrings_release_v2089_summary_persistent_map_cache">Cache persistente de mosaicos para visualização instantânea e sem oscilações do mapa</string>
+    <string name="appstrings_release_v2090_summary_map_split_screen">Painel lateral para detalhes do suporte em ecrãs grandes (tablets e dobráveis) diretamente a partir do mapa com centragem estável</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registo de pedidos de rede</string>

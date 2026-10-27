@@ -47,7 +47,7 @@ import fr.geotower.ui.screens.coverage.TheoreticalCoverageScreen
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
 
-private enum class SiteDetailSidePane {
+internal enum class SiteDetailSidePane {
     ElevationProfile,
     ThroughputCalculator,
     TheoreticalCoverage
@@ -575,7 +575,7 @@ private fun splitBreadcrumbRootItems(
 }
 
 @Composable
-private fun RowScope.AnimatedSplitPane(
+internal fun RowScope.AnimatedSplitPane(
     visible: Boolean,
     content: @Composable () -> Unit
 ) {
@@ -606,7 +606,7 @@ private fun RowScope.AnimatedSplitPane(
 }
 
 @Composable
-private fun SiteDetailPane(
+internal fun SiteDetailPane(
     navController: NavController,
     repository: AnfrRepository,
     antennaId: String,
@@ -631,7 +631,7 @@ private fun SiteDetailPane(
 }
 
 @Composable
-private fun ElevationProfilePane(
+internal fun ElevationProfilePane(
     navController: NavController,
     repository: AnfrRepository,
     antennaId: String,
@@ -648,7 +648,7 @@ private fun ElevationProfilePane(
 }
 
 @Composable
-private fun ThroughputCalculatorPane(
+internal fun ThroughputCalculatorPane(
     navController: NavController,
     repository: AnfrRepository,
     antennaId: String,
@@ -665,7 +665,7 @@ private fun ThroughputCalculatorPane(
 }
 
 @Composable
-private fun TheoreticalCoveragePane(
+internal fun TheoreticalCoveragePane(
     navController: NavController,
     repository: AnfrRepository,
     antennaId: String,
