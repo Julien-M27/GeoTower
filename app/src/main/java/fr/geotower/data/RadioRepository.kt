@@ -19,6 +19,7 @@ import java.util.zip.InflaterInputStream
 import kotlin.math.roundToInt
 
 class RadioRepository(private val context: Context) {
+    val appContext: Context get() = context.applicationContext
 
     private data class LongitudeRange(val minE6: Int, val maxE6: Int)
 

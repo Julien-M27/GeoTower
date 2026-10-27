@@ -24,6 +24,7 @@ import fr.geotower.data.api.SqCoveragePointData
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.PhysiqueEntity
 import fr.geotower.data.models.RadioMapMarker
+import fr.geotower.utils.SharedMapAntennaCacheHolder
 import fr.geotower.data.models.TechniqueEntity
 import fr.geotower.data.models.DbCluster
 import kotlinx.coroutines.CancellationException
@@ -108,10 +109,10 @@ class MapViewModel(
     private val radioRepository: RadioRepository
 ) : ViewModel() {
 
-    private val _antennas = MutableStateFlow<List<LocalisationEntity>>(emptyList())
+    private val _antennas = MutableStateFlow<List<LocalisationEntity>>(SharedMapAntennaCacheHolder.getAntennas())
     val antennas = _antennas.asStateFlow()
 
-    private val _radioMarkers = MutableStateFlow<List<RadioMapMarker>>(emptyList())
+    private val _radioMarkers = MutableStateFlow<List<RadioMapMarker>>(SharedMapAntennaCacheHolder.getRadioMarkers())
     val radioMarkers = _radioMarkers.asStateFlow()
 
     private val _signalQuestCoveragePoints = MutableStateFlow<List<SignalQuestCoveragePoint>>(emptyList())
@@ -179,6 +180,14 @@ class MapViewModel(
                 _antennas.value = filteredMarkers
                 _radioMarkers.value = loadRadioMarkers(13.0, latNorth, lonEast, latSouth, lonWest)
                     .filter { isPointInPolygon(it.latitude, it.longitude, polygons) }
+                SharedMapAntennaCacheHolder.put(
+                    context = radioRepository.appContext,
+                    antennas = filteredMarkers,
+                    radioMarkers = _radioMarkers.value,
+                    zoom = 13.0,
+                    lat = (latNorth + latSouth) / 2.0,
+                    lon = (lonEast + lonWest) / 2.0
+                )
                 AppLogger.d(TAG, "City map markers filtered=${filteredMarkers.size} total=${apiMarkers.size}")
             } catch (e: CancellationException) {
                 throw e
@@ -457,6 +466,14 @@ class MapViewModel(
                     }
                 }
                 _radioMarkers.value = loadRadioMarkers(radioMarkerQueryZoom, latNorth, lonEast, latSouth, lonWest)
+                SharedMapAntennaCacheHolder.put(
+                    context = radioRepository.appContext,
+                    antennas = _antennas.value,
+                    radioMarkers = _radioMarkers.value,
+                    zoom = zoom,
+                    lat = (latNorth + latSouth) / 2.0,
+                    lon = (lonEast + lonWest) / 2.0
+                )
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

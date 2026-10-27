@@ -1690,6 +1690,27 @@
     <string name="appstrings_version_quarterly_label">Dados\ntrimestrais</string>
     <string name="appstrings_version_time_at">às</string>
     <string name="appstrings_version_weekly_label">Dados\nsemanais</string>
+    <string name="appstrings_version_api_table_title">Versões dos servidores API</string>
+    <string name="appstrings_version_api_table_desc">Versões das bases de dados fornecidas por cada servidor GeoTower</string>
+    <string name="appstrings_version_api_table_db_header">Base</string>
+    <string name="appstrings_version_mobile_db_short">Base móvel</string>
+    <string name="appstrings_version_radio_db_short">Base rádio</string>
+    <string name="appstrings_version_enb_db_short">Base eNB / gNB</string>
+    <string name="appstrings_version_live_db_short">Base online</string>
+    <string name="appstrings_version_anfr_weekly_short">Semanal (ANFR)</string>
+    <string name="appstrings_version_table_category_versions">Versões das bases</string>
+    <string name="appstrings_version_table_category_sources">Extrações de origem</string>
+    <string name="appstrings_version_table_category_sizes">Tamanhos dos ficheiros</string>
+    <string name="appstrings_version_table_category_stats">Volumes e Publicação</string>
+    <string name="appstrings_version_table_category_enb_operators">Datas eNB por operadora</string>
+    <string name="appstrings_version_table_size_mobile">Tamanho base móvel</string>
+    <string name="appstrings_version_table_size_radio">Tamanho base rádio</string>
+    <string name="appstrings_version_table_size_enb">Tamanho base eNB</string>
+    <string name="appstrings_version_table_enb_rows">Identificadores eNB</string>
+    <string name="appstrings_version_table_live_stations">Estações online</string>
+    <string name="appstrings_version_table_published">Colocada online</string>
+    <string name="appstrings_version_api_server_active">Ativo</string>
+    <string name="appstrings_version_server_unreachable">Inacessível</string>
     <string name="appstrings_about_versions_refresh">Atualizar as versões</string>
     <string name="appstrings_version_live_db_title">Base de dados online</string>
     <string name="appstrings_version_live_db_desc">Não há base instalada no dispositivo: o mapa, a pesquisa e as fichas leem diretamente o servidor GeoTower. Estes são os dados que ele fornece.</string>
@@ -3436,6 +3457,7 @@
     <string name="appstrings_release_v2088_summary_sql_operator_filters">Filtragem otimizada de operadores na base de dados para o mapa e preservação do estilo clássico</string>
     <string name="appstrings_release_v2089_summary_persistent_map_cache">Cache persistente de mosaicos para visualização instantânea e sem oscilações do mapa</string>
     <string name="appstrings_release_v2090_summary_map_split_screen">Painel lateral para detalhes do suporte em ecrãs grandes (tablets e dobráveis) diretamente a partir do mapa com centragem estável</string>
+    <string name="appstrings_release_v2091_summary_api_versions_table_and_antenna_cache">Tabela comparativa das versões das bases de dados por servidor API em «Sobre» e retenção instantânea das antenas no mapa ao navegar</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registo de pedidos de rede</string>

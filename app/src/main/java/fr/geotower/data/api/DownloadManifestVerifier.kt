@@ -38,6 +38,9 @@ data class DownloadManifestDatabase(
     val countryCode: String,
     val version: String?,
     val sourceDate: String? = null,
+    val dateAnfr: String? = null,
+    val quarterlyVersion: String? = null,
+    val rowCount: Int? = null,
     val operators: List<EnbOperatorVersion> = emptyList()
 )
 
@@ -138,6 +141,9 @@ object DownloadManifestVerifier {
             countryCode = stringOrBlank("country_code").uppercase(Locale.ROOT),
             version = stringOrBlank("version").takeIf { it.isNotBlank() },
             sourceDate = stringOrBlank("source_date").takeIf { it.isNotBlank() },
+            dateAnfr = stringOrBlank("date_anfr").takeIf { it.isNotBlank() } ?: stringOrBlank("source_date").takeIf { it.isNotBlank() },
+            quarterlyVersion = stringOrBlank("quarterly_version").takeIf { it.isNotBlank() },
+            rowCount = intOrNull("row_count"),
             operators = operatorsList
         )
     }

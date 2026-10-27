@@ -136,6 +136,7 @@ import fr.geotower.ui.screens.map.MapScreen
 import fr.geotower.ui.screens.map.MapSupportWrapperScreen
 import fr.geotower.ui.screens.map.MapViewModel
 import fr.geotower.ui.screens.map.MapViewModelFactory
+import fr.geotower.utils.SharedMapAntennaCacheHolder
 import fr.geotower.ui.theme.AppColorPalette
 import fr.geotower.ui.theme.GeoTowerUiStyleProvider
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
@@ -675,6 +676,7 @@ class MainActivity : ComponentActivity() {
         val basePath = File(cacheDir, "osmdroid")
         osmdroidConfig.osmdroidBasePath = basePath
         osmdroidConfig.osmdroidTileCache = File(basePath, "tiles")
+        SharedMapAntennaCacheHolder.initFromDisk(applicationContext)
 
         // =====================================================================
         // 🚀 NOUVEAU : BOOST DE PERFORMANCES (Spécial Cartes Vectorielles)

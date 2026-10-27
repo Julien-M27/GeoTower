@@ -4726,6 +4726,7 @@ fun MapScreen(
     // On ajoute explicitement les 4 opérateurs dans les "déclencheurs" (keys)
     // Dès qu'une case est cochée/décochée, la carte sera forcée de se redessiner !
     LaunchedEffect(
+        mapViewRef,
         filteredAntennas,
         hiddenSites,
         sitesHs, // ✅ AJOUT ICI

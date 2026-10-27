@@ -97,6 +97,11 @@ import fr.geotower.data.outages.OutageServerInfo
 import fr.geotower.ui.components.DatabaseRefreshMembership
 import fr.geotower.ui.components.DatabaseRefreshTimeout
 import fr.geotower.ui.components.DatabaseSectionRefreshButton
+import fr.geotower.data.api.ApiEndpoints
+import fr.geotower.data.api.ApiServer
+import fr.geotower.ui.components.ApiServerDbVersionInfo
+import fr.geotower.ui.components.ApiServersDatabaseVersionsCard
+import fr.geotower.ui.components.fetchApiServerDbVersionInfo
 import fr.geotower.ui.components.AppLogoImage
 import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.components.SafeClick
@@ -109,6 +114,8 @@ import fr.geotower.utils.AppIconManager
 import fr.geotower.utils.AppLogoDrawingResources
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.LocalizedDateLabels
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import androidx.compose.material.icons.filled.NewReleases as FilledNewReleases
 import android.database.sqlite.SQLiteDatabase
@@ -1056,6 +1063,9 @@ fun SectionVersions(
     var liveDbInUse by remember { mutableStateOf(false) }
     var liveDbDataset by remember { mutableStateOf<LiveDatabaseDataset?>(null) }
     var liveDbUnreachable by remember { mutableStateOf(false) }
+    var primaryApiVersions by remember { mutableStateOf(ApiServerDbVersionInfo(ApiServer.PRIMARY, isLoading = true)) }
+    var mirrorApiVersions by remember { mutableStateOf(ApiServerDbVersionInfo(ApiServer.MIRROR, isLoading = true)) }
+    val activeApiServer by ApiEndpoints.activeServer
     var enbOperatorDates by remember { mutableStateOf<List<fr.geotower.data.db.EnbOperatorDateInfo>?>(null) }
     var enbDatesFromLocal by remember { mutableStateOf(false) }
     var enbDatesUnreachable by remember { mutableStateOf(false) }
@@ -1201,6 +1211,23 @@ fun SectionVersions(
                 enbOperatorDates = null
                 enbDatesUnreachable = true
             }
+            // 7. Versions fournies par chaque serveur API (tableau comparatif)
+            try {
+                coroutineScope {
+                    val pDef = async {
+                        fetchApiServerDbVersionInfo(ApiServer.PRIMARY, forceRefresh = versionsRefreshKey > 0)
+                    }
+                    val mDef = async {
+                        fetchApiServerDbVersionInfo(ApiServer.MIRROR, forceRefresh = versionsRefreshKey > 0)
+                    }
+                    primaryApiVersions = pDef.await()
+                    mirrorApiVersions = mDef.await()
+                }
+            } catch (e: Exception) {
+                AppLogger.w(TAG_ABOUT, "API servers database versions could not be fetched", e)
+                primaryApiVersions = primaryApiVersions.copy(unreachable = true, isLoading = false)
+                mirrorApiVersions = mirrorApiVersions.copy(unreachable = true, isLoading = false)
+            }
         }
         refreshState.reportRefreshed(VERSIONS_REFRESH_ID, versionsRefreshKey)
     }
@@ -1301,8 +1328,18 @@ fun SectionVersions(
         }
     }
 
-    // Les versions ci-dessus sont celles des fichiers posés sur l'appareil. Les métadonnées de la
-    // base en ligne ont toujours leur propre carte, avec la source active explicitement indiquée.
+    // Les versions ci-dessus sont celles des fichiers posés sur l'appareil. Les versions fournies
+    // par les serveurs API sont affichées dans un tableau comparatif dédié.
+    Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+    ApiServersDatabaseVersionsCard(
+        cardShape = cardShape,
+        cardColor = cardColor,
+        primaryVersions = primaryApiVersions,
+        mirrorVersions = mirrorApiVersions,
+        activeServer = activeApiServer,
+        timeAtLabel = txtVersionTimeAt
+    )
+
     Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
     LiveDatabaseVersionsCard(
         cardShape = cardShape,
@@ -1760,17 +1797,18 @@ private fun normalizeQuarterlyVersion(rawValue: String?): String {
  * [LocalizedDateLabels.formatWeeklyVersionWithWeekNumber]. Partagé par la base installée et la base
  * en ligne : les deux lignes doivent se lire pareil pour être comparables.
  */
-private fun formatAnfrWeeklyDate(rawValue: String?): String {
+internal fun formatAnfrWeeklyDate(rawValue: String?): String {
     val raw = rawValue?.trim().orEmpty()
-    if (raw.isBlank()) return "-"
+    if (raw.isBlank() || raw == "-") return "-"
 
     return try {
-        if (raw.contains("T")) {
-            val dParts = raw.substringBefore("T").split("-")
+        val datePart = if (raw.contains("T")) raw.substringBefore("T") else raw
+        if (datePart.contains("-")) {
+            val dParts = datePart.split("-")
             if (dParts.size >= 3) "${dParts[2]}/${dParts[1]}/${dParts[0]}" else raw
         } else {
-            when (raw.length) {
-                13, 8 -> "${raw.substring(6, 8)}/${raw.substring(4, 6)}/${raw.substring(0, 4)}"
+            when (datePart.length) {
+                13, 8 -> "${datePart.substring(6, 8)}/${datePart.substring(4, 6)}/${datePart.substring(0, 4)}"
                 else -> raw
             }
         }
@@ -1779,7 +1817,7 @@ private fun formatAnfrWeeklyDate(rawValue: String?): String {
     }
 }
 
-private fun formatAboutDatabaseVersion(rawValue: String?, timeAtLabel: String): String {
+internal fun formatAboutDatabaseVersion(rawValue: String?, timeAtLabel: String): String {
     val raw = rawValue?.trim().orEmpty()
     if (raw.isBlank()) return "-"
 

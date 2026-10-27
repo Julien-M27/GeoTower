@@ -1690,6 +1690,27 @@
     <string name="appstrings_version_quarterly_label">Quartals-\ndaten</string>
     <string name="appstrings_version_time_at">um</string>
     <string name="appstrings_version_weekly_label">Wochen-\ndaten</string>
+    <string name="appstrings_version_api_table_title">Versionen der API-Server</string>
+    <string name="appstrings_version_api_table_desc">Von jedem GeoTower-Server bereitgestellte Datenbankversionen</string>
+    <string name="appstrings_version_api_table_db_header">Datenbank</string>
+    <string name="appstrings_version_mobile_db_short">Mobilfunk-DB</string>
+    <string name="appstrings_version_radio_db_short">Radio-DB</string>
+    <string name="appstrings_version_enb_db_short">eNB / gNB-DB</string>
+    <string name="appstrings_version_live_db_short">Online-DB</string>
+    <string name="appstrings_version_anfr_weekly_short">ANFR wöchentlich</string>
+    <string name="appstrings_version_table_category_versions">Datenbankversionen</string>
+    <string name="appstrings_version_table_category_sources">Quelldaten-Stände</string>
+    <string name="appstrings_version_table_category_sizes">Dateigrößen</string>
+    <string name="appstrings_version_table_category_stats">Umfang &amp; Veröffentlichung</string>
+    <string name="appstrings_version_table_category_enb_operators">eNB-Daten nach Betreiber</string>
+    <string name="appstrings_version_table_size_mobile">Größe Mobilfunk-DB</string>
+    <string name="appstrings_version_table_size_radio">Größe Radio-DB</string>
+    <string name="appstrings_version_table_size_enb">Größe eNB-DB</string>
+    <string name="appstrings_version_table_enb_rows">eNB-Kennungen</string>
+    <string name="appstrings_version_table_live_stations">Online-Stationen</string>
+    <string name="appstrings_version_table_published">Online gestellt</string>
+    <string name="appstrings_version_api_server_active">Aktiv</string>
+    <string name="appstrings_version_server_unreachable">Nicht erreichbar</string>
     <string name="appstrings_about_versions_refresh">Versionen aktualisieren</string>
     <string name="appstrings_version_live_db_title">Online-Datenbank</string>
     <string name="appstrings_version_live_db_desc">Auf diesem Gerät ist keine Datenbank installiert: Karte, Suche und Standortblätter lesen direkt vom GeoTower-Server. Das sind die Daten, die er liefert.</string>
@@ -3436,6 +3457,7 @@
     <string name="appstrings_release_v2088_summary_sql_operator_filters">Optimierte Datenbankfilterung nach Betreibern für schnellere Kartenladezeiten und klassischer Stil bewahrt</string>
     <string name="appstrings_release_v2089_summary_persistent_map_cache">Persistenter Kartentextur-Cache für sofortige, flackerfreie Kartenanzeige beim Tab-Wechsel</string>
     <string name="appstrings_release_v2090_summary_map_split_screen">Seitenbereich-Ansicht für Standortdetails auf großen Bildschirmen (Tablets und Foldables) direkt von der Karte mit stabiler Kartenzentrierung</string>
+    <string name="appstrings_release_v2091_summary_api_versions_table_and_antenna_cache">Vergleichstabelle der Datenbankversionen je API-Server in «Über die App» und Beibehaltung sichtbarer Antennen beim Navigieren</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Netzwerkanfragen-Protokoll</string>
