@@ -3482,6 +3482,7 @@
     <string name="appstrings_release_v2090_summary_map_split_screen">Side pane view for support sites on large screens (tablets and foldables) directly from the map, with stable map centering</string>
     <string name="appstrings_release_v2091_summary_api_versions_table_and_antenna_cache">Comparative table of database versions per API server in About and instant retention of visible map antennas while navigating</string>
     <string name="appstrings_release_v2092_summary_home_status_banners_in_more_menu">Harmonized status, connectivity and download banners displayed in the More menu as well as on Home</string>
+    <string name="appstrings_release_v2093_summary_nav_animation_and_visual_refinements">Bouncy animation on the bottom navigation bar when switching tabs, dynamic welcome logo and visual refinements</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Network requests log</string>

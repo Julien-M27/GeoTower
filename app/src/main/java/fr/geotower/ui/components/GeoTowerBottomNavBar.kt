@@ -1,10 +1,13 @@
 package fr.geotower.ui.components
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -46,7 +49,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -56,6 +61,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -259,11 +265,52 @@ private fun OneUiFloatingBottomNavBar(
                         label = "oneui_tab_slide"
                     )
 
+                    // Animation de dézoom puis zoom lors du déplacement de la zone active
+                    val pillScale = remember { Animatable(1f) }
+                    var previousIndex by remember { mutableIntStateOf(activeIndex) }
+                    var isInitialized by remember { mutableStateOf(false) }
+
+                    LaunchedEffect(activeIndex) {
+                        if (!isInitialized) {
+                            isInitialized = true
+                            previousIndex = activeIndex
+                            return@LaunchedEffect
+                        }
+                        if (PowerProfile.isEcoPlus) {
+                            pillScale.snapTo(1f)
+                            previousIndex = activeIndex
+                            return@LaunchedEffect
+                        }
+                        if (activeIndex != previousIndex) {
+                            previousIndex = activeIndex
+                            // Phase 1 : Dézoom rapide pendant le départ et la traversée
+                            pillScale.animateTo(
+                                targetValue = 0.80f,
+                                animationSpec = tween(
+                                    durationMillis = 110,
+                                    easing = FastOutSlowInEasing
+                                )
+                            )
+                            // Phase 2 : Zoom avec léger rebond élastique à l'arrivée
+                            pillScale.animateTo(
+                                targetValue = 1f,
+                                animationSpec = spring(
+                                    dampingRatio = 0.68f,
+                                    stiffness = Spring.StiffnessMediumLow
+                                )
+                            )
+                        }
+                    }
+
                     Box(
                         modifier = Modifier
                             .offset(x = animatedOffset)
                             .width(tabWidth)
                             .fillMaxHeight()
+                            .graphicsLayer {
+                                scaleX = pillScale.value
+                                scaleY = pillScale.value
+                            }
                             .clip(CircleShape)
                             .background(activeItemBgColor)
                     )

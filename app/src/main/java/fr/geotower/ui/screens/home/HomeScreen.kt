@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -522,7 +523,9 @@ internal fun HomeNotificationsButton(
         modifier = modifier,
         badge = {
             if (unreadCount > 0) {
-                Badge {
+                Badge(
+                    modifier = Modifier.offset(x = (-4).dp, y = 6.dp)
+                ) {
                     // Au-delà de 99 la pastille déborderait du bouton.
                     Text(
                         text = notificationBadgeText(unreadCount),

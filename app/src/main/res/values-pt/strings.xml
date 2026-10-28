@@ -3459,6 +3459,7 @@
     <string name="appstrings_release_v2090_summary_map_split_screen">Painel lateral para detalhes do suporte em ecrãs grandes (tablets e dobráveis) diretamente a partir do mapa com centragem estável</string>
     <string name="appstrings_release_v2091_summary_api_versions_table_and_antenna_cache">Tabela comparativa das versões das bases de dados por servidor API em «Sobre» e retenção instantânea das antenas no mapa ao navegar</string>
     <string name="appstrings_release_v2092_summary_home_status_banners_in_more_menu">Banners de estado, conectividade e transferências harmonizados no menu Mais e no ecrã inicial</string>
+    <string name="appstrings_release_v2093_summary_nav_animation_and_visual_refinements">Animação elástica da barra de navegação inferior ao alternar separadores, logótipo dinâmico de boas-vindas e refinamentos visuais</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registo de pedidos de rede</string>

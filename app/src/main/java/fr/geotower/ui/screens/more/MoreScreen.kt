@@ -306,6 +306,7 @@ fun MoreScreen(navController: NavController) {
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             GeoTowerBackTopBar(
+                modifier = Modifier.padding(top = sizing.spacing(4.dp)),
                 title = stringResource(R.string.bottom_nav_more),
                 onBack = { safeBackNavigation.navigateBack() },
                 showBackButton = false,

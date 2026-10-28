@@ -91,6 +91,7 @@ import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.db.GeoTowerDatabaseValidator
 import fr.geotower.data.workers.DatabaseBulkUpdate
 import fr.geotower.data.workers.LocalDbBuildWorker
+import fr.geotower.ui.components.AppLogoImage
 import fr.geotower.ui.components.SafeClick
 import fr.geotower.ui.components.geoTowerFadingEdge
 import fr.geotower.ui.components.rememberSafeClick
@@ -99,6 +100,8 @@ import fr.geotower.ui.screens.settings.PreferenceProfilesSheet
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.services.LiveTrackingController
 import fr.geotower.utils.AppConfig
+import fr.geotower.utils.AppIconManager
+import fr.geotower.utils.AppLogoDrawingResources
 import fr.geotower.utils.AppLocale
 import fr.geotower.utils.AppUiMode
 import fr.geotower.utils.OperatorLogos
@@ -1051,10 +1054,13 @@ fun StepWelcomeDesign(
     onOpenLanguageSheet: () -> Unit,
     onSafeClick: SafeClick
 ) {
-    // --- NOUVEAU : On récupère dynamiquement l'icône actuelle ! ---
     val context = LocalContext.current
-    val currentIconRes by fr.geotower.utils.AppIconManager.currentIconRes
-    val displayIcon = if (currentIconRes != 0) currentIconRes else fr.geotower.utils.AppIconManager.getLogoResId(context)
+    val logoResId by AppIconManager.currentIconRes
+    val themeMode by AppConfig.themeMode
+    val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
+    val appLogoDrawingChoice by AppConfig.appLogoDrawingChoice
+    val activeLauncherIcon = if (logoResId != 0) logoResId else AppIconManager.getLogoResId(context)
+    val displayLogoResId = AppLogoDrawingResources.resolve(appLogoDrawingChoice, activeLauncherIcon, isDark)
 
     val appLanguage by AppConfig.appLanguage
     val sizing = LocalGeoTowerUiStyle.current.sizing
@@ -1062,8 +1068,11 @@ fun StepWelcomeDesign(
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
         Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
 
-        // On remplace le R.mipmap... par notre variable dynamique
-        DrawableImage(resId = displayIcon, modifier = Modifier.size(sizing.component(150.dp)))
+        AppLogoImage(
+            resId = displayLogoResId,
+            modifier = Modifier.size(sizing.component(150.dp)),
+            contentDescription = stringResource(R.string.common_logo)
+        )
 
         Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
 
@@ -1691,9 +1700,5 @@ fun PagerIndicator(totalSteps: Int, currentStep: Int) {
 
 @Composable
 fun DrawableImage(resId: Int, modifier: Modifier = Modifier) {
-    AndroidView(
-        factory = { ctx -> ImageView(ctx).apply { scaleType = ImageView.ScaleType.FIT_CENTER; setImageResource(resId) } },
-        modifier = modifier,
-        update = { it.setImageResource(resId) }
-    )
+    AppLogoImage(resId = resId, modifier = modifier)
 }

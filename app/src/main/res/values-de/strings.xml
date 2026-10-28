@@ -3459,6 +3459,7 @@
     <string name="appstrings_release_v2090_summary_map_split_screen">Seitenbereich-Ansicht für Standortdetails auf großen Bildschirmen (Tablets und Foldables) direkt von der Karte mit stabiler Kartenzentrierung</string>
     <string name="appstrings_release_v2091_summary_api_versions_table_and_antenna_cache">Vergleichstabelle der Datenbankversionen je API-Server in «Über die App» und Beibehaltung sichtbarer Antennen beim Navigieren</string>
     <string name="appstrings_release_v2092_summary_home_status_banners_in_more_menu">Einheitliche Status-, Verbindungs- und Download-Banner im Mehr-Menü und auf der Startseite</string>
+    <string name="appstrings_release_v2093_summary_nav_animation_and_visual_refinements">Elastische Animation der unteren Navigationsleiste beim Tab-Wechsel, dynamisches Begrüßungslogo und visuelle Anpassungen</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Netzwerkanfragen-Protokoll</string>

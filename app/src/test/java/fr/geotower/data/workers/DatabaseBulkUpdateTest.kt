@@ -23,10 +23,9 @@ class DatabaseBulkUpdateTest {
             DatabaseBulkUpdate.runChecksConcurrently(
                 listOf(1, 2, 3).map { expected ->
                     suspend {
-                        started.countDown()
-                        check(started.await(2, TimeUnit.SECONDS))
                         val active = activeChecks.incrementAndGet()
                         maximumActiveChecks.updateAndGet { current -> maxOf(current, active) }
+                        started.countDown()
                         check(release.await(2, TimeUnit.SECONDS))
                         activeChecks.decrementAndGet()
                         expected
