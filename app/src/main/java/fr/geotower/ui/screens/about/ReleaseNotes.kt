@@ -32,7 +32,7 @@ internal data class ReleaseNoteItem(
 @Composable
 internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
     section(stringResource(R.string.appstrings_release_section_interface)) {
-        item(stringResource(R.string.appstrings_release_v2093_summary_nav_animation_and_visual_refinements))
+        item(stringResource(R.string.appstrings_release_v2094_summary_mini_map_azimuth_and_contrast))
     }
 }
 

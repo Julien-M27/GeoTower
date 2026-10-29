@@ -3462,6 +3462,7 @@
     <string name="appstrings_release_v2091_summary_api_versions_table_and_antenna_cache">Tableau comparatif des versions de bases par serveur API dans À propos et maintien des antennes visibles en mémoire lors de la navigation</string>
     <string name="appstrings_release_v2092_summary_home_status_banners_in_more_menu">Affichage harmonisé des bandeaux d\'état, de connectivité et de téléchargement dans le menu Plus et sur l\'accueil</string>
     <string name="appstrings_release_v2093_summary_nav_animation_and_visual_refinements">Animation élastique de la barre de navigation lors du changement d\'onglet, logo dynamique au premier lancement et ajustements visuels</string>
+    <string name="appstrings_release_v2094_summary_mini_map_azimuth_and_contrast">Amélioration de l\'affichage des azimuts et du contraste satellite des marqueurs dans la mini-carte</string>
 
     <!-- Journal des requêtes réseau -->
     <string name="network_log_title">Journal des requêtes réseau</string>

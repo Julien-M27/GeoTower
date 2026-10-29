@@ -3460,6 +3460,7 @@
     <string name="appstrings_release_v2091_summary_api_versions_table_and_antenna_cache">Vergleichstabelle der Datenbankversionen je API-Server in «Über die App» und Beibehaltung sichtbarer Antennen beim Navigieren</string>
     <string name="appstrings_release_v2092_summary_home_status_banners_in_more_menu">Einheitliche Status-, Verbindungs- und Download-Banner im Mehr-Menü und auf der Startseite</string>
     <string name="appstrings_release_v2093_summary_nav_animation_and_visual_refinements">Elastische Animation der unteren Navigationsleiste beim Tab-Wechsel, dynamisches Begrüßungslogo und visuelle Anpassungen</string>
+    <string name="appstrings_release_v2094_summary_mini_map_azimuth_and_contrast">Verbesserte Darstellung von Azimuten und Satellitenkontrast für Markierungen in der Mini-Karte</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Netzwerkanfragen-Protokoll</string>
