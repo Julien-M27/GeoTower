@@ -3463,6 +3463,7 @@
     <string name="appstrings_release_v2092_summary_home_status_banners_in_more_menu">Affichage harmonisé des bandeaux d\'état, de connectivité et de téléchargement dans le menu Plus et sur l\'accueil</string>
     <string name="appstrings_release_v2093_summary_nav_animation_and_visual_refinements">Animation élastique de la barre de navigation lors du changement d\'onglet, logo dynamique au premier lancement et ajustements visuels</string>
     <string name="appstrings_release_v2094_summary_mini_map_azimuth_and_contrast">Amélioration de l\'affichage des azimuts et du contraste satellite des marqueurs dans la mini-carte</string>
+    <string name="appstrings_release_v2095_summary_fullscreen_photo_viewers">Affichage plein écran bord à bord amélioré des visionneurs de photos et intégration harmonieuse de la barre d\'état</string>
 
     <!-- Journal des requêtes réseau -->
     <string name="network_log_title">Journal des requêtes réseau</string>

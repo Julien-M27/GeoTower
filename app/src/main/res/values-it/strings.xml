@@ -3461,6 +3461,7 @@
     <string name="appstrings_release_v2092_summary_home_status_banners_in_more_menu">Banner di stato, connettività e download armonizzati nel menu Altro e nella schermata iniziale</string>
     <string name="appstrings_release_v2093_summary_nav_animation_and_visual_refinements">Animazione elastica della barra di navigazione inferiore al cambio scheda, logo dinamico di benvenuto e rifiniture visive</string>
     <string name="appstrings_release_v2094_summary_mini_map_azimuth_and_contrast">Migliorata la visualizzazione degli azimut e del contrasto satellitare dei marcatori nella mini-mappa</string>
+    <string name="appstrings_release_v2095_summary_fullscreen_photo_viewers">Visualizzazione a schermo intero bordo a bordo migliorata per le foto e integrazione armoniosa della barra di stato</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registro richieste di rete</string>

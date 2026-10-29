@@ -75,6 +75,7 @@ import androidx.compose.ui.unit.dp
 import fr.geotower.ui.theme.LocalGeoTowerUiSizing
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import fr.geotower.ui.components.FullScreenDialogWindow
 import androidx.navigation.NavController
 import fr.geotower.R
 import fr.geotower.data.AnfrRepository
@@ -500,8 +501,12 @@ private fun FavoritePhotoViewer(
 
     Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
+        )
     ) {
+        FullScreenDialogWindow()
         Box(
             modifier = Modifier
                 .fillMaxSize()

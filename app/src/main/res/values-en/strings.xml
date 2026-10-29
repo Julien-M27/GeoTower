@@ -3461,6 +3461,7 @@
     <string name="appstrings_release_v2092_summary_home_status_banners_in_more_menu">Harmonized status, connectivity and download banners displayed in the More menu as well as on Home</string>
     <string name="appstrings_release_v2093_summary_nav_animation_and_visual_refinements">Bouncy animation on the bottom navigation bar when switching tabs, dynamic welcome logo and visual refinements</string>
     <string name="appstrings_release_v2094_summary_mini_map_azimuth_and_contrast">Improved display of azimuths and satellite contrast for markers in the mini-map</string>
+    <string name="appstrings_release_v2095_summary_fullscreen_photo_viewers">Improved edge-to-edge full-screen display for photo viewers and seamless status bar integration</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Network requests log</string>

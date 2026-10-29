@@ -109,6 +109,7 @@ import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import fr.geotower.ui.components.FullScreenDialogWindow
 import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
@@ -1286,8 +1287,12 @@ private fun SignalQuestPhotoViewer(
 
     Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
+        )
     ) {
+        FullScreenDialogWindow()
         Box(
             modifier = Modifier
                 .fillMaxSize()

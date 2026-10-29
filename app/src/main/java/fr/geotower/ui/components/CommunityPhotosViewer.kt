@@ -40,6 +40,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -111,6 +112,7 @@ import fr.geotower.data.api.RetrofitClient
 import fr.geotower.ui.components.PhotoAsyncImage
 import fr.geotower.ui.components.PhotoReportDialog
 import fr.geotower.ui.components.SharedMiniMapCard
+import fr.geotower.ui.components.FullScreenDialogWindow
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.LocalizedDateLabels
@@ -1537,8 +1539,13 @@ fun CommunityPhotosSectionShared(
     if (showPlaceholderFullScreen && placeholderRes != null) {
         androidx.compose.ui.window.Dialog(
             onDismissRequest = { showPlaceholderFullScreen = false },
-            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+            properties = androidx.compose.ui.window.DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false
+            )
         ) {
+            FullScreenDialogWindow()
+            val statusBarTopPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
             Surface(modifier = Modifier.fillMaxSize(), color = viewerBgBaseColor) {
                 Box(modifier = Modifier.fillMaxSize()) {
                     // L'image au centre
@@ -1558,7 +1565,7 @@ fun CommunityPhotosSectionShared(
                         onClick = { showPlaceholderFullScreen = false },
                         modifier = Modifier
                             .align(Alignment.TopEnd)
-                            .padding(top = sizing.spacing(20.dp), end = sizing.spacing(4.dp))
+                            .padding(top = statusBarTopPadding + sizing.spacing(8.dp), end = sizing.spacing(4.dp))
                             .background(overlayButtonBg, shape = CircleShape)
                     ) {
                         Icon(Icons.Default.Close, contentDescription = stringResource(R.string.appstrings_close), tint = viewerContentColor)
@@ -1633,18 +1640,24 @@ fun CommunityPhotosSectionShared(
                 selectedPhotosSnapshot = emptyList()
                 coroutineScope.launch { dismissOffset.snapTo(0f) }
             },
-            properties = DialogProperties(usePlatformDefaultWidth = false)
+            properties = DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false
+            )
         ) {
+            FullScreenDialogWindow()
             val bgAlpha = (1f - (abs(dismissOffset.value) / 800f)).coerceIn(0f, 1f)
             // L'habillage se cale sur le visionneur, pas sur les bords calculés de la photo : sinon il flotte
             // au milieu du fond dès que l'image ne remplit pas l'écran.
             val chromeSidePadding = sizing.spacing(16.dp)
+            val statusBarTopPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
             val navigationBottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
             val photoBottomPadding = navigationBottomPadding + 12.dp
 
             // --- VOILES DÉGRADÉS ---
             // Pleine largeur du visionneur, et non l'emprise de la photo : sinon le rectangle du voile
             // se voit sur les marges et l'habillage se retrouve moitié sur le voile, moitié sur le fond nu.
+            val topScrimHeight = statusBarTopPadding + PHOTO_VIEWER_TOP_SCRIM_HEIGHT
             val bottomScrimHeight = photoBottomPadding + PHOTO_VIEWER_BOTTOM_SCRIM_HEIGHT
             val topScrimBrush = remember(viewerBgBaseColor) { photoViewerTopScrimBrush(viewerBgBaseColor) }
             val bottomScrimBrush = remember(viewerBgBaseColor) { photoViewerBottomScrimBrush(viewerBgBaseColor) }
@@ -1800,7 +1813,7 @@ fun CommunityPhotosSectionShared(
                         modifier = Modifier
                             .align(Alignment.TopCenter)
                             .fillMaxWidth()
-                            .height(PHOTO_VIEWER_TOP_SCRIM_HEIGHT)
+                            .height(topScrimHeight)
                             .alpha(bgAlpha)
                             .background(topScrimBrush)
                     )
@@ -1835,7 +1848,14 @@ fun CommunityPhotosSectionShared(
 
                     // --- TEXTES EN HAUT ---
                     Row(
-                        modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter).padding(top = sizing.spacing(28.dp), start = sizing.spacing(56.dp), end = sizing.spacing(56.dp)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .align(Alignment.TopCenter)
+                            .padding(
+                                top = statusBarTopPadding + sizing.spacing(14.dp),
+                                start = sizing.spacing(56.dp),
+                                end = sizing.spacing(56.dp)
+                            ),
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -1852,7 +1872,12 @@ fun CommunityPhotosSectionShared(
                     }
 
                     Row(
-                        modifier = Modifier.align(Alignment.TopStart).padding(top = sizing.spacing(28.dp), start = sizing.spacing(12.dp)),
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(
+                                top = statusBarTopPadding + sizing.spacing(14.dp),
+                                start = sizing.spacing(12.dp)
+                            ),
                         horizontalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp)),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -1873,7 +1898,13 @@ fun CommunityPhotosSectionShared(
                             selectedPhotosSnapshot = emptyList()
                             coroutineScope.launch { dismissOffset.snapTo(0f) }
                         },
-                        modifier = Modifier.align(Alignment.TopEnd).padding(top = sizing.spacing(20.dp), end = sizing.spacing(4.dp)).background(chromeButtonBg, shape = CircleShape)
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(
+                                top = statusBarTopPadding + sizing.spacing(8.dp),
+                                end = sizing.spacing(4.dp)
+                            )
+                            .background(chromeButtonBg, shape = CircleShape)
                     ) {
                         Icon(Icons.Default.Close, contentDescription = stringResource(R.string.appstrings_close), tint = chromeContentColor)
                     }
