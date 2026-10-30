@@ -170,6 +170,125 @@ class RadioRepository(private val context: Context) {
         }
     }
 
+    suspend fun searchSites(query: String, limit: Int = 20): List<RadioMapMarker> = withContext(Dispatchers.IO) {
+        val trimmed = query.trim()
+        if (trimmed.length < 2 || !databaseFile().isFile) return@withContext emptyList()
+
+        try {
+            openDatabase().use { db ->
+                val hasDigits = trimmed.any { it.isDigit() }
+                val candidates = if (hasDigits) supportIdCandidates(trimmed) else emptyList()
+                val likeQuery = "%$trimmed%"
+
+                val whereClause = buildString {
+                    append("WHERE (")
+                    val subClauses = mutableListOf<String>()
+                    if (candidates.isNotEmpty()) {
+                        val placeholders = candidates.joinToString(",") { "?" }
+                        subClauses += "s.sup_id IN ($placeholders)"
+                        subClauses += "s.sta_nm_anfr IN ($placeholders)"
+                    }
+                    subClauses += "s.sta_nm_anfr LIKE ?"
+                    subClauses += "s.sup_id LIKE ?"
+                    subClauses += "a.label LIKE ?"
+                    append(subClauses.joinToString(" OR "))
+                    append(")")
+                    append(" ")
+                    append(excludePublicMobileFhSql())
+                }
+
+                val args = mutableListOf<String>()
+                if (candidates.isNotEmpty()) {
+                    args.addAll(candidates)
+                    args.addAll(candidates)
+                }
+                args.add(likeQuery)
+                args.add(likeQuery)
+                args.add(likeQuery)
+                args.addAll(excludePublicMobileFhArgs())
+                args.add(limit.coerceAtLeast(1).toString())
+
+                val cursor = db.rawQuery(
+                    """
+                    SELECT
+                        s.sta_nm_anfr,
+                        s.sup_id,
+                        s.lat_e6,
+                        s.lon_e6,
+                        s.service_mask,
+                        s.system_mask,
+                        a.label,
+                        s.emitter_count,
+                        s.antenna_count,
+                        s.min_freq_khz,
+                        s.max_freq_khz,
+                        d.detail_z
+                    FROM non_mobile_site s
+                    LEFT JOIN ref_actor a ON a.adm_id = s.adm_id
+                    LEFT JOIN non_mobile_detail d ON d.sta_nm_anfr = s.sta_nm_anfr AND d.sup_id = s.sup_id
+                    $whereClause
+                    ORDER BY s.emitter_count DESC, s.antenna_count DESC
+                    LIMIT ?
+                    """.trimIndent(),
+                    args.toTypedArray()
+                )
+
+                cursor.use { it.toRadioMarkers(typeLabels = loadAntennaTypeLabels(db)) }
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLogger.w(TAG, "Radio search sites failed for query=$query", e)
+            emptyList()
+        }
+    }
+
+    suspend fun searchSiteById(query: String): RadioMapMarker? = withContext(Dispatchers.IO) {
+        val trimmed = query.trim()
+        if (trimmed.isBlank() || !databaseFile().isFile) return@withContext null
+
+        try {
+            openDatabase().use { db ->
+                val candidates = supportIdCandidates(trimmed)
+                val placeholders = candidates.joinToString(",") { "?" }
+                val likeArg = "%$trimmed%"
+
+                val cursor = db.rawQuery(
+                    """
+                    SELECT
+                        s.sta_nm_anfr,
+                        s.sup_id,
+                        s.lat_e6,
+                        s.lon_e6,
+                        s.service_mask,
+                        s.system_mask,
+                        a.label,
+                        s.emitter_count,
+                        s.antenna_count,
+                        s.min_freq_khz,
+                        s.max_freq_khz,
+                        d.detail_z
+                    FROM non_mobile_site s
+                    LEFT JOIN ref_actor a ON a.adm_id = s.adm_id
+                    LEFT JOIN non_mobile_detail d ON d.sta_nm_anfr = s.sta_nm_anfr AND d.sup_id = s.sup_id
+                    WHERE (s.sta_nm_anfr IN ($placeholders) OR s.sup_id IN ($placeholders) OR s.sta_nm_anfr LIKE ? OR s.sup_id LIKE ?)
+                      ${excludePublicMobileFhSql()}
+                    ORDER BY (s.sta_nm_anfr = ? OR s.sup_id = ?) DESC, s.emitter_count DESC
+                    LIMIT 1
+                    """.trimIndent(),
+                    (candidates + candidates + listOf(likeArg, likeArg) + excludePublicMobileFhArgs() + listOf(trimmed, trimmed)).toTypedArray()
+                )
+
+                cursor.use { it.toRadioMarkers(typeLabels = loadAntennaTypeLabels(db)).firstOrNull() }
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLogger.w(TAG, "Radio search site by id failed for query=$query", e)
+            null
+        }
+    }
+
     private fun querySites(
         db: SQLiteDatabase,
         bounds: QueryBounds,

@@ -89,6 +89,7 @@ import androidx.compose.material.icons.filled.LocationDisabled
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.NearMe
 import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.Radio
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Smartphone
@@ -190,6 +191,7 @@ import fr.geotower.data.db.CommuneNameRow
 import fr.geotower.ui.components.SecureScreenEffect
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.RadioMapMarker
+import fr.geotower.data.models.RadioServiceMasks
 import fr.geotower.data.AdminAreaExtent
 import fr.geotower.data.models.SiteHsEntity
 import fr.geotower.data.trip.TripFollowStatus
@@ -1201,6 +1203,8 @@ private sealed interface MapSearchSuggestion {
 
     data class Site(val site: LocalisationEntity) : MapSearchSuggestion
 
+    data class RadioSite(val marker: RadioMapMarker) : MapSearchSuggestion
+
     data class Operator(val spec: OperatorColorSpec) : MapSearchSuggestion
 }
 
@@ -1258,18 +1262,25 @@ private suspend fun buildMapSearchSuggestions(
         emptyList()
     }
 
+    val radioSites = if (query.length >= 2) {
+        viewModel.searchRadioSiteSuggestions(query, limit = 2).map(MapSearchSuggestion::RadioSite)
+    } else {
+        emptyList()
+    }
+
     val communes = viewModel
         .searchCommuneSuggestions(query, limit = MAP_SEARCH_SUGGESTION_COUNT)
         .map(::toCommuneSuggestion)
     val looseOperators = matchOperatorSuggestions(query, exactOnly = false)
         .map(MapSearchSuggestion::Operator)
 
-    return (exactOperators + adminAreas + sites + communes + looseOperators)
+    return (exactOperators + adminAreas + sites + radioSites + communes + looseOperators)
         .distinctBy { suggestion ->
             when (suggestion) {
                 is MapSearchSuggestion.Commune -> "commune:${suggestion.codeInsee}"
                 is MapSearchSuggestion.AdminArea -> "area:${suggestion.area.kind}:${suggestion.area.code}"
                 is MapSearchSuggestion.Site -> "site:${suggestion.site.idAnfr}"
+                is MapSearchSuggestion.RadioSite -> "radio:${suggestion.marker.stationId}_${suggestion.marker.supportId}"
                 is MapSearchSuggestion.Operator -> "operator:${suggestion.spec.key}"
             }
         }
@@ -6080,19 +6091,29 @@ fun MapScreen(
                 // son nom complet, un code nu comme « 35 » ne voudrait rien dire pour un géocodeur.
                 val locationQuery = adminArea?.let { "${it.name}, France" } ?: cleanQuery
 
-                // 3. ✅ NOUVEAU : Recherche Globale d'ID (Base de données entière)
+                // 3. ✅ Recherche Globale d'ID ou Site (Base mobile ou base radio annexe)
                 val hasDigits = cleanQuery.any { it.isDigit() }
-                if (adminArea == null && hasDigits && cleanQuery.length >= 3) {
-                    val globalSite = viewModel.searchSiteById(cleanQuery)
+                if (adminArea == null && (hasDigits || cleanQuery.length >= 3)) {
+                    val globalSite = if (hasDigits && cleanQuery.length >= 3) viewModel.searchSiteById(cleanQuery) else null
+                    val radioSite = if (globalSite == null && cleanQuery.length >= 2) viewModel.searchRadioSiteById(cleanQuery) else null
 
                     if (globalSite != null) {
-                        // On a trouvé le site ! On déplace la caméra.
+                        // On a trouvé le site mobile ! On déplace la caméra.
                         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                             releaseLocationFollowForSearch()
                             mapViewRef?.controller?.setZoom(18.0)
                             mapViewRef?.controller?.setCenter(GeoPoint(globalSite.latitude, globalSite.longitude))
                         }
                         return@launch // On arrête ici, pas besoin de chercher une ville
+
+                    } else if (radioSite != null) {
+                        // On a trouvé le site radio annexe ! On déplace la caméra.
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                            releaseLocationFollowForSearch()
+                            mapViewRef?.controller?.setZoom(18.0)
+                            mapViewRef?.controller?.setCenter(GeoPoint(radioSite.latitude, radioSite.longitude))
+                        }
+                        return@launch
 
                     } else if (cleanQuery.all { it.isDigit() }) {
                         // Si l'utilisateur n'a tapé QUE des chiffres et qu'on n'a rien trouvé en base,
@@ -6148,6 +6169,18 @@ fun MapScreen(
                     mapViewRef?.controller?.setZoom(18.0)
                     mapViewRef?.controller?.setCenter(
                         GeoPoint(suggestion.site.latitude, suggestion.site.longitude)
+                    )
+                }
+
+                is MapSearchSuggestion.RadioSite -> {
+                    submit(suggestion.marker.actorLabel?.takeIf { it.isNotBlank() }
+                        ?: suggestion.marker.stationId.takeIf { it.isNotBlank() }
+                        ?: suggestion.marker.supportId)
+                    restoreOperatorSearchSelection()
+                    releaseLocationFollowForSearch()
+                    mapViewRef?.controller?.setZoom(18.0)
+                    mapViewRef?.controller?.setCenter(
+                        GeoPoint(suggestion.marker.latitude, suggestion.marker.longitude)
                     )
                 }
 
@@ -8602,10 +8635,14 @@ private fun MapSearchSuggestionList(
 private fun MapSearchSuggestionRow(suggestion: MapSearchSuggestion, onClick: () -> Unit) {
     val sizing = LocalGeoTowerUiSizing.current
 
+    val context = androidx.compose.ui.platform.LocalContext.current
     val title = when (suggestion) {
         is MapSearchSuggestion.Commune -> suggestion.name
         is MapSearchSuggestion.AdminArea -> suggestion.area.name
         is MapSearchSuggestion.Site -> suggestion.site.idAnfr
+        is MapSearchSuggestion.RadioSite -> suggestion.marker.actorLabel?.takeIf { it.isNotBlank() }
+            ?: suggestion.marker.stationId.takeIf { it.isNotBlank() }
+            ?: suggestion.marker.supportId
         is MapSearchSuggestion.Operator -> suggestion.spec.label
     }
     val subtitle = when (suggestion) {
@@ -8621,6 +8658,14 @@ private fun MapSearchSuggestionRow(suggestion: MapSearchSuggestion, onClick: () 
             }
         )
         is MapSearchSuggestion.Site -> suggestion.site.operateur
+        is MapSearchSuggestion.RadioSite -> {
+            val parts = listOfNotNull(
+                suggestion.marker.stationId.takeIf { it.isNotBlank() }?.let { "Station $it" },
+                suggestion.marker.supportId.takeIf { it.isNotBlank() }?.let { "Support $it" },
+                RadioServiceMasks.labelFor(context, suggestion.marker.serviceMask)
+            )
+            parts.joinToString(" • ")
+        }
         is MapSearchSuggestion.Operator -> stringResource(R.string.map_search_suggestion_operator)
     }
 
@@ -8645,6 +8690,7 @@ private fun MapSearchSuggestionRow(suggestion: MapSearchSuggestion, onClick: () 
                 imageVector = when (suggestion) {
                     is MapSearchSuggestion.Commune -> Icons.Default.LocationCity
                     is MapSearchSuggestion.AdminArea -> Icons.Default.Flag
+                    is MapSearchSuggestion.RadioSite -> Icons.Default.Radio
                     else -> Icons.Default.CellTower
                 },
                 contentDescription = null,

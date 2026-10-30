@@ -1007,6 +1007,17 @@ class MapViewModel(
         }
     }
 
+    suspend fun searchRadioSiteById(query: String): RadioMapMarker? {
+        if (!radioRepository.isInstalled()) return null
+        return try {
+            radioRepository.searchSiteById(query)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     /**
      * Stations proposées pendant la frappe : mêmes résultats que [searchSiteById], mais dédoublonnés
      * par identifiant ANFR — une station porte une ligne par opérateur, et la liste de suggestions
@@ -1018,6 +1029,17 @@ class MapViewModel(
             repository.searchAntennasById(query)
                 .distinctBy { it.idAnfr }
                 .take(limit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    suspend fun searchRadioSiteSuggestions(query: String, limit: Int): List<RadioMapMarker> {
+        if (limit <= 0 || !radioRepository.isInstalled()) return emptyList()
+        return try {
+            radioRepository.searchSites(query, limit)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

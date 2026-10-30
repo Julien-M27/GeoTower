@@ -3485,6 +3485,7 @@
     <string name="appstrings_release_v2093_summary_nav_animation_and_visual_refinements">Bouncy animation on the bottom navigation bar when switching tabs, dynamic welcome logo and visual refinements</string>
     <string name="appstrings_release_v2094_summary_mini_map_azimuth_and_contrast">Improved display of azimuths and satellite contrast for markers in the mini-map</string>
     <string name="appstrings_release_v2095_summary_fullscreen_photo_viewers">Improved edge-to-edge full-screen display for photo viewers and seamless status bar integration</string>
+    <string name="appstrings_release_v2096_summary_radio_database_search_and_keyboard_handling">Search for radio and non-mobile sites (TDF, Towercast, rail networks...) on the map and in Nearby emitters, plus automatic keyboard dismissal when navigating tabs</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Network requests log</string>

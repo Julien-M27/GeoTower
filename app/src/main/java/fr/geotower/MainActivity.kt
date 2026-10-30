@@ -989,8 +989,13 @@ class MainActivity : ComponentActivity() {
                     bottomNavStartRoute
                 }
 
-                val onNavigateTab: (String) -> Unit = remember(navController, resolvedPopUpRoute) {
+                val tabFocusManager = androidx.compose.ui.platform.LocalFocusManager.current
+                val tabKeyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+
+                val onNavigateTab: (String) -> Unit = remember(navController, resolvedPopUpRoute, tabFocusManager, tabKeyboardController) {
                     { targetRoute ->
+                        tabFocusManager.clearFocus(force = true)
+                        tabKeyboardController?.hide()
                         val currentDest = navController.currentDestination?.route?.substringBefore('?')
                         if (currentDest != targetRoute) {
                             try {

@@ -3462,6 +3462,7 @@
     <string name="appstrings_release_v2093_summary_nav_animation_and_visual_refinements">Animación elástica de la barra de navegación al cambiar de pestaña, logotipo dinámico de bienvenida y ajustes visuales</string>
     <string name="appstrings_release_v2094_summary_mini_map_azimuth_and_contrast">Visualización mejorada de acimutes y contraste satelital de los marcadores en el minimapa</string>
     <string name="appstrings_release_v2095_summary_fullscreen_photo_viewers">Visualización mejorada a pantalla completa de borde a borde para fotos e integración perfecta de la barra de estado</string>
+    <string name="appstrings_release_v2096_summary_radio_database_search_and_keyboard_handling">Búsqueda de emplazamientos de radio y no móviles (TDF, Towercast, redes ferroviarias...) en el mapa y en Emisores cercanos, y cierre automático del teclado al navegar</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registro de solicitudes de red</string>

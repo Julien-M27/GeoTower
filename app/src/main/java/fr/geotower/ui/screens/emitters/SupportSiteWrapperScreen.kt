@@ -356,6 +356,7 @@ fun NearEmittersSupportWrapperScreen(
                     else -> NearEmittersScreen(
                         navController = navController,
                         repository = repository,
+                        radioRepository = radioRepository,
                         onSupportClick = { site, searchedOperatorKey ->
                             val supportId = site.idSupport?.takeIf { it.isNotBlank() } ?: site.id.toString()
                             if (splitDisplay) {

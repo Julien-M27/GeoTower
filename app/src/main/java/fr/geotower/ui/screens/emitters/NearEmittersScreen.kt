@@ -142,6 +142,10 @@ import java.text.Normalizer
 import java.util.Locale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
+import fr.geotower.data.RadioRepository
+import fr.geotower.data.models.RadioMapMarker
+import fr.geotower.data.models.RadioServiceMasks
+import kotlin.math.roundToInt
 
 private const val TAG_NEAR_EMITTERS = "GeoTower"
 private const val NEARBY_RELOAD_DISTANCE_METERS = 100f
@@ -202,11 +206,45 @@ private data class NearbySearchSpec(
     val longitude: Double? = null
 )
 
+private fun mapRadioMarkerToUiSite(
+    marker: RadioMapMarker,
+    referenceLocation: Location?,
+    context: Context
+): UiSite {
+    val distance = if (referenceLocation != null) {
+        calculateDistance(referenceLocation.latitude, referenceLocation.longitude, marker.latitude, marker.longitude).roundToInt()
+    } else {
+        0
+    }
+    val actor = marker.actorLabel?.takeIf { it.isNotBlank() } ?: RadioServiceMasks.labelFor(context, marker.serviceMask)
+    val supportIdStr = marker.supportId.takeIf { it.isNotBlank() } ?: marker.stationId
+    val fakeId = (marker.latitude * 100000 + marker.longitude * 1000).toLong().let { if (it == 0L) 1L else kotlin.math.abs(it) }
+
+    return UiSite(
+        id = fakeId,
+        idSupport = supportIdStr,
+        distance = distance,
+        address = actor,
+        description = RadioServiceMasks.labelFor(context, marker.serviceMask),
+        operators = listOf(actor),
+        latitude = marker.latitude,
+        longitude = marker.longitude,
+        anfrIds = listOfNotNull(marker.stationId.takeIf { it.isNotBlank() }),
+        supportIds = listOfNotNull(marker.supportId.takeIf { it.isNotBlank() }),
+        supportTypes = listOf(RadioServiceMasks.labelFor(context, marker.serviceMask)),
+        technologies = listOfNotNull(marker.systemSummary),
+        technicalText = marker.frequencySummary ?: "",
+        supportText = marker.antennaSummary ?: "",
+        searchText = "${marker.stationId} ${marker.supportId} ${marker.actorLabel.orEmpty()} ${RadioServiceMasks.labelFor(context, marker.serviceMask)}"
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun NearEmittersScreen(
     navController: NavController,
     repository: AnfrRepository,
+    radioRepository: RadioRepository = remember { RadioRepository(navController.context.applicationContext) },
     onSupportClick: ((UiSite, String?) -> Unit)? = null
 ) {
     val sizing = LocalGeoTowerUiSizing.current
@@ -300,6 +338,14 @@ fun NearEmittersScreen(
     val siteAnfrLabel = stringResource(R.string.appstrings_site_anfr_label)
 
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+    val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+
+    DisposableEffect(Unit) {
+        onDispose {
+            focusManager.clearFocus(force = true)
+            keyboardController?.hide()
+        }
+    }
 
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
     var showSearchBar by remember { mutableStateOf(prefs.getBoolean("show_search_bar", true)) }
@@ -503,7 +549,7 @@ fun NearEmittersScreen(
         val localMatches = visibleSites.filter { siteMatchesSearch(it, searchSpec) }
         val matchingRemoteSites = if (remoteSearchQuery == query) visibleRemoteSites else emptyList()
         (localMatches + matchingRemoteSites)
-            .distinctBy { it.id }
+            .distinctBy { it.idSupport ?: "${it.id}_${it.latitude}_${it.longitude}" }
             .applyNearbyDisplayFilters(showSitesInService, showSitesOutOfService, showProjectSites, showOnlyZbSites, hideUndergroundSites, hsOperatorMap)
             .sortedBy { it.distance }
             .take(maxItemsToShow)
@@ -545,7 +591,8 @@ fun NearEmittersScreen(
                     NearbySearchField.PostalCode,
                     NearbySearchField.Gps
                 ) ||
-                (searchSpec.field == NearbySearchField.All && searchValue.length >= 3)
+                (searchSpec.field == NearbySearchField.All && searchValue.length >= 2) ||
+                (searchValue.length >= 2 && radioRepository.isInstalled())
             )
 
         // On ne lance le scan distant que si ce n'est pas un opérateur ET qu'il y a au moins 3 caractères
@@ -664,6 +711,18 @@ fun NearEmittersScreen(
                         globalAntennas.addAll(nearestResults)
                     }
 
+                    // --- 3. RECHERCHE DANS LA BASE ANNEXE (RADIO) ---
+                    val radioSites = if (radioRepository.isInstalled() && (
+                        searchSpec.field in setOf(NearbySearchField.AnfrId, NearbySearchField.SupportId, NearbySearchField.Operator, NearbySearchField.All) ||
+                        searchValue.length >= 2
+                    )) {
+                        radioRepository.searchSites(searchValue, limit = NEARBY_GLOBAL_MAPPING_LIMIT).map { marker ->
+                            mapRadioMarkerToUiSite(marker, referenceLocation, context)
+                        }
+                    } else {
+                        emptyList()
+                    }
+
                     // On supprime les doublons éventuels
                     val uniqueGlobalAntennas = globalAntennas
                         .distinctBy { it.idAnfr }
@@ -683,14 +742,18 @@ fun NearEmittersScreen(
                     val frequencyFilteredGlobalAntennas =
                         filterNearbyAntennasByFrequency(uniqueGlobalAntennas, nearbyFrequencyFilter)
 
-                    if (frequencyFilteredGlobalAntennas.isNotEmpty()) {
-                        val mappedGlobal = mapAntennasToUiSites(
-                            repository = repository,
-                            antennas = frequencyFilteredGlobalAntennas,
-                            referenceLocation = referenceLocation,
-                            unknownAddressText = unknownAddressText,
-                            siteAnfrLabel = siteAnfrLabel
-                        )
+                    if (frequencyFilteredGlobalAntennas.isNotEmpty() || radioSites.isNotEmpty()) {
+                        val mappedGlobal = if (frequencyFilteredGlobalAntennas.isNotEmpty()) {
+                            mapAntennasToUiSites(
+                                repository = repository,
+                                antennas = frequencyFilteredGlobalAntennas,
+                                referenceLocation = referenceLocation,
+                                unknownAddressText = unknownAddressText,
+                                siteAnfrLabel = siteAnfrLabel
+                            )
+                        } else {
+                            emptyList()
+                        }
 
                         val keepsGeoAreaResults = targetLat != null && targetLon != null &&
                                 !filtersOnWholeAddress &&
@@ -714,10 +777,14 @@ fun NearEmittersScreen(
                             mappedGlobal.filter { siteMatchesSearch(it, searchSpec) }
                         }
 
+                        val combinedResults = (filteredGlobal + radioSites)
+                            .distinctBy { it.idSupport ?: "${it.id}_${it.latitude}_${it.longitude}" }
+                            .sortedBy { it.distance }
+
                         // ✅ On combine les antennes locales filtrées AVEC les antennes lointaines trouvées,
                         // on retire les doublons et on trie tout ça par distance !
                         withContext(Dispatchers.Main) {
-                            remoteSearchSites = filteredGlobal
+                            remoteSearchSites = combinedResults
                             remoteSearchQuery = query
                             hasCompletedInitialLoad = true
                             isSearchingRemote = false
@@ -880,7 +947,7 @@ fun NearEmittersScreen(
                                         refreshTrigger++
                                     }
                                 },
-                                enabled = searchCenter != null && !isLoading,
+                                enabled = searchCenter != null && !isLoading && searchQuery.isBlank() && filteredSites.isNotEmpty(),
                                 modifier = Modifier.weight(1f).fillMaxWidth()
                             ) {
                                 when {
