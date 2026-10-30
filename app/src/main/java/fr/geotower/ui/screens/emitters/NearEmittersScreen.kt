@@ -1544,10 +1544,13 @@ fun OperatorGrid(operators: List<String>, priorityOperatorKey: String? = null) {
     addPriorityOperator(OperatorColors.keyFor(defaultOp))
     baseOrder.forEach { if (!priorityList.contains(it)) priorityList.add(it) }
 
-    val parsedOperators = operators.flatMap { OperatorColors.keysFor(it) }.distinct()
+    val parsedOperators = operators.flatMap { op ->
+        val keys = OperatorColors.keysFor(op)
+        if (keys.isNotEmpty()) keys else listOf(op)
+    }.filter { it.isNotBlank() }.distinct()
     val sortedOperators = priorityList.filter { priorityOp ->
         priorityOp in parsedOperators
-    }
+    } + parsedOperators.filter { it !in priorityList }
     val displayOps = sortedOperators.take(4)
 
     Column(
@@ -1594,6 +1597,7 @@ fun GridCell(opName: String?, modifier: Modifier = Modifier) {
             Image(
                 painter = painterResource(id = iconRes),
                 contentDescription = null,
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
                 modifier = Modifier.fillMaxSize().clip(cornerShape)
             )
         } else if (spec != null && fallbackColor != null) {
@@ -1686,15 +1690,25 @@ private suspend fun mapAntennasToUiSites(
             calculateDistance(it.latitude, it.longitude, main.latitude, main.longitude)
         } ?: 0f
 
-        val operators = list.mapNotNull { it.operateur }
-            .flatMap { OperatorColors.keysFor(it) }
+        val techniques = list.mapNotNull { techniquesById[it.idAnfr] }
+        val physiques = list.flatMap { physiquesById[it.idAnfr].orEmpty() }
+
+        val rawOperators = list.mapNotNull { it.operateur }.filter { it.isNotBlank() }
+        val effectiveOperators = if (rawOperators.isNotEmpty()) {
+            rawOperators
+        } else {
+            physiques.mapNotNull { it.proprietaire?.takeIf(String::isNotBlank) ?: it.exploitant?.takeIf(String::isNotBlank) }
+        }
+        val operators = effectiveOperators
+            .flatMap { op ->
+                val keys = OperatorColors.keysFor(op)
+                if (keys.isNotEmpty()) keys else listOf(op)
+            }
             .distinct()
         val isZb = list.any { it.isZb == 1 }
         val hasUnderground = list.any { it.hasUndergroundSupport == 1 }
         val isEntirelyProject = list.none { it.isDeclaredActive() }
 
-        val techniques = list.mapNotNull { techniquesById[it.idAnfr] }
-        val physiques = list.flatMap { physiquesById[it.idAnfr].orEmpty() }
         val allAddresses = techniques.mapNotNull { it.adresse?.takeIf(String::isNotBlank) }.distinct()
         val fullAddress = allAddresses.firstOrNull()
             ?: unknownAddressText
@@ -1887,9 +1901,12 @@ private fun splitNearbyAddress(fullAddress: String, idAnfr: String, siteAnfrLabe
 
 private fun parseNearbySearchQuery(raw: String): NearbySearchSpec {
     val trimmed = raw.trim()
-    val splitIndex = trimmed.indexOf(':')
-    val prefix = if (splitIndex > 0) normalizeNearbySearchCompact(trimmed.substring(0, splitIndex)) else ""
-    val value = if (splitIndex > 0) trimmed.substring(splitIndex + 1).trim() else trimmed
+    val isHashSearch = trimmed.startsWith("#")
+    val strippedTrimmed = if (isHashSearch) trimmed.removePrefix("#").trim() else trimmed
+    val splitIndex = strippedTrimmed.indexOf(':')
+    val prefix = if (splitIndex > 0) normalizeNearbySearchCompact(strippedTrimmed.substring(0, splitIndex)) else ""
+    val rawValue = if (splitIndex > 0) strippedTrimmed.substring(splitIndex + 1).trim() else strippedTrimmed
+    val value = rawValue.removePrefix("#").trim()
 
     val explicitField = when (prefix) {
         "op", "operateur", "operator", "o" -> NearbySearchField.Operator
@@ -1902,7 +1919,7 @@ private fun parseNearbySearchQuery(raw: String): NearbySearchSpec {
         "adresse", "address", "addr" -> NearbySearchField.Address
         "gps", "coord", "coords", "latlon", "latlng" -> NearbySearchField.Gps
         "zb", "zoneblanche" -> NearbySearchField.Zb
-        else -> null
+        else -> if (isHashSearch) NearbySearchField.SupportId else null
     }
 
     val coordinateMatch = nearbyCoordinateRegex.find(value)
@@ -1948,8 +1965,8 @@ private fun siteMatchesSearch(site: UiSite, spec: NearbySearchSpec): Boolean {
         NearbySearchField.Operator -> containsNeedle(site.operators)
         NearbySearchField.Technology -> containsNeedle(site.technologies + site.technicalText)
         NearbySearchField.SupportType -> containsNeedle(site.supportTypes + site.supportText)
-        NearbySearchField.SupportId -> containsNeedle(site.supportIds + site.idSupport)
-        NearbySearchField.AnfrId -> containsNeedle(site.anfrIds + site.id.toString())
+        NearbySearchField.SupportId -> containsNeedle(site.supportIds + site.idSupport + site.anfrIds + site.id.toString())
+        NearbySearchField.AnfrId -> containsNeedle(site.anfrIds + site.id.toString() + site.supportIds + site.idSupport)
         NearbySearchField.Address -> containsNeedle(site.allAddresses + listOf(site.fullAddress, site.address, site.description))
         NearbySearchField.City -> containsNeedle(site.allAddresses + listOf(site.city, site.description, site.fullAddress))
         NearbySearchField.PostalCode -> containsNeedle(site.allAddresses + listOf(site.postalCode, site.description, site.fullAddress))

@@ -2687,18 +2687,33 @@ private fun RadioSiteHeaderCard(
             modifier = Modifier.padding(sizing.spacing(16.dp)).fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            val logoRes = fr.geotower.utils.OperatorLogos.drawableRes(marker.actorLabel)
             Box(
                 modifier = Modifier
                     .size(sizing.component(72.dp))
                     .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.62f)),
+                    .background(
+                        if (logoRes != null) Color.Transparent
+                        else MaterialTheme.colorScheme.surface.copy(alpha = 0.62f)
+                    ),
                 contentAlignment = Alignment.Center
             ) {
-                RadioUsageIcon(
-                    serviceMask = marker.serviceMask,
-                    systemMask = marker.systemMask,
-                    size = 48.dp
-                )
+                if (logoRes != null) {
+                    androidx.compose.foundation.Image(
+                        painter = androidx.compose.ui.res.painterResource(id = logoRes),
+                        contentDescription = marker.actorLabel,
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(RoundedCornerShape(8.dp))
+                    )
+                } else {
+                    RadioUsageIcon(
+                        serviceMask = marker.serviceMask,
+                        systemMask = marker.systemMask,
+                        size = 48.dp
+                    )
+                }
             }
             Spacer(modifier = Modifier.width(sizing.spacing(16.dp)))
             Column(modifier = Modifier.weight(1f)) {

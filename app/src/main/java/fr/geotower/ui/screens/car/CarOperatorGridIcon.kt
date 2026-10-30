@@ -25,8 +25,10 @@ private const val OPERATOR_LOGO_INSET = 10
  * 2x2 que celui de l'écran téléphone, afin de garder les logos visibles sans allonger la liste.
  */
 internal fun carOperatorGridIcon(context: android.content.Context, rawOperators: String): CarIcon {
-    val keys = OperatorColors.orderedKeys
-        .filter { it in OperatorColors.keysFor(rawOperators) }
+    val parsed = OperatorColors.keysFor(rawOperators).ifEmpty {
+        rawOperators.takeIf { it.isNotBlank() }?.let(::listOf) ?: emptyList()
+    }
+    val keys = (OperatorColors.orderedKeys.filter { it in parsed } + parsed.filter { it !in OperatorColors.orderedKeys })
         .take(4)
 
     if (keys.isEmpty()) return CarIcon.APP_ICON

@@ -1249,6 +1249,27 @@ private suspend fun buildMapSearchSuggestions(
             .take(MAP_SEARCH_SUGGESTION_COUNT)
     }
 
+    if (query.trim().startsWith("#")) {
+        val idQuery = query.trim().removePrefix("#").trim()
+        val sites = if (idQuery.isNotEmpty()) {
+            viewModel.searchSiteSuggestions(idQuery, limit = 4).map(MapSearchSuggestion::Site)
+        } else {
+            emptyList()
+        }
+        val radioSites = if (idQuery.isNotEmpty()) {
+            viewModel.searchRadioSiteSuggestions(idQuery, limit = 4).map(MapSearchSuggestion::RadioSite)
+        } else {
+            emptyList()
+        }
+        return (sites + radioSites).distinctBy { suggestion ->
+            when (suggestion) {
+                is MapSearchSuggestion.Site -> "site:${suggestion.site.idAnfr}"
+                is MapSearchSuggestion.RadioSite -> "radio:${suggestion.marker.stationId}_${suggestion.marker.supportId}"
+                else -> ""
+            }
+        }
+    }
+
     val exactOperators = matchOperatorSuggestions(query, exactOnly = true)
         .map(MapSearchSuggestion::Operator)
     val adminAreas = FrenchAdminAreas.suggest(query, limit = 2)
@@ -4213,10 +4234,12 @@ fun MapScreen(
 
         map.post {
             try {
+                val isIdSearch = submittedSearchQuery?.let { q -> q.startsWith("#") || (q.isNotBlank() && q.all { it.isDigit() }) } == true
+                val fromMapParam = if (isIdSearch) "false" else "true"
                 val photoDraftParam = pendingSharedPhotoDraftId
                     ?.let { "&photoDraftId=${Uri.encode(it)}" }
                     .orEmpty()
-                navController.navigate("support_detail/${Uri.encode(supportId)}?operator=&fromMap=true$photoDraftParam") {
+                navController.navigate("support_detail/${Uri.encode(supportId)}?operator=&fromMap=$fromMapParam$photoDraftParam") {
                     launchSingleTop = true
                 }
             } catch (e: Exception) {
@@ -4278,10 +4301,12 @@ fun MapScreen(
 
         map.post {
             try {
+                val isIdSearch = submittedSearchQuery?.let { q -> q.startsWith("#") || (q.isNotBlank() && q.all { it.isDigit() }) } == true
+                val fromMapParam = if (isIdSearch) "false" else "true"
                 val photoDraftParam = pendingSharedPhotoDraftId
                     ?.let { "&photoDraftId=${Uri.encode(it)}" }
                     .orEmpty()
-                navController.navigate("support_detail/${Uri.encode(marker.supportId)}?operator=&fromMap=true$photoDraftParam") {
+                navController.navigate("support_detail/${Uri.encode(marker.supportId)}?operator=&fromMap=$fromMapParam$photoDraftParam") {
                     launchSingleTop = true
                 }
             } catch (e: Exception) {
@@ -6047,12 +6072,49 @@ fun MapScreen(
 
         fun performSearch(query: String) {
             val cleanQuery = query.trim()
+            val isHashSearch = cleanQuery.startsWith("#")
+            val idSearchQuery = if (isHashSearch) cleanQuery.removePrefix("#").trim() else cleanQuery
             // Saisie validée : la liste de suggestions se referme et ne se rouvrira pas sur ce
             // texte, sans quoi elle recouvrirait le résultat qu'on vient de cadrer.
             submittedSearchQuery = cleanQuery
             searchSuggestions = emptyList()
             if (cleanQuery.isBlank()) {
                 restoreOperatorSearchSelection()
+                return
+            }
+
+            if (isHashSearch) {
+                restoreOperatorSearchSelection()
+                val foundSite = antennas.find { it.idAnfr == idSearchQuery }
+                if (foundSite != null) {
+                    releaseLocationFollowForSearch()
+                    mapViewRef?.controller?.setZoom(18.0)
+                    mapViewRef?.controller?.setCenter(GeoPoint(foundSite.latitude, foundSite.longitude))
+                    return
+                }
+
+                scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                    val globalSite = if (idSearchQuery.isNotEmpty()) viewModel.searchSiteById(idSearchQuery) else null
+                    val radioSite = if (globalSite == null && idSearchQuery.isNotEmpty()) viewModel.searchRadioSiteById(idSearchQuery) else null
+
+                    if (globalSite != null) {
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                            releaseLocationFollowForSearch()
+                            mapViewRef?.controller?.setZoom(18.0)
+                            mapViewRef?.controller?.setCenter(GeoPoint(globalSite.latitude, globalSite.longitude))
+                        }
+                    } else if (radioSite != null) {
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                            releaseLocationFollowForSearch()
+                            mapViewRef?.controller?.setZoom(18.0)
+                            mapViewRef?.controller?.setCenter(GeoPoint(radioSite.latitude, radioSite.longitude))
+                        }
+                    } else {
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                            Toast.makeText(context, resources.getString(R.string.map_site_not_in_area, cleanQuery), Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }
                 return
             }
 

@@ -113,12 +113,20 @@ internal class CarNearbySitesLoader(
                     .firstOrNull()
                     ?: carContext.getString(R.string.appstrings_unknown_address)
                 val addressParts = splitCarAddress(fullAddress, main.idAnfr, siteAnfrLabel)
-                val operators = antennas
-                    .flatMap { it.operatorSummary(carContext).split(", ") }
-                    .distinct()
-                    .joinToString(", ")
                 val techniques = antennas.mapNotNull { techniqueById[it.idAnfr] }
                 val physiques = antennas.flatMap { physiqueById[it.idAnfr].orEmpty() }
+
+                val rawAntennaOperators = antennas
+                    .flatMap { it.operatorSummary(carContext).split(", ") }
+                    .filter { it.isNotBlank() && it != carContext.getString(R.string.appstrings_operator_unknown) }
+                    .distinct()
+                val effectiveOperators = if (rawAntennaOperators.isNotEmpty()) {
+                    rawAntennaOperators
+                } else {
+                    physiques.mapNotNull { it.proprietaire?.trim()?.takeIf(String::isNotBlank) ?: it.exploitant?.trim()?.takeIf(String::isNotBlank) }
+                }
+                val operators = effectiveOperators.distinct().joinToString(", ").takeIf { it.isNotBlank() }
+                    ?: carContext.getString(R.string.appstrings_operator_unknown)
                 val supportTypes = physiques
                     .mapNotNull { it.natureSupport?.trim()?.takeIf(String::isNotBlank) }
                     .distinct()

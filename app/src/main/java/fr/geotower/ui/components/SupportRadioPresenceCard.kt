@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -148,18 +149,33 @@ private fun SupportRadioItem(
             .alpha(if (isMuted) 0.42f else 1f),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        val logoRes = fr.geotower.utils.OperatorLogos.drawableRes(marker.actorLabel)
         Box(
             modifier = Modifier
                 .size(sizing.component(54.dp))
                 .clip(RoundedCornerShape(8.dp))
-                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.62f)),
+                .background(
+                    if (logoRes != null) Color.Transparent
+                    else MaterialTheme.colorScheme.surface.copy(alpha = 0.62f)
+                ),
             contentAlignment = Alignment.Center
         ) {
-            RadioUsageIcon(
-                serviceMask = marker.serviceMask,
-                systemMask = marker.systemMask,
-                size = 34.dp
-            )
+            if (logoRes != null) {
+                androidx.compose.foundation.Image(
+                    painter = androidx.compose.ui.res.painterResource(id = logoRes),
+                    contentDescription = marker.actorLabel,
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(8.dp))
+                )
+            } else {
+                RadioUsageIcon(
+                    serviceMask = marker.serviceMask,
+                    systemMask = marker.systemMask,
+                    size = 34.dp
+                )
+            }
         }
         Spacer(modifier = Modifier.width(sizing.spacing(14.dp)))
         Column(modifier = Modifier.weight(1f)) {

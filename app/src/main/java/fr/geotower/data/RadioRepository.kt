@@ -171,7 +171,7 @@ class RadioRepository(private val context: Context) {
     }
 
     suspend fun searchSites(query: String, limit: Int = 20): List<RadioMapMarker> = withContext(Dispatchers.IO) {
-        val trimmed = query.trim()
+        val trimmed = query.trim().removePrefix("#").trim()
         if (trimmed.length < 2 || !databaseFile().isFile) return@withContext emptyList()
 
         try {
@@ -244,7 +244,7 @@ class RadioRepository(private val context: Context) {
     }
 
     suspend fun searchSiteById(query: String): RadioMapMarker? = withContext(Dispatchers.IO) {
-        val trimmed = query.trim()
+        val trimmed = query.trim().removePrefix("#").trim()
         if (trimmed.isBlank() || !databaseFile().isFile) return@withContext null
 
         try {
@@ -494,7 +494,7 @@ class RadioRepository(private val context: Context) {
     }
 
     private fun supportIdCandidates(value: String): List<String> {
-        val trimmed = value.trim()
+        val trimmed = value.trim().removePrefix("#").trim()
         if (trimmed.isBlank()) return emptyList()
         if (!trimmed.all { it.isDigit() }) return listOf(trimmed)
 

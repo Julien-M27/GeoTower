@@ -4,6 +4,16 @@ import fr.geotower.R
 
 object OperatorLogos {
     fun drawableRes(raw: String?): Int? {
+        val normalized = raw?.uppercase()?.trim().orEmpty()
+        if (normalized.contains("TDF") ||
+            normalized.contains("TELEDIFFUSION") ||
+            normalized.contains("TÉLÉDIFFUSION")
+        ) {
+            return R.drawable.logo_tdf
+        }
+        if (normalized.contains("TOWERCAST") || normalized.contains("TOWER CAST")) {
+            return R.drawable.logo_towercast
+        }
         return when (OperatorColors.keyFor(raw)) {
             OperatorColors.ORANGE_KEY -> R.drawable.logo_orange
             OperatorColors.BOUYGUES_KEY -> R.drawable.logo_bouygues

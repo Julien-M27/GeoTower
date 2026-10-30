@@ -18,4 +18,19 @@ class OperatorColorsTest {
     fun searchLabelsFor_returnsFallbackForUnknownOperator() {
         assertEquals(listOf("Unknown Mobile"), OperatorColors.searchLabelsFor(" Unknown Mobile "))
     }
+
+    @Test
+    fun operatorLogos_resolvesTdfLogo() {
+        assertEquals(fr.geotower.R.drawable.logo_tdf, OperatorLogos.drawableRes("TDF"))
+        assertEquals(fr.geotower.R.drawable.logo_tdf, OperatorLogos.drawableRes("tdf"))
+        assertEquals(fr.geotower.R.drawable.logo_tdf, OperatorLogos.drawableRes("Télédiffusion de France"))
+        assertEquals(fr.geotower.R.drawable.logo_tdf, OperatorLogos.drawableRes("TELEDIFFUSION DE FRANCE"))
+    }
+
+    @Test
+    fun operatorLogos_resolvesTowercastLogo() {
+        assertEquals(fr.geotower.R.drawable.logo_towercast, OperatorLogos.drawableRes("TOWERCAST"))
+        assertEquals(fr.geotower.R.drawable.logo_towercast, OperatorLogos.drawableRes("towercast"))
+        assertEquals(fr.geotower.R.drawable.logo_towercast, OperatorLogos.drawableRes("Tower Cast"))
+    }
 }

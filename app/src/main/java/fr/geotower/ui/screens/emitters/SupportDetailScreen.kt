@@ -577,12 +577,12 @@ fun SupportDetailScreen(
             context = context,
             antennas = antennas,
             sitesHs = hsDataMap.values,
-            applyFilters = true,
+            applyFilters = applyMapFilters,
             timeSliderActive = AppConfig.timeSliderActive.value,
             timeSliderThreshold = AppConfig.timeSliderThreshold.value
         )
     }
-    val priorityOperatorKey = effectiveHighlightedOperatorKey ?: activeOperatorKeys?.singleOrNull()
+    val priorityOperatorKey = effectiveHighlightedOperatorKey ?: (if (applyMapFilters) activeOperatorKeys?.singleOrNull() else null)
     val navigationTarget = antennas.firstOrNull()?.let { it.latitude to it.longitude }
         ?: radioSupportMarkers.firstOrNull { !it.isCluster }?.let { it.latitude to it.longitude }
     val sharedPhotoUploadOperators = remember(antennas, featureFlags) {

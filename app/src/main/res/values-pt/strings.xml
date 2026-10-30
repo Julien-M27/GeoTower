@@ -3463,6 +3463,7 @@
     <string name="appstrings_release_v2094_summary_mini_map_azimuth_and_contrast">Visualização melhorada dos azimutes e contraste de satélite dos marcadores no minimapa</string>
     <string name="appstrings_release_v2095_summary_fullscreen_photo_viewers">Visualização melhorada em ecrã inteiro de ponta a ponta para fotos e integração harmoniosa da barra de estado</string>
     <string name="appstrings_release_v2096_summary_radio_database_search_and_keyboard_handling">Pesquisa de locais de rádio e não móveis (TDF, Towercast, redes ferroviárias...) no mapa e em Emissores próximos, e fecho automático do teclado ao navegar</string>
+    <string name="appstrings_release_v2097_summary_tdf_towercast_logos_and_hash_id_search">Logótipos de emissores TDF e Towercast, pesquisa direta por identificador com o prefixo # e visualização fiel dos operadores sem escurecimento erróneo</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registo de pedidos de rede</string>

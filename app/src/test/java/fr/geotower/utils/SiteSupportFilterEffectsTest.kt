@@ -95,6 +95,31 @@ class SiteSupportFilterEffectsTest {
     }
 
     @Test
+    fun applyFiltersFalseAlwaysReturnsNull() {
+        val antennas = listOf(
+            antenna("1001", "Orange"),
+            antenna("1002", "Free"),
+            antenna("1003", "SFR")
+        )
+
+        val result = resolveActiveOperatorKeys(
+            context = null,
+            antennas = antennas,
+            sitesHs = emptyList(),
+            selectedOperatorKeys = setOf(OperatorColors.FREE_KEY),
+            frequencyFilter = fullyEnabledFilter(),
+            showSitesInService = true,
+            showSitesOutOfService = true,
+            showProjectSites = false,
+            hideUndergroundSites = false,
+            showOnlyZbSites = false,
+            applyFilters = false
+        )
+
+        assertNull("Quand applyFilters est false (ex: recherche d'un support), la fonction doit renvoyer null pour ne rien griser", result)
+    }
+
+    @Test
     fun operatorFilterActiveFiltersAnnexOperators() {
         val antennas = listOf(
             antenna("1001", "Orange"),
