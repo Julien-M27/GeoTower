@@ -43,6 +43,12 @@
 -keep class fr.geotower.data.upload.SignalQuestUploadManifest { *; }
 -keep class fr.geotower.data.upload.SignalQuestUploadFile { *; }
 
+# Cache d'antennes et marqueurs ecran (SharedMapAntennaCacheHolder) : contient List<LocalisationEntity>
+# et List<RadioMapMarker>. Sans regle keep, R8 supprime les signatures generiques et Gson
+# deserialise en ArrayList<LinkedTreeMap>, declenchant un ClassCastException a la lecture.
+-keep class fr.geotower.utils.SharedMapAntennaCacheHolder* { *; }
+-keep class fr.geotower.utils.CachedScreenData { *; }
+
 # Trajets enregistres : TripPlan porte `steps`, `legs` et `reminderOffsetsMinutes`, donc la regle
 # est obligatoire (voir plus haut). Poser cette regle des la premiere version qui ecrit le fichier :
 # la garder fige les noms de champs, et l'ajouter apres coup rendrait illisibles les trajets deja

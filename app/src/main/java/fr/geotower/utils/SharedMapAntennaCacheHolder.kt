@@ -1,13 +1,24 @@
 package fr.geotower.utils
 
 import android.content.Context
+import androidx.annotation.Keep
 import com.google.gson.Gson
+import com.google.gson.annotations.SerializedName
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.RadioMapMarker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.File
+
+@Keep
+data class CachedScreenData(
+    @SerializedName("zoom") val zoom: Double = 0.0,
+    @SerializedName("lat") val lat: Double = 0.0,
+    @SerializedName("lon") val lon: Double = 0.0,
+    @SerializedName("antennas") val antennas: List<LocalisationEntity>? = emptyList(),
+    @SerializedName("radioMarkers") val radioMarkers: List<RadioMapMarker>? = emptyList()
+)
 
 /**
  * Cache mémoire (RAM) et persistant pour les antennes et marqueurs radio actuellement
@@ -43,14 +54,6 @@ object SharedMapAntennaCacheHolder {
     @Volatile
     private var isInitializedFromDisk = false
 
-    private data class CachedScreenData(
-        val zoom: Double,
-        val lat: Double,
-        val lon: Double,
-        val antennas: List<LocalisationEntity>,
-        val radioMarkers: List<RadioMapMarker>
-    )
-
     @Synchronized
     fun getAntennas(): List<LocalisationEntity> = cachedAntennas
 
@@ -73,16 +76,30 @@ object SharedMapAntennaCacheHolder {
                 if (file.exists() && file.length() > 0) {
                     val json = file.readText()
                     val data = gson.fromJson(json, CachedScreenData::class.java)
-                    if (data != null && (data.antennas.isNotEmpty() || data.radioMarkers.isNotEmpty())) {
-                        cachedAntennas = data.antennas
-                        cachedRadioMarkers = data.radioMarkers
-                        cachedZoom = data.zoom
-                        cachedLat = data.lat
-                        cachedLon = data.lon
+                    if (data != null) {
+                        val antennas = data.antennas ?: emptyList()
+                        val radioMarkers = data.radioMarkers ?: emptyList()
+
+                        // Sécurité runtime : vérifie que la désérialisation a bien produit des instances
+                        // du type attendu et non des LinkedTreeMap orphelins (ex: résidu de build obfusqué)
+                        val validAntennas = antennas.filterIsInstance<LocalisationEntity>()
+                        val validRadioMarkers = radioMarkers.filterIsInstance<RadioMapMarker>()
+
+                        if (antennas.size != validAntennas.size || radioMarkers.size != validRadioMarkers.size) {
+                            AppLogger.w(TAG, "Cached screen antennas file contained invalid/obfuscated objects, deleting file")
+                            file.delete()
+                        } else if (validAntennas.isNotEmpty() || validRadioMarkers.isNotEmpty()) {
+                            cachedAntennas = validAntennas
+                            cachedRadioMarkers = validRadioMarkers
+                            cachedZoom = data.zoom
+                            cachedLat = data.lat
+                            cachedLon = data.lon
+                        }
                     }
                 }
             } catch (e: Exception) {
                 AppLogger.w(TAG, "Failed to load cached screen antennas from disk", e)
+                runCatching { File(context.cacheDir, CACHE_FILE_NAME).delete() }
             }
         }
     }
@@ -113,6 +130,7 @@ object SharedMapAntennaCacheHolder {
             scope.launch {
                 try {
                     val file = File(appCtx.cacheDir, CACHE_FILE_NAME)
+                    val tempFile = File(appCtx.cacheDir, "$CACHE_FILE_NAME.tmp")
                     val data = CachedScreenData(
                         zoom = zoom,
                         lat = lat,
@@ -120,7 +138,11 @@ object SharedMapAntennaCacheHolder {
                         antennas = snapAntennas,
                         radioMarkers = snapRadioMarkers
                     )
-                    file.writeText(gson.toJson(data))
+                    tempFile.writeText(gson.toJson(data))
+                    if (tempFile.exists()) {
+                        if (file.exists()) file.delete()
+                        tempFile.renameTo(file)
+                    }
                 } catch (e: Exception) {
                     AppLogger.w(TAG, "Failed to persist cached screen antennas", e)
                 }

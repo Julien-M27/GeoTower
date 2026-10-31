@@ -3466,6 +3466,7 @@
     <string name="appstrings_release_v2096_summary_radio_database_search_and_keyboard_handling">Búsqueda de emplazamientos de radio y no móviles (TDF, Towercast, redes ferroviarias...) en el mapa y en Emisores cercanos, y cierre automático del teclado al navegar</string>
     <string name="appstrings_release_v2097_summary_tdf_towercast_logos_and_hash_id_search">Logotipos de operadores emisores TDF y Towercast, búsqueda directa por identificador con el prefijo # y visualización fiel sin oscurecimiento erróneo</string>
     <string name="appstrings_release_v2098_summary_enb_proximity_fallback">Correspondencia geográfica de identificadores eNB / gNB para emplazamientos sin identificador de soporte oficial e indicador de posición estimada</string>
+    <string name="appstrings_release_v2099_summary_antenna_cache_proguard_and_atomicity">Protección y escritura atómica de la caché persistente de antenas del mapa para una restauración instantánea y sin errores</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registro de solicitudes de red</string>

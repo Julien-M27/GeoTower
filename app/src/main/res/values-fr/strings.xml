@@ -3468,6 +3468,7 @@
     <string name="appstrings_release_v2096_summary_radio_database_search_and_keyboard_handling">Recherche des sites radio et non mobiles (TDF, Towercast, SNCF...) sur la carte et dans Émetteurs proches, et fermeture automatique du clavier lors de la navigation</string>
     <string name="appstrings_release_v2097_summary_tdf_towercast_logos_and_hash_id_search">Logos diffuseurs TDF et Towercast, recherche directe par identifiant avec le préfixe # et affichage fidèle des opérateurs sans grisement erroné</string>
     <string name="appstrings_release_v2098_summary_enb_proximity_fallback">Rapprochement géographique des identifiants eNB / gNB pour les sites sans identifiant support officiel et indication de position estimée</string>
+    <string name="appstrings_release_v2099_summary_antenna_cache_proguard_and_atomicity">Sécurisation et écriture atomique du cache persistant des antennes de la carte pour une restauration instantanée et sans erreur</string>
 
     <!-- Journal des requêtes réseau -->
     <string name="network_log_title">Journal des requêtes réseau</string>
