@@ -32,7 +32,7 @@ internal data class ReleaseNoteItem(
 @Composable
 internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
     section(stringResource(R.string.appstrings_release_section_interface)) {
-        item(stringResource(R.string.appstrings_release_v2097_summary_tdf_towercast_logos_and_hash_id_search))
+        item(stringResource(R.string.appstrings_release_v2098_summary_enb_proximity_fallback))
     }
 }
 

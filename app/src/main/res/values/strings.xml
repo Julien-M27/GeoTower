@@ -373,6 +373,7 @@
     <string name="radio_database_site_count">Radio sites: %1$s</string>
     <string name="enb_database_title">eNB / gNB identifiers</string>
     <string name="appstrings_site_network_ids_title">Network identifiers</string>
+    <string name="appstrings_site_network_ids_estimated">Estimated position</string>
     <string name="appstrings_site_network_ids_option">Network identifiers (eNB / gNB)</string>
     <string name="appstrings_site_network_ids_source">Source: eNB Analytics</string>
     <string name="appstrings_site_network_ids_about_action">About eNB Analytics</string>
@@ -3487,6 +3488,7 @@
     <string name="appstrings_release_v2095_summary_fullscreen_photo_viewers">Improved edge-to-edge full-screen display for photo viewers and seamless status bar integration</string>
     <string name="appstrings_release_v2096_summary_radio_database_search_and_keyboard_handling">Search for radio and non-mobile sites (TDF, Towercast, rail networks...) on the map and in Nearby emitters, plus automatic keyboard dismissal when navigating tabs</string>
     <string name="appstrings_release_v2097_summary_tdf_towercast_logos_and_hash_id_search">TDF and Towercast broadcaster logos, direct ID search using the # prefix, and faithful site operator display without erroneous greying</string>
+    <string name="appstrings_release_v2098_summary_enb_proximity_fallback">Geographic proximity matching for eNB / gNB identifiers on sites without an official support ID, with an estimated position indicator</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Network requests log</string>

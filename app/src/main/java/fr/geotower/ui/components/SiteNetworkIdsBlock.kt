@@ -19,6 +19,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -75,6 +76,23 @@ fun SiteNetworkIdsBlock(
                 Icon(Icons.Default.CellTower, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
                 Text(text = txtTitle, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                if (identifiers.isEstimated) {
+                    Spacer(modifier = Modifier.weight(1f))
+                    Surface(
+                        shape = MaterialTheme.shapes.small,
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                    ) {
+                        Text(
+                            text = stringResource(R.string.appstrings_site_network_ids_estimated),
+                            modifier = Modifier.padding(
+                                horizontal = sizing.spacing(8.dp),
+                                vertical = sizing.spacing(2.dp)
+                            ),
+                            style = sizing.textStyle(MaterialTheme.typography.labelSmall),
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        )
+                    }
+                }
             }
             HorizontalDivider(
                 modifier = Modifier.padding(vertical = sizing.spacing(12.dp)),

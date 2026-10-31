@@ -237,6 +237,7 @@
     <string name="radio_database_site_count">Sites de rádio: %1$s</string>
     <string name="enb_database_title">Identificadores eNB / gNB</string>
     <string name="appstrings_site_network_ids_title">Identificadores de rede</string>
+    <string name="appstrings_site_network_ids_estimated">Posição estimada</string>
     <string name="appstrings_site_network_ids_option">Identificadores de rede (eNB / gNB)</string>
     <string name="appstrings_site_network_ids_source">Fonte: eNB Analytics</string>
     <string name="appstrings_site_network_ids_about_action">Acerca do eNB Analytics</string>
@@ -3464,6 +3465,7 @@
     <string name="appstrings_release_v2095_summary_fullscreen_photo_viewers">Visualização melhorada em ecrã inteiro de ponta a ponta para fotos e integração harmoniosa da barra de estado</string>
     <string name="appstrings_release_v2096_summary_radio_database_search_and_keyboard_handling">Pesquisa de locais de rádio e não móveis (TDF, Towercast, redes ferroviárias...) no mapa e em Emissores próximos, e fecho automático do teclado ao navegar</string>
     <string name="appstrings_release_v2097_summary_tdf_towercast_logos_and_hash_id_search">Logótipos de emissores TDF e Towercast, pesquisa direta por identificador com o prefixo # e visualização fiel dos operadores sem escurecimento erróneo</string>
+    <string name="appstrings_release_v2098_summary_enb_proximity_fallback">Correspondência geográfica de identificadores eNB / gNB para locais sem identificador de suporte oficial e indicador de posição estimada</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registo de pedidos de rede</string>

@@ -237,6 +237,7 @@
     <string name="radio_database_site_count">Rundfunkstandorte: %1$s</string>
     <string name="enb_database_title">eNB-/gNB-Kennungen</string>
     <string name="appstrings_site_network_ids_title">Netzkennungen</string>
+    <string name="appstrings_site_network_ids_estimated">Geschätzte Position</string>
     <string name="appstrings_site_network_ids_option">Netzkennungen (eNB / gNB)</string>
     <string name="appstrings_site_network_ids_source">Quelle: eNB Analytics</string>
     <string name="appstrings_site_network_ids_about_action">Über eNB Analytics</string>
@@ -3464,6 +3465,7 @@
     <string name="appstrings_release_v2095_summary_fullscreen_photo_viewers">Verbesserte randlose Vollbildanzeige für Fotobetrachter und nahtlose Integration der Statusleiste</string>
     <string name="appstrings_release_v2096_summary_radio_database_search_and_keyboard_handling">Suche nach Radio- und Nicht-Mobilfunkstandorten (TDF, Towercast, Bahnnetze...) auf der Karte und bei Sendern in der Nähe sowie automatisches Schließen der Tastatur beim Tab-Wechsel</string>
     <string name="appstrings_release_v2097_summary_tdf_towercast_logos_and_hash_id_search">Rundfunkbetreiber-Logos für TDF und Towercast, direkte ID-Suche mit dem Präfix # und getreue Betreiberanzeige ohne fehlerhaftes Ausgrauen</string>
+    <string name="appstrings_release_v2098_summary_enb_proximity_fallback">Geografischer Abgleich von eNB-/gNB-Kennungen für Standorte ohne offizielle Trägerkennung samt Kennzeichnung geschätzter Positionen</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Netzwerkanfragen-Protokoll</string>

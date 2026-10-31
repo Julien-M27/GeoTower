@@ -1005,11 +1005,13 @@ fun SiteDetailScreen(
 
     // Identifiants réseau : lecture locale d'une base optionnelle, hors du chemin bloquant du site.
     // Le bloc ne s'affiche pas si elle est absente ou si le pylône n'a aucun eNB/gNB rattaché.
-    LaunchedEffect(physique?.idSupport, antenna?.operateur, showNetworkIds) {
+    LaunchedEffect(physique?.idSupport, antenna?.operateur, antenna?.latitude, antenna?.longitude, showNetworkIds) {
         networkIds = if (showNetworkIds) {
             fr.geotower.data.EnbRepository(context).getIdentifiersForSupport(
                 idSupport = physique?.idSupport,
-                operator = antenna?.operateur
+                operator = antenna?.operateur,
+                latitude = antenna?.latitude,
+                longitude = antenna?.longitude
             )
         } else {
             fr.geotower.data.EnbRepository.SiteNetworkIds()
