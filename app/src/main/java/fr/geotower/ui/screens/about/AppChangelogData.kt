@@ -27,11 +27,18 @@ data class ChangelogMilestone(
 object AppChangelogRepository {
     val milestones: List<ChangelogMilestone> = listOf(
         ChangelogMilestone(
+            versionName = "2.1.1",
+            releaseDate = "2026-11-03",
+            isCurrent = true,
+            badge = MilestoneBadge.CURRENT,
+            summary = "Fiabilisation des transferts Bluetooth et segmentation multi-trames pour montres Garmin",
+            itemResIds = listOf(R.string.appstrings_release_v211_summary_garmin_ble_chunks_and_transfer_reliability)
+        ),
+        ChangelogMilestone(
             versionName = "2.1.0",
             releaseDate = "2026-11-03",
             isMajor = true,
-            isCurrent = true,
-            badge = MilestoneBadge.CURRENT,
+            badge = MilestoneBadge.MAJOR,
             summary = "Application compagnon Garmin Connect IQ et journal des versions",
             itemResIds = listOf(R.string.appstrings_release_v210_summary_garmin_companion_and_changelog_history)
         ),

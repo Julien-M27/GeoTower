@@ -18,13 +18,17 @@ import fr.geotower.data.models.PhysiqueEntity
 import fr.geotower.data.models.TechniqueEntity
 import fr.geotower.utils.AppFileLog
 import fr.geotower.utils.AppLogger
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -43,12 +47,19 @@ data class GarminConnectedWatch(
  * Permet à la montre de recevoir les antennes relais à proximité directement
  * depuis la base de données locale (Room) du téléphone en BLE, sans nécessiter
  * de connexion Internet ni de serveur distant.
+ *
+ * Supporte la segmentation multi-trames (chunking) pour acheminer jusqu'à
+ * 50 sites de manière fluide sans saturer le buffer radio BLE (8 Ko max).
  */
 object GarminCompanionManager {
 
     const val GARMIN_APP_UUID = "4d29f8a3-9b1c-4f76-8f3e-72bc31920e40"
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val coroutineExceptionHandler = CoroutineExceptionHandler { _, throwable ->
+        AppFileLog.e("GarminBridge", "Exception non capturée dans coroutine Garmin", throwable)
+    }
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO + coroutineExceptionHandler)
     private var connectIQ: ConnectIQ? = null
     private var repository: AnfrRepository? = null
     private val iqApp = IQApp(GARMIN_APP_UUID)
@@ -66,20 +77,30 @@ object GarminCompanionManager {
     val lastStatusMessage: StateFlow<String?> = _lastStatusMessage.asStateFlow()
 
     private val deviceEventListener = IQDeviceEventListener { device, newStatus ->
-        AppFileLog.i("GarminBridge", "Montre ${device.friendlyName} statut: $newStatus")
-        refreshConnectedDevices()
+        runCatching {
+            val name = device?.friendlyName ?: "Inconnue"
+            AppFileLog.i("GarminBridge", "Montre $name statut: $newStatus")
+            refreshConnectedDevices()
+        }.onFailure { e ->
+            AppFileLog.e("GarminBridge", "Erreur deviceEventListener", e)
+        }
     }
 
     private val appEventListener = IQApplicationEventListener { device, app, messageData, status ->
-        if (status == IQMessageStatus.SUCCESS && messageData != null) {
-            AppFileLog.i("GarminBridge", "Message reçu de la montre ${device.friendlyName} : ${messageData.size} élément(s)")
-            for (item in messageData) {
-                if (item is Map<*, *>) {
-                    handleWatchMessage(device, app, item)
+        runCatching {
+            val name = device?.friendlyName ?: "Inconnue"
+            if (status == IQMessageStatus.SUCCESS && messageData != null && device != null && app != null) {
+                AppFileLog.i("GarminBridge", "Message reçu de la montre $name : ${messageData.size} élément(s)")
+                for (item in messageData) {
+                    if (item is Map<*, *>) {
+                        handleWatchMessage(device, app, item)
+                    }
                 }
+            } else {
+                AppFileLog.i("GarminBridge", "Statut réception message montre: $status")
             }
-        } else {
-            AppFileLog.i("GarminBridge", "Erreur réception message montre: $status")
+        }.onFailure { e ->
+            AppFileLog.e("GarminBridge", "Erreur appEventListener", e)
         }
     }
 
@@ -174,13 +195,25 @@ object GarminCompanionManager {
                 sendToWatch(device, app, mapOf("cmd" to "pong", "time" to System.currentTimeMillis()))
             }
             "nearby" -> {
-                val lat = (data["lat"] as? Number)?.toDouble() ?: return
-                val lon = (data["lon"] as? Number)?.toDouble() ?: return
-                val radiusKm = (data["radius_km"] as? Number)?.toDouble() ?: 10.0
-                val limit = (data["limit"] as? Number)?.toInt()?.coerceIn(1, 50) ?: 10
+                val lat = (data["lat"] as? Number)?.toDouble()
+                    ?: data["lat"]?.toString()?.toDoubleOrNull()
+                    ?: return
+                val lon = (data["lon"] as? Number)?.toDouble()
+                    ?: data["lon"]?.toString()?.toDoubleOrNull()
+                    ?: return
+                val radiusKm = (data["radius_km"] as? Number)?.toDouble()
+                    ?: data["radius_km"]?.toString()?.toDoubleOrNull()
+                    ?: 10.0
+                val limit = (data["limit"] as? Number)?.toInt()
+                    ?: data["limit"]?.toString()?.toIntOrNull()?.coerceIn(1, 50)
+                    ?: 10
 
                 scope.launch {
-                    processNearbyRequest(device, app, lat, lon, radiusKm, limit)
+                    try {
+                        processNearbyRequest(device, app, lat, lon, radiusKm, limit)
+                    } catch (t: Throwable) {
+                        AppFileLog.e("GarminBridge", "Erreur critique dans processNearbyRequest", t)
+                    }
                 }
             }
         }
@@ -196,11 +229,15 @@ object GarminCompanionManager {
     ) {
         val repo = repository ?: return
         try {
-            // Lecture des antennes les plus proches
-            val candidateCount = (limit * 6).coerceIn(25, 300)
+            val effectiveLimit = limit.coerceIn(1, 50)
+            val candidateCount = (effectiveLimit * 6).coerceIn(25, 300)
             val antennas = repo.getNearest(lat, lon, candidateCount)
             if (antennas.isEmpty()) {
-                sendToWatch(device, app, mapOf("sites" to emptyList<Map<String, Any>>()))
+                sendToWatchAsync(
+                    device,
+                    app,
+                    mapOf("sites" to emptyList<Map<String, Any>>(), "chunk" to 0, "total_chunks" to 1)
+                )
                 return
             }
 
@@ -243,22 +280,41 @@ object GarminCompanionManager {
                 siteMap["lat"] = main.latitude
                 siteMap["lon"] = main.longitude
                 siteMap["sup"] = supCode
-                siteMap["support_name"] = supName
+                siteMap["support_name"] = supName.take(35)
                 siteMap["h"] = height
-                siteMap["loc"] = locationName
-                siteMap["addr"] = if (fullAddress.isNotBlank()) fullAddress else locationName
+                siteMap["loc"] = locationName.take(30)
+                siteMap["addr"] = (if (fullAddress.isNotBlank()) fullAddress else locationName).take(45)
                 siteMap["ops"] = ops
 
                 sitesList.add(siteMap)
             }
 
-            // Trier par distance et limiter
+            // Trier par distance et limiter au nombre demandé (jusqu'à 50)
             sitesList.sortBy { (it["d"] as? Int) ?: 0 }
-            val finalSites = sitesList.take(limit)
+            val finalSites = sitesList.take(effectiveLimit)
 
-            val payload = mapOf("sites" to finalSites)
-            AppFileLog.i("GarminBridge", "Envoi de ${finalSites.size} site(s) BLE à la montre")
-            sendToWatch(device, app, payload)
+            // Découpage en trames BLE sécurisées de 15 sites max (~5 Ko par trame)
+            val chunkSize = 15
+            val chunks = finalSites.chunked(chunkSize)
+
+            AppFileLog.i("GarminBridge", "Envoi progressif de ${finalSites.size} site(s) BLE en ${chunks.size} trame(s) à la montre")
+
+            for ((index, chunk) in chunks.withIndex()) {
+                val chunkPayload = mapOf(
+                    "sites" to chunk,
+                    "chunk" to index,
+                    "total_chunks" to chunks.size
+                )
+                val success = sendToWatchAsync(device, app, chunkPayload)
+                if (!success) {
+                    AppFileLog.w("GarminBridge", "Arrêt envoi trames : échec ou déconnexion à la trame $index / ${chunks.size}")
+                    break
+                }
+                if (index < chunks.size - 1) {
+                    delay(120L)
+                }
+            }
+
             _lastSyncTimestamp.value = System.currentTimeMillis()
         } catch (e: Exception) {
             AppFileLog.e("GarminBridge", "Erreur lors du traitement nearby pour la montre", e)
@@ -298,7 +354,7 @@ object GarminCompanionManager {
             val opMap = HashMap<String, Any>()
             opMap["id"] = opId
             opMap["t"] = techStr
-            opMap["bands"] = bandsStr
+            opMap["bands"] = bandsStr.take(35)
             opMap["az"] = azimuths
             result.add(opMap)
         }
@@ -383,16 +439,43 @@ object GarminCompanionManager {
         return ((bearing % 360f + 360f) % 360f).roundToInt()
     }
 
-    private fun sendToWatch(device: IQDevice, app: IQApp, payload: Any) {
-        val ciq = connectIQ ?: return
-        try {
+    private suspend fun sendToWatchAsync(device: IQDevice?, app: IQApp?, payload: Any): Boolean {
+        val ciq = connectIQ ?: return false
+        if (device == null || app == null) return false
+        return try {
+            val deferred = CompletableDeferred<Boolean>()
             ciq.sendMessage(device, app, payload, object : IQSendMessageListener {
-                override fun onMessageStatus(dev: IQDevice, a: IQApp, status: IQMessageStatus) {
-                    AppFileLog.i("GarminBridge", "Statut envoi message vers ${dev.friendlyName}: $status")
+                override fun onMessageStatus(dev: IQDevice?, a: IQApp?, status: IQMessageStatus?) {
+                    runCatching {
+                        val name = dev?.friendlyName ?: "Montre"
+                        AppFileLog.i("GarminBridge", "Statut envoi trame vers $name: $status")
+                        deferred.complete(status == IQMessageStatus.SUCCESS)
+                    }.onFailure {
+                        deferred.complete(false)
+                    }
                 }
             })
-        } catch (e: Exception) {
-            AppFileLog.e("GarminBridge", "Erreur lors de l'envoi du message à la montre", e)
+            withTimeoutOrNull(3000L) { deferred.await() } ?: false
+        } catch (t: Throwable) {
+            AppFileLog.e("GarminBridge", "Exception sendToWatchAsync", t)
+            false
+        }
+    }
+
+    private fun sendToWatch(device: IQDevice?, app: IQApp?, payload: Any) {
+        val ciq = connectIQ ?: return
+        if (device == null || app == null) return
+        try {
+            ciq.sendMessage(device, app, payload, object : IQSendMessageListener {
+                override fun onMessageStatus(dev: IQDevice?, a: IQApp?, status: IQMessageStatus?) {
+                    runCatching {
+                        val name = dev?.friendlyName ?: "Montre"
+                        AppFileLog.i("GarminBridge", "Statut envoi message vers $name: $status")
+                    }
+                }
+            })
+        } catch (t: Throwable) {
+            AppFileLog.e("GarminBridge", "Erreur lors de l'envoi du message à la montre", t)
         }
     }
 }
