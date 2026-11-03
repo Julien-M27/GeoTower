@@ -20,19 +20,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BugReport
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -58,6 +56,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fr.geotower.services.garmin.GarminCompanionManager
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
+import fr.geotower.utils.AppFileLog
 
 @Composable
 fun GarminSettingsCard(
@@ -78,10 +77,26 @@ fun GarminSettingsCard(
     val isReady by GarminCompanionManager.isSdkReady.collectAsStateWithLifecycle()
     val watches by GarminCompanionManager.connectedWatches.collectAsStateWithLifecycle()
     val lastSync by GarminCompanionManager.lastSyncTimestamp.collectAsStateWithLifecycle()
-    val logs by GarminCompanionManager.logs.collectAsStateWithLifecycle()
+    val liveLogs by GarminCompanionManager.logs.collectAsStateWithLifecycle()
     val lastError by GarminCompanionManager.lastError.collectAsStateWithLifecycle()
     val lastReceivedPayload by GarminCompanionManager.lastReceivedPayload.collectAsStateWithLifecycle()
     val sdkStatusMsg by GarminCompanionManager.lastStatusMessage.collectAsStateWithLifecycle()
+
+    // Lecture du journal persistant sur disque (conserve les plantages précédents même après redémarrage de l'app)
+    var diskLogText by remember(showDialog) {
+        mutableStateOf(if (showDialog) AppFileLog.readText(context) else "")
+    }
+
+    val diskCrash = remember(diskLogText) {
+        extractLastCrash(diskLogText)
+    }
+
+    val combinedLogs = remember(diskLogText, liveLogs) {
+        val diskGarminLines = diskLogText.lines().filter {
+            it.contains("GarminBridge") || it.contains("E/Crash") || it.contains("CrashHandler")
+        }.takeLast(60)
+        (diskGarminLines + liveLogs).distinct().takeLast(80)
+    }
 
     val subtitle = remember(isGcmInstalled, isReady, watches, lastSync) {
         when {
@@ -104,6 +119,7 @@ fun GarminSettingsCard(
             if (isGcmInstalled) {
                 GarminCompanionManager.refreshConnectedDevices()
             }
+            diskLogText = AppFileLog.readText(context)
             showDialog = true
         },
         shape = shape,
@@ -203,8 +219,57 @@ fun GarminSettingsCard(
                         }
                     }
 
-                    // Erreur récente mise en avant
-                    if (lastError != null) {
+                    // Crash précédent intercepté sur disque (survit au redémarrage du processus)
+                    if (diskCrash != null) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.errorContainer,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        Icons.Default.Error,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(
+                                        text = "Plantage détecté (enregistré sur disque) :",
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onErrorContainer,
+                                        style = MaterialTheme.typography.labelSmall
+                                    )
+                                }
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    text = diskCrash,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 10.sp,
+                                    lineHeight = 13.sp,
+                                    color = MaterialTheme.colorScheme.onErrorContainer,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(max = 140.dp)
+                                        .verticalScroll(rememberScrollState())
+                                )
+                                Spacer(Modifier.height(6.dp))
+                                Button(
+                                    onClick = {
+                                        clipboardManager.setText(AnnotatedString(diskCrash))
+                                        Toast.makeText(context, "Rapport de crash copié !", Toast.LENGTH_SHORT).show()
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(14.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Copier le crash", fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    } else if (lastError != null) {
                         Surface(
                             shape = RoundedCornerShape(8.dp),
                             color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f),
@@ -250,7 +315,7 @@ fun GarminSettingsCard(
 
                         OutlinedButton(
                             onClick = {
-                                val fullLog = logs.joinToString("\n")
+                                val fullLog = combinedLogs.joinToString("\n")
                                 if (fullLog.isNotBlank()) {
                                     clipboardManager.setText(AnnotatedString(fullLog))
                                     Toast.makeText(context, "Logs BLE copiés dans le presse-papier", Toast.LENGTH_SHORT).show()
@@ -266,18 +331,36 @@ fun GarminSettingsCard(
                         }
                     }
 
+                    // Partage complet du journal de diagnostic
+                    OutlinedButton(
+                        onClick = {
+                            if (!AppFileLog.share(context, "Partager le journal GeoTower")) {
+                                Toast.makeText(context, "Journal vide ou impossible à partager", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Partager tout le journal de débogage (disque)", fontSize = 12.sp)
+                    }
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Journal en direct (${logs.size} entrées) :",
+                            text = "Journal consolidé (${combinedLogs.size} entrées) :",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold
                         )
                         TextButton(
-                            onClick = { GarminCompanionManager.clearLogs() }
+                            onClick = {
+                                GarminCompanionManager.clearLogs()
+                                AppFileLog.clear(context)
+                                diskLogText = ""
+                            }
                         ) {
                             Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(14.dp))
                             Spacer(Modifier.width(2.dp))
@@ -302,7 +385,7 @@ fun GarminSettingsCard(
                             .padding(8.dp)
                             .verticalScroll(rememberScrollState())
                     ) {
-                        if (logs.isEmpty()) {
+                        if (combinedLogs.isEmpty()) {
                             Text(
                                 text = "Aucun événement BLE enregistré.\n\nLancez la recherche d'antennes sur la montre Garmin pour observer les échanges et requêtes.",
                                 style = MaterialTheme.typography.bodySmall,
@@ -311,7 +394,7 @@ fun GarminSettingsCard(
                             )
                         } else {
                             Text(
-                                text = logs.joinToString("\n"),
+                                text = combinedLogs.joinToString("\n"),
                                 fontFamily = FontFamily.Monospace,
                                 fontSize = 11.sp,
                                 lineHeight = 14.sp,
@@ -328,4 +411,15 @@ fun GarminSettingsCard(
             }
         )
     }
+}
+
+private fun extractLastCrash(fullLog: String): String? {
+    if (fullLog.isBlank()) return null
+    val marker = "E/Crash:"
+    val crashIndex = fullLog.lastIndexOf(marker)
+    if (crashIndex == -1) return null
+    // Remonter un peu avant le marqueur pour avoir l'horodatage
+    val lineStart = fullLog.lastIndexOf('\n', crashIndex).let { if (it == -1) 0 else it + 1 }
+    val snippet = fullLog.substring(lineStart)
+    return snippet.take(2500).trim()
 }
