@@ -3472,6 +3472,7 @@
     <string name="appstrings_release_v211_summary_garmin_ble_chunks_and_transfer_reliability">Migliorata la trasmissione Bluetooth agli orologi Garmin: invio multi-frame fluido fino a 50 siti e maggiore stabilità nei trasferimenti</string>
     <string name="appstrings_release_v212_summary_garmin_connection_and_reconnect_reliability">Riconnessione automatica e rilevamento affidabile degli orologi Garmin Connect IQ, con risposta sistematica durante le ricerche di antenne</string>
     <string name="appstrings_release_v213_summary_garmin_diagnostic_dialog_and_live_logs">Finestra di diagnostica per orologi Garmin in Impostazioni: log eventi BLE in tempo reale, test ping e maggiore stabilità anti-crash</string>
+    <string name="appstrings_release_v214_summary_garmin_r8_proguard_and_persisted_diagnostics">Stabilità dell\'app complementare Garmin nelle build release (R8/Proguard) e visualizzazione dei log persistenti nella diagnostica</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registro richieste di rete</string>

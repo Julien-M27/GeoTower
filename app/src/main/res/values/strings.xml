@@ -3495,6 +3495,7 @@
     <string name="appstrings_release_v211_summary_garmin_ble_chunks_and_transfer_reliability">Improved Bluetooth transmission to Garmin smartwatches: smooth multi-frame transfer up to 50 sites and increased connection reliability</string>
     <string name="appstrings_release_v212_summary_garmin_connection_and_reconnect_reliability">Automatic reconnection and reliable discovery for Garmin Connect IQ smartwatches, with guaranteed responses on tower lookups</string>
     <string name="appstrings_release_v213_summary_garmin_diagnostic_dialog_and_live_logs">Diagnostic dialog for Garmin smartwatches in Settings: live BLE event logs, ping test, and enhanced crash resilience</string>
+    <string name="appstrings_release_v214_summary_garmin_r8_proguard_and_persisted_diagnostics">Garmin companion app stability in release builds (R8/Proguard) and display of persisted logs in diagnostics</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Network requests log</string>
