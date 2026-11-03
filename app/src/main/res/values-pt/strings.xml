@@ -3471,6 +3471,7 @@
     <string name="appstrings_release_v210_summary_garmin_companion_and_changelog_history">Aplicação complementar para relógios Garmin Connect IQ, histórico completo de versões em «Sobre» e personalização avançada de páginas</string>
     <string name="appstrings_release_v211_summary_garmin_ble_chunks_and_transfer_reliability">Melhoria da transmissão Bluetooth para relógios Garmin: envio multi-trama fluido até 50 locais e maior estabilidade de transferências</string>
     <string name="appstrings_release_v212_summary_garmin_connection_and_reconnect_reliability">Reconexão automática e deteção fiável de relógios Garmin Connect IQ, com resposta sistemática nas pesquisas de emissores</string>
+    <string name="appstrings_release_v213_summary_garmin_diagnostic_dialog_and_live_logs">Diálogo de diagnóstico para relógios Garmin nas Definições: registo BLE em tempo real, teste de ping e maior estabilidade anti-falhas</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registo de pedidos de rede</string>
