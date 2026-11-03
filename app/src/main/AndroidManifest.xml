@@ -39,6 +39,12 @@
     <uses-feature
         android:name="android.hardware.sensor.compass"
         android:required="false" />
+    <uses-feature
+        android:name="android.hardware.bluetooth"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.bluetooth_le"
+        android:required="false" />
 
     <queries>
         <!-- Hôte Android Auto : la visibilité du paquet est nécessaire pour lire sa version dans
