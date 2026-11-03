@@ -66,6 +66,17 @@
 -keep class fr.geotower.services.** { *; }
 -keep class fr.geotower.ui.screens.car.** { *; }
 
+# Garmin Connect IQ Companion App SDK
+# Les classes (IQDevice, IQApp, etc.) sont deserialisees depuis des Broadcast Intents inter-processus
+# emis par l'application Garmin Connect Mobile. Sans regle keep, R8 renomme ces classes et declenche
+# BadParcelableException: ClassNotFoundException when unmarshalling: com.garmin.android.connectiq.IQDevice
+-keep class com.garmin.android.connectiq.** { *; }
+-keepclassmembers class com.garmin.android.connectiq.** { *; }
+-keep class com.garmin.android.apps.connectmobile.connectiq.** { *; }
+-keepclassmembers class com.garmin.android.apps.connectmobile.connectiq.** { *; }
+-keep class com.garmin.monkeybrains.** { *; }
+-keepclassmembers class com.garmin.monkeybrains.** { *; }
+
 -dontwarn javax.annotation.**
 -dontwarn kotlin.Unit
 -dontwarn okhttp3.**
