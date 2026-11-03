@@ -76,17 +76,24 @@ object GarminCompanionManager {
     private val _lastStatusMessage = MutableStateFlow<String?>("Non initialisé")
     val lastStatusMessage: StateFlow<String?> = _lastStatusMessage.asStateFlow()
 
-    private val deviceEventListener = IQDeviceEventListener { device, newStatus ->
+    private val deviceEventListener: IQDeviceEventListener = IQDeviceEventListener { device, newStatus ->
         runCatching {
             val name = device?.friendlyName ?: "Inconnue"
             AppFileLog.i("GarminBridge", "Montre $name statut: $newStatus")
+            if (device != null && newStatus == IQDevice.IQDeviceStatus.CONNECTED) {
+                connectIQ?.let { ciq ->
+                    try {
+                        ciq.registerForEvents(device, deviceEventListener, iqApp, appEventListener)
+                    } catch (_: Exception) {}
+                }
+            }
             refreshConnectedDevices()
         }.onFailure { e ->
             AppFileLog.e("GarminBridge", "Erreur deviceEventListener", e)
         }
     }
 
-    private val appEventListener = IQApplicationEventListener { device, app, messageData, status ->
+    private val appEventListener: IQApplicationEventListener = IQApplicationEventListener { device, app, messageData, status ->
         runCatching {
             val name = device?.friendlyName ?: "Inconnue"
             if (status == IQMessageStatus.SUCCESS && messageData != null && device != null && app != null) {
@@ -156,12 +163,23 @@ object GarminCompanionManager {
     private fun registerWithConnectedDevices() {
         val ciq = connectIQ ?: return
         try {
-            val devices = ciq.connectedDevices ?: emptyList()
-            AppFileLog.i("GarminBridge", "Montres connectées détectées: ${devices.size}")
-            for (dev in devices) {
-                ciq.registerForDeviceEvents(dev, deviceEventListener)
-                ciq.registerForAppEvents(dev, iqApp, appEventListener)
-                AppFileLog.i("GarminBridge", "Enregistré pour événements sur: ${dev.friendlyName}")
+            val connected = ciq.connectedDevices ?: emptyList()
+            val known = ciq.knownDevices ?: emptyList()
+            val allDevices = (connected + known).distinctBy { it.deviceIdentifier }
+            AppFileLog.i("GarminBridge", "Montres détectées (connectées + connues): ${allDevices.size}")
+            for (dev in allDevices) {
+                try {
+                    ciq.registerForEvents(dev, deviceEventListener, iqApp, appEventListener)
+                    AppFileLog.i("GarminBridge", "Enregistré pour événements sur: ${dev.friendlyName}")
+                } catch (e: Exception) {
+                    AppFileLog.w("GarminBridge", "Impossible d'enregistrer ${dev.friendlyName}", e)
+                }
+            }
+            // Enregistre également le listener d'application pour le service AIDL (Android 13+)
+            try {
+                ciq.registerForAppEvents(appEventListener)
+            } catch (e: Exception) {
+                AppFileLog.w("GarminBridge", "Impossible d'enregistrer appEventListener global", e)
             }
             refreshConnectedDevices()
         } catch (e: Exception) {
@@ -173,8 +191,10 @@ object GarminCompanionManager {
         val ciq = connectIQ ?: return
         if (!_isSdkReady.value) return
         try {
-            val devices = ciq.connectedDevices ?: emptyList()
-            _connectedWatches.value = devices.map {
+            val connected = ciq.connectedDevices ?: emptyList()
+            val known = ciq.knownDevices ?: emptyList()
+            val allDevices = (connected + known).distinctBy { it.deviceIdentifier }
+            _connectedWatches.value = allDevices.map {
                 GarminConnectedWatch(
                     id = it.deviceIdentifier,
                     name = it.friendlyName ?: "Montre Garmin",
@@ -293,6 +313,16 @@ object GarminCompanionManager {
             sitesList.sortBy { (it["d"] as? Int) ?: 0 }
             val finalSites = sitesList.take(effectiveLimit)
 
+            if (finalSites.isEmpty()) {
+                AppFileLog.i("GarminBridge", "Aucun site dans le rayon demandé, envoi trame vide")
+                sendToWatchAsync(
+                    device,
+                    app,
+                    mapOf("sites" to emptyList<Map<String, Any>>(), "chunk" to 0, "total_chunks" to 1)
+                )
+                return
+            }
+
             // Découpage en trames BLE sécurisées de 15 sites max (~5 Ko par trame)
             val chunkSize = 15
             val chunks = finalSites.chunked(chunkSize)
@@ -318,6 +348,13 @@ object GarminCompanionManager {
             _lastSyncTimestamp.value = System.currentTimeMillis()
         } catch (e: Exception) {
             AppFileLog.e("GarminBridge", "Erreur lors du traitement nearby pour la montre", e)
+            runCatching {
+                sendToWatchAsync(
+                    device,
+                    app,
+                    mapOf("sites" to emptyList<Map<String, Any>>(), "chunk" to 0, "total_chunks" to 1)
+                )
+            }
         }
     }
 

@@ -3470,6 +3470,7 @@
     <string name="appstrings_release_v2099_summary_antenna_cache_proguard_and_atomicity">Absicherung und atomares Schreiben des persistenten Antennencaches der Karte für eine sofortige und fehlerfreie Wiederherstellung</string>
     <string name="appstrings_release_v210_summary_garmin_companion_and_changelog_history">Begleit-App für Garmin Connect IQ Smartwatches, vollständiger Versionsverlauf in «Über die App» und erweiterte Seitenanpassung</string>
     <string name="appstrings_release_v211_summary_garmin_ble_chunks_and_transfer_reliability">Verbesserte Bluetooth-Übertragung an Garmin Smartwatches: reibungslose Multi-Frame-Übertragung für bis zu 50 Standorte und stabilere Verbindungen</string>
+    <string name="appstrings_release_v212_summary_garmin_connection_and_reconnect_reliability">Automatische Wiederverbindung und zuverlässige Erkennung von Garmin Connect IQ Smartwatches mit garantierter Antwort bei Sendersuchen</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Netzwerkanfragen-Protokoll</string>

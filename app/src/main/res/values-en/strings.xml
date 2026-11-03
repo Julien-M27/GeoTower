@@ -3470,6 +3470,7 @@
     <string name="appstrings_release_v2099_summary_antenna_cache_proguard_and_atomicity">Secured and atomic persistence of the map antenna cache for error-free instant restoration</string>
     <string name="appstrings_release_v210_summary_garmin_companion_and_changelog_history">Companion app for Garmin Connect IQ smartwatches, complete changelog history in About, and advanced page customization</string>
     <string name="appstrings_release_v211_summary_garmin_ble_chunks_and_transfer_reliability">Improved Bluetooth transmission to Garmin smartwatches: smooth multi-frame transfer up to 50 sites and increased connection reliability</string>
+    <string name="appstrings_release_v212_summary_garmin_connection_and_reconnect_reliability">Automatic reconnection and reliable discovery for Garmin Connect IQ smartwatches, with guaranteed responses on tower lookups</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Network requests log</string>

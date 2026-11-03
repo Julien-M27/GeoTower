@@ -3470,6 +3470,7 @@
     <string name="appstrings_release_v2099_summary_antenna_cache_proguard_and_atomicity">Proteção e escrita atómica da cache persistente de antenas do mapa para um restauro instantâneo e sem erros</string>
     <string name="appstrings_release_v210_summary_garmin_companion_and_changelog_history">Aplicação complementar para relógios Garmin Connect IQ, histórico completo de versões em «Sobre» e personalização avançada de páginas</string>
     <string name="appstrings_release_v211_summary_garmin_ble_chunks_and_transfer_reliability">Melhoria da transmissão Bluetooth para relógios Garmin: envio multi-trama fluido até 50 locais e maior estabilidade de transferências</string>
+    <string name="appstrings_release_v212_summary_garmin_connection_and_reconnect_reliability">Reconexão automática e deteção fiável de relógios Garmin Connect IQ, com resposta sistemática nas pesquisas de emissores</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registo de pedidos de rede</string>
