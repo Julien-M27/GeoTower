@@ -25,6 +25,10 @@
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
+    <uses-permission
+        android:name="android.permission.BLUETOOTH"
+        android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 
     <uses-feature
         android:name="android.hardware.location"
@@ -45,6 +49,8 @@
         <!-- CellularFR masqué — voir CellularFrApi.ENABLED -->
         <package android:name="com.luisbaker.cellularfr" />
         <package android:name="org.rncteam.rncfreemobile" />
+        <!-- Garmin Connect Mobile pour la communication BLE avec les montres Connect IQ -->
+        <package android:name="com.garmin.android.apps.connectmobile" />
     </queries>
 
     <application

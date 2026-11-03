@@ -734,6 +734,24 @@ object AboutPagePrefs {
     }
 }
 
+/**
+ * Réglages d'affichage propres à la page d'historique des versions et changelogs.
+ */
+object ChangelogPagePrefs {
+    val showHeaderStats = BooleanPreference("page_changelogs_show_header_stats", true)
+    val expandAllByDefault = BooleanPreference("page_changelogs_expand_all_by_default", false)
+    val showDates = BooleanPreference("page_changelogs_show_dates", true)
+    val showBadges = BooleanPreference("page_changelogs_show_badges", true)
+
+    fun putDefaults(editor: SharedPreferences.Editor): SharedPreferences.Editor {
+        editor.putBoolean(showHeaderStats.key, showHeaderStats.defaultValue)
+        editor.putBoolean(expandAllByDefault.key, expandAllByDefault.defaultValue)
+        editor.putBoolean(showDates.key, showDates.defaultValue)
+        editor.putBoolean(showBadges.key, showBadges.defaultValue)
+        return editor
+    }
+}
+
 object WidgetPrefs {
     const val SYNC_FREQUENCY_MINUTES = "widget_sync_freq"
     const val DEFAULT_SYNC_MINUTES = 60

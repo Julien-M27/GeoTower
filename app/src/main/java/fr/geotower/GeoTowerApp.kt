@@ -83,6 +83,8 @@ class GeoTowerApp : Application() {
             runCatching { AppDatabase.getDatabase(applicationContext) }
         }
         SignalQuestUploadQueue.cleanupStaleFiles(applicationContext)
+        // Pont BLE pour montres connectées Garmin (Connect IQ)
+        fr.geotower.services.garmin.GarminCompanionManager.init(this, repository)
     }
 
     @Suppress("DEPRECATION")

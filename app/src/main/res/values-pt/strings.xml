@@ -3466,7 +3466,9 @@
     <string name="appstrings_release_v2096_summary_radio_database_search_and_keyboard_handling">Pesquisa de locais de rádio e não móveis (TDF, Towercast, redes ferroviárias...) no mapa e em Emissores próximos, e fecho automático do teclado ao navegar</string>
     <string name="appstrings_release_v2097_summary_tdf_towercast_logos_and_hash_id_search">Logótipos de emissores TDF e Towercast, pesquisa direta por identificador com o prefixo # e visualização fiel dos operadores sem escurecimento erróneo</string>
     <string name="appstrings_release_v2098_summary_enb_proximity_fallback">Correspondência geográfica de identificadores eNB / gNB para locais sem identificador de suporte oficial e indicador de posição estimada</string>
+    
     <string name="appstrings_release_v2099_summary_antenna_cache_proguard_and_atomicity">Proteção e escrita atómica da cache persistente de antenas do mapa para um restauro instantâneo e sem erros</string>
+    <string name="appstrings_release_v210_summary_garmin_companion_and_changelog_history">Aplicação complementar para relógios Garmin Connect IQ, histórico completo de versões em «Sobre» e personalização avançada de páginas</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registo de pedidos de rede</string>
@@ -3532,4 +3534,29 @@
     <string name="settings_bottom_nav_opacity_desc">Ajusta o nível de opacidade e transparência da barra inferior</string>
     <string name="settings_bottom_nav_opacity_transparent">Transparente (0%)</string>
     <string name="settings_bottom_nav_opacity_opaque">Opaco (100%)</string>
+
+    <!-- Changelog History & App Evolution -->
+    <string name="appstrings_changelogs_history_title">Evolução da aplicação</string>
+    <string name="appstrings_changelogs_history_desc">Acompanhe todas as novidades e atualizações desde o início</string>
+    <string name="appstrings_changelogs_search_placeholder">Pesquisar versão, funcionalidade ou palavra-chave…</string>
+    <string name="appstrings_changelogs_filter_all">Todas</string>
+    <string name="appstrings_changelogs_filter_v2">Versão 2.x</string>
+    <string name="appstrings_changelogs_filter_v1">Versão 1.x</string>
+    <string name="appstrings_changelogs_filter_major">Principais</string>
+    <string name="appstrings_changelogs_expand_all">Expandir tudo</string>
+    <string name="appstrings_changelogs_collapse_all">Recolher tudo</string>
+    <string name="appstrings_changelogs_empty_search">Nenhum histórico de alterações corresponde à pesquisa.</string>
+    <string name="appstrings_changelogs_versions_count">%1$d versões registadas</string>
+    <string name="appstrings_changelogs_badge_current">Atual</string>
+    <string name="appstrings_changelogs_badge_play_store">Play Store</string>
+    <string name="appstrings_changelogs_badge_major">Principal</string>
+    <string name="appstrings_changelogs_badge_launch">Lançamento</string>
+    <string name="appstrings_changelogs_summary_stat_versions">Versões</string>
+    <string name="appstrings_changelogs_summary_stat_start">Início do projeto</string>
+    <string name="appstrings_changelogs_summary_stat_latest">Versão atual</string>
+    <string name="settings_page_changelogs_desc">Ajudas de deslocamento, estatísticas, datas e emblemas de versão</string>
+    <string name="changelogs_option_show_stats">Mostrar cabeçalho de resumo e estatísticas</string>
+    <string name="changelogs_option_expand_all">Expandir tudo por padrão</string>
+    <string name="changelogs_option_show_dates">Mostrar datas de lançamento</string>
+    <string name="changelogs_option_show_badges">Mostrar emblemas de marcos principais</string>
 </resources>

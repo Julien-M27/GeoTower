@@ -55,6 +55,7 @@ import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material.icons.outlined.ViewAgenda
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -581,6 +582,9 @@ fun AboutScreen(navController: NavController) {
                                     },
                                     onOpenTerms = {
                                         navController.navigate("terms")
+                                    },
+                                    onOpenChangelogs = {
+                                        navController.navigate("changelogs")
                                     }
                                 )
                                 Spacer(modifier = Modifier.height(sizing.spacing(60.dp)))
@@ -597,7 +601,8 @@ fun AboutScreen(navController: NavController) {
                                         bubbleColor = bubbleBaseColor,
                                         onOpenHistories = { navController.navigate("histories") },
                                         onOpenDiagnostic = { navController.navigate("diagnostic") },
-                                        onOpenTerms = { navController.navigate("terms") }
+                                        onOpenTerms = { navController.navigate("terms") },
+                                        onOpenChangelogs = { navController.navigate("changelogs") }
                                     )
                                 }
                             }
@@ -625,7 +630,8 @@ fun AboutScreen(navController: NavController) {
                                         bubbleColor = bubbleBaseColor,
                                         onOpenHistories = { navController.navigate("histories") },
                                         onOpenDiagnostic = { navController.navigate("diagnostic") },
-                                        onOpenTerms = { navController.navigate("terms") }
+                                        onOpenTerms = { navController.navigate("terms") },
+                                        onOpenChangelogs = { navController.navigate("changelogs") }
                                     )
                                 }
                                 Spacer(modifier = Modifier.height(sizing.spacing(60.dp)))
@@ -803,7 +809,8 @@ fun AllAboutContent(
     sectionModifiers: List<Modifier> = List(AboutPagePrefs.sections.size) { Modifier },
     onOpenHistories: () -> Unit = {},
     onOpenDiagnostic: () -> Unit = {},
-    onOpenTerms: () -> Unit = {}
+    onOpenTerms: () -> Unit = {},
+    onOpenChangelogs: () -> Unit = {}
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
     visibleSections.forEachIndexed { position, section ->
@@ -825,7 +832,8 @@ fun AllAboutContent(
                 bubbleColor = bubbleColor,
                 onOpenHistories = onOpenHistories,
                 onOpenDiagnostic = onOpenDiagnostic,
-                onOpenTerms = onOpenTerms
+                onOpenTerms = onOpenTerms,
+                onOpenChangelogs = onOpenChangelogs
             )
         }
     }
@@ -842,11 +850,12 @@ private fun AboutSectionContent(
     bubbleColor: Color,
     onOpenHistories: () -> Unit,
     onOpenDiagnostic: () -> Unit,
-    onOpenTerms: () -> Unit
+    onOpenTerms: () -> Unit,
+    onOpenChangelogs: () -> Unit = {}
 ) {
     when (section) {
         0 -> SectionPresentation(appTitle, appVersion, logoResId)
-        1 -> SectionNouveautes(appVersion, cardShape, bubbleColor)
+        1 -> SectionNouveautes(appVersion, cardShape, bubbleColor, onOpenChangelogs)
         2 -> SectionConfidentialite(cardShape, bubbleColor, onOpenHistories, onOpenTerms)
         3 -> SectionSources(cardShape, bubbleColor)
         VERSIONS_SECTION -> SectionVersions(cardShape, bubbleColor, onOpenDiagnostic)
@@ -870,7 +879,12 @@ fun SectionPresentation(appTitle: String, appVersion: String, logoResId: Int) {
 }
 
 @Composable
-fun SectionNouveautes(appVersion: String, cardShape: Shape, bubbleColor: Color) {
+fun SectionNouveautes(
+    appVersion: String,
+    cardShape: Shape,
+    bubbleColor: Color,
+    onOpenChangelogs: () -> Unit = {}
+) {
     val releaseNotes = currentReleaseNotes()
     val sizing = LocalGeoTowerUiStyle.current.sizing
 
@@ -904,6 +918,49 @@ fun SectionNouveautes(appVersion: String, cardShape: Shape, bubbleColor: Color) 
                 Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
 
             }
+        }
+    }
+
+    Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+    OutlinedCard(
+        onClick = onOpenChangelogs,
+        shape = cardShape,
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.outlinedCardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(14.dp)),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.History,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(sizing.component(26.dp))
+            )
+            Spacer(modifier = Modifier.width(sizing.spacing(12.dp)))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.appstrings_changelogs_history_title),
+                    style = sizing.textStyle(MaterialTheme.typography.titleSmall),
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = stringResource(R.string.appstrings_changelogs_history_desc),
+                    style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

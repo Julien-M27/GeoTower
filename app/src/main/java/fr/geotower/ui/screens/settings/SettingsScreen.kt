@@ -714,6 +714,7 @@ fun SettingsScreen(
     var showStatsSettingsSheet by remember { mutableStateOf(false) }
     var showDepartmentStatsSettingsSheet by remember { mutableStateOf(false) }
     var showAboutPageSettingsSheet by remember { mutableStateOf(false) }
+    var showChangelogSettingsSheet by remember { mutableStateOf(false) }
     var showCompassSettingsSheet by remember { mutableStateOf(false) }
     var compassOrder by remember { mutableStateOf(prefs.getString("compass_order", "location,gps,accuracy")!!.split(",")) }
     var showCompassLocation by remember { mutableStateOf(prefs.getBoolean("show_compass_location", true)) }
@@ -990,6 +991,7 @@ fun SettingsScreen(
         onStats = { safeClick { showStatsSettingsSheet = true } },
         onDepartmentStats = { safeClick { showDepartmentStatsSettingsSheet = true } },
         onAbout = { safeClick { showAboutPageSettingsSheet = true } },
+        onChangelogs = { safeClick { showChangelogSettingsSheet = true } },
         onSupport = { safeClick { showSupportSettingsSheet = true } },
         onSite = { safeClick { showSiteSettingsSheet = true } },
         onFrequencyReference = { safeClick { showFrequencyReferenceSettingsSheet = true } },
@@ -1129,6 +1131,7 @@ fun SettingsScreen(
                 }
                 if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.ABOUT)) {
                     entry(context.getString(R.string.appstrings_about), "a propos about parties sections ordre visibilite defilant defilement scrolling une a la fois", SECTION_PAGES) { showAboutPageSettingsSheet = true }
+                    entry(context.getString(R.string.appstrings_changelogs_history_title), "changelog changelogs historique versions evolutions mises a jour notes statistiques scroll aides", SECTION_PAGES) { showChangelogSettingsSheet = true }
                 }
                 if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.SUPPORT_DETAIL)) {
                     entry(context.getString(R.string.appstrings_page_support_settings), "support pylone fiche blocs mini carte photos operateurs", SECTION_PAGES) { showSupportSettingsSheet = true }
@@ -2448,6 +2451,17 @@ fun SettingsScreen(
             AboutPageSettingsSheet(
                 onDismiss = { showAboutPageSettingsSheet = false },
                 onBack = { safeClick { showAboutPageSettingsSheet = false } },
+                sheetState = sheetState,
+                useOneUi = useOneUi,
+                bubbleColor = bubbleBaseColor
+            )
+        }
+
+        // --- SOUS-MENU : PAGE HISTORIQUE DES CHANGELOGS ---
+        if (showChangelogSettingsSheet) {
+            ChangelogPageSettingsSheet(
+                onDismiss = { showChangelogSettingsSheet = false },
+                onBack = { safeClick { showChangelogSettingsSheet = false } },
                 sheetState = sheetState,
                 useOneUi = useOneUi,
                 bubbleColor = bubbleBaseColor
@@ -4180,6 +4194,15 @@ fun SectionSysteme(
             Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
+
+    Spacer(Modifier.height(sizing.spacing(12.dp)))
+
+    GarminSettingsCard(
+        shape = shape,
+        border = border,
+        bubbleColor = bubbleColor,
+        useOneUi = useOneUi
+    )
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)

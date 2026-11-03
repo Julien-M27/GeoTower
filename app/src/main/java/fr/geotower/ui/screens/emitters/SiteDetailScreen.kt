@@ -643,7 +643,20 @@ fun SiteDetailScreen(
             .putFloat("last_map_lon", longitude.toFloat())
             .putFloat("last_map_zoom", 18f)
             .apply()
-        navController.navigate("map?focusLat=$latitude&focusLon=$longitude")
+        val route = "map?focusLat=$latitude&focusLon=$longitude"
+        if (AppConfig.isBottomNavActive()) {
+            val poppedToEmitters = runCatching {
+                navController.popBackStack("emitters", inclusive = false)
+            }.getOrDefault(false)
+            if (poppedToEmitters) {
+                navController.navigate(route) { launchSingleTop = true }
+            } else {
+                runCatching { navController.popBackStack("map", inclusive = false) }
+                navController.navigate(route) { launchSingleTop = true }
+            }
+        } else {
+            navController.navigate(route)
+        }
     }
     val openElevationProfile = onOpenElevationProfile ?: { id: String ->
         if (canUseElevationProfile) {
@@ -2469,7 +2482,20 @@ fun RadioSiteDetailScreen(
             .putFloat("last_map_lon", site.longitude.toFloat())
             .putFloat("last_map_zoom", 18f)
             .apply()
-        navController.navigate("map?focusLat=${site.latitude}&focusLon=${site.longitude}")
+        val route = "map?focusLat=${site.latitude}&focusLon=${site.longitude}"
+        if (AppConfig.isBottomNavActive()) {
+            val poppedToEmitters = runCatching {
+                navController.popBackStack("emitters", inclusive = false)
+            }.getOrDefault(false)
+            if (poppedToEmitters) {
+                navController.navigate(route) { launchSingleTop = true }
+            } else {
+                runCatching { navController.popBackStack("map", inclusive = false) }
+                navController.navigate(route) { launchSingleTop = true }
+            }
+        } else {
+            navController.navigate(route)
+        }
     }
 
     SiteDetailScaffold(

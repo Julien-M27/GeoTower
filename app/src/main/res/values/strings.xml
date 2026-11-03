@@ -3489,7 +3489,9 @@
     <string name="appstrings_release_v2096_summary_radio_database_search_and_keyboard_handling">Search for radio and non-mobile sites (TDF, Towercast, rail networks...) on the map and in Nearby emitters, plus automatic keyboard dismissal when navigating tabs</string>
     <string name="appstrings_release_v2097_summary_tdf_towercast_logos_and_hash_id_search">TDF and Towercast broadcaster logos, direct ID search using the # prefix, and faithful site operator display without erroneous greying</string>
     <string name="appstrings_release_v2098_summary_enb_proximity_fallback">Geographic proximity matching for eNB / gNB identifiers on sites without an official support ID, with an estimated position indicator</string>
+    
     <string name="appstrings_release_v2099_summary_antenna_cache_proguard_and_atomicity">Secured and atomic persistence of the map antenna cache for error-free instant restoration</string>
+    <string name="appstrings_release_v210_summary_garmin_companion_and_changelog_history">Companion app for Garmin Connect IQ smartwatches, complete changelog history in About, and advanced page customization</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Network requests log</string>
@@ -3555,4 +3557,29 @@
     <string name="settings_bottom_nav_opacity_desc">Adjust the opacity and transparency level of the bottom bar</string>
     <string name="settings_bottom_nav_opacity_transparent">Transparent (0%)</string>
     <string name="settings_bottom_nav_opacity_opaque">Opaque (100%)</string>
+
+    <!-- Changelog History & App Evolution -->
+    <string name="appstrings_changelogs_history_title">Application evolution</string>
+    <string name="appstrings_changelogs_history_desc">Trace all updates and new features since the beginning</string>
+    <string name="appstrings_changelogs_search_placeholder">Search version, feature, keyword…</string>
+    <string name="appstrings_changelogs_filter_all">All</string>
+    <string name="appstrings_changelogs_filter_v2">Version 2.x</string>
+    <string name="appstrings_changelogs_filter_v1">Version 1.x</string>
+    <string name="appstrings_changelogs_filter_major">Major</string>
+    <string name="appstrings_changelogs_expand_all">Expand all</string>
+    <string name="appstrings_changelogs_collapse_all">Collapse all</string>
+    <string name="appstrings_changelogs_empty_search">No changelog matches your search.</string>
+    <string name="appstrings_changelogs_versions_count">%1$d versions listed</string>
+    <string name="appstrings_changelogs_badge_current">Current</string>
+    <string name="appstrings_changelogs_badge_play_store">Play Store</string>
+    <string name="appstrings_changelogs_badge_major">Major</string>
+    <string name="appstrings_changelogs_badge_launch">Launch</string>
+    <string name="appstrings_changelogs_summary_stat_versions">Releases</string>
+    <string name="appstrings_changelogs_summary_stat_start">Launched</string>
+    <string name="appstrings_changelogs_summary_stat_latest">Current version</string>
+    <string name="settings_page_changelogs_desc">Scroll aids, statistics, version dates and badges</string>
+    <string name="changelogs_option_show_stats">Show summary and statistics header</string>
+    <string name="changelogs_option_expand_all">Expand all by default</string>
+    <string name="changelogs_option_show_dates">Show release dates</string>
+    <string name="changelogs_option_show_badges">Show milestone badges</string>
 </resources>

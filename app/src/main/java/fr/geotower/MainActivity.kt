@@ -124,6 +124,7 @@ import fr.geotower.ui.screens.stats.DepartmentStatsScreen
 import fr.geotower.ui.screens.stats.FrequencyStatsDetailScreen
 import fr.geotower.ui.screens.stats.StatisticsScreen
 import fr.geotower.ui.screens.about.AboutScreen
+import fr.geotower.ui.screens.about.ChangelogHistoryScreen
 import fr.geotower.ui.screens.about.PhotoUploadHistoryScreen
 import fr.geotower.ui.screens.compass.CompassScreen
 import fr.geotower.ui.screens.diagnostic.DiagnosticScreen
@@ -983,11 +984,7 @@ class MainActivity : ComponentActivity() {
                 val isMapRoute = currentRoute == "map" || currentRoute?.startsWith("map") == true
                 val isSwipeBetweenTabsEnabled = isRootTab && !isMapRoute
                 val bottomNavStartRoute = if (destinationApresSplash in bottomNavTabs) destinationApresSplash else "map"
-                val resolvedPopUpRoute = if (bottomNavStartRoute == "map") {
-                    "map?photoDraftId={photoDraftId}&tripId={tripId}&tripMode={tripMode}&focusLat={focusLat}&focusLon={focusLon}"
-                } else {
-                    bottomNavStartRoute
-                }
+                val resolvedPopUpRoute = if (bottomNavStartRoute == "map") "map" else bottomNavStartRoute
 
                 val tabFocusManager = androidx.compose.ui.platform.LocalFocusManager.current
                 val tabKeyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
@@ -998,18 +995,23 @@ class MainActivity : ComponentActivity() {
                         tabKeyboardController?.hide()
                         val currentDest = navController.currentDestination?.route?.substringBefore('?')
                         if (currentDest != targetRoute) {
-                            try {
-                                navController.navigate(targetRoute) {
-                                    popUpTo(resolvedPopUpRoute) {
-                                        saveState = true
-                                    }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                            } catch (_: Exception) {
-                                runCatching {
+                            val popped = runCatching {
+                                navController.popBackStack(targetRoute, inclusive = false)
+                            }.getOrDefault(false)
+                            if (!popped) {
+                                try {
                                     navController.navigate(targetRoute) {
+                                        popUpTo(resolvedPopUpRoute) {
+                                            saveState = true
+                                        }
                                         launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                } catch (_: Exception) {
+                                    runCatching {
+                                        navController.navigate(targetRoute) {
+                                            launchSingleTop = true
+                                        }
                                     }
                                 }
                             }
@@ -1409,6 +1411,16 @@ class MainActivity : ComponentActivity() {
                                     } else {
                                         DisabledFeatureRoute(navController, txtUnavailable)
                                     }
+                                }
+                            }
+
+                            // Évolution de l'application et changelogs complets
+                            composable(
+                                route = "changelogs",
+                                deepLinks = listOf(navDeepLink { uriPattern = "geotower://changelogs" })
+                            ) {
+                                Box(modifier = Modifier.padding(screenPadding)) {
+                                    ChangelogHistoryScreen(navController)
                                 }
                             }
 

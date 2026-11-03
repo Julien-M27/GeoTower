@@ -544,7 +544,19 @@ fun SupportDetailScreen(
         val route = sharedPhotoDraftId
             ?.let { "map?photoDraftId=${Uri.encode(it)}&focusLat=$latitude&focusLon=$longitude" }
             ?: "map?focusLat=$latitude&focusLon=$longitude"
-        navController.navigate(route)
+        if (AppConfig.isBottomNavActive()) {
+            val poppedToEmitters = runCatching {
+                navController.popBackStack("emitters", inclusive = false)
+            }.getOrDefault(false)
+            if (poppedToEmitters) {
+                navController.navigate(route) { launchSingleTop = true }
+            } else {
+                runCatching { navController.popBackStack("map", inclusive = false) }
+                navController.navigate(route) { launchSingleTop = true }
+            }
+        } else {
+            navController.navigate(route)
+        }
     }
 
     var pageSupportOrder by remember { mutableStateOf(SupportPagePrefs.order(prefs)) }

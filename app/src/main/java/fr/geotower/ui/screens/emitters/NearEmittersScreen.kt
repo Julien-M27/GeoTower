@@ -154,6 +154,11 @@ private const val NEARBY_ADDRESS_SEARCH_LIMIT = 1000
 private const val NEARBY_GLOBAL_MAPPING_LIMIT = 800
 private const val NEARBY_VISIBLE_PAGE_SIZE = 100
 
+data class UiSupportInfo(
+    val type: String,
+    val height: Double? = null
+)
+
 data class UiSite(
     val id: Long,
     val idSupport: String?,
@@ -166,6 +171,7 @@ data class UiSite(
     val anfrIds: List<String> = emptyList(),
     val supportIds: List<String> = emptyList(),
     val supportTypes: List<String> = emptyList(),
+    val supports: List<UiSupportInfo> = emptyList(),
     val technologies: List<String> = emptyList(),
     val postalCode: String? = null,
     val city: String? = null,
@@ -220,6 +226,16 @@ private fun mapRadioMarkerToUiSite(
     val supportIdStr = marker.supportId.takeIf { it.isNotBlank() } ?: marker.stationId
     val fakeId = (marker.latitude * 100000 + marker.longitude * 1000).toLong().let { if (it == 0L) 1L else kotlin.math.abs(it) }
 
+    val heightDm = Regex("""hauteur_dm=(\d+)""")
+        .find(marker.supportSummary.orEmpty())
+        ?.groupValues
+        ?.getOrNull(1)
+        ?.toIntOrNull()
+    val radioSupportHeight = heightDm?.let { it / 10.0 }
+    val radioNature = marker.supportNatureSummary?.takeIf { it.isNotBlank() }
+        ?: RadioServiceMasks.labelFor(context, marker.serviceMask)
+    val radioSupports = listOf(UiSupportInfo(type = radioNature, height = radioSupportHeight))
+
     return UiSite(
         id = fakeId,
         idSupport = supportIdStr,
@@ -231,7 +247,8 @@ private fun mapRadioMarkerToUiSite(
         longitude = marker.longitude,
         anfrIds = listOfNotNull(marker.stationId.takeIf { it.isNotBlank() }),
         supportIds = listOfNotNull(marker.supportId.takeIf { it.isNotBlank() }),
-        supportTypes = listOf(RadioServiceMasks.labelFor(context, marker.serviceMask)),
+        supportTypes = listOf(radioNature),
+        supports = radioSupports,
         technologies = listOfNotNull(marker.systemSummary),
         technicalText = marker.frequencySummary ?: "",
         supportText = marker.antennaSummary ?: "",
@@ -1436,6 +1453,17 @@ private fun NearbySearchHelpLine(
     }
 }
 
+private fun formatNearbySupportHeight(heightMeters: Double?, isMi: Boolean): String? {
+    if (heightMeters == null || heightMeters <= 0.0) return null
+    return if (isMi) {
+        val feet = (heightMeters * 3.28084).roundToInt()
+        if (feet > 0) "$feet ft" else null
+    } else {
+        if (heightMeters % 1.0 == 0.0) "${heightMeters.toInt()} m"
+        else String.format(Locale.US, "%.1f m", heightMeters)
+    }
+}
+
 @Composable
 fun EmitterCard(
     site: UiSite,
@@ -1508,9 +1536,20 @@ fun EmitterCard(
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = site.address, style = sizing.textStyle(MaterialTheme.typography.bodyMedium), fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurface)
                 // Nature du support entre l'adresse et la ville (traduite comme sur la fiche site).
-                val supportTypeLabel = site.supportTypes
-                    .filter { it.isNotBlank() }
-                    .map { AnfrDisplayText.nature(it) }
+                val supportItems = site.supports.ifEmpty {
+                    site.supportTypes.map { UiSupportInfo(type = it, height = null) }
+                }
+                val supportTypeLabel = supportItems
+                    .filter { it.type.isNotBlank() }
+                    .map { support ->
+                        val translatedNature = AnfrDisplayText.nature(support.type)
+                        val formattedHeight = formatNearbySupportHeight(support.height, isMi)
+                        if (formattedHeight != null) {
+                            "$translatedNature ($formattedHeight)"
+                        } else {
+                            translatedNature
+                        }
+                    }
                     .distinct()
                     .joinToString(" • ")
                 if (supportTypeLabel.isNotBlank()) {
@@ -1715,7 +1754,19 @@ private suspend fun mapAntennasToUiSites(
         val addressParts = splitNearbyAddress(fullAddress, main.idAnfr, siteAnfrLabel)
         val anfrIds = list.map { it.idAnfr }.filter { it.isNotBlank() }.distinct()
         val supportIds = physiques.map { it.idSupport }.filter { it.isNotBlank() }.distinct()
-        val supportTypes = physiques.mapNotNull { it.natureSupport?.takeIf(String::isNotBlank) }.distinct()
+        val supports = physiques
+            .groupBy { it.idSupport.ifBlank { it.natureSupport.orEmpty() } }
+            .values
+            .mapNotNull { entries ->
+                val nature = entries.mapNotNull { it.natureSupport?.takeIf(String::isNotBlank) }.firstOrNull()
+                    ?: return@mapNotNull null
+                val height = entries.mapNotNull { it.hauteur?.takeIf { h -> h > 0.0 } }.maxOrNull()
+                UiSupportInfo(type = nature, height = height)
+            }
+            .distinct()
+        val supportTypes = supports.map { it.type }.distinct().ifEmpty {
+            physiques.mapNotNull { it.natureSupport?.takeIf(String::isNotBlank) }.distinct()
+        }
         val supportText = physiques.flatMap {
             listOfNotNull(it.idSupport, it.natureSupport, it.proprietaire, it.azimutsEtTypes)
         }.joinToString(" ")
@@ -1764,6 +1815,7 @@ private suspend fun mapAntennasToUiSites(
             anfrIds = anfrIds,
             supportIds = supportIds,
             supportTypes = supportTypes,
+            supports = supports,
             technologies = technologies,
             postalCode = postalCode,
             city = city,

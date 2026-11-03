@@ -32,7 +32,7 @@ internal data class ReleaseNoteItem(
 @Composable
 internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
     section(stringResource(R.string.appstrings_release_section_interface)) {
-        item(stringResource(R.string.appstrings_release_v2099_summary_antenna_cache_proguard_and_atomicity))
+        item(stringResource(R.string.appstrings_release_v210_summary_garmin_companion_and_changelog_history))
     }
 }
 

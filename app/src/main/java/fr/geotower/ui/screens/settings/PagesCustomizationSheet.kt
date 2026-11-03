@@ -50,6 +50,7 @@ import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.VerticalAlignTop
 import androidx.compose.material.icons.filled.ViewColumn
 import androidx.compose.material.icons.filled.WifiTethering
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -136,6 +137,7 @@ import fr.geotower.ui.screens.emitters.loadElevationProfileIncludeObstacles
 import fr.geotower.ui.screens.emitters.saveElevationProfileIncludeObstacles
 import fr.geotower.ui.screens.emitters.FrequencyReferenceTechnology
 import fr.geotower.utils.AboutPagePrefs
+import fr.geotower.utils.ChangelogPagePrefs
 import fr.geotower.utils.DepartmentStatsPreferences
 import fr.geotower.utils.HomePrefs
 import fr.geotower.utils.SimpleDrawerPrefs
@@ -623,6 +625,7 @@ class PagesSectionActions(
     val onStats: () -> Unit = {},
     val onDepartmentStats: () -> Unit = {},
     val onAbout: () -> Unit = {},
+    val onChangelogs: () -> Unit = {},
     val onSupport: () -> Unit = {},
     val onSite: () -> Unit = {},
     val onFrequencyReference: () -> Unit = {},
@@ -814,6 +817,13 @@ fun SectionPages(
                 desc = stringResource(R.string.settings_page_about_desc),
                 icon = Icons.Default.Info,
                 onClick = actions.onAbout,
+                shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi, safeClick = safeClick
+            )
+            PageSettingsCard(
+                title = stringResource(R.string.appstrings_changelogs_history_title),
+                desc = stringResource(R.string.settings_page_changelogs_desc),
+                icon = Icons.Outlined.History,
+                onClick = actions.onChangelogs,
                 shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi, safeClick = safeClick
             )
         }
@@ -2146,6 +2156,129 @@ fun AboutPageSettingsSheet(
                     scrollingPage = AboutPagePrefs.scrolling.defaultValue
                     PageScrollPrefs.Aid.entries.forEach { aid ->
                         PageScrollPrefs.set(prefs, aid, PageScrollPrefs.ABOUT, PageScrollPrefs.defaultEnabled(aid, PageScrollPrefs.ABOUT))
+                    }
+                }
+            ) {
+                Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(sizing.spacing(8.dp)))
+                Text(stringResource(R.string.appstrings_reset_to_default), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            }
+            Spacer(modifier = Modifier.height(sizing.spacing(32.dp)).navigationBarsPadding())
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ChangelogPageSettingsSheet(
+    onDismiss: () -> Unit,
+    onBack: () -> Unit,
+    sheetState: SheetState,
+    useOneUi: Boolean,
+    bubbleColor: Color
+) {
+    val themeMode by AppConfig.themeMode
+    val isOledMode by AppConfig.isOledMode
+    val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
+    val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
+    val scrollState = rememberScrollState()
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    val context = LocalContext.current
+    val prefs = remember(context) { context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE) }
+
+    var showHeaderStats by remember { mutableStateOf(ChangelogPagePrefs.showHeaderStats.read(prefs)) }
+    var expandAllByDefault by remember { mutableStateOf(ChangelogPagePrefs.expandAllByDefault.read(prefs)) }
+    var showDates by remember { mutableStateOf(ChangelogPagePrefs.showDates.read(prefs)) }
+    var showBadges by remember { mutableStateOf(ChangelogPagePrefs.showBadges.read(prefs)) }
+
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
+        BackHandler(onBack = onBack)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .settingsPopupFadingEdge(scrollState)
+                .verticalScroll(scrollState)
+                .padding(bottom = sizing.spacing(48.dp), start = sizing.spacing(24.dp), end = sizing.spacing(24.dp)),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Row(modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(24.dp)), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
+                Text(
+                    text = stringResource(R.string.appstrings_changelogs_history_title),
+                    style = sizing.textStyle(MaterialTheme.typography.titleLarge),
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center
+                )
+                Spacer(Modifier.width(sizing.spacing(48.dp)))
+            }
+
+            val shape = oneUiActionButtonShape(useOneUi)
+            val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
+
+            Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))) {
+                SimpleSwitchCard(
+                    title = stringResource(R.string.changelogs_option_show_stats),
+                    showMapLocation = showHeaderStats,
+                    onLocationChange = { enabled ->
+                        showHeaderStats = enabled
+                        ChangelogPagePrefs.showHeaderStats.write(prefs.edit(), enabled).apply()
+                    },
+                    shape = shape,
+                    border = border,
+                    bubbleColor = bubbleColor,
+                    useOneUi = useOneUi
+                )
+                SimpleSwitchCard(
+                    title = stringResource(R.string.changelogs_option_expand_all),
+                    showMapLocation = expandAllByDefault,
+                    onLocationChange = { enabled ->
+                        expandAllByDefault = enabled
+                        ChangelogPagePrefs.expandAllByDefault.write(prefs.edit(), enabled).apply()
+                    },
+                    shape = shape,
+                    border = border,
+                    bubbleColor = bubbleColor,
+                    useOneUi = useOneUi
+                )
+                SimpleSwitchCard(
+                    title = stringResource(R.string.changelogs_option_show_dates),
+                    showMapLocation = showDates,
+                    onLocationChange = { enabled ->
+                        showDates = enabled
+                        ChangelogPagePrefs.showDates.write(prefs.edit(), enabled).apply()
+                    },
+                    shape = shape,
+                    border = border,
+                    bubbleColor = bubbleColor,
+                    useOneUi = useOneUi
+                )
+                SimpleSwitchCard(
+                    title = stringResource(R.string.changelogs_option_show_badges),
+                    showMapLocation = showBadges,
+                    onLocationChange = { enabled ->
+                        showBadges = enabled
+                        ChangelogPagePrefs.showBadges.write(prefs.edit(), enabled).apply()
+                    },
+                    shape = shape,
+                    border = border,
+                    bubbleColor = bubbleColor,
+                    useOneUi = useOneUi
+                )
+
+                PageScrollAidsCards(PageScrollPrefs.CHANGELOGS, shape, border, bubbleColor, useOneUi, spacing = 0.dp)
+            }
+
+            Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
+            TextButton(
+                onClick = {
+                    ChangelogPagePrefs.putDefaults(prefs.edit()).apply()
+                    showHeaderStats = ChangelogPagePrefs.showHeaderStats.defaultValue
+                    expandAllByDefault = ChangelogPagePrefs.expandAllByDefault.defaultValue
+                    showDates = ChangelogPagePrefs.showDates.defaultValue
+                    showBadges = ChangelogPagePrefs.showBadges.defaultValue
+                    PageScrollPrefs.Aid.entries.forEach { aid ->
+                        PageScrollPrefs.set(prefs, aid, PageScrollPrefs.CHANGELOGS, PageScrollPrefs.defaultEnabled(aid, PageScrollPrefs.CHANGELOGS))
                     }
                 }
             ) {

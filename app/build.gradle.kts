@@ -38,8 +38,8 @@ android {
         targetSdk = 37
         // Google Play ne compare QUE versionCode : il doit augmenter a chaque envoi et un numero
         // deja envoye ne peut jamais etre reutilise. versionName n'est qu'un libelle d'affichage.
-        versionCode = 101
-        versionName = "2.0.99"
+        versionCode = 102
+        versionName = "2.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         val manifestPublicKeys = providers
@@ -188,4 +188,7 @@ dependencies {
 
     // WorkManager conversion photo
     implementation(libs.androidx.exifinterface)
+
+    // Garmin Connect IQ Companion App SDK (communication BLE montre Garmin)
+    implementation(libs.garmin.connectiq)
 }
