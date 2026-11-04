@@ -3474,6 +3474,7 @@
     <string name="appstrings_release_v213_summary_garmin_diagnostic_dialog_and_live_logs">Diálogo de diagnóstico para relojes Garmin en Ajustes: registro BLE en vivo, prueba de ping y mayor estabilidad anti-fallos</string>
     <string name="appstrings_release_v214_summary_garmin_r8_proguard_and_persisted_diagnostics">Estabilidad de la app complementaria Garmin en versiones de producción (R8/Proguard) et consulta de registros persistentes en diagnósticos</string>
     <string name="appstrings_release_v215_summary_garmin_background_wake_and_screen_off_sync">Activación en segundo plano y comunicación fiable con pantalla apagada para relojes Garmin Connect IQ mediante el servicio Binder</string>
+    <string name="appstrings_release_v216_summary_garmin_direct_broadcast_and_deduplication">Recepción directa y fiable de peticiones Bluetooth de relojes Garmin Connect IQ con deduplicación de mensajes</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registro de solicitudes de red</string>
