@@ -27,10 +27,16 @@ data class ChangelogMilestone(
 object AppChangelogRepository {
     val milestones: List<ChangelogMilestone> = listOf(
         ChangelogMilestone(
-            versionName = "2.1.4",
-            releaseDate = "2026-11-03",
+            versionName = "2.1.5",
+            releaseDate = "2026-11-04",
             isCurrent = true,
             badge = MilestoneBadge.CURRENT,
+            summary = "Reveil en arriere-plan et communication ecran eteint pour montres Garmin",
+            itemResIds = listOf(R.string.appstrings_release_v215_summary_garmin_background_wake_and_screen_off_sync)
+        ),
+        ChangelogMilestone(
+            versionName = "2.1.4",
+            releaseDate = "2026-11-03",
             summary = "Stabilite Garmin en release R8/Proguard et logs persistants dans le diagnostic",
             itemResIds = listOf(R.string.appstrings_release_v214_summary_garmin_r8_proguard_and_persisted_diagnostics)
         ),

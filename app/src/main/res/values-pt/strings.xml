@@ -3473,6 +3473,7 @@
     <string name="appstrings_release_v212_summary_garmin_connection_and_reconnect_reliability">Reconexão automática e deteção fiável de relógios Garmin Connect IQ, com resposta sistemática nas pesquisas de emissores</string>
     <string name="appstrings_release_v213_summary_garmin_diagnostic_dialog_and_live_logs">Diálogo de diagnóstico para relógios Garmin nas Definições: registo BLE em tempo real, teste de ping e maior estabilidade anti-falhas</string>
     <string name="appstrings_release_v214_summary_garmin_r8_proguard_and_persisted_diagnostics">Estabilidade da aplicação complementar Garmin em versões de produção (R8/Proguard) e visualização de registos persistentes no diagnóstico</string>
+    <string name="appstrings_release_v215_summary_garmin_background_wake_and_screen_off_sync">Ativação em segundo plano e comunicação fiável com ecrã desligado para relógios Garmin Connect IQ através do serviço Binder</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registo de pedidos de rede</string>
