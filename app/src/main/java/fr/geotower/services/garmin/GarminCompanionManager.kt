@@ -1,7 +1,12 @@
 package fr.geotower.services.garmin
 
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.location.Location
+import android.os.Build
+import androidx.core.content.ContextCompat
 import com.garmin.android.connectiq.ConnectIQ
 import com.garmin.android.connectiq.ConnectIQ.ConnectIQListener
 import com.garmin.android.connectiq.ConnectIQ.IQApplicationEventListener
@@ -12,6 +17,7 @@ import com.garmin.android.connectiq.ConnectIQ.IQSdkErrorStatus
 import com.garmin.android.connectiq.ConnectIQ.IQSendMessageListener
 import com.garmin.android.connectiq.IQApp
 import com.garmin.android.connectiq.IQDevice
+import com.garmin.monkeybrains.serialization.Serializer
 import fr.geotower.data.AnfrRepository
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.PhysiqueEntity
@@ -182,22 +188,6 @@ object GarminCompanionManager {
                     _lastStatusMessage.value = "Prêt (Garmin Connect actif)"
                     log("GarminBridge", "SDK Connect IQ prêt et opérationnel")
 
-                    // 1. Enregistre GeoTower auprès de Garmin Connect Mobile pour le réveil en arrière-plan (Binder)
-                    try {
-                        ciq.registerAppToUseBinderService(GARMIN_APP_UUID)
-                        log("GarminBridge", "Application enregistrée auprès de GCM pour le réveil en arrière-plan (Binder)")
-                    } catch (e: Exception) {
-                        log("GarminBridge", "Avertissement registerAppToUseBinderService", e)
-                    }
-
-                    // 2. Enregistre l'écouteur global d'application (Binder)
-                    try {
-                        ciq.registerForAppEvents(appEventListener)
-                        log("GarminBridge", "Écouteur global d'application enregistré (Binder)")
-                    } catch (e: Exception) {
-                        log("GarminBridge", "Avertissement registerForAppEvents global", e)
-                    }
-
                     registerWithConnectedDevices()
                 }
 
@@ -215,13 +205,56 @@ object GarminCompanionManager {
                 }
             })
 
-            // Pré-attachement synchrone de l'écouteur pour tout appel Binder précoce
+            // Récepteur direct BroadcastReceiver pour garantir la réception même si le SDK filtre
             try {
-                ciq.registerForAppEvents(appEventListener)
-            } catch (_: Exception) {}
+                val filter = IntentFilter("com.garmin.android.connectiq.INCOMING_MESSAGE")
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    appCtx.registerReceiver(rawBroadcastReceiver, filter, Context.RECEIVER_EXPORTED)
+                } else {
+                    appCtx.registerReceiver(rawBroadcastReceiver, filter)
+                }
+                log("GarminBridge", "Récepteur broadcast direct enregistré")
+            } catch (e: Exception) {
+                log("GarminBridge", "Erreur enregistrement récepteur direct", e)
+            }
         } catch (e: Exception) {
             _lastStatusMessage.value = "Exception: ${e.message}"
             log("GarminBridge", "Impossible d'initialiser ConnectIQ", e)
+        }
+    }
+
+    private val rawBroadcastReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent == null) return
+            val action = intent.action ?: return
+            if (action == "com.garmin.android.connectiq.INCOMING_MESSAGE") {
+                try {
+                    val dev = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        intent.getParcelableExtra("com.garmin.android.connectiq.EXTRA_REMOTE_DEVICE", IQDevice::class.java)
+                    } else {
+                        @Suppress("DEPRECATION")
+                        intent.getParcelableExtra("com.garmin.android.connectiq.EXTRA_REMOTE_DEVICE")
+                    }
+                    val app = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        intent.getParcelableExtra("com.garmin.android.connectiq.EXTRA_REMOTE_APPLICATION", IQApp::class.java)
+                    } else {
+                        @Suppress("DEPRECATION")
+                        intent.getParcelableExtra("com.garmin.android.connectiq.EXTRA_REMOTE_APPLICATION")
+                    }
+                    val payloadBytes = intent.getByteArrayExtra("com.garmin.android.connectiq.EXTRA_PAYLOAD")
+                    if (dev != null && app != null && payloadBytes != null) {
+                        val deserialized = Serializer.deserialize(payloadBytes)
+                        log("GarminBridge", "Broadcast direct reçu de ${dev.friendlyName}: ${deserialized.size} élément(s)")
+                        for (item in deserialized) {
+                            if (item is Map<*, *>) {
+                                handleWatchMessage(dev, app, item)
+                            }
+                        }
+                    }
+                } catch (e: Throwable) {
+                    log("GarminBridge", "Erreur traitement broadcast direct", e)
+                }
+            }
         }
     }
 
@@ -242,11 +275,6 @@ object GarminCompanionManager {
                     log("GarminBridge", "Impossible d'enregistrer ${dev.friendlyName}", e)
                 }
             }
-
-            // S'assurer que le listener Binder reste actif
-            try {
-                ciq.registerForAppEvents(appEventListener)
-            } catch (_: Exception) {}
 
             refreshConnectedDevices()
         } catch (e: Exception) {
@@ -293,7 +321,18 @@ object GarminCompanionManager {
         }
     }
 
+    private var lastHandledPayload: String? = null
+    private var lastHandledTimestamp: Long = 0L
+
     private fun handleWatchMessage(device: IQDevice, app: IQApp, data: Map<*, *>) {
+        val payloadKey = "${device.deviceIdentifier}_$data"
+        val now = System.currentTimeMillis()
+        if (payloadKey == lastHandledPayload && now - lastHandledTimestamp < 1500L) {
+            return
+        }
+        lastHandledPayload = payloadKey
+        lastHandledTimestamp = now
+
         runCatching {
             val cmd = data["cmd"]?.toString() ?: ""
             _lastReceivedPayload.value = "Cmd '$cmd' de ${device.friendlyName} ($data)"
