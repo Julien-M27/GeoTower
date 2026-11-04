@@ -95,6 +95,7 @@ object GarminCompanionManager {
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO + coroutineExceptionHandler)
+    private var appContext: Context? = null
     private var connectIQ: ConnectIQ? = null
     private var repository: AnfrRepository? = null
     private val iqApp = IQApp(GARMIN_APP_UUID)
@@ -160,8 +161,9 @@ object GarminCompanionManager {
     }
 
     fun init(context: Context, anfrRepo: AnfrRepository) {
-        val appContext = context.applicationContext
-        if (!isGarminConnectInstalled(appContext)) {
+        val appCtx = context.applicationContext
+        appContext = appCtx
+        if (!isGarminConnectInstalled(appCtx)) {
             _isSdkReady.value = false
             _lastStatusMessage.value = "Garmin Connect non installé"
             log("GarminBridge", "Garmin Connect Mobile non détecté sur le téléphone")
@@ -172,13 +174,30 @@ object GarminCompanionManager {
         log("GarminBridge", "Initialisation du SDK Connect IQ...")
 
         try {
-            val ciq = ConnectIQ.getInstance(appContext, IQConnectType.WIRELESS)
+            val ciq = ConnectIQ.getInstance(appCtx, IQConnectType.WIRELESS)
             connectIQ = ciq
-            ciq.initialize(appContext, false, object : ConnectIQListener {
+            ciq.initialize(appCtx, false, object : ConnectIQListener {
                 override fun onSdkReady() {
                     _isSdkReady.value = true
                     _lastStatusMessage.value = "Prêt (Garmin Connect actif)"
                     log("GarminBridge", "SDK Connect IQ prêt et opérationnel")
+
+                    // 1. Enregistre GeoTower auprès de Garmin Connect Mobile pour le réveil en arrière-plan (Binder)
+                    try {
+                        ciq.registerAppToUseBinderService(GARMIN_APP_UUID)
+                        log("GarminBridge", "Application enregistrée auprès de GCM pour le réveil en arrière-plan (Binder)")
+                    } catch (e: Exception) {
+                        log("GarminBridge", "Avertissement registerAppToUseBinderService", e)
+                    }
+
+                    // 2. Enregistre l'écouteur global d'application (Binder)
+                    try {
+                        ciq.registerForAppEvents(appEventListener)
+                        log("GarminBridge", "Écouteur global d'application enregistré (Binder)")
+                    } catch (e: Exception) {
+                        log("GarminBridge", "Avertissement registerForAppEvents global", e)
+                    }
+
                     registerWithConnectedDevices()
                 }
 
@@ -195,6 +214,11 @@ object GarminCompanionManager {
                     log("GarminBridge", "SDK Connect IQ arrêté")
                 }
             })
+
+            // Pré-attachement synchrone de l'écouteur pour tout appel Binder précoce
+            try {
+                ciq.registerForAppEvents(appEventListener)
+            } catch (_: Exception) {}
         } catch (e: Exception) {
             _lastStatusMessage.value = "Exception: ${e.message}"
             log("GarminBridge", "Impossible d'initialiser ConnectIQ", e)
@@ -218,6 +242,12 @@ object GarminCompanionManager {
                     log("GarminBridge", "Impossible d'enregistrer ${dev.friendlyName}", e)
                 }
             }
+
+            // S'assurer que le listener Binder reste actif
+            try {
+                ciq.registerForAppEvents(appEventListener)
+            } catch (_: Exception) {}
+
             refreshConnectedDevices()
         } catch (e: Exception) {
             log("GarminBridge", "Erreur lors de l'enregistrement des montres", e)
@@ -292,11 +322,19 @@ object GarminCompanionManager {
                     }
 
                     log("GarminBridge", "Requête 'nearby' : lat=$lat, lon=$lon, rayon=${radiusKm}km, max=$limit sites")
+                    val powerManager = appContext?.getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
+                    val wakeLock = powerManager?.newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "geotower:garmin_bridge")
+                    wakeLock?.acquire(15_000L)
+
                     scope.launch {
                         try {
                             processNearbyRequest(device, app, lat, lon, radiusKm, limit)
                         } catch (t: Throwable) {
                             log("GarminBridge", "Erreur critique dans processNearbyRequest", t)
+                        } finally {
+                            if (wakeLock?.isHeld == true) {
+                                runCatching { wakeLock.release() }
+                            }
                         }
                     }
                 }
