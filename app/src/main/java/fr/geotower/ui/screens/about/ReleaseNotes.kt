@@ -31,8 +31,8 @@ internal data class ReleaseNoteItem(
  */
 @Composable
 internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
-    section(stringResource(R.string.appstrings_release_section_interface)) {
-        item(stringResource(R.string.appstrings_release_v218_summary_garmin_switch_ui_styling))
+    section(stringResource(R.string.appstrings_release_section_settings)) {
+        item(stringResource(R.string.appstrings_release_v219_summary_garmin_notification_access_and_continuous_mode))
     }
 }
 

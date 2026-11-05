@@ -3477,6 +3477,7 @@
     <string name="appstrings_release_v216_summary_garmin_direct_broadcast_and_deduplication">Recepción directa y fiable de peticiones Bluetooth de relojes Garmin Connect IQ con deduplicación de mensajes</string>
     <string name="appstrings_release_v217_summary_garmin_background_foreground_service">Servicio en segundo plano opcional para mantener la conexión Bluetooth con relojes Garmin con la pantalla apagada</string>
     <string name="appstrings_release_v218_summary_garmin_switch_ui_styling">Armonización visual del interruptor de enlace con el reloj Garmin con el diseño de la aplicación (estilos One UI y Material)</string>
+    <string name="appstrings_release_v219_summary_garmin_notification_access_and_continuous_mode">Acceso directo a los ajustes de Garmin desde la notificación persistente, funcionamiento continuo en segundo plano y mejoras en el registro de conexión</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registro de solicitudes de red</string>

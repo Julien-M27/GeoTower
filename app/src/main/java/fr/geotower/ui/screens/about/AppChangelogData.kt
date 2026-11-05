@@ -27,10 +27,16 @@ data class ChangelogMilestone(
 object AppChangelogRepository {
     val milestones: List<ChangelogMilestone> = listOf(
         ChangelogMilestone(
-            versionName = "2.1.8",
+            versionName = "2.1.9",
             releaseDate = "2026-11-05",
             isCurrent = true,
             badge = MilestoneBadge.CURRENT,
+            summary = "Accès direct aux réglages Garmin depuis la notification et fonctionnement continu",
+            itemResIds = listOf(R.string.appstrings_release_v219_summary_garmin_notification_access_and_continuous_mode)
+        ),
+        ChangelogMilestone(
+            versionName = "2.1.8",
+            releaseDate = "2026-11-05",
             summary = "Harmonisation visuelle de l'interrupteur liaison montre Garmin",
             itemResIds = listOf(R.string.appstrings_release_v218_summary_garmin_switch_ui_styling)
         ),
