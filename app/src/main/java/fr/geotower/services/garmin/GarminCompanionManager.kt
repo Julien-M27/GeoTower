@@ -119,19 +119,53 @@ object GarminCompanionManager {
     val lastStatusMessage: StateFlow<String?> = _lastStatusMessage.asStateFlow()
 
     const val PREF_GARMIN_BACKGROUND_SERVICE = "garmin_background_service_enabled"
+    const val PREF_GARMIN_BACKGROUND_DURATION = "garmin_background_duration_ms"
+    const val PREF_GARMIN_SERVICE_START_TIME = "garmin_service_start_time"
+
+    val DURATION_CHOICES = listOf(
+        0L to "Illimité",
+        1 * 3600 * 1000L to "1h",
+        2 * 3600 * 1000L to "2h",
+        4 * 3600 * 1000L to "4h",
+        8 * 3600 * 1000L to "8h"
+    )
+
     private val _isBackgroundServiceEnabled = MutableStateFlow(false)
     val isBackgroundServiceEnabled: StateFlow<Boolean> = _isBackgroundServiceEnabled.asStateFlow()
+
+    private val _backgroundDurationMs = MutableStateFlow(0L)
+    val backgroundDurationMs: StateFlow<Long> = _backgroundDurationMs.asStateFlow()
+
+    private val _serviceStartTimeMs = MutableStateFlow(0L)
+    val serviceStartTimeMs: StateFlow<Long> = _serviceStartTimeMs.asStateFlow()
 
     fun setBackgroundServiceEnabled(context: Context, enabled: Boolean) {
         val appCtx = context.applicationContext
         _isBackgroundServiceEnabled.value = enabled
+        val now = if (enabled) System.currentTimeMillis() else 0L
+        _serviceStartTimeMs.value = now
         val prefs = appCtx.getSharedPreferences("geotower_prefs", Context.MODE_PRIVATE)
-        prefs.edit().putBoolean(PREF_GARMIN_BACKGROUND_SERVICE, enabled).apply()
-        log("GarminBridge", "Liaison montre écran éteint configurée : $enabled")
+        prefs.edit()
+            .putBoolean(PREF_GARMIN_BACKGROUND_SERVICE, enabled)
+            .putLong(PREF_GARMIN_SERVICE_START_TIME, now)
+            .apply()
+        log("GarminBridge", "Liaison montre écran éteint configurée : $enabled (start: $now)")
         if (enabled) {
             GarminCompanionService.start(appCtx)
         } else {
             GarminCompanionService.stop(appCtx)
+        }
+    }
+
+    fun setBackgroundDuration(context: Context, durationMs: Long) {
+        val appCtx = context.applicationContext
+        _backgroundDurationMs.value = durationMs
+        val prefs = appCtx.getSharedPreferences("geotower_prefs", Context.MODE_PRIVATE)
+        prefs.edit().putLong(PREF_GARMIN_BACKGROUND_DURATION, durationMs).apply()
+        log("GarminBridge", "Durée liaison montre configurée : $durationMs ms")
+        if (_isBackgroundServiceEnabled.value) {
+            // Relancer pour mettre à jour la notification et le timer d'arrêt automatique
+            GarminCompanionService.start(appCtx)
         }
     }
 
@@ -197,9 +231,21 @@ object GarminCompanionManager {
 
         val prefs = appCtx.getSharedPreferences("geotower_prefs", Context.MODE_PRIVATE)
         val bgEnabled = prefs.getBoolean(PREF_GARMIN_BACKGROUND_SERVICE, false)
-        _isBackgroundServiceEnabled.value = bgEnabled
-        if (bgEnabled) {
-            GarminCompanionService.start(appCtx)
+        val durationMs = prefs.getLong(PREF_GARMIN_BACKGROUND_DURATION, 0L)
+        val startTime = prefs.getLong(PREF_GARMIN_SERVICE_START_TIME, 0L)
+        _backgroundDurationMs.value = durationMs
+        _serviceStartTimeMs.value = startTime
+
+        if (bgEnabled && durationMs > 0L && startTime > 0L && (System.currentTimeMillis() - startTime) >= durationMs) {
+            _isBackgroundServiceEnabled.value = false
+            _serviceStartTimeMs.value = 0L
+            prefs.edit().putBoolean(PREF_GARMIN_BACKGROUND_SERVICE, false).putLong(PREF_GARMIN_SERVICE_START_TIME, 0L).apply()
+            log("GarminBridge", "Durée liaison expirée pendant l'arrêt de l'application")
+        } else {
+            _isBackgroundServiceEnabled.value = bgEnabled
+            if (bgEnabled) {
+                GarminCompanionService.start(appCtx)
+            }
         }
 
         log("GarminBridge", "Initialisation du SDK Connect IQ...")

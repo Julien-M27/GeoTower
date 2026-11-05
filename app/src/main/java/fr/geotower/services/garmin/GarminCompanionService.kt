@@ -9,7 +9,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import androidx.core.app.NotificationCompat
 import fr.geotower.MainActivity
 import fr.geotower.utils.AppFileLog
@@ -68,16 +70,50 @@ class GarminCompanionService : Service() {
         }
     }
 
+    private val autoStopHandler = Handler(Looper.getMainLooper())
+    private val autoStopRunnable = Runnable {
+        AppFileLog.i("GarminBridge", "Durée programmée de liaison écoulée, arrêt automatique")
+        GarminCompanionManager.setBackgroundServiceEnabled(applicationContext, false)
+        stopSelf()
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        val manager = getSystemService(NotificationManager::class.java)
+        manager?.notify(NOTIFICATION_ID, buildNotification())
+
+        val durationMs = GarminCompanionManager.backgroundDurationMs.value
+        val startTime = GarminCompanionManager.serviceStartTimeMs.value
+        autoStopHandler.removeCallbacks(autoStopRunnable)
+        if (durationMs > 0L && startTime > 0L) {
+            val elapsed = System.currentTimeMillis() - startTime
+            val remaining = durationMs - elapsed
+            if (remaining <= 0) {
+                AppFileLog.i("GarminBridge", "Durée programmée déjà expirée, arrêt immédiat")
+                GarminCompanionManager.setBackgroundServiceEnabled(applicationContext, false)
+                stopSelf()
+                return START_NOT_STICKY
+            } else {
+                AppFileLog.i("GarminBridge", "Arrêt automatique programmé dans ${remaining / 1000}s")
+                autoStopHandler.postDelayed(autoStopRunnable, remaining)
+            }
+        }
         return START_STICKY
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        autoStopHandler.removeCallbacks(autoStopRunnable)
         AppFileLog.i("GarminBridge", "GarminCompanionService arrêté")
         if (GarminCompanionManager.isBackgroundServiceEnabled.value) {
-            AppFileLog.i("GarminBridge", "Relance automatique du service GarminCompanionService (mode illimité)")
-            start(applicationContext)
+            val durationMs = GarminCompanionManager.backgroundDurationMs.value
+            val startTime = GarminCompanionManager.serviceStartTimeMs.value
+            val isExpired = durationMs > 0L && startTime > 0L && (System.currentTimeMillis() - startTime) >= durationMs
+            if (!isExpired) {
+                AppFileLog.i("GarminBridge", "Relance automatique du service GarminCompanionService")
+                start(applicationContext)
+            } else {
+                GarminCompanionManager.setBackgroundServiceEnabled(applicationContext, false)
+            }
         }
     }
 
@@ -115,10 +151,18 @@ class GarminCompanionService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
+        val durationMs = GarminCompanionManager.backgroundDurationMs.value
+        val durationText = if (durationMs > 0L) {
+            val hours = durationMs / 3600000L
+            "Durée : ${hours}h (écran éteint)"
+        } else {
+            "Durée : Illimité (écran éteint)"
+        }
+
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("GeoTower • Montre Garmin")
-            .setContentText("Liaison active • Durée illimitée (écran éteint)")
-            .setSubText("En continu")
+            .setContentText("Liaison active • $durationText")
+            .setSubText(if (durationMs > 0L) "${durationMs / 3600000L}h" else "Illimité")
             .setContentIntent(pendingIntent)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true)

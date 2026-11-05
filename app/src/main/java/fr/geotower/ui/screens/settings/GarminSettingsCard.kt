@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -33,6 +34,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -41,6 +43,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -241,6 +244,35 @@ fun GarminSettingsCard(
 
                     // Option Service d'arrière-plan écran éteint
                     val isBgEnabled by GarminCompanionManager.isBackgroundServiceEnabled.collectAsStateWithLifecycle()
+                    val selectedDuration by GarminCompanionManager.backgroundDurationMs.collectAsStateWithLifecycle()
+                    val startTime by GarminCompanionManager.serviceStartTimeMs.collectAsStateWithLifecycle()
+
+                    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+                    androidx.compose.runtime.LaunchedEffect(isBgEnabled) {
+                        while (isBgEnabled) {
+                            kotlinx.coroutines.delay(1000)
+                            now = System.currentTimeMillis()
+                        }
+                    }
+
+                    val timerText = remember(isBgEnabled, selectedDuration, startTime, now) {
+                        if (!isBgEnabled || startTime <= 0L) null
+                        else if (selectedDuration == 0L) {
+                            val elapsedSec = maxOf(0L, (now - startTime) / 1000L)
+                            val h = elapsedSec / 3600
+                            val m = (elapsedSec % 3600) / 60
+                            val s = elapsedSec % 60
+                            String.format(java.util.Locale.ROOT, "⏱️ Chrono : %02d:%02d:%02d (Illimité)", h, m, s)
+                        } else {
+                            val remainingSec = maxOf(0L, ((startTime + selectedDuration) - now) / 1000L)
+                            val h = remainingSec / 3600
+                            val m = (remainingSec % 3600) / 60
+                            val s = remainingSec % 60
+                            val totalHours = selectedDuration / 3600000L
+                            String.format(java.util.Locale.ROOT, "⏳ Décompte : %02d:%02d:%02d restant(s) sur %dh", h, m, s, totalHours)
+                        }
+                    }
+
                     Surface(
                         shape = RoundedCornerShape(8.dp),
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
@@ -254,12 +286,12 @@ fun GarminSettingsCard(
                             ) {
                                 Column(modifier = Modifier.weight(1f).padding(end = sizing.spacing(12.dp))) {
                                     Text(
-                                        text = "Liaison écran éteint (en continu)",
+                                        text = "Liaison écran éteint",
                                         style = sizing.textStyle(MaterialTheme.typography.titleSmall),
                                         fontWeight = FontWeight.SemiBold
                                     )
                                     Text(
-                                        text = "Durée illimitée • Répondre avec le téléphone dans la poche",
+                                        text = "Répondre avec le téléphone dans la poche",
                                         style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -272,12 +304,47 @@ fun GarminSettingsCard(
                                     useOneUi = useOneUi
                                 )
                             }
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                text = "⏱️ Durée : Illimitée (reste actif en continu en arrière-plan sans coupure tant que l'option est activée).",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
-                            )
+
+                            // Sélecteur de durée (Illimité, 1h, 2h, 4h, 8h)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = sizing.spacing(6.dp))
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(sizing.spacing(6.dp))
+                            ) {
+                                GarminCompanionManager.DURATION_CHOICES.forEach { (durationMs, label) ->
+                                    FilterChip(
+                                        selected = selectedDuration == durationMs,
+                                        onClick = {
+                                            GarminCompanionManager.setBackgroundDuration(context, durationMs)
+                                        },
+                                        label = {
+                                            Text(
+                                                text = label,
+                                                fontSize = sizing.text(12.sp)
+                                            )
+                                        }
+                                    )
+                                }
+                            }
+
+                            // Compteur ou information de durée
+                            Spacer(Modifier.height(sizing.spacing(4.dp)))
+                            if (timerText != null) {
+                                Text(
+                                    text = timerText,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            } else {
+                                Text(
+                                    text = if (selectedDuration == 0L) "⏱️ Durée : Illimité" else "⏱️ Durée : ${selectedDuration / 3600000L}h avant coupure automatique",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                                )
+                            }
                         }
                     }
 
