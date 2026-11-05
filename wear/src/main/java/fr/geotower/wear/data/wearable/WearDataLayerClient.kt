@@ -7,7 +7,9 @@ import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Wearable
 import fr.geotower.wear.data.model.WearTower
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.json.JSONObject
 
@@ -23,17 +25,18 @@ class WearDataLayerClient(private val context: Context) {
         private const val TAG = "WearDataLayerClient"
         const val PATH_REQUEST_NEARBY = "/geotower/request_nearby"
         const val PATH_RESPONSE_NEARBY = "/geotower/response_nearby"
-        private const val TIMEOUT_MS = 6000L
+        // 12 secondes pour laisser le temps au smartphone de se réveiller et d'interroger SQLite
+        private const val TIMEOUT_MS = 12000L
     }
 
-    suspend fun fetchNearbyFromPhone(lat: Double, lon: Double, radiusKm: Double = 5.0, limit: Int = 15): List<WearTower> {
+    suspend fun fetchNearbyFromPhone(lat: Double, lon: Double, radiusKm: Double = 5.0, limit: Int = 15): List<WearTower> = withContext(Dispatchers.IO) {
         val nodes = nodeClient.connectedNodes.await()
         if (nodes.isEmpty()) {
             throw RuntimeException("Aucun smartphone connecté en Bluetooth")
         }
 
-        // On prend le premier nœud disponible (le smartphone appairé)
-        val phoneNode = nodes.first()
+        // On prend le nœud de proximité directe en priorité (le smartphone appairé)
+        val phoneNode = nodes.find { it.isNearby } ?: nodes.first()
         val requestJson = JSONObject().apply {
             put("lat", lat)
             put("lon", lon)
@@ -47,6 +50,7 @@ class WearDataLayerClient(private val context: Context) {
             override fun onMessageReceived(event: MessageEvent) {
                 if (event.path == PATH_RESPONSE_NEARBY) {
                     val body = String(event.data, Charsets.UTF_8)
+                    Log.d(TAG, "Réponse brute reçue du téléphone (${body.length} caractères)")
                     responseDeferred.complete(body)
                 }
             }
@@ -55,13 +59,13 @@ class WearDataLayerClient(private val context: Context) {
         try {
             messageClient.addListener(listener).await()
             messageClient.sendMessage(phoneNode.id, PATH_REQUEST_NEARBY, requestJson.toByteArray(Charsets.UTF_8)).await()
-            Log.d(TAG, "Requête envoyée au téléphone (${phoneNode.displayName})")
+            Log.d(TAG, "Requête envoyée au téléphone (${phoneNode.displayName}, id=${phoneNode.id})")
 
             val rawResponse = withTimeout(TIMEOUT_MS) {
                 responseDeferred.await()
             }
 
-            return parsePhoneResponse(rawResponse)
+            return@withContext parsePhoneResponse(rawResponse)
         } finally {
             try {
                 messageClient.removeListener(listener)

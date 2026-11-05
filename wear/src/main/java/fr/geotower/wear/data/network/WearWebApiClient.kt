@@ -5,6 +5,8 @@ import android.util.Log
 import com.google.gson.annotations.SerializedName
 import fr.geotower.wear.data.model.WearOperatorSite
 import fr.geotower.wear.data.model.WearTower
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
@@ -48,9 +50,18 @@ object WearWebApiClient {
     private const val TAG = "WearWebApiClient"
     private const val BASE_URL = "https://api.geotower.fr/"
 
-    val okHttpClient = OkHttpClient.Builder()
-        .connectTimeout(6, TimeUnit.SECONDS)
-        .readTimeout(8, TimeUnit.SECONDS)
+    // Timeouts adaptés au Bluetooth proxy Wear OS (latence plus élevée qu'en Wi-Fi direct)
+    val okHttpClient: OkHttpClient = OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
+        .callTimeout(20, TimeUnit.SECONDS)
+        .addInterceptor { chain ->
+            val req = chain.request().newBuilder()
+                .header("User-Agent", "GeoTower-WearOS/2.1.11")
+                .header("Accept", "application/json")
+                .build()
+            chain.proceed(req)
+        }
         .build()
 
     val api: WearLiveSitesApi by lazy {
@@ -62,7 +73,9 @@ object WearWebApiClient {
             .create(WearLiveSitesApi::class.java)
     }
 
-    suspend fun fetchNearbyTowers(lat: Double, lon: Double, radiusKm: Double = 5.0, limit: Int = 15): List<WearTower> {
+    suspend fun fetchNearbyTowers(lat: Double, lon: Double, radiusKm: Double = 5.0, limit: Int = 15): List<WearTower> = withContext(Dispatchers.IO) {
+        Log.i(TAG, "fetchNearbyTowers début : lat=$lat, lon=$lon, radius=$radiusKm, limit=$limit")
+
         // 1. Tenter l'endpoint dédié aux montres (identique à Garmin, groupé par support physique avec multi-opérateurs)
         try {
             val watchUrl = "${BASE_URL}api/v1/watch/nearby?lat=$lat&lon=$lon&limit=$limit&radius_km=$radiusKm"
@@ -73,16 +86,20 @@ object WearWebApiClient {
                     if (!body.isNullOrBlank()) {
                         val parsed = parseWatchApiJson(body, lat, lon)
                         if (parsed.isNotEmpty()) {
-                            return parsed
+                            Log.i(TAG, "Succès Watch API : ${parsed.size} supports chargés")
+                            return@withContext parsed
                         }
                     }
+                } else {
+                    Log.w(TAG, "Watch API code retour : ${response.code}")
                 }
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Watch API endpoint non disponible, repli sur l'API v2 live", e)
+            Log.w(TAG, "Watch API endpoint non disponible, bascule sur l'API Live v2 : ${e.message}", e)
         }
 
         // 2. Repli sur l'API Live v2 avec regroupement par support physique
+        Log.i(TAG, "Interrogation de l'API Live v2 de secours...")
         val resp = api.getNearbySites(lat = lat, lon = lon, limit = limit * 2, radiusKm = radiusKm)
         if (!resp.isSuccessful) {
             throw RuntimeException("Erreur serveur API (${resp.code()})")
@@ -97,12 +114,11 @@ object WearWebApiClient {
         for (site in rawSites) {
             val siteLat = site.latitude ?: continue
             val siteLon = site.longitude ?: continue
-            // Clé de support
             val key = "${roundTo4(siteLat)}_${roundTo4(siteLon)}"
             supportMap.getOrPut(key) { mutableListOf() }.add(site)
         }
 
-        return supportMap.values.mapNotNull { group ->
+        val parsedV2 = supportMap.values.mapNotNull { group ->
             val first = group.first()
             val siteLat = first.latitude ?: return@mapNotNull null
             val siteLon = first.longitude ?: return@mapNotNull null
@@ -142,6 +158,9 @@ object WearWebApiClient {
                 source = "web_api"
             )
         }.sortedBy { it.distanceMeters }.take(limit)
+
+        Log.i(TAG, "Succès API Live v2 : ${parsedV2.size} supports agrégés")
+        parsedV2
     }
 
     private fun parseWatchApiJson(jsonStr: String, userLat: Double, userLon: Double): List<WearTower> {

@@ -225,6 +225,15 @@
                     android:pathPrefix="/geotower"
                     android:scheme="wear" />
             </intent-filter>
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <data
+                    android:host="*"
+                    android:pathPrefix="/geotower" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.BIND_LISTENER_INTENT" />
+            </intent-filter>
         </service>
 
         <!-- Android Auto must discover this exported CarAppService; release hosts are restricted in createHostValidator(). -->
