@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -25,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.wear.compose.foundation.lazy.AutoCenteringParams
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.items
@@ -35,6 +37,7 @@ import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
 import fr.geotower.wear.data.model.WearTower
 import fr.geotower.wear.presentation.theme.getOperatorColor
+import fr.geotower.wear.presentation.theme.getOperatorShortName
 
 @Composable
 fun TowerListScreen(
@@ -116,16 +119,19 @@ fun TowerListScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Badges opérateurs
+                        // Badges opérateurs (avec noms courts compacts : FREE, BOUYGUES, SFR, ORANGE)
                         Row(
+                            modifier = Modifier.weight(1f, fill = false),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(3.dp)
                         ) {
                             val opsToShow = if (tower.operators.isNotEmpty()) tower.operators else listOf(
                                 fr.geotower.wear.data.model.WearOperatorSite(operator = tower.operator)
                             )
-                            opsToShow.take(3).forEach { opSite ->
+                            // Affiche jusqu'à 2 badges courts, puis +N pour ne jamais déborder
+                            opsToShow.take(2).forEach { opSite ->
                                 val color = getOperatorColor(opSite.operator)
+                                val shortName = getOperatorShortName(opSite.operator)
                                 Box(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(4.dp))
@@ -133,31 +139,56 @@ fun TowerListScreen(
                                         .padding(horizontal = 4.dp, vertical = 1.dp)
                                 ) {
                                     Text(
-                                        text = opSite.operator,
+                                        text = shortName,
                                         fontSize = 9.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = Color.White
+                                        color = Color.White,
+                                        maxLines = 1,
+                                        softWrap = false
                                     )
                                 }
                             }
-                            if (opsToShow.size > 3) {
-                                Text(text = "+${opsToShow.size - 3}", fontSize = 8.sp, color = Color.White)
+                            if (opsToShow.size > 2) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(Color(0xFF333333))
+                                        .padding(horizontal = 3.dp, vertical = 1.dp)
+                                ) {
+                                    Text(
+                                        text = "+${opsToShow.size - 2}",
+                                        fontSize = 8.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.LightGray,
+                                        maxLines = 1,
+                                        softWrap = false
+                                    )
+                                }
                             }
                         }
 
-                        // Cap & Azimut
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Spacer(Modifier.width(6.dp))
+
+                        // Cap & Azimut (Garanti sur une seule ligne sans repliement vertical)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.wrapContentWidth()
+                        ) {
                             Text(
                                 text = tower.arrowSymbol,
-                                fontSize = 13.sp,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colors.primary
+                                color = MaterialTheme.colors.primary,
+                                maxLines = 1,
+                                softWrap = false
                             )
                             Spacer(Modifier.width(2.dp))
                             Text(
                                 text = "${tower.cardinalDirection} (${tower.bearingDegrees}°)",
                                 fontSize = 9.sp,
-                                color = MaterialTheme.colors.onSurfaceVariant
+                                color = MaterialTheme.colors.onSurfaceVariant,
+                                maxLines = 1,
+                                softWrap = false
                             )
                         }
                     }
@@ -180,8 +211,12 @@ fun TowerListScreen(
                             text = distanceText,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            color = Color.White,
+                            maxLines = 1,
+                            softWrap = false
                         )
+
+                        Spacer(Modifier.width(4.dp))
 
                         val supDesc = if (tower.supportHeight != null && tower.supportHeight > 0) {
                             "${tower.supportType} (${tower.supportHeight}m)"
@@ -192,7 +227,10 @@ fun TowerListScreen(
                             text = supDesc,
                             fontSize = 9.sp,
                             color = Color(0xFFFFB300),
-                            maxLines = 1
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
                         )
                     }
 
@@ -203,6 +241,8 @@ fun TowerListScreen(
                             fontSize = 8.sp,
                             color = MaterialTheme.colors.onSurfaceVariant,
                             maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.padding(top = 2.dp)
                         )
                     }

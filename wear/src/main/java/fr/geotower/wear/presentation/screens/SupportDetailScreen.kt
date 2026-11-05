@@ -32,6 +32,7 @@ import androidx.wear.compose.material.Text
 import fr.geotower.wear.data.model.WearOperatorSite
 import fr.geotower.wear.data.model.WearTower
 import fr.geotower.wear.presentation.theme.getOperatorColor
+import fr.geotower.wear.presentation.theme.getOperatorShortName
 import java.util.Locale
 
 /**
@@ -144,10 +145,12 @@ fun SupportDetailScreen(
                                 .padding(horizontal = 4.dp, vertical = 1.dp)
                         ) {
                             Text(
-                                text = op.operator,
+                                text = getOperatorShortName(op.operator),
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color.White
+                                color = Color.White,
+                                maxLines = 1,
+                                softWrap = false
                             )
                         }
                         Spacer(Modifier.padding(start = 6.dp))

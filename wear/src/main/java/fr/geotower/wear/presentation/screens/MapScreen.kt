@@ -30,6 +30,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -44,6 +46,7 @@ import fr.geotower.wear.data.model.GpsFixStatus
 import fr.geotower.wear.data.model.WearTower
 import fr.geotower.wear.data.network.WearWebApiClient
 import fr.geotower.wear.presentation.theme.getOperatorColor
+import fr.geotower.wear.presentation.theme.getOperatorShortName
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Request
@@ -71,6 +74,23 @@ fun MapScreen(
     val maxRange = zoomScales[zoomIndex]
     val tileZoom = tileZooms[zoomIndex]
 
+    // Mode d'affichage de la carte : Fond OSM (tuiles OpenStreetMap gratuites sans clé API) ou Radar tactique noir pur
+    var isOsmMapEnabled by remember { mutableStateOf(true) }
+
+    // Matrice de couleur sombre nocturne pour adapter les tuiles claires OpenStreetMap à l'écran OLED noir
+    val nightFilter = remember {
+        ColorFilter.colorMatrix(
+            ColorMatrix(
+                floatArrayOf(
+                    -0.75f, 0f, 0f, 0f, 215f,
+                    0f, -0.75f, 0f, 0f, 215f,
+                    0f, 0f, -0.75f, 0f, 215f,
+                    0f, 0f, 0f, 1f, 0f
+                )
+            )
+        )
+    }
+
     // Coordonnées utilisateur
     val userLat = (gpsStatus as? GpsFixStatus.Fixed)?.latitude ?: towers.firstOrNull()?.latitude ?: 48.005678
     val userLon = (gpsStatus as? GpsFixStatus.Fixed)?.longitude ?: towers.firstOrNull()?.longitude ?: 0.201598
@@ -78,8 +98,9 @@ fun MapScreen(
     // Cache des tuiles de fond de carte
     val tileCache = remember { mutableStateMapOf<String, ImageBitmap>() }
 
-    // Chargement asynchrone des tuiles de fond de carte (CartoDB Dark Matter / OSM)
-    LaunchedEffect(tileZoom, userLat, userLon) {
+    // Chargement asynchrone des tuiles OpenStreetMap gratuites (AUCUNE clé API nécessaire)
+    LaunchedEffect(tileZoom, userLat, userLon, isOsmMapEnabled) {
+        if (!isOsmMapEnabled) return@LaunchedEffect
         withContext(Dispatchers.IO) {
             val n = 1 shl tileZoom
             val centerTileX = ((userLon + 180.0) / 360.0 * n).toInt()
@@ -94,10 +115,11 @@ fun MapScreen(
                     val key = "$tileZoom/$tx/$ty"
                     if (!tileCache.containsKey(key)) {
                         try {
-                            val url = "https://basemaps.cartocdn.com/rastertiles/dark_all/$tileZoom/$tx/$ty.png"
+                            // OpenStreetMap officiel : gratuit, public, sans aucune clé API requise
+                            val url = "https://tile.openstreetmap.org/$tileZoom/$tx/$ty.png"
                             val req = Request.Builder()
                                 .url(url)
-                                .header("User-Agent", "GeoTower-Wear/2.0")
+                                .header("User-Agent", "GeoTower-WearOS/2.1 (contact@geotower.fr)")
                                 .build()
                             val resp = WearWebApiClient.okHttpClient.newCall(req).execute()
                             if (resp.isSuccessful) {
@@ -110,7 +132,7 @@ fun MapScreen(
                                 }
                             }
                         } catch (e: Exception) {
-                            // En cas d'absence de réseau, le fond géométrique Canvas prend le relais
+                            // En cas d'absence de réseau, le fond géométrique Canvas radar prend le relais
                         }
                     }
                 }
@@ -128,7 +150,7 @@ fun MapScreen(
             val center = Offset(size.width / 2f, size.height / 2f)
             val mapRadius = (size.minDimension / 2f) * 0.74f
 
-            // 1. Dessin des tuiles du fond de carte si disponibles
+            // 1. Dessin des tuiles OpenStreetMap avec filtre sombre si activé
             val n = 1 shl tileZoom
             val exactX = ((userLon + 180.0) / 360.0 * n)
             val latRad = Math.toRadians(userLat)
@@ -141,21 +163,24 @@ fun MapScreen(
             val offsetYInTiles = (exactY - centerTileY) * tileSizePx
 
             var drawnAnyTile = false
-            for (dx in -1..1) {
-                for (dy in -1..1) {
-                    val tx = centerTileX + dx
-                    val ty = centerTileY + dy
-                    val key = "$tileZoom/$tx/$ty"
-                    val tile = tileCache[key]
-                    if (tile != null) {
-                        drawnAnyTile = true
-                        val drawX = center.x + (dx * tileSizePx) - offsetXInTiles.toFloat()
-                        val drawY = center.y + (dy * tileSizePx) - offsetYInTiles.toFloat()
-                        drawImage(
-                            image = tile,
-                            dstOffset = IntOffset(drawX.toInt(), drawY.toInt()),
-                            dstSize = IntSize(tileSizePx.toInt(), tileSizePx.toInt())
-                        )
+            if (isOsmMapEnabled) {
+                for (dx in -1..1) {
+                    for (dy in -1..1) {
+                        val tx = centerTileX + dx
+                        val ty = centerTileY + dy
+                        val key = "$tileZoom/$tx/$ty"
+                        val tile = tileCache[key]
+                        if (tile != null) {
+                            drawnAnyTile = true
+                            val drawX = center.x + (dx * tileSizePx) - offsetXInTiles.toFloat()
+                            val drawY = center.y + (dy * tileSizePx) - offsetYInTiles.toFloat()
+                            drawImage(
+                                image = tile,
+                                dstOffset = IntOffset(drawX.toInt(), drawY.toInt()),
+                                dstSize = IntSize(tileSizePx.toInt(), tileSizePx.toInt()),
+                                colorFilter = nightFilter
+                            )
+                        }
                     }
                 }
             }
@@ -266,8 +291,8 @@ fun MapScreen(
             val activeTower = selectedTower ?: towers.firstOrNull()
             Box(
                 modifier = Modifier
-                    .fillMaxWidth(0.74f)
-                    .padding(top = 26.dp)
+                    .fillMaxWidth(0.85f)
+                    .padding(top = 24.dp)
                     .clip(RoundedCornerShape(8.dp))
                     .background(Color.Black.copy(alpha = 0.85f))
                     .padding(horizontal = 6.dp, vertical = 3.dp)
@@ -278,12 +303,34 @@ fun MapScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = activeTower?.operatorNamesSummary ?: "Carte",
+                        text = activeTower?.let { getOperatorShortName(it.operator) } ?: "Mini map",
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colors.primary,
-                        maxLines = 1
+                        maxLines = 1,
+                        modifier = Modifier.weight(1f, fill = false)
                     )
+
+                    Spacer(Modifier.width(4.dp))
+
+                    // Bascule directe 1 clic : OSM (fond tuiles gratuit sans clé) / RADAR (mode tactique noir Garmin)
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(if (isOsmMapEnabled) Color(0xFF007AFF) else Color(0xFF333333))
+                            .clickable { isOsmMapEnabled = !isOsmMapEnabled }
+                            .padding(horizontal = 5.dp, vertical = 1.dp)
+                    ) {
+                        Text(
+                            text = if (isOsmMapEnabled) "OSM" else "RADAR",
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+
+                    Spacer(Modifier.width(4.dp))
+
                     Text(
                         text = if (maxRange >= 1000f) "${(maxRange / 1000).toInt()} km" else "${maxRange.toInt()} m",
                         fontSize = 9.sp,

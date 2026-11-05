@@ -27,3 +27,17 @@ fun getOperatorColor(operatorName: String): Color {
         else -> ColorUnknown
     }
 }
+
+/**
+ * Nom court compact pour les puces et badges de la montre (ex: BOUYGUES, FREE, SFR, ORANGE).
+ */
+fun getOperatorShortName(operatorName: String): String {
+    val upper = operatorName.uppercase()
+    return when {
+        upper.contains("ORANGE") -> "ORANGE"
+        upper.contains("SFR") -> "SFR"
+        upper.contains("BOUYGUES") -> "BOUYGUES"
+        upper.contains("FREE") -> "FREE"
+        else -> operatorName.trim().take(8).uppercase()
+    }
+}
