@@ -173,7 +173,7 @@ fun SettingsScreen(
                 },
                 secondaryLabel = {
                     Text(
-                        text = "GeoTower Wear OS v2.0 • ANFR",
+                        text = "GeoTower Wear OS v2.0",
                         fontSize = 9.sp,
                         color = MaterialTheme.colors.onSurfaceVariant
                     )

@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -24,25 +23,29 @@ import androidx.compose.ui.unit.sp
 import androidx.wear.compose.foundation.lazy.AutoCenteringParams
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
-import androidx.wear.compose.material.Button
-import androidx.wear.compose.material.ButtonDefaults
 import androidx.wear.compose.material.CompactChip
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
+import fr.geotower.wear.data.model.WearOperatorSite
 import fr.geotower.wear.data.model.WearTower
 import fr.geotower.wear.presentation.theme.getOperatorColor
-import java.util.Locale
 
+/**
+ * Fiche détaillée du site / opérateur spécifique (identique à Garmin OperatorDetailView).
+ * Affiche les technologies, les bandes de fréquences en MHz et les secteurs ANFR réels.
+ */
 @Composable
-fun TowerDetailScreen(
+fun OperatorDetailScreen(
     tower: WearTower,
-    isTarget: Boolean,
-    onLockTarget: () -> Unit,
+    operatorSite: WearOperatorSite,
+    operatorIndex: Int,
+    totalOperators: Int,
+    onOpenCompass: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val listState = rememberScalingLazyListState()
-    val opColor = getOperatorColor(tower.operator)
+    val opColor = getOperatorColor(operatorSite.operator)
 
     ScalingLazyColumn(
         state = listState,
@@ -51,12 +54,18 @@ fun TowerDetailScreen(
         verticalArrangement = Arrangement.spacedBy(5.dp),
         modifier = modifier.fillMaxSize().background(Color.Black)
     ) {
-        // En-tête : Opérateur + ID ANFR
+        // En-tête : Index de l'opérateur sur le site (ex: "Opérateur 1/2")
         item {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp)
             ) {
+                Text(
+                    text = "Opérateur $operatorIndex/$totalOperators",
+                    fontSize = 9.sp,
+                    color = MaterialTheme.colors.onSurfaceVariant
+                )
+                Spacer(Modifier.height(2.dp))
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(6.dp))
@@ -64,81 +73,64 @@ fun TowerDetailScreen(
                         .padding(horizontal = 8.dp, vertical = 2.dp)
                 ) {
                     Text(
-                        text = tower.operator,
+                        text = operatorSite.operator,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
                 }
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text = "ID ANFR : ${tower.id}",
-                    fontSize = 10.sp,
-                    color = MaterialTheme.colors.onSurfaceVariant
-                )
             }
         }
 
-        // Distance & Cap
+        // Section 1 : Technologies actives
         item {
-            DetailItemCard(
-                title = "Distance & Azimut",
-                value = "${tower.distanceMeters} m • ${tower.cardinalDirection} (${tower.bearingDegrees}°)",
-                accentColor = MaterialTheme.colors.primary
+            OperatorDetailCard(
+                title = "Technologies",
+                value = operatorSite.technologies,
+                accentColor = Color.White
             )
         }
 
-        // Technologies
+        // Section 2 : Fréquences & Bandes actives
         item {
-            DetailItemCard(
-                title = "Technologies actives",
-                value = tower.technologies,
-                accentColor = MaterialTheme.colors.secondary
+            OperatorDetailCard(
+                title = "Fréquences actives",
+                value = operatorSite.bands,
+                accentColor = Color.White
             )
         }
 
-        // Type de support
+        // Section 3 : Azimuts des secteurs radio ANFR
         item {
-            val supportLabel = if (tower.supportHeight != null && tower.supportHeight > 0) {
-                "${tower.supportType} (${tower.supportHeight} m)"
+            OperatorDetailCard(
+                title = "Secteurs ANFR",
+                value = operatorSite.azimuthsString,
+                accentColor = Color(0xFF30D158) // Vert cap Garmin
+            )
+        }
+
+        // Section 4 : Support associé
+        item {
+            val supDesc = if (tower.supportHeight != null && tower.supportHeight > 0) {
+                "${tower.supportType} (${tower.supportHeight} m) • ${tower.distanceMeters} m"
             } else {
-                tower.supportType
+                "${tower.supportType} • ${tower.distanceMeters} m"
             }
-            DetailItemCard(
-                title = "Support",
-                value = supportLabel,
-                accentColor = Color(0xFFFFB300)
-            )
-        }
-
-        // Commune & Adresse
-        if (tower.address.isNotBlank()) {
-            item {
-                DetailItemCard(
-                    title = "Commune / Adresse",
-                    value = tower.address,
-                    accentColor = Color.White
-                )
-            }
-        }
-
-        // Coordonnées GPS
-        item {
-            DetailItemCard(
-                title = "Coordonnées pylône",
-                value = String.format(Locale.US, "%.5f, %.5f", tower.latitude, tower.longitude),
+            OperatorDetailCard(
+                title = "Support physique",
+                value = supDesc,
                 accentColor = MaterialTheme.colors.onSurfaceVariant
             )
         }
 
-        // Bouton Verrouiller cible
+        // Bouton Boussole / Radar
         item {
             Spacer(Modifier.height(4.dp))
             CompactChip(
-                onClick = onLockTarget,
+                onClick = onOpenCompass,
                 label = {
                     Text(
-                        text = if (isTarget) "✓ Cible active sur le radar" else "Verrouiller sur le radar",
+                        text = "Boussole / Radar",
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center,
@@ -168,7 +160,7 @@ fun TowerDetailScreen(
 }
 
 @Composable
-private fun DetailItemCard(
+private fun OperatorDetailCard(
     title: String,
     value: String,
     accentColor: Color,

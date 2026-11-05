@@ -19,15 +19,17 @@ import androidx.wear.compose.material.Scaffold
 import androidx.wear.compose.material.TimeText
 import fr.geotower.wear.data.location.WatchGpsEngine
 import fr.geotower.wear.data.model.GpsFixStatus
+import fr.geotower.wear.data.model.WearOperatorSite
 import fr.geotower.wear.data.model.WearScreen
 import fr.geotower.wear.data.model.WearTower
 import fr.geotower.wear.data.repository.WearTowerRepository
 import fr.geotower.wear.presentation.screens.AboutScreen
 import fr.geotower.wear.presentation.screens.HomeScreen
 import fr.geotower.wear.presentation.screens.MapScreen
+import fr.geotower.wear.presentation.screens.OperatorDetailScreen
 import fr.geotower.wear.presentation.screens.RadarCompassScreen
 import fr.geotower.wear.presentation.screens.SettingsScreen
-import fr.geotower.wear.presentation.screens.TowerDetailScreen
+import fr.geotower.wear.presentation.screens.SupportDetailScreen
 import fr.geotower.wear.presentation.screens.TowerListScreen
 import fr.geotower.wear.presentation.theme.GeoTowerWearTheme
 import kotlinx.coroutines.launch
@@ -54,6 +56,7 @@ fun WearApp(
         // Page d'accueil par défaut (Menu principal en liste comme sur Garmin)
         var currentScreen by remember { mutableStateOf(WearScreen.HOME) }
         var inspectedTower by remember { mutableStateOf<WearTower?>(null) }
+        var inspectedOperatorSite by remember { mutableStateOf<WearOperatorSite?>(null) }
 
         // Démarre l'écoute du GPS matériel interne de la montre avec la fréquence sélectionnée
         LaunchedEffect(gpsRefreshInterval) {
@@ -90,10 +93,11 @@ fun WearApp(
             filteredTowers.find { it.id == selectedTowerId } ?: filteredTowers.firstOrNull()
         }
 
-        // Gestion du bouton retour physique et geste swipe Wear OS
+        // Gestion du bouton retour physique et geste swipe Wear OS (parcours Garmin)
         BackHandler(enabled = currentScreen != WearScreen.HOME) {
             when (currentScreen) {
-                WearScreen.DETAIL -> currentScreen = WearScreen.LIST
+                WearScreen.OPERATOR_DETAIL -> currentScreen = WearScreen.SUPPORT_DETAIL
+                WearScreen.SUPPORT_DETAIL -> currentScreen = WearScreen.LIST
                 WearScreen.ABOUT -> currentScreen = WearScreen.SETTINGS
                 else -> currentScreen = WearScreen.HOME
             }
@@ -117,16 +121,11 @@ fun WearApp(
                     WearScreen.LIST -> {
                         TowerListScreen(
                             towers = filteredTowers,
-                            selectedTower = selectedTower,
                             isLoading = isLoading,
                             errorMessage = errorMessage,
-                            onTowerSelected = { tower ->
-                                repository.selectTower(tower.id)
-                                currentScreen = WearScreen.RADAR // Verrouille et affiche la boussole
-                            },
-                            onOpenDetails = { tower ->
+                            onSupportSelected = { tower ->
                                 inspectedTower = tower
-                                currentScreen = WearScreen.DETAIL
+                                currentScreen = WearScreen.SUPPORT_DETAIL
                             },
                             onRefresh = {
                                 val status = gpsStatus
@@ -154,7 +153,7 @@ fun WearApp(
                             },
                             onOpenDetails = { tower ->
                                 inspectedTower = tower
-                                currentScreen = WearScreen.DETAIL
+                                currentScreen = WearScreen.SUPPORT_DETAIL
                             },
                             onNavigateToList = {
                                 currentScreen = WearScreen.LIST
@@ -172,7 +171,7 @@ fun WearApp(
                             },
                             onOpenDetails = { tower ->
                                 inspectedTower = tower
-                                currentScreen = WearScreen.DETAIL
+                                currentScreen = WearScreen.SUPPORT_DETAIL
                             }
                         )
                     }
@@ -218,13 +217,16 @@ fun WearApp(
                         )
                     }
 
-                    WearScreen.DETAIL -> {
+                    WearScreen.SUPPORT_DETAIL -> {
                         val towerToShow = inspectedTower ?: selectedTower
                         if (towerToShow != null) {
-                            TowerDetailScreen(
+                            SupportDetailScreen(
                                 tower = towerToShow,
-                                isTarget = selectedTower?.id == towerToShow.id,
-                                onLockTarget = {
+                                onOperatorClick = { opSite ->
+                                    inspectedOperatorSite = opSite
+                                    currentScreen = WearScreen.OPERATOR_DETAIL
+                                },
+                                onOpenCompass = {
                                     repository.selectTower(towerToShow.id)
                                     currentScreen = WearScreen.RADAR
                                 },
@@ -234,6 +236,29 @@ fun WearApp(
                             )
                         } else {
                             currentScreen = WearScreen.LIST
+                        }
+                    }
+
+                    WearScreen.OPERATOR_DETAIL -> {
+                        val towerToShow = inspectedTower ?: selectedTower
+                        val opToShow = inspectedOperatorSite ?: towerToShow?.operators?.firstOrNull()
+                        if (towerToShow != null && opToShow != null) {
+                            val opIndex = (towerToShow.operators.indexOf(opToShow).takeIf { it >= 0 } ?: 0) + 1
+                            OperatorDetailScreen(
+                                tower = towerToShow,
+                                operatorSite = opToShow,
+                                operatorIndex = opIndex,
+                                totalOperators = towerToShow.operators.size.coerceAtLeast(1),
+                                onOpenCompass = {
+                                    repository.selectTower(towerToShow.id)
+                                    currentScreen = WearScreen.RADAR
+                                },
+                                onBack = {
+                                    currentScreen = WearScreen.SUPPORT_DETAIL
+                                }
+                            )
+                        } else {
+                            currentScreen = WearScreen.SUPPORT_DETAIL
                         }
                     }
                 }

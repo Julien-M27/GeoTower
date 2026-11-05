@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -43,7 +44,7 @@ fun AboutScreen(
     val appIconBitmap = remember(context) {
         try {
             val drawable = context.packageManager.getApplicationIcon(context.packageName)
-            drawable.toBitmap(width = 72, height = 72)
+            drawable.toBitmap(width = 64, height = 64)
         } catch (e: Exception) {
             null
         }
@@ -56,80 +57,90 @@ fun AboutScreen(
         verticalArrangement = Arrangement.spacedBy(6.dp),
         modifier = modifier.fillMaxSize().background(Color.Black)
     ) {
+        // En-tête : Logo & Titre
         item {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp)
-            ) {
-                Text(
-                    text = "À propos",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colors.primary
-                )
-            }
-        }
-
-        item {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.fillMaxWidth()
             ) {
                 if (appIconBitmap != null) {
                     Image(
                         bitmap = appIconBitmap.asImageBitmap(),
                         contentDescription = "Logo GeoTower",
                         modifier = Modifier
-                            .size(36.dp)
+                            .size(32.dp)
                             .clip(CircleShape)
                     )
                     Spacer(Modifier.height(4.dp))
                 }
                 Text(
-                    text = "GeoTower Wear",
-                    fontSize = 13.sp,
+                    text = "GeoTower",
+                    fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = Color(0xFFFF7900) // Orange Garmin
                 )
                 Text(
-                    text = "Version 2.0 (Wear OS)",
+                    text = "v2.0.0 • Wear OS Edition",
                     fontSize = 10.sp,
-                    color = MaterialTheme.colors.onSurfaceVariant
+                    color = Color(0xFFAAAAAA)
                 )
             }
         }
 
+        // Présentation
         item {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFF1C1C1E))
+                    .padding(8.dp)
             ) {
                 Text(
-                    text = "Données radioélectriques :",
+                    text = "Localisation des antennes relais de téléphonie mobile (Orange, SFR, Bouygues, Free). Données radio & GPS matériel directement au poignet.",
                     fontSize = 9.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colors.primary,
-                    textAlign = TextAlign.Center
-                )
-                Text(
-                    text = "ANFR (Agence Nationale des Fréquences)",
-                    fontSize = 9.sp,
-                    color = MaterialTheme.colors.onSurfaceVariant,
+                    color = Color.White,
                     textAlign = TextAlign.Center
                 )
             }
         }
 
+        // Section Nouveautés
         item {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)
+            Text(
+                text = "NOUVEAUTÉS v2.0.0",
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFFFF7900),
+                modifier = Modifier.padding(start = 4.dp, top = 4.dp)
+            )
+        }
+
+        val features = listOf(
+            "Fiches antennes complètes",
+            "Fiches détaillées par opérateur",
+            "Supports multi-opérateurs",
+            "Fréquences & bandes en MHz",
+            "Secteurs radio ANFR réels",
+            "Boussole radar interactive",
+            "Mode 100% autonome ou couplé",
+            "Mini map GPS & tracé d'antennes",
+            "Synchronisation smartphone"
+        )
+
+        items(features.size) { index ->
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color(0xFF16191E))
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
             ) {
                 Text(
-                    text = "GPS 100% matériel montre intégré, liaison Bluetooth smartphone ou API Web autonome.",
-                    fontSize = 8.sp,
-                    color = MaterialTheme.colors.onSurfaceVariant,
-                    textAlign = TextAlign.Center
+                    text = "• ${features[index]}",
+                    fontSize = 9.sp,
+                    color = Color.White
                 )
             }
         }

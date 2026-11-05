@@ -39,11 +39,9 @@ import fr.geotower.wear.presentation.theme.getOperatorColor
 @Composable
 fun TowerListScreen(
     towers: List<WearTower>,
-    selectedTower: WearTower?,
     isLoading: Boolean,
     errorMessage: String?,
-    onTowerSelected: (WearTower) -> Unit,
-    onOpenDetails: (WearTower) -> Unit,
+    onSupportSelected: (WearTower) -> Unit,
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -68,7 +66,7 @@ fun TowerListScreen(
                     color = MaterialTheme.colors.primary
                 )
                 Text(
-                    text = if (towers.isNotEmpty()) "${towers.size} antennes détectées" else "Recherche...",
+                    text = if (towers.isNotEmpty()) "${towers.size} supports physiques détectés" else "Recherche...",
                     fontSize = 10.sp,
                     color = MaterialTheme.colors.onSurfaceVariant
                 )
@@ -99,60 +97,55 @@ fun TowerListScreen(
         }
 
         items(towers) { tower ->
-            val isTarget = selectedTower?.id == tower.id
-            val opColor = getOperatorColor(tower.operator)
+            val primaryOpColor = getOperatorColor(tower.operator)
 
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
                     .background(MaterialTheme.colors.surface)
-                    .border(
-                        width = if (isTarget) 1.5.dp else 0.5.dp,
-                        color = if (isTarget) Color.White else opColor.copy(alpha = 0.4f),
-                        shape = RoundedCornerShape(12.dp)
-                    )
                     .clickable {
-                        onTowerSelected(tower)
+                        onSupportSelected(tower)
                     }
                     .padding(horizontal = 8.dp, vertical = 6.dp)
             ) {
                 Column(modifier = Modifier.fillMaxWidth()) {
-                    // Indicateur cible verrouillée
-                    if (isTarget) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(bottom = 3.dp)
-                        ) {
-                            Text(
-                                text = "🎯 CIBLE RADAR VERROUILLÉE",
-                                fontSize = 8.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = Color.White
-                            )
-                        }
-                    }
-
-                    // Ligne supérieure : Opérateur + Direction / Azimut
+                    // Ligne 1 : Badges des opérateurs présents sur ce support (Multi-opérateurs) + Direction
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(opColor)
-                                .padding(horizontal = 5.dp, vertical = 1.dp)
+                        // Badges opérateurs
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(3.dp)
                         ) {
-                            Text(
-                                text = tower.operator,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
+                            val opsToShow = if (tower.operators.isNotEmpty()) tower.operators else listOf(
+                                fr.geotower.wear.data.model.WearOperatorSite(operator = tower.operator)
                             )
+                            opsToShow.take(3).forEach { opSite ->
+                                val color = getOperatorColor(opSite.operator)
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(color)
+                                        .padding(horizontal = 4.dp, vertical = 1.dp)
+                                ) {
+                                    Text(
+                                        text = opSite.operator,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+                                }
+                            }
+                            if (opsToShow.size > 3) {
+                                Text(text = "+${opsToShow.size - 3}", fontSize = 8.sp, color = Color.White)
+                            }
                         }
 
+                        // Cap & Azimut
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 text = tower.arrowSymbol,
@@ -160,7 +153,7 @@ fun TowerListScreen(
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colors.primary
                             )
-                            Spacer(Modifier.width(3.dp))
+                            Spacer(Modifier.width(2.dp))
                             Text(
                                 text = "${tower.cardinalDirection} (${tower.bearingDegrees}°)",
                                 fontSize = 9.sp,
@@ -171,7 +164,7 @@ fun TowerListScreen(
 
                     Spacer(Modifier.height(3.dp))
 
-                    // Ligne médiane : Distance & Technologies
+                    // Ligne 2 : Distance & Type de Support physique (comme sur Garmin)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -185,28 +178,32 @@ fun TowerListScreen(
 
                         Text(
                             text = distanceText,
-                            fontSize = 14.sp,
+                            fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
                         )
 
+                        val supDesc = if (tower.supportHeight != null && tower.supportHeight > 0) {
+                            "${tower.supportType} (${tower.supportHeight}m)"
+                        } else {
+                            tower.supportType
+                        }
                         Text(
-                            text = tower.technologies,
-                            fontSize = 10.sp,
-                            color = MaterialTheme.colors.secondary
+                            text = supDesc,
+                            fontSize = 9.sp,
+                            color = Color(0xFFFFB300),
+                            maxLines = 1
                         )
                     }
 
-                    // Bouton fiche détails
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
-                        horizontalArrangement = Arrangement.End
-                    ) {
+                    // Ligne 3 : Adresse ou Commune
+                    if (tower.address.isNotBlank()) {
                         Text(
-                            text = "Fiche détails >",
-                            fontSize = 9.sp,
-                            color = MaterialTheme.colors.primary,
-                            modifier = Modifier.clickable { onOpenDetails(tower) }
+                            text = tower.address,
+                            fontSize = 8.sp,
+                            color = MaterialTheme.colors.onSurfaceVariant,
+                            maxLines = 1,
+                            modifier = Modifier.padding(top = 2.dp)
                         )
                     }
                 }

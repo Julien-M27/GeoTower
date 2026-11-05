@@ -82,18 +82,43 @@ class WearDataLayerClient(private val context: Context) {
 
         for (i in 0 until towersArray.length()) {
             val obj = towersArray.getJSONObject(i)
+            val opName = obj.optString("operator", "Inconnu")
+            val techStr = obj.optString("technologies", "Mobile")
+
+            // Support multi-opérateur si transmis par le smartphone
+            val opList = mutableListOf<fr.geotower.wear.data.model.WearOperatorSite>()
+            if (obj.has("operators")) {
+                val arr = obj.getJSONArray("operators")
+                for (j in 0 until arr.length()) {
+                    val o = arr.getJSONObject(j)
+                    opList.add(
+                        fr.geotower.wear.data.model.WearOperatorSite(
+                            operator = o.optString("name", opName),
+                            technologies = o.optString("tech", techStr),
+                            bands = o.optString("bands", "700, 1800, 2100 MHz")
+                        )
+                    )
+                }
+            } else {
+                opList.add(
+                    fr.geotower.wear.data.model.WearOperatorSite(
+                        operator = opName,
+                        technologies = techStr
+                    )
+                )
+            }
+
             towers.add(
                 WearTower(
                     id = obj.getString("id"),
-                    operator = obj.getString("operator"),
                     distanceMeters = obj.getInt("distanceMeters"),
                     bearingDegrees = obj.getInt("bearingDegrees"),
-                    technologies = obj.optString("technologies", "Mobile"),
                     address = obj.optString("address", ""),
                     latitude = obj.optDouble("latitude", 0.0),
                     longitude = obj.optDouble("longitude", 0.0),
-                    supportType = obj.optString("supportType", "Pylône / Support"),
-                    supportHeight = if (obj.has("supportHeight") && !obj.isNull("supportHeight")) obj.getInt("supportHeight") else null,
+                    supportType = obj.optString("supportType", "Pylône autostable"),
+                    supportHeight = if (obj.has("supportHeight") && !obj.isNull("supportHeight")) obj.getInt("supportHeight") else 35,
+                    operators = opList,
                     source = "phone_db"
                 )
             )

@@ -145,7 +145,7 @@ fun HomeScreen(
             MenuNavigationCard(
                 icon = "🗺️",
                 title = "Carte",
-                subtitle = "Mini-carte tactique Garmin",
+                subtitle = "Mini map",
                 onClick = { onNavigate(WearScreen.MAP) }
             )
         }

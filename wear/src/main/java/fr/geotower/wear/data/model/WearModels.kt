@@ -1,21 +1,49 @@
 package fr.geotower.wear.data.model
 
 /**
- * Modèle unifié d'une antenne relais affichée sur la montre Wear OS.
+ * Détail d'un opérateur / émetteur sur un support physique (comme sur Garmin).
+ */
+data class WearOperatorSite(
+    val operator: String, // "ORANGE", "SFR", "BOUYGUES", "FREE"
+    val technologies: String = "4G / 5G", // "2G / 3G / 4G / 5G"
+    val bands: String = "4G: 700, 1800, 2100 • 5G: 3500 MHz",
+    val azimuths: List<Int> = listOf(0, 120, 240)
+) {
+    val azimuthsString: String
+        get() = if (azimuths.isEmpty()) "Omnidirectionnel (360°)" else azimuths.joinToString(", ") { "$it°" }
+}
+
+/**
+ * Modèle unifié d'un support physique d'antennes relais (comme sur Garmin).
+ * Prend en charge le multi-opérateur (ex: Orange + Free sur le même pylône).
  */
 data class WearTower(
     val id: String,
-    val operator: String,
     val distanceMeters: Int,
     val bearingDegrees: Int,
-    val technologies: String,
     val address: String,
     val latitude: Double,
     val longitude: Double,
-    val supportType: String = "Pylône",
-    val supportHeight: Int? = null,
-    val source: String = "phone_db" // "phone_db" ou "web_api"
+    val supportType: String = "Pylône autostable",
+    val supportHeight: Int? = 35,
+    val operators: List<WearOperatorSite> = emptyList(),
+    val source: String = "auto"
 ) {
+    // Opérateur principal ou de repli
+    val operator: String
+        get() = operators.firstOrNull()?.operator ?: "Inconnu"
+
+    val technologies: String
+        get() = operators.flatMap { it.technologies.split("/", ",") }
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .joinToString(", ")
+            .ifEmpty { "4G / 5G" }
+
+    val operatorNamesSummary: String
+        get() = if (operators.isEmpty()) "Inconnu" else operators.joinToString(" / ") { it.operator }
+
     val cardinalDirection: String
         get() = when (((bearingDegrees + 22) % 360) / 45) {
             0 -> "N"
@@ -89,7 +117,8 @@ enum class WearScreen {
     RADAR,
     MAP,
     SETTINGS,
-    DETAIL,
+    SUPPORT_DETAIL,
+    OPERATOR_DETAIL,
     ABOUT
 }
 

@@ -1,5 +1,6 @@
 package fr.geotower.wear.presentation.screens
 
+import android.graphics.BitmapFactory
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -17,7 +18,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -25,25 +28,32 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.wear.compose.material.CompactChip
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
 import fr.geotower.wear.data.model.GpsFixStatus
 import fr.geotower.wear.data.model.WearTower
+import fr.geotower.wear.data.network.WearWebApiClient
 import fr.geotower.wear.presentation.theme.getOperatorColor
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import okhttp3.Request
 import kotlin.math.cos
+import kotlin.math.ln
 import kotlin.math.sin
+import kotlin.math.tan
 
 /**
- * Écran Carte tactique Garmin pour Wear OS.
- * Affiche la position de la montre au centre, les cercles d'échelle de portée,
- * les antennes relais géolocalisées avec la couleur de leur opérateur et des boutons de zoom (+/-).
+ * Écran Carte avec fond de carte tuilé (Dark Map Tiles) et tracé GPS comme sur Garmin.
  */
 @Composable
 fun MapScreen(
@@ -56,48 +66,155 @@ fun MapScreen(
 ) {
     // Échelle de portée de la carte en mètres : 250m, 500m, 1000m, 2000m, 5000m
     val zoomScales = listOf(250f, 500f, 1000f, 2000f, 5000f)
-    var zoomIndex by remember { mutableStateOf(2) } // 1000m par défaut
+    val tileZooms = listOf(16, 15, 14, 13, 12)
+    var zoomIndex by remember { mutableStateOf(2) } // 1000m (zoom 14) par défaut
     val maxRange = zoomScales[zoomIndex]
+    val tileZoom = tileZooms[zoomIndex]
+
+    // Coordonnées utilisateur
+    val userLat = (gpsStatus as? GpsFixStatus.Fixed)?.latitude ?: towers.firstOrNull()?.latitude ?: 48.005678
+    val userLon = (gpsStatus as? GpsFixStatus.Fixed)?.longitude ?: towers.firstOrNull()?.longitude ?: 0.201598
+
+    // Cache des tuiles de fond de carte
+    val tileCache = remember { mutableStateMapOf<String, ImageBitmap>() }
+
+    // Chargement asynchrone des tuiles de fond de carte (CartoDB Dark Matter / OSM)
+    LaunchedEffect(tileZoom, userLat, userLon) {
+        withContext(Dispatchers.IO) {
+            val n = 1 shl tileZoom
+            val centerTileX = ((userLon + 180.0) / 360.0 * n).toInt()
+            val latRad = Math.toRadians(userLat)
+            val centerTileY = ((1.0 - ln(tan(latRad) + 1.0 / cos(latRad)) / Math.PI) / 2.0 * n).toInt()
+
+            // Télécharge les tuiles 3x3 autour du centre
+            for (dx in -1..1) {
+                for (dy in -1..1) {
+                    val tx = centerTileX + dx
+                    val ty = centerTileY + dy
+                    val key = "$tileZoom/$tx/$ty"
+                    if (!tileCache.containsKey(key)) {
+                        try {
+                            val url = "https://basemaps.cartocdn.com/rastertiles/dark_all/$tileZoom/$tx/$ty.png"
+                            val req = Request.Builder()
+                                .url(url)
+                                .header("User-Agent", "GeoTower-Wear/2.0")
+                                .build()
+                            val resp = WearWebApiClient.okHttpClient.newCall(req).execute()
+                            if (resp.isSuccessful) {
+                                val bytes = resp.body?.bytes()
+                                if (bytes != null) {
+                                    val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                                    if (bmp != null) {
+                                        tileCache[key] = bmp.asImageBitmap()
+                                    }
+                                }
+                            }
+                        } catch (e: Exception) {
+                            // En cas d'absence de réseau, le fond géométrique Canvas prend le relais
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFF0A0E14)),
+            .background(Color(0xFF0F1218)),
         contentAlignment = Alignment.Center
     ) {
-        // Dessin de la carte vectorielle Canvas
         Canvas(modifier = Modifier.fillMaxSize()) {
             val center = Offset(size.width / 2f, size.height / 2f)
             val mapRadius = (size.minDimension / 2f) * 0.74f
 
-            // 1. Cercles de distance concentriques (Garmin Range Rings)
+            // 1. Dessin des tuiles du fond de carte si disponibles
+            val n = 1 shl tileZoom
+            val exactX = ((userLon + 180.0) / 360.0 * n)
+            val latRad = Math.toRadians(userLat)
+            val exactY = ((1.0 - ln(tan(latRad) + 1.0 / cos(latRad)) / Math.PI) / 2.0 * n)
+            val centerTileX = exactX.toInt()
+            val centerTileY = exactY.toInt()
+
+            val tileSizePx = 256f
+            val offsetXInTiles = (exactX - centerTileX) * tileSizePx
+            val offsetYInTiles = (exactY - centerTileY) * tileSizePx
+
+            var drawnAnyTile = false
+            for (dx in -1..1) {
+                for (dy in -1..1) {
+                    val tx = centerTileX + dx
+                    val ty = centerTileY + dy
+                    val key = "$tileZoom/$tx/$ty"
+                    val tile = tileCache[key]
+                    if (tile != null) {
+                        drawnAnyTile = true
+                        val drawX = center.x + (dx * tileSizePx) - offsetXInTiles.toFloat()
+                        val drawY = center.y + (dy * tileSizePx) - offsetYInTiles.toFloat()
+                        drawImage(
+                            image = tile,
+                            dstOffset = IntOffset(drawX.toInt(), drawY.toInt()),
+                            dstSize = IntSize(tileSizePx.toInt(), tileSizePx.toInt())
+                        )
+                    }
+                }
+            }
+
+            // Calque sombre semi-transparent au-dessus des tuiles pour faire ressortir les antennes
+            if (drawnAnyTile) {
+                drawCircle(
+                    color = Color.Black.copy(alpha = 0.35f),
+                    radius = size.minDimension / 2f,
+                    center = center
+                )
+            }
+
+            // 2. Cercles de distance Garmin concentriques
             val ringSteps = 3
             for (step in 1..ringSteps) {
                 val radius = mapRadius * (step / ringSteps.toFloat())
                 drawCircle(
-                    color = Color(0xFF1E2630),
+                    color = Color(0xFF2C3847).copy(alpha = 0.8f),
                     radius = radius,
                     center = center,
                     style = Stroke(width = 1.dp.toPx())
                 )
             }
 
-            // 2. Axes Nord-Sud et Est-Ouest
+            // 3. Axes Nord-Sud et Est-Ouest
             drawLine(
-                color = Color(0xFF1E2630),
+                color = Color(0xFF2C3847).copy(alpha = 0.6f),
                 start = Offset(center.x, center.y - mapRadius),
                 end = Offset(center.x, center.y + mapRadius),
                 strokeWidth = 1.dp.toPx()
             )
             drawLine(
-                color = Color(0xFF1E2630),
+                color = Color(0xFF2C3847).copy(alpha = 0.6f),
                 start = Offset(center.x - mapRadius, center.y),
                 end = Offset(center.x + mapRadius, center.y),
                 strokeWidth = 1.dp.toPx()
             )
 
-            // Indicateur "N" au Nord
-            // 3. Dessin des antennes réparties sur la carte selon leur azimut et distance
+            // 4. Tracé direct (Polyline) de l'utilisateur vers l'antenne sélectionnée
+            val target = selectedTower ?: towers.firstOrNull()
+            if (target != null) {
+                val targetDistFraction = (target.distanceMeters.toFloat() / maxRange).coerceAtMost(1.05f)
+                val targetCanvasDist = mapRadius * targetDistFraction
+                val targetAngleRad = Math.toRadians((target.bearingDegrees - 90).toDouble())
+                val targetPointX = center.x + (targetCanvasDist * cos(targetAngleRad)).toFloat()
+                val targetPointY = center.y + (targetCanvasDist * sin(targetAngleRad)).toFloat()
+                val targetOpColor = getOperatorColor(target.operator)
+
+                // Ligne de liaison Garmin
+                drawLine(
+                    color = targetOpColor.copy(alpha = 0.9f),
+                    start = center,
+                    end = Offset(targetPointX, targetPointY),
+                    strokeWidth = 2.dp.toPx()
+                )
+            }
+
+            // 5. Marqueurs des antennes relais spatialisées
             towers.forEach { tower ->
                 val distFraction = (tower.distanceMeters.toFloat() / maxRange).coerceAtMost(1.05f)
                 val canvasDist = mapRadius * distFraction
@@ -105,26 +222,26 @@ fun MapScreen(
                 val pointX = center.x + (canvasDist * cos(angleRad)).toFloat()
                 val pointY = center.y + (canvasDist * sin(angleRad)).toFloat()
                 val opColor = getOperatorColor(tower.operator)
-                val isSelected = selectedTower?.id == tower.id
+                val isSelected = target?.id == tower.id
 
                 // Point antenne
                 drawCircle(
                     color = opColor,
-                    radius = if (isSelected) 5.dp.toPx() else 3.5.dp.toPx(),
+                    radius = if (isSelected) 5.5.dp.toPx() else 4.dp.toPx(),
                     center = Offset(pointX, pointY)
                 )
 
                 if (isSelected) {
                     drawCircle(
                         color = Color.White,
-                        radius = 8.dp.toPx(),
+                        radius = 8.5.dp.toPx(),
                         center = Offset(pointX, pointY),
                         style = Stroke(width = 1.5.dp.toPx())
                     )
                 }
             }
 
-            // 4. Position de l'utilisateur (Montre) au centre
+            // 6. Marqueur Position Utilisateur (Moi)
             drawCircle(
                 color = Color(0xFF007AFF),
                 radius = 5.dp.toPx(),
@@ -137,116 +254,120 @@ fun MapScreen(
             )
         }
 
-        // Éléments d'interface superposés
+        // Éléments d'interface superposés (Bandeaux style Garmin)
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 8.dp, vertical = 4.dp),
+                .padding(horizontal = 6.dp, vertical = 2.dp),
             verticalArrangement = Arrangement.SpaceBetween,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Haut : Titre Carte + Échelle de portée (Zoom)
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
+            // Bandeau supérieur style Garmin (Opérateurs • Distance • Échelle)
+            val activeTower = selectedTower ?: towers.firstOrNull()
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth(0.65f)
-                    .padding(top = 30.dp)
+                    .fillMaxWidth(0.74f)
+                    .padding(top = 26.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color.Black.copy(alpha = 0.85f))
+                    .padding(horizontal = 6.dp, vertical = 3.dp)
             ) {
-                Text(
-                    text = "Carte",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colors.primary
-                )
-                Text(
-                    text = if (maxRange >= 1000f) "${(maxRange / 1000).toInt()} km" else "${maxRange.toInt()} m",
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF30D158)
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = activeTower?.operatorNamesSummary ?: "Carte",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colors.primary,
+                        maxLines = 1
+                    )
+                    Text(
+                        text = if (maxRange >= 1000f) "${(maxRange / 1000).toInt()} km" else "${maxRange.toInt()} m",
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF30D158)
+                    )
+                }
             }
 
             Spacer(Modifier.weight(1f))
 
-            // Bas : Commandes de zoom Garmin (+ / -) et Antenne sélectionnée
+            // Bas : Commandes de zoom Garmin (+ / -) et Support sélectionné
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center,
                 modifier = Modifier
-                    .fillMaxWidth(0.72f)
-                    .padding(bottom = 26.dp)
+                    .fillMaxWidth(0.74f)
+                    .padding(bottom = 22.dp)
             ) {
                 // Zoom Moins
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
-                        .size(32.dp)
+                        .size(30.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFF2C2C2E))
+                        .background(Color(0xFF2C2C2E).copy(alpha = 0.9f))
                         .clickable(enabled = zoomIndex < zoomScales.lastIndex) {
                             if (zoomIndex < zoomScales.lastIndex) zoomIndex++
                         }
                 ) {
                     Text(
                         text = "−",
-                        fontSize = 16.sp,
+                        fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
                         color = if (zoomIndex < zoomScales.lastIndex) Color.White else Color(0xFF555555)
                     )
                 }
 
-                Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(8.dp))
 
-                // Carte résumé antenne verrouillée
-                if (selectedTower != null) {
+                // Cartouche central : Support et distance
+                if (activeTower != null) {
                     Box(
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0xFF1C1C1E).copy(alpha = 0.92f))
-                            .clickable { onOpenDetails(selectedTower) }
+                            .background(Color.Black.copy(alpha = 0.85f))
+                            .clickable { onOpenDetails(activeTower) }
                             .padding(horizontal = 6.dp, vertical = 3.dp)
                     ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
                             Text(
-                                text = "${selectedTower.operator} • ${selectedTower.distanceMeters}m",
+                                text = "${activeTower.distanceMeters} m • ${activeTower.cardinalDirection} (${activeTower.bearingDegrees}°)",
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White,
                                 maxLines = 1
                             )
                             Text(
-                                text = "${selectedTower.cardinalDirection} ${selectedTower.bearingDegrees}°",
+                                text = activeTower.supportType,
                                 fontSize = 8.sp,
-                                color = MaterialTheme.colors.primary
+                                color = Color(0xFFFFB300),
+                                maxLines = 1
                             )
                         }
                     }
-                } else {
-                    Text(
-                        text = "${towers.size} antennes",
-                        fontSize = 9.sp,
-                        color = MaterialTheme.colors.onSurfaceVariant
-                    )
                 }
 
-                Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(8.dp))
 
                 // Zoom Plus
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
-                        .size(32.dp)
+                        .size(30.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFF2C2C2E))
+                        .background(Color(0xFF2C2C2E).copy(alpha = 0.9f))
                         .clickable(enabled = zoomIndex > 0) {
                             if (zoomIndex > 0) zoomIndex--
                         }
                 ) {
                     Text(
                         text = "+",
-                        fontSize = 16.sp,
+                        fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
                         color = if (zoomIndex > 0) Color.White else Color(0xFF555555)
                     )
