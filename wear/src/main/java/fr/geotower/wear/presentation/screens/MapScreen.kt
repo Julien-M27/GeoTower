@@ -252,18 +252,9 @@ fun MapScreen(
                 // Point antenne
                 drawCircle(
                     color = opColor,
-                    radius = if (isSelected) 5.5.dp.toPx() else 4.dp.toPx(),
+                    radius = if (isSelected) 5.dp.toPx() else 4.dp.toPx(),
                     center = Offset(pointX, pointY)
                 )
-
-                if (isSelected) {
-                    drawCircle(
-                        color = Color.White,
-                        radius = 8.5.dp.toPx(),
-                        center = Offset(pointX, pointY),
-                        style = Stroke(width = 1.5.dp.toPx())
-                    )
-                }
             }
 
             // 6. Marqueur Position Utilisateur (Moi)
@@ -287,15 +278,16 @@ fun MapScreen(
             verticalArrangement = Arrangement.SpaceBetween,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Bandeau supérieur style Garmin (Opérateurs • Distance • Échelle)
+            // Bandeau supérieur style Garmin (Opérateurs • Bascule OSM/RADAR • Échelle)
+            // Centré et ajusté pour ne pas être tronqué par le haut de l'écran circulaire
             val activeTower = selectedTower ?: towers.firstOrNull()
             Box(
                 modifier = Modifier
-                    .fillMaxWidth(0.85f)
-                    .padding(top = 24.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color.Black.copy(alpha = 0.85f))
-                    .padding(horizontal = 6.dp, vertical = 3.dp)
+                    .fillMaxWidth(0.68f)
+                    .padding(top = 38.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color.Black.copy(alpha = 0.88f))
+                    .padding(horizontal = 8.dp, vertical = 3.dp)
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -304,7 +296,7 @@ fun MapScreen(
                 ) {
                     Text(
                         text = activeTower?.let { getOperatorShortName(it.operator) } ?: "Mini map",
-                        fontSize = 10.sp,
+                        fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colors.primary,
                         maxLines = 1,
@@ -319,7 +311,7 @@ fun MapScreen(
                             .clip(RoundedCornerShape(4.dp))
                             .background(if (isOsmMapEnabled) Color(0xFF007AFF) else Color(0xFF333333))
                             .clickable { isOsmMapEnabled = !isOsmMapEnabled }
-                            .padding(horizontal = 5.dp, vertical = 1.dp)
+                            .padding(horizontal = 4.dp, vertical = 1.dp)
                     ) {
                         Text(
                             text = if (isOsmMapEnabled) "OSM" else "RADAR",
@@ -333,7 +325,7 @@ fun MapScreen(
 
                     Text(
                         text = if (maxRange >= 1000f) "${(maxRange / 1000).toInt()} km" else "${maxRange.toInt()} m",
-                        fontSize = 9.sp,
+                        fontSize = 8.5.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF30D158)
                     )
@@ -343,80 +335,91 @@ fun MapScreen(
             Spacer(Modifier.weight(1f))
 
             // Bas : Commandes de zoom Garmin (+ / -) et Support sélectionné
+            // Espacé et surélevé pour être entièrement visible au-dessus du bord inférieur circulaire
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center,
                 modifier = Modifier
-                    .fillMaxWidth(0.74f)
+                    .fillMaxWidth(0.82f)
                     .padding(bottom = 22.dp)
             ) {
                 // Zoom Moins
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
-                        .size(30.dp)
+                        .size(26.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFF2C2C2E).copy(alpha = 0.9f))
+                        .background(Color(0xFF2C2C2E).copy(alpha = 0.95f))
                         .clickable(enabled = zoomIndex < zoomScales.lastIndex) {
                             if (zoomIndex < zoomScales.lastIndex) zoomIndex++
                         }
                 ) {
                     Text(
                         text = "−",
-                        fontSize = 15.sp,
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
-                        color = if (zoomIndex < zoomScales.lastIndex) Color.White else Color(0xFF555555)
+                        color = if (zoomIndex < zoomScales.lastIndex) Color.White else Color(0xFF666666)
                     )
                 }
 
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(6.dp))
 
-                // Cartouche central : Support et distance
+                // Cartouche central : Support, distance et azimut (sans coupure)
                 if (activeTower != null) {
                     Box(
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(8.dp))
-                            .background(Color.Black.copy(alpha = 0.85f))
+                            .background(Color.Black.copy(alpha = 0.90f))
                             .clickable { onOpenDetails(activeTower) }
-                            .padding(horizontal = 6.dp, vertical = 3.dp)
+                            .padding(horizontal = 5.dp, vertical = 3.dp)
                     ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
                             Text(
                                 text = "${activeTower.distanceMeters} m • ${activeTower.cardinalDirection} (${activeTower.bearingDegrees}°)",
-                                fontSize = 9.sp,
+                                fontSize = 8.5.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White,
-                                maxLines = 1
+                                maxLines = 1,
+                                softWrap = false
                             )
+                            val supDesc = if (activeTower.supportHeight != null && activeTower.supportHeight > 0) {
+                                "${activeTower.supportType} (${activeTower.supportHeight}m)"
+                            } else {
+                                activeTower.supportType
+                            }
                             Text(
-                                text = activeTower.supportType,
-                                fontSize = 8.sp,
+                                text = supDesc,
+                                fontSize = 7.5.sp,
                                 color = Color(0xFFFFB300),
-                                maxLines = 1
+                                maxLines = 1,
+                                softWrap = false
                             )
                         }
                     }
                 }
 
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(6.dp))
 
                 // Zoom Plus
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
-                        .size(30.dp)
+                        .size(26.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFF2C2C2E).copy(alpha = 0.9f))
+                        .background(Color(0xFF2C2C2E).copy(alpha = 0.95f))
                         .clickable(enabled = zoomIndex > 0) {
                             if (zoomIndex > 0) zoomIndex--
                         }
                 ) {
                     Text(
                         text = "+",
-                        fontSize = 15.sp,
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
-                        color = if (zoomIndex > 0) Color.White else Color(0xFF555555)
+                        color = if (zoomIndex > 0) Color.White else Color(0xFF666666)
                     )
                 }
             }

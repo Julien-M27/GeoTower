@@ -1,6 +1,7 @@
 package fr.geotower.wear.presentation.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -91,12 +92,13 @@ fun OperatorDetailScreen(
             )
         }
 
-        // Section 2 : Fréquences & Bandes actives
+        // Section 2 : Fréquences & Bandes actives (défilement continu Marquee comme sur Garmin)
         item {
             OperatorDetailCard(
                 title = "Fréquences actives",
                 value = operatorSite.bands,
-                accentColor = Color.White
+                accentColor = Color.White,
+                isMarquee = true
             )
         }
 
@@ -105,7 +107,8 @@ fun OperatorDetailScreen(
             OperatorDetailCard(
                 title = "Secteurs ANFR",
                 value = operatorSite.azimuthsString,
-                accentColor = Color(0xFF30D158) // Vert cap Garmin
+                accentColor = Color(0xFF30D158), // Vert cap Garmin
+                isMarquee = true
             )
         }
 
@@ -119,7 +122,8 @@ fun OperatorDetailScreen(
             OperatorDetailCard(
                 title = "Support physique",
                 value = supDesc,
-                accentColor = MaterialTheme.colors.onSurfaceVariant
+                accentColor = MaterialTheme.colors.onSurfaceVariant,
+                isMarquee = true
             )
         }
 
@@ -164,6 +168,7 @@ private fun OperatorDetailCard(
     title: String,
     value: String,
     accentColor: Color,
+    isMarquee: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     Box(
@@ -184,7 +189,10 @@ private fun OperatorDetailCard(
                 text = value,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = accentColor
+                color = accentColor,
+                maxLines = if (isMarquee) 1 else 3,
+                softWrap = !isMarquee,
+                modifier = if (isMarquee) Modifier.basicMarquee(iterations = Int.MAX_VALUE) else Modifier
             )
         }
     }
