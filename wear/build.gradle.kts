@@ -25,11 +25,12 @@ android {
         // Google Play exige un versionCode unique pour chaque artefact sous le même applicationId.
         // Mobile utilise 114, Automotive utilise 10114 (offset 10 000), Wear OS utilise 20114 (offset 20 000).
         versionCode = 20114
-        versionName = "2.1.11"
+        versionName = "2.0.1"
     }
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     lint {

@@ -3,6 +3,7 @@ package fr.geotower.wear.data.network
 import android.location.Location
 import android.util.Log
 import com.google.gson.annotations.SerializedName
+import fr.geotower.wear.BuildConfig
 import fr.geotower.wear.data.model.WearOperatorSite
 import fr.geotower.wear.data.model.WearTower
 import kotlinx.coroutines.Dispatchers
@@ -57,7 +58,7 @@ object WearWebApiClient {
         .callTimeout(20, TimeUnit.SECONDS)
         .addInterceptor { chain ->
             val req = chain.request().newBuilder()
-                .header("User-Agent", "GeoTower-WearOS/2.1.11")
+                .header("User-Agent", "GeoTower-WearOS/${BuildConfig.VERSION_NAME}")
                 .header("Accept", "application/json")
                 .build()
             chain.proceed(req)

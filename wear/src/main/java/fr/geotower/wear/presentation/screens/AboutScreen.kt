@@ -33,6 +33,7 @@ import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material.CompactChip
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
+import fr.geotower.wear.BuildConfig
 
 @Composable
 fun AboutScreen(
@@ -80,7 +81,7 @@ fun AboutScreen(
                     color = MaterialTheme.colors.primary
                 )
                 Text(
-                    text = "v2.0.0 • Wear OS Edition",
+                    text = "v${BuildConfig.VERSION_NAME} • Wear OS Edition",
                     fontSize = 10.sp,
                     color = Color(0xFFAAAAAA)
                 )
@@ -109,7 +110,7 @@ fun AboutScreen(
         // Section Nouveautés
         item {
             Text(
-                text = "NOUVEAUTÉS v2.0.0",
+                text = "NOUVEAUTÉS v${BuildConfig.VERSION_NAME}",
                 fontSize = 9.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colors.primary,

@@ -33,6 +33,7 @@ import androidx.wear.compose.material.CompactChip
 import androidx.wear.compose.material.Icon
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
+import fr.geotower.wear.BuildConfig
 import fr.geotower.wear.data.model.DataSourceMode
 import fr.geotower.wear.data.model.GpsFixStatus
 import fr.geotower.wear.data.model.GpsRefreshInterval
@@ -261,7 +262,7 @@ fun SettingsScreen(
                 },
                 secondaryLabel = {
                     Text(
-                        text = "GeoTower Wear OS v2.0",
+                        text = "GeoTower Wear OS v${BuildConfig.VERSION_NAME}",
                         fontSize = 9.sp,
                         color = MaterialTheme.colors.onSurfaceVariant
                     )
