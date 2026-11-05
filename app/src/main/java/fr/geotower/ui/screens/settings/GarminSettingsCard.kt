@@ -256,20 +256,29 @@ fun GarminSettingsCard(
                     }
 
                     val timerText = remember(isBgEnabled, selectedDuration, startTime, now) {
-                        if (!isBgEnabled || startTime <= 0L) null
-                        else if (selectedDuration == 0L) {
-                            val elapsedSec = maxOf(0L, (now - startTime) / 1000L)
-                            val h = elapsedSec / 3600
-                            val m = (elapsedSec % 3600) / 60
-                            val s = elapsedSec % 60
-                            String.format(java.util.Locale.ROOT, "⏱️ Chrono : %02d:%02d:%02d (Illimité)", h, m, s)
+                        if (isBgEnabled) {
+                            val start = if (startTime > 0L) startTime else now
+                            if (selectedDuration == 0L) {
+                                val elapsedSec = maxOf(0L, (now - start) / 1000L)
+                                val h = elapsedSec / 3600
+                                val m = (elapsedSec % 3600) / 60
+                                val s = elapsedSec % 60
+                                String.format(java.util.Locale.ROOT, "⏱️ Chrono : %02d:%02d:%02d (Illimité)", h, m, s)
+                            } else {
+                                val remainingSec = maxOf(0L, ((start + selectedDuration) - now) / 1000L)
+                                val h = remainingSec / 3600
+                                val m = (remainingSec % 3600) / 60
+                                val s = remainingSec % 60
+                                val totalHours = selectedDuration / 3600000L
+                                String.format(java.util.Locale.ROOT, "⏳ Décompte : %02d:%02d:%02d restant(s) (sur %dh)", h, m, s, totalHours)
+                            }
                         } else {
-                            val remainingSec = maxOf(0L, ((startTime + selectedDuration) - now) / 1000L)
-                            val h = remainingSec / 3600
-                            val m = (remainingSec % 3600) / 60
-                            val s = remainingSec % 60
-                            val totalHours = selectedDuration / 3600000L
-                            String.format(java.util.Locale.ROOT, "⏳ Décompte : %02d:%02d:%02d restant(s) sur %dh", h, m, s, totalHours)
+                            if (selectedDuration == 0L) {
+                                "⏱️ Chrono : 00:00:00 (en attente d'activation)"
+                            } else {
+                                val totalHours = selectedDuration / 3600000L
+                                String.format(java.util.Locale.ROOT, "⏳ Décompte : %02d:00:00 (démarrera à l'activation)", totalHours)
+                            }
                         }
                     }
 
@@ -330,19 +339,18 @@ fun GarminSettingsCard(
                             }
 
                             // Compteur ou information de durée
-                            Spacer(Modifier.height(sizing.spacing(4.dp)))
-                            if (timerText != null) {
+                            Spacer(Modifier.height(sizing.spacing(6.dp)))
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = if (isBgEnabled) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else MaterialTheme.colorScheme.surfaceVariant,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
                                 Text(
                                     text = timerText,
-                                    style = MaterialTheme.typography.labelSmall,
+                                    style = MaterialTheme.typography.bodySmall,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            } else {
-                                Text(
-                                    text = if (selectedDuration == 0L) "⏱️ Durée : Illimité" else "⏱️ Durée : ${selectedDuration / 3600000L}h avant coupure automatique",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                                    color = if (isBgEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = sizing.spacing(10.dp), vertical = sizing.spacing(6.dp))
                                 )
                             }
                         }
