@@ -61,8 +61,12 @@ class WearDataLayerClient(private val context: Context) {
             messageClient.sendMessage(phoneNode.id, PATH_REQUEST_NEARBY, requestJson.toByteArray(Charsets.UTF_8)).await()
             Log.d(TAG, "Requête envoyée au téléphone (${phoneNode.displayName}, id=${phoneNode.id})")
 
-            val rawResponse = withTimeout(TIMEOUT_MS) {
-                responseDeferred.await()
+            val rawResponse = try {
+                withTimeout(TIMEOUT_MS) {
+                    responseDeferred.await()
+                }
+            } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+                throw RuntimeException("Le smartphone ne répond pas. Assurez-vous que GeoTower y est installé et à jour.")
             }
 
             return@withContext parsePhoneResponse(rawResponse)
