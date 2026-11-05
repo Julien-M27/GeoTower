@@ -68,8 +68,9 @@ sealed interface GpsFixStatus {
 }
 
 enum class WearScreen {
-    RADAR,
+    HOME,
     LIST,
+    RADAR,
     SETTINGS,
     DETAIL
 }

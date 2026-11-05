@@ -50,7 +50,8 @@ fun TowerListScreen(
 
     ScalingLazyColumn(
         state = listState,
-        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 26.dp),
+        autoCentering = null,
+        contentPadding = PaddingValues(start = 8.dp, top = 20.dp, end = 8.dp, bottom = 26.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
         modifier = modifier.fillMaxSize().background(Color.Black)
     ) {
@@ -60,7 +61,7 @@ fun TowerListScreen(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp)
             ) {
                 Text(
-                    text = "📋 Liste de proximité",
+                    text = "📡 Antennes à proximité",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colors.primary

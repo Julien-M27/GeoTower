@@ -62,15 +62,13 @@ class WatchGpsEngine(private val context: Context) {
     private val fusedCallback = object : LocationCallback() {
         override fun onLocationResult(result: LocationResult) {
             val loc = result.lastLocation ?: return
-            // Si le GPS matériel n'a pas encore fait de fix, on peut accepter la position haute précision
-            if (_gpsStatus.value !is GpsFixStatus.Fixed) {
-                _gpsStatus.value = GpsFixStatus.Fixed(
-                    latitude = loc.latitude,
-                    longitude = loc.longitude,
-                    accuracyMeters = loc.accuracy,
-                    provider = "Haute précision (${loc.provider})"
-                )
-            }
+            Log.d(TAG, "Fix GPS montre reçu (fused) : ${loc.latitude}, ${loc.longitude} (±${loc.accuracy}m)")
+            _gpsStatus.value = GpsFixStatus.Fixed(
+                latitude = loc.latitude,
+                longitude = loc.longitude,
+                accuracyMeters = loc.accuracy,
+                provider = "GPS Montre"
+            )
         }
     }
 
@@ -128,6 +126,18 @@ class WatchGpsEngine(private val context: Context) {
 
         // 2. Client Fused en parallèle avec haute précision matérielle pour assister l'acquisition
         try {
+            fusedClient.lastLocation.addOnSuccessListener { loc ->
+                if (loc != null && _gpsStatus.value !is GpsFixStatus.Fixed) {
+                    Log.d(TAG, "Dernière position connue montre lue : ${loc.latitude}, ${loc.longitude}")
+                    _gpsStatus.value = GpsFixStatus.Fixed(
+                        latitude = loc.latitude,
+                        longitude = loc.longitude,
+                        accuracyMeters = loc.accuracy,
+                        provider = "GPS Montre (récent)"
+                    )
+                }
+            }
+
             val fusedRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 2000L)
                 .setMinUpdateIntervalMillis(1000L)
                 .setMinUpdateDistanceMeters(1f)

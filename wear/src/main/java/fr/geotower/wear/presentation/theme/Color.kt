@@ -14,7 +14,7 @@ val WearTextSecondary = Color(0xFF8E8E93)
 val ColorOrange = Color(0xFFFF7900)
 val ColorSfr = Color(0xFFE2001A)
 val ColorBouygues = Color(0xFF009FE3)
-val ColorFree = Color(0xFFE53935)
+val ColorFree = Color(0xFF757575)
 val ColorUnknown = Color(0xFF8E8E93)
 
 fun getOperatorColor(operatorName: String): Color {

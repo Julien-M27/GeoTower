@@ -153,24 +153,24 @@ fun RadarCompassScreen(
             verticalArrangement = Arrangement.SpaceBetween,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Haut : Indicateurs rapides (Source & Fix GPS)
+            // Haut : Titre Boussole + Statut GPS
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 10.dp)
+                    .padding(top = 18.dp)
             ) {
                 Text(
-                    text = dataSourceMode.shortLabel,
-                    fontSize = 10.sp,
+                    text = "🧭 Boussole",
+                    fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colors.primary
                 )
                 Text(
                     text = when (gpsStatus) {
                         is GpsFixStatus.Fixed -> "Fix ±${gpsStatus.accuracyMeters.toInt()}m"
-                        is GpsFixStatus.Searching -> "Fix en cours..."
+                        is GpsFixStatus.Searching -> "Fix..."
                         is GpsFixStatus.Error -> "Pas de GPS"
                     },
                     fontSize = 9.sp,

@@ -45,7 +45,8 @@ fun TowerDetailScreen(
 
     ScalingLazyColumn(
         state = listState,
-        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 26.dp),
+        autoCentering = null,
+        contentPadding = PaddingValues(start = 10.dp, top = 20.dp, end = 10.dp, bottom = 26.dp),
         verticalArrangement = Arrangement.spacedBy(5.dp),
         modifier = modifier.fillMaxSize().background(Color.Black)
     ) {
