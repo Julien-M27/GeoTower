@@ -3502,6 +3502,7 @@
     <string name="appstrings_release_v218_summary_garmin_switch_ui_styling">Visual harmonization of the Garmin smartwatch link switch with the app design system (One UI and Material styles)</string>
     <string name="appstrings_release_v219_summary_garmin_notification_access_and_continuous_mode">Direct access to Garmin settings from the persistent notification, continuous background operation, and connection log improvements</string>
     <string name="appstrings_release_v2110_summary_garmin_duration_selector_and_countdown">Duration selector (unlimited, 1h, 2h, 4h, 8h) with live countdown and auto-stop for Garmin smartwatch background connection</string>
+    <string name="appstrings_release_v2111_summary_garmin_timer_permanent_preview_and_timer_reset">Permanent display and preview of the Garmin smartwatch timer/countdown (active and standby states) and timer reset on duration change</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Network requests log</string>

@@ -3481,6 +3481,7 @@
     <string name="appstrings_release_v218_summary_garmin_switch_ui_styling">Harmonisation visuelle de l\'interrupteur de liaison montre Garmin avec la charte graphique de l\'application (styles One UI et Material)</string>
     <string name="appstrings_release_v219_summary_garmin_notification_access_and_continuous_mode">Accès direct aux réglages Garmin depuis la notification persistante, fonctionnement continu en arrière-plan et amélioration du journal de liaison</string>
     <string name="appstrings_release_v2110_summary_garmin_duration_selector_and_countdown">Sélecteur de durée (Illimité, 1h, 2h, 4h, 8h) avec décompte en direct et coupure automatique pour la liaison montre Garmin écran éteint</string>
+    <string name="appstrings_release_v2111_summary_garmin_timer_permanent_preview_and_timer_reset">Affichage permanent et aperçu du chronomètre/décompte montre Garmin (état actif et en attente) avec réinitialisation lors du changement de durée</string>
 
     <!-- Journal des requêtes réseau -->
     <string name="network_log_title">Journal des requêtes réseau</string>

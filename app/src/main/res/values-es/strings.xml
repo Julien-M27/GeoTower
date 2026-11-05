@@ -3479,6 +3479,7 @@
     <string name="appstrings_release_v218_summary_garmin_switch_ui_styling">Armonización visual del interruptor de enlace con el reloj Garmin con el diseño de la aplicación (estilos One UI y Material)</string>
     <string name="appstrings_release_v219_summary_garmin_notification_access_and_continuous_mode">Acceso directo a los ajustes de Garmin desde la notificación persistente, funcionamiento continuo en segundo plano y mejoras en el registro de conexión</string>
     <string name="appstrings_release_v2110_summary_garmin_duration_selector_and_countdown">Selector de duración (ilimitado, 1h, 2h, 4h, 8h) con cuenta atrás en directo y parada automática para el enlace en segundo plano con el reloj Garmin</string>
+    <string name="appstrings_release_v2111_summary_garmin_timer_permanent_preview_and_timer_reset">Visualización permanente y vista previa del cronómetro/cuenta atrás del reloj Garmin (estados activo y en espera) con reinicio al cambiar la duración</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registro de solicitudes de red</string>

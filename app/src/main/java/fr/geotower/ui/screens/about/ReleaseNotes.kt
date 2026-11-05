@@ -32,7 +32,7 @@ internal data class ReleaseNoteItem(
 @Composable
 internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
     section(stringResource(R.string.appstrings_release_section_settings)) {
-        item(stringResource(R.string.appstrings_release_v2110_summary_garmin_duration_selector_and_countdown))
+        item(stringResource(R.string.appstrings_release_v2111_summary_garmin_timer_permanent_preview_and_timer_reset))
     }
 }
 
