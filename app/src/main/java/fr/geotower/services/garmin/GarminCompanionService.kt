@@ -75,6 +75,10 @@ class GarminCompanionService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         AppFileLog.i("GarminBridge", "GarminCompanionService arrêté")
+        if (GarminCompanionManager.isBackgroundServiceEnabled.value) {
+            AppFileLog.i("GarminBridge", "Relance automatique du service GarminCompanionService (mode illimité)")
+            start(applicationContext)
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -99,6 +103,9 @@ class GarminCompanionService : Service() {
 
     private fun buildNotification(): Notification {
         val tapIntent = Intent(this, MainActivity::class.java).apply {
+            action = "ACTION_SHOW_GARMIN_SETTINGS"
+            putExtra("widget_dest", "garmin")
+            data = android.net.Uri.parse("geotower://settings?section=garmin")
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
         val pendingIntent = PendingIntent.getActivity(
@@ -110,7 +117,8 @@ class GarminCompanionService : Service() {
 
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("GeoTower • Montre Garmin")
-            .setContentText("Liaison active (écran éteint)")
+            .setContentText("Liaison active • Durée illimitée (écran éteint)")
+            .setSubText("En continu")
             .setContentIntent(pendingIntent)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true)

@@ -906,6 +906,17 @@ fun SettingsScreen(
                     "preference_profiles" -> showPreferenceProfilesSheet = true
                 }
             }
+            "garmin", "garmin_companion" -> {
+                kotlinx.coroutines.delay(200)
+                activeSectionIndex = SECTION_SYSTEM
+                if (useSectionsHome) {
+                    openedSection = SECTION_SYSTEM
+                } else if (navMode == 0 || !isWideScreen) {
+                    sectionBringIntoViewRequesters[SECTION_SYSTEM].bringIntoView()
+                    kotlinx.coroutines.delay(80)
+                    alignAnchorToViewportTop(sectionRootPositions[SECTION_SYSTEM])
+                }
+            }
         }
     }
 
@@ -1772,6 +1783,7 @@ fun SettingsScreen(
                                     databaseCardModifiers = databaseCardAnchorModifiers,
                                     databaseRefreshState = databaseRefreshState,
                                     initialOpenDisclosure = initialSection == "background_disclosure",
+                                    initialOpenGarminDialog = initialSection == "garmin" || initialSection == "garmin_companion",
                                     openDisclosure = triggerBgDisclosure,
                                     onDisclosureDismissed = {
                                         triggerBgDisclosure = false
@@ -1894,6 +1906,7 @@ fun SettingsScreen(
                                         onOpenDiagnostic = { navController.navigate("diagnostic") },
                                         onOpenNetworkLog = { navController.navigate("network_log") },
                                         initialOpenDisclosure = initialSection == "background_disclosure",
+                                        initialOpenGarminDialog = initialSection == "garmin" || initialSection == "garmin_companion",
                                         openDisclosure = triggerBgDisclosure,
                                         onDisclosureDismissed = {
                                             triggerBgDisclosure = false
@@ -3083,6 +3096,7 @@ fun AllSettingsContent(
     databaseCardModifiers: Map<String, Modifier> = emptyMap(),
     databaseRefreshState: DatabaseRefreshState? = null,
     initialOpenDisclosure: Boolean = false,
+    initialOpenGarminDialog: Boolean = false,
     openDisclosure: Boolean = false,
     onDisclosureDismissed: () -> Unit = {},
     onDisclosureAccepted: () -> Unit = {},
@@ -3126,6 +3140,7 @@ fun AllSettingsContent(
             ctx, shape, border, bubbleColor, useOneUi, safeClick, onOpenDiagnostic,
             onOpenNetworkLog = onOpenNetworkLog,
             initialOpenDisclosure = initialOpenDisclosure,
+            initialOpenGarminDialog = initialOpenGarminDialog,
             openDisclosure = openDisclosure,
             onDisclosureDismissed = onDisclosureDismissed,
             onDisclosureAccepted = onDisclosureAccepted,
@@ -3914,6 +3929,7 @@ fun SectionSysteme(
     onOpenDiagnostic: () -> Unit = {},
     onOpenNetworkLog: () -> Unit = {},
     initialOpenDisclosure: Boolean = false,
+    initialOpenGarminDialog: Boolean = false,
     openDisclosure: Boolean = false,
     onDisclosureDismissed: () -> Unit = {},
     onDisclosureAccepted: () -> Unit = {},
@@ -4201,7 +4217,8 @@ fun SectionSysteme(
         shape = shape,
         border = border,
         bubbleColor = bubbleColor,
-        useOneUi = useOneUi
+        useOneUi = useOneUi,
+        initialOpenDialog = initialOpenGarminDialog
     )
 }
 

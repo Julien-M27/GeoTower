@@ -540,6 +540,8 @@ class MainActivity : ComponentActivity() {
             navigateToSiteFlow.tryEmit("emitters")
         } else if (widgetDest == "bg_location_disclosure" || intent.action == "ACTION_SHOW_BG_LOCATION_DISCLOSURE") {
             navigateToSiteFlow.tryEmit("settings?section=background_disclosure")
+        } else if (widgetDest == "garmin" || intent.action == "ACTION_SHOW_GARMIN_SETTINGS" || intent.data?.getQueryParameter("section") == "garmin") {
+            navigateToSiteFlow.tryEmit("settings?section=garmin")
         }
     }
 
@@ -774,6 +776,8 @@ class MainActivity : ComponentActivity() {
             "map"
         } else if (widgetDest == "bg_location_disclosure" || intent.action == "ACTION_SHOW_BG_LOCATION_DISCLOSURE") {
             "settings?section=background_disclosure"
+        } else if (widgetDest == "garmin" || intent.action == "ACTION_SHOW_GARMIN_SETTINGS" || intent.data?.getQueryParameter("section") == "garmin") {
+            "settings?section=garmin"
         } else if (assistantFeature != null) {
             "map" // 🗺️ Téléportation directe sur la carte si demandé par la voix !
         } else {

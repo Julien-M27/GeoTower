@@ -7,8 +7,10 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -51,6 +53,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -65,14 +68,21 @@ fun GarminSettingsCard(
     border: BorderStroke?,
     bubbleColor: Color,
     useOneUi: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    initialOpenDialog: Boolean = false
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
     val cardBg = if (useOneUi) bubbleColor else Color.Transparent
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
 
-    var showDialog by remember { mutableStateOf(false) }
+    var showDialog by remember(initialOpenDialog) { mutableStateOf(initialOpenDialog) }
+
+    androidx.compose.runtime.LaunchedEffect(initialOpenDialog) {
+        if (initialOpenDialog) {
+            showDialog = true
+        }
+    }
 
     val isGcmInstalled = remember { GarminCompanionManager.isGarminConnectInstalled(context) }
     val isReady by GarminCompanionManager.isSdkReady.collectAsStateWithLifecycle()
@@ -86,6 +96,15 @@ fun GarminSettingsCard(
     // Lecture du journal persistant sur disque (conserve les plantages précédents même après redémarrage de l'app)
     var diskLogText by remember(showDialog) {
         mutableStateOf(if (showDialog) AppFileLog.readText(context) else "")
+    }
+
+    androidx.compose.runtime.LaunchedEffect(showDialog) {
+        if (showDialog) {
+            diskLogText = AppFileLog.readText(context)
+            if (isGcmInstalled) {
+                GarminCompanionManager.refreshConnectedDevices()
+            }
+        }
     }
 
     val diskCrash = remember(diskLogText) {
@@ -227,31 +246,37 @@ fun GarminSettingsCard(
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = sizing.spacing(12.dp), vertical = sizing.spacing(8.dp)),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column(modifier = Modifier.weight(1f).padding(end = sizing.spacing(12.dp))) {
-                                Text(
-                                    text = "Liaison écran éteint",
-                                    style = sizing.textStyle(MaterialTheme.typography.titleSmall),
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Text(
-                                    text = "Répondre avec le téléphone dans la poche",
-                                    style = sizing.textStyle(MaterialTheme.typography.bodySmall),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = sizing.spacing(12.dp), vertical = sizing.spacing(8.dp))) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(modifier = Modifier.weight(1f).padding(end = sizing.spacing(12.dp))) {
+                                    Text(
+                                        text = "Liaison écran éteint (en continu)",
+                                        style = sizing.textStyle(MaterialTheme.typography.titleSmall),
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Text(
+                                        text = "Durée illimitée • Répondre avec le téléphone dans la poche",
+                                        style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                GeoTowerSwitch(
+                                    checked = isBgEnabled,
+                                    onCheckedChange = { checked ->
+                                        GarminCompanionManager.setBackgroundServiceEnabled(context, checked)
+                                    },
+                                    useOneUi = useOneUi
                                 )
                             }
-                            GeoTowerSwitch(
-                                checked = isBgEnabled,
-                                onCheckedChange = { checked ->
-                                    GarminCompanionManager.setBackgroundServiceEnabled(context, checked)
-                                },
-                                useOneUi = useOneUi
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = "⏱️ Durée : Illimitée (reste actif en continu en arrière-plan sans coupure tant que l'option est activée).",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
                             )
                         }
                     }
@@ -390,18 +415,23 @@ fun GarminSettingsCard(
                         Text(
                             text = "Journal consolidé (${combinedLogs.size} entrées) :",
                             style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.weight(1f, fill = false),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                         TextButton(
                             onClick = {
                                 GarminCompanionManager.clearLogs()
                                 AppFileLog.clear(context)
                                 diskLogText = ""
-                            }
+                            },
+                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                            modifier = Modifier.defaultMinSize(minWidth = 1.dp, minHeight = 1.dp)
                         ) {
                             Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(14.dp))
-                            Spacer(Modifier.width(2.dp))
-                            Text("Effacer", fontSize = 11.sp)
+                            Spacer(Modifier.width(4.dp))
+                            Text("Effacer", fontSize = 11.sp, maxLines = 1, softWrap = false)
                         }
                     }
 
