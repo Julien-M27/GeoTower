@@ -3476,6 +3476,7 @@
     <string name="appstrings_release_v215_summary_garmin_background_wake_and_screen_off_sync">Risveglio in background e comunicazione affidabile a schermo spento per orologi Garmin Connect IQ tramite servizio Binder</string>
     <string name="appstrings_release_v216_summary_garmin_direct_broadcast_and_deduplication">Ricezione diretta e affidabile delle richieste Bluetooth dagli orologi Garmin Connect IQ con deduplicazione dei messaggi</string>
     <string name="appstrings_release_v217_summary_garmin_background_foreground_service">Servizio in background opzionale per mantenere la connessione Bluetooth con gli orologi Garmin a schermo spento</string>
+    <string name="appstrings_release_v218_summary_garmin_switch_ui_styling">Armonizzazione visiva dell\'interruttore di collegamento con lo smartwatch Garmin con il design dell\'app (stili One UI e Material)</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registro richieste di rete</string>
