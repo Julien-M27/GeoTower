@@ -20,6 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.wear.compose.foundation.lazy.AutoCenteringParams
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material.Chip
@@ -29,32 +30,32 @@ import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
 import fr.geotower.wear.data.model.DataSourceMode
 import fr.geotower.wear.data.model.GpsFixStatus
+import fr.geotower.wear.data.model.GpsRefreshInterval
 import fr.geotower.wear.presentation.components.GpsStatusHeader
 
 @Composable
 fun SettingsScreen(
     currentSource: DataSourceMode,
-    operatorFilter: String?,
+    gpsRefreshInterval: GpsRefreshInterval,
     gpsStatus: GpsFixStatus,
     onSourceChanged: (DataSourceMode) -> Unit,
-    onOperatorFilterChanged: (String?) -> Unit,
+    onGpsRefreshIntervalChanged: (GpsRefreshInterval) -> Unit,
     onForceRefresh: () -> Unit,
+    onOpenAbout: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val listState = rememberScalingLazyListState()
 
-    val operators = listOf(
-        null to "Tous les opérateurs",
-        "ORANGE" to "Orange",
-        "SFR" to "SFR",
-        "BOUYGUES" to "Bouygues Telecom",
-        "FREE" to "Free Mobile"
+    val sourceModes = listOf(
+        DataSourceMode.AUTO to "Auto (Tél. puis Web)",
+        DataSourceMode.PHONE_LOCAL to "Base locale tél. (Bluetooth)",
+        DataSourceMode.WEB_API to "API Web directe (Wi-Fi/4G)"
     )
 
     ScalingLazyColumn(
         state = listState,
-        autoCentering = null,
-        contentPadding = PaddingValues(start = 8.dp, top = 20.dp, end = 8.dp, bottom = 26.dp),
+        autoCentering = AutoCenteringParams(itemIndex = 1),
+        contentPadding = PaddingValues(start = 10.dp, top = 20.dp, end = 10.dp, bottom = 26.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
         modifier = modifier.fillMaxSize().background(Color.Black)
     ) {
@@ -64,7 +65,7 @@ fun SettingsScreen(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp)
             ) {
                 Text(
-                    text = "⚙️ Paramètres",
+                    text = "Paramètres",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colors.primary
@@ -72,51 +73,47 @@ fun SettingsScreen(
             }
         }
 
-        // Section 1 : Source des données
+        // Section 1 : Source des données (avec Auto, Phone, Web)
         item {
             Text(
                 text = "SOURCE DES DONNÉES",
                 fontSize = 9.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colors.onSurfaceVariant,
-                modifier = Modifier.padding(start = 4.dp, top = 4.dp)
+                modifier = Modifier.padding(start = 4.dp, top = 2.dp)
             )
         }
 
-        item {
+        items(sourceModes.size) { index ->
+            val (mode, desc) = sourceModes[index]
+            val isSelected = currentSource == mode
+
             Chip(
-                onClick = {
-                    onSourceChanged(
-                        if (currentSource == DataSourceMode.PHONE_LOCAL) DataSourceMode.WEB_API
-                        else DataSourceMode.PHONE_LOCAL
-                    )
-                },
+                onClick = { onSourceChanged(mode) },
                 label = {
                     Text(
-                        text = currentSource.shortLabel,
+                        text = if (isSelected) "✓ ${mode.label}" else mode.label,
                         fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                        color = if (isSelected) Color.White else MaterialTheme.colors.onSurfaceVariant
                     )
                 },
                 secondaryLabel = {
                     Text(
-                        text = when (currentSource) {
-                            DataSourceMode.PHONE_LOCAL -> "Room SQLite via Bluetooth"
-                            DataSourceMode.WEB_API -> "API Web HTTPS directe"
-                        },
+                        text = desc,
                         fontSize = 9.sp,
                         color = MaterialTheme.colors.onSurfaceVariant
                     )
                 },
-                colors = ChipDefaults.secondaryChipColors(),
+                colors = if (isSelected) ChipDefaults.primaryChipColors() else ChipDefaults.secondaryChipColors(),
                 modifier = Modifier.fillMaxWidth()
             )
         }
 
-        // Section 2 : Filtres Opérateurs
+        // Section 2 : Actualisation du GPS (comme sur Garmin)
         item {
             Text(
-                text = "FILTRER PAR OPÉRATEUR",
+                text = "ACTUALISATION GPS (GARMIN)",
                 fontSize = 9.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colors.onSurfaceVariant,
@@ -124,21 +121,25 @@ fun SettingsScreen(
             )
         }
 
-        items(operators.size) { index ->
-            val (key, label) = operators[index]
-            val isSelected = (operatorFilter == key) || (operatorFilter == null && key == null)
-
+        item {
             Chip(
-                onClick = { onOperatorFilterChanged(key) },
+                onClick = { onGpsRefreshIntervalChanged(gpsRefreshInterval.next()) },
                 label = {
                     Text(
-                        text = if (isSelected) "✓ $label" else label,
-                        fontSize = 10.sp,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                        color = if (isSelected) Color.White else MaterialTheme.colors.onSurfaceVariant
+                        text = gpsRefreshInterval.label,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
                     )
                 },
-                colors = if (isSelected) ChipDefaults.primaryChipColors() else ChipDefaults.secondaryChipColors(),
+                secondaryLabel = {
+                    Text(
+                        text = gpsRefreshInterval.description,
+                        fontSize = 9.sp,
+                        color = MaterialTheme.colors.onSurfaceVariant
+                    )
+                },
+                colors = ChipDefaults.secondaryChipColors(),
                 modifier = Modifier.fillMaxWidth()
             )
         }
@@ -156,6 +157,30 @@ fun SettingsScreen(
 
         item {
             GpsStatusHeader(gpsStatus = gpsStatus)
+        }
+
+        // Section 4 : À propos
+        item {
+            Chip(
+                onClick = onOpenAbout,
+                label = {
+                    Text(
+                        text = "À propos",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White
+                    )
+                },
+                secondaryLabel = {
+                    Text(
+                        text = "GeoTower Wear OS v2.0 • ANFR",
+                        fontSize = 9.sp,
+                        color = MaterialTheme.colors.onSurfaceVariant
+                    )
+                },
+                colors = ChipDefaults.secondaryChipColors(),
+                modifier = Modifier.fillMaxWidth()
+            )
         }
 
         // Bouton Rafraîchir

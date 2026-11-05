@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.wear.compose.foundation.lazy.AutoCenteringParams
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material.Button
@@ -45,7 +46,7 @@ fun TowerDetailScreen(
 
     ScalingLazyColumn(
         state = listState,
-        autoCentering = null,
+        autoCentering = AutoCenteringParams(itemIndex = 1),
         contentPadding = PaddingValues(start = 10.dp, top = 20.dp, end = 10.dp, bottom = 26.dp),
         verticalArrangement = Arrangement.spacedBy(5.dp),
         modifier = modifier.fillMaxSize().background(Color.Black)
@@ -137,7 +138,7 @@ fun TowerDetailScreen(
                 onClick = onLockTarget,
                 label = {
                     Text(
-                        text = if (isTarget) "✓ Cible active sur le radar" else "🎯 Verrouiller sur le radar",
+                        text = if (isTarget) "✓ Cible active sur le radar" else "Verrouiller sur le radar",
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center,
@@ -154,7 +155,7 @@ fun TowerDetailScreen(
                 onClick = onBack,
                 label = {
                     Text(
-                        text = "⬅ Retour",
+                        text = "Retour",
                         fontSize = 10.sp,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth()

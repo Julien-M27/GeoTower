@@ -45,12 +45,28 @@ data class WearTower(
 
 /**
  * Choix de la source des données :
+ * - AUTO : tente d'abord la base Room du smartphone via Bluetooth, bascule automatiquement sur l'API Web si indisponible.
  * - PHONE_LOCAL : base SQLite Room locale du smartphone via Play Services Wearable (100% hors-ligne).
  * - WEB_API : appel direct à l'API Web GeoTower / ANFR en HTTPS (Wi-Fi / eSIM 4G de la montre).
  */
 enum class DataSourceMode(val label: String, val shortLabel: String) {
+    AUTO("Automatique", "🔄 Auto"),
     PHONE_LOCAL("Base locale smartphone", "📱 Téléphone"),
     WEB_API("API Web directe", "🌐 Web API")
+}
+
+/**
+ * Fréquence d'actualisation du GPS de la montre (comme sur Garmin).
+ */
+enum class GpsRefreshInterval(val label: String, val description: String, val intervalMs: Long) {
+    ON_OPEN("À l'ouverture", "Fix unique au lancement", 0L),
+    EVERY_1_MIN("1 minute", "Actualisation toutes les 60s", 60_000L),
+    CONTINUOUS("Continu", "Temps réel haute précision", 2_000L);
+
+    fun next(): GpsRefreshInterval {
+        val values = values()
+        return values[(ordinal + 1) % values.size]
+    }
 }
 
 /**
@@ -71,7 +87,9 @@ enum class WearScreen {
     HOME,
     LIST,
     RADAR,
+    MAP,
     SETTINGS,
-    DETAIL
+    DETAIL,
+    ABOUT
 }
 

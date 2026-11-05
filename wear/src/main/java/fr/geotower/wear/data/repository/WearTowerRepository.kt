@@ -16,6 +16,7 @@ class WearTowerRepository(context: Context) {
     private val dataLayerClient = WearDataLayerClient(context)
 
     val dataSourceMode: StateFlow<DataSourceMode> = preferences.dataSourceMode
+    val gpsRefreshInterval: StateFlow<fr.geotower.wear.data.model.GpsRefreshInterval> = preferences.gpsRefreshInterval
 
     private val _towers = MutableStateFlow<List<WearTower>>(emptyList())
     val towers: StateFlow<List<WearTower>> = _towers.asStateFlow()
@@ -23,7 +24,7 @@ class WearTowerRepository(context: Context) {
     private val _selectedTowerId = MutableStateFlow<String?>(null)
     val selectedTowerId: StateFlow<String?> = _selectedTowerId.asStateFlow()
 
-    private val _operatorFilter = MutableStateFlow<String?>(null) // null = Tous, ou "ORANGE", "SFR", "BOUYGUES", "FREE"
+    private val _operatorFilter = MutableStateFlow<String?>(null) // null = Tous
     val operatorFilter: StateFlow<String?> = _operatorFilter.asStateFlow()
 
     private val _isLoading = MutableStateFlow(false)
@@ -44,6 +45,10 @@ class WearTowerRepository(context: Context) {
         preferences.setDataSourceMode(mode)
     }
 
+    fun setGpsRefreshInterval(interval: fr.geotower.wear.data.model.GpsRefreshInterval) {
+        preferences.setGpsRefreshInterval(interval)
+    }
+
     suspend fun loadTowers(latitude: Double, longitude: Double) {
         _isLoading.value = true
         _errorMessage.value = null
@@ -52,6 +57,21 @@ class WearTowerRepository(context: Context) {
 
         try {
             val results = when (currentMode) {
+                DataSourceMode.AUTO -> {
+                    // Stratégie Auto : interroge d'abord la base locale du téléphone via Bluetooth
+                    try {
+                        val phoneResults = dataLayerClient.fetchNearbyFromPhone(lat = latitude, lon = longitude)
+                        if (phoneResults.isNotEmpty()) {
+                            phoneResults
+                        } else {
+                            // Repli direct sur l'API Web
+                            WearWebApiClient.fetchNearbyTowers(lat = latitude, lon = longitude)
+                        }
+                    } catch (e: Exception) {
+                        // Échec Bluetooth ou téléphone inaccessible -> repli automatique sur l'API Web
+                        WearWebApiClient.fetchNearbyTowers(lat = latitude, lon = longitude)
+                    }
+                }
                 DataSourceMode.PHONE_LOCAL -> {
                     dataLayerClient.fetchNearbyFromPhone(lat = latitude, lon = longitude)
                 }

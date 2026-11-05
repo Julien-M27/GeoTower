@@ -29,6 +29,7 @@ fun SourceToggleChip(
         secondaryLabel = {
             Text(
                 text = when (currentMode) {
+                    DataSourceMode.AUTO -> "Auto (Tél. puis Web)"
                     DataSourceMode.PHONE_LOCAL -> "Room SQLite hors-ligne"
                     DataSourceMode.WEB_API -> "API Web HTTPS directe"
                 },

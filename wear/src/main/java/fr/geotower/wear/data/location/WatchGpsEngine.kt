@@ -34,6 +34,7 @@ class WatchGpsEngine(private val context: Context) {
     val gpsStatus: StateFlow<GpsFixStatus> = _gpsStatus.asStateFlow()
 
     private var isListening = false
+    private var currentRefreshInterval: fr.geotower.wear.data.model.GpsRefreshInterval = fr.geotower.wear.data.model.GpsRefreshInterval.CONTINUOUS
 
     private val hardwareGpsListener = object : LocationListener {
         override fun onLocationChanged(location: Location) {
@@ -44,6 +45,10 @@ class WatchGpsEngine(private val context: Context) {
                 accuracyMeters = location.accuracy,
                 provider = "GPS Montre (${location.provider})"
             )
+            if (currentRefreshInterval == fr.geotower.wear.data.model.GpsRefreshInterval.ON_OPEN) {
+                Log.d(TAG, "Mode 'À l'ouverture' : position acquise, coupure du GPS pour économiser la batterie")
+                stopListening()
+            }
         }
 
         @Deprecated("Deprecated in Java")
@@ -69,6 +74,20 @@ class WatchGpsEngine(private val context: Context) {
                 accuracyMeters = loc.accuracy,
                 provider = "GPS Montre"
             )
+            if (currentRefreshInterval == fr.geotower.wear.data.model.GpsRefreshInterval.ON_OPEN) {
+                Log.d(TAG, "Mode 'À l'ouverture' (fused) : position acquise, coupure du GPS")
+                stopListening()
+            }
+        }
+    }
+
+    fun setRefreshInterval(interval: fr.geotower.wear.data.model.GpsRefreshInterval) {
+        if (currentRefreshInterval != interval) {
+            currentRefreshInterval = interval
+            if (isListening) {
+                stopListening()
+                startListening()
+            }
         }
     }
 
@@ -105,14 +124,20 @@ class WatchGpsEngine(private val context: Context) {
                     )
                 }
 
+                val gpsInterval = when (currentRefreshInterval) {
+                    fr.geotower.wear.data.model.GpsRefreshInterval.ON_OPEN -> 1000L
+                    fr.geotower.wear.data.model.GpsRefreshInterval.EVERY_1_MIN -> 60_000L
+                    fr.geotower.wear.data.model.GpsRefreshInterval.CONTINUOUS -> 1000L
+                }
+
                 locationManager.requestLocationUpdates(
                     LocationManager.GPS_PROVIDER,
-                    1000L, // Intervalle : 1 seconde
-                    1f,    // Distance min : 1 mètre
+                    gpsInterval,
+                    if (currentRefreshInterval == fr.geotower.wear.data.model.GpsRefreshInterval.CONTINUOUS) 1f else 5f,
                     hardwareGpsListener,
                     Looper.getMainLooper()
                 )
-                Log.i(TAG, "Écoute du GPS matériel interne (GPS_PROVIDER) démarrée")
+                Log.i(TAG, "Écoute du GPS matériel interne (GPS_PROVIDER) démarrée (mode=$currentRefreshInterval, intervalle=${gpsInterval}ms)")
             } catch (e: SecurityException) {
                 Log.e(TAG, "Permission de localisation manquante", e)
                 _gpsStatus.value = GpsFixStatus.Error("Permission GPS requise")
@@ -138,8 +163,14 @@ class WatchGpsEngine(private val context: Context) {
                 }
             }
 
-            val fusedRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 2000L)
-                .setMinUpdateIntervalMillis(1000L)
+            val fusedInterval = when (currentRefreshInterval) {
+                fr.geotower.wear.data.model.GpsRefreshInterval.ON_OPEN -> 2000L
+                fr.geotower.wear.data.model.GpsRefreshInterval.EVERY_1_MIN -> 60_000L
+                fr.geotower.wear.data.model.GpsRefreshInterval.CONTINUOUS -> 2000L
+            }
+
+            val fusedRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, fusedInterval)
+                .setMinUpdateIntervalMillis(fusedInterval / 2)
                 .setMinUpdateDistanceMeters(1f)
                 .build()
 

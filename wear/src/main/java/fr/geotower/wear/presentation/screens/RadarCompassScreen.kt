@@ -60,7 +60,7 @@ fun RadarCompassScreen(
         // Dessin du Radar et de la Boussole Canvas
         Canvas(modifier = Modifier.fillMaxSize()) {
             val center = Offset(size.width / 2f, size.height / 2f)
-            val maxRadarRadius = (size.minDimension / 2f) * 0.72f
+            val maxRadarRadius = (size.minDimension / 2f) * 0.65f
 
             // 1. Cercles concentriques du radar
             val ringCount = 3
@@ -149,20 +149,20 @@ fun RadarCompassScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 14.dp, vertical = 6.dp),
+                .padding(horizontal = 6.dp, vertical = 2.dp),
             verticalArrangement = Arrangement.SpaceBetween,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Haut : Titre Boussole + Statut GPS
+            // Haut : Titre Boussole + Statut GPS (resserré au centre pour l'écran circulaire)
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 18.dp)
+                    .fillMaxWidth(0.65f)
+                    .padding(top = 30.dp)
             ) {
                 Text(
-                    text = "🧭 Boussole",
+                    text = "Boussole",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colors.primary
@@ -184,16 +184,16 @@ fun RadarCompassScreen(
 
             Spacer(Modifier.weight(1f))
 
-            // Bas : Cartouche d'informations sur l'antenne verrouillée
+            // Bas : Cartouche d'informations sur l'antenne verrouillée (resserré pour s'adapter à la courbure basse)
             if (selectedTower != null) {
                 val opColor = getOperatorColor(selectedTower.operator)
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth(0.92f)
+                        .fillMaxWidth(0.72f)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xFF1C1C1E).copy(alpha = 0.92f))
+                        .background(Color(0xFF1C1C1E).copy(alpha = 0.94f))
                         .clickable { onOpenDetails(selectedTower) }
-                        .padding(horizontal = 8.dp, vertical = 5.dp)
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -209,11 +209,11 @@ fun RadarCompassScreen(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(4.dp))
                                     .background(opColor)
-                                    .padding(horizontal = 5.dp, vertical = 1.dp)
+                                    .padding(horizontal = 4.dp, vertical = 1.dp)
                             ) {
                                 Text(
                                     text = selectedTower.operator,
-                                    fontSize = 10.sp,
+                                    fontSize = 9.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White,
                                     maxLines = 1,
@@ -229,7 +229,7 @@ fun RadarCompassScreen(
                             }
                             Text(
                                 text = distText,
-                                fontSize = 13.sp,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = Color.White
                             )
@@ -237,7 +237,7 @@ fun RadarCompassScreen(
                             // Cap
                             Text(
                                 text = "${selectedTower.cardinalDirection} ${selectedTower.bearingDegrees}°",
-                                fontSize = 10.sp,
+                                fontSize = 9.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colors.primary
                             )
@@ -252,12 +252,12 @@ fun RadarCompassScreen(
                         ) {
                             Text(
                                 text = selectedTower.technologies,
-                                fontSize = 9.sp,
+                                fontSize = 8.sp,
                                 color = MaterialTheme.colors.secondary
                             )
                             Text(
-                                text = "🔍 Fiche détails >",
-                                fontSize = 9.sp,
+                                text = "Détails >",
+                                fontSize = 8.sp,
                                 color = MaterialTheme.colors.onSurfaceVariant
                             )
                         }
@@ -271,14 +271,14 @@ fun RadarCompassScreen(
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
                     Text(
-                        text = if (towers.isEmpty()) "Aucune antenne détectée" else "Touchez la liste pour cibler",
-                        fontSize = 10.sp,
+                        text = if (towers.isEmpty()) "Aucune antenne" else "Touchez la liste",
+                        fontSize = 9.sp,
                         color = MaterialTheme.colors.onSurfaceVariant
                     )
                 }
             }
 
-            Spacer(Modifier.height(18.dp))
+            Spacer(Modifier.height(26.dp))
         }
     }
 }

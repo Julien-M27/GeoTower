@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.wear.compose.foundation.lazy.AutoCenteringParams
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.items
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
@@ -50,7 +51,7 @@ fun TowerListScreen(
 
     ScalingLazyColumn(
         state = listState,
-        autoCentering = null,
+        autoCentering = AutoCenteringParams(itemIndex = if (towers.isNotEmpty()) 1 else 0),
         contentPadding = PaddingValues(start = 8.dp, top = 20.dp, end = 8.dp, bottom = 26.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
         modifier = modifier.fillMaxSize().background(Color.Black)
@@ -61,7 +62,7 @@ fun TowerListScreen(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp)
             ) {
                 Text(
-                    text = "📡 Antennes à proximité",
+                    text = "Antennes à proximité",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colors.primary

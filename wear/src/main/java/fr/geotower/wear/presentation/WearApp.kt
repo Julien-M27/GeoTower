@@ -22,7 +22,9 @@ import fr.geotower.wear.data.model.GpsFixStatus
 import fr.geotower.wear.data.model.WearScreen
 import fr.geotower.wear.data.model.WearTower
 import fr.geotower.wear.data.repository.WearTowerRepository
+import fr.geotower.wear.presentation.screens.AboutScreen
 import fr.geotower.wear.presentation.screens.HomeScreen
+import fr.geotower.wear.presentation.screens.MapScreen
 import fr.geotower.wear.presentation.screens.RadarCompassScreen
 import fr.geotower.wear.presentation.screens.SettingsScreen
 import fr.geotower.wear.presentation.screens.TowerDetailScreen
@@ -42,6 +44,7 @@ fun WearApp(
 
         val gpsStatus by gpsEngine.gpsStatus.collectAsStateWithLifecycle()
         val dataSourceMode by repository.dataSourceMode.collectAsStateWithLifecycle()
+        val gpsRefreshInterval by repository.gpsRefreshInterval.collectAsStateWithLifecycle()
         val towers by repository.towers.collectAsStateWithLifecycle()
         val selectedTowerId by repository.selectedTowerId.collectAsStateWithLifecycle()
         val operatorFilter by repository.operatorFilter.collectAsStateWithLifecycle()
@@ -52,7 +55,11 @@ fun WearApp(
         var currentScreen by remember { mutableStateOf(WearScreen.HOME) }
         var inspectedTower by remember { mutableStateOf<WearTower?>(null) }
 
-        // Démarre l'écoute du GPS matériel interne de la montre
+        // Démarre l'écoute du GPS matériel interne de la montre avec la fréquence sélectionnée
+        LaunchedEffect(gpsRefreshInterval) {
+            gpsEngine.setRefreshInterval(gpsRefreshInterval)
+        }
+
         DisposableEffect(Unit) {
             gpsEngine.startListening()
             onDispose {
@@ -87,6 +94,7 @@ fun WearApp(
         BackHandler(enabled = currentScreen != WearScreen.HOME) {
             when (currentScreen) {
                 WearScreen.DETAIL -> currentScreen = WearScreen.LIST
+                WearScreen.ABOUT -> currentScreen = WearScreen.SETTINGS
                 else -> currentScreen = WearScreen.HOME
             }
         }
@@ -154,10 +162,25 @@ fun WearApp(
                         )
                     }
 
+                    WearScreen.MAP -> {
+                        MapScreen(
+                            towers = filteredTowers,
+                            selectedTower = selectedTower,
+                            gpsStatus = gpsStatus,
+                            onTowerSelected = { tower ->
+                                repository.selectTower(tower.id)
+                            },
+                            onOpenDetails = { tower ->
+                                inspectedTower = tower
+                                currentScreen = WearScreen.DETAIL
+                            }
+                        )
+                    }
+
                     WearScreen.SETTINGS -> {
                         SettingsScreen(
                             currentSource = dataSourceMode,
-                            operatorFilter = operatorFilter,
+                            gpsRefreshInterval = gpsRefreshInterval,
                             gpsStatus = gpsStatus,
                             onSourceChanged = { newSource ->
                                 repository.setDataSourceMode(newSource)
@@ -168,8 +191,8 @@ fun WearApp(
                                     }
                                 }
                             },
-                            onOperatorFilterChanged = { filter ->
-                                repository.setOperatorFilter(filter)
+                            onGpsRefreshIntervalChanged = { newInterval ->
+                                repository.setGpsRefreshInterval(newInterval)
                             },
                             onForceRefresh = {
                                 val status = gpsStatus
@@ -180,6 +203,17 @@ fun WearApp(
                                 } else {
                                     gpsEngine.startListening()
                                 }
+                            },
+                            onOpenAbout = {
+                                currentScreen = WearScreen.ABOUT
+                            }
+                        )
+                    }
+
+                    WearScreen.ABOUT -> {
+                        AboutScreen(
+                            onBack = {
+                                currentScreen = WearScreen.SETTINGS
                             }
                         )
                     }
