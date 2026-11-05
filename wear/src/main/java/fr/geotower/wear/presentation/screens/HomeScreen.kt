@@ -17,6 +17,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -24,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -35,6 +41,7 @@ import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material.Chip
 import androidx.wear.compose.material.ChipDefaults
+import androidx.wear.compose.material.Icon
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
 import fr.geotower.wear.data.model.DataSourceMode
@@ -123,9 +130,8 @@ fun HomeScreen(
         // 1. Antennes à proximité
         item {
             MenuNavigationCard(
-                icon = "📡",
+                icon = Icons.Default.MyLocation,
                 title = "Antennes à proximité",
-                subtitle = if (towersCount > 0) "$towersCount antennes détectées" else "Recherche autour de vous",
                 onClick = { onNavigate(WearScreen.LIST) }
             )
         }
@@ -133,9 +139,8 @@ fun HomeScreen(
         // 2. Boussole
         item {
             MenuNavigationCard(
-                icon = "🧭",
+                icon = Icons.Default.Explore,
                 title = "Boussole",
-                subtitle = "Azimut & radar en direct",
                 onClick = { onNavigate(WearScreen.RADAR) }
             )
         }
@@ -143,9 +148,8 @@ fun HomeScreen(
         // 3. Carte
         item {
             MenuNavigationCard(
-                icon = "🗺️",
+                icon = Icons.Default.Map,
                 title = "Carte",
-                subtitle = "Mini map",
                 onClick = { onNavigate(WearScreen.MAP) }
             )
         }
@@ -153,9 +157,8 @@ fun HomeScreen(
         // 4. Paramètres
         item {
             MenuNavigationCard(
-                icon = "⚙️",
+                icon = Icons.Default.Settings,
                 title = "Paramètres",
-                subtitle = "Source (${dataSourceMode.shortLabel}), GPS",
                 onClick = { onNavigate(WearScreen.SETTINGS) }
             )
         }
@@ -164,30 +167,27 @@ fun HomeScreen(
 
 @Composable
 private fun MenuNavigationCard(
-    icon: String,
+    icon: ImageVector,
     title: String,
-    subtitle: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Chip(
         onClick = onClick,
         icon = {
-            Text(text = icon, fontSize = 16.sp)
+            Icon(
+                imageVector = icon,
+                contentDescription = title,
+                tint = MaterialTheme.colors.primary,
+                modifier = Modifier.size(20.dp)
+            )
         },
         label = {
             Text(
                 text = title,
-                fontSize = 11.sp,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.White
-            )
-        },
-        secondaryLabel = {
-            Text(
-                text = subtitle,
-                fontSize = 9.sp,
-                color = MaterialTheme.colors.onSurfaceVariant
             )
         },
         colors = ChipDefaults.secondaryChipColors(),

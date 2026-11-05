@@ -48,6 +48,8 @@ fun WearApp(
         val gpsStatus by gpsEngine.gpsStatus.collectAsStateWithLifecycle()
         val dataSourceMode by repository.dataSourceMode.collectAsStateWithLifecycle()
         val gpsRefreshInterval by repository.gpsRefreshInterval.collectAsStateWithLifecycle()
+        val mapTheme by repository.mapTheme.collectAsStateWithLifecycle()
+        val currentLanguage by repository.language.collectAsStateWithLifecycle()
         val towers by repository.towers.collectAsStateWithLifecycle()
         val selectedTowerId by repository.selectedTowerId.collectAsStateWithLifecycle()
         val operatorFilter by repository.operatorFilter.collectAsStateWithLifecycle()
@@ -185,6 +187,7 @@ fun WearApp(
                             towers = filteredTowers,
                             selectedTower = selectedTower,
                             gpsStatus = gpsStatus,
+                            mapTheme = mapTheme,
                             onTowerSelected = { tower ->
                                 repository.selectTower(tower.id)
                             },
@@ -200,6 +203,8 @@ fun WearApp(
                             currentSource = dataSourceMode,
                             gpsRefreshInterval = gpsRefreshInterval,
                             gpsStatus = gpsStatus,
+                            mapTheme = mapTheme,
+                            currentLanguage = currentLanguage,
                             onSourceChanged = { newSource ->
                                 repository.setDataSourceMode(newSource)
                                 val status = gpsStatus
@@ -211,6 +216,12 @@ fun WearApp(
                             },
                             onGpsRefreshIntervalChanged = { newInterval ->
                                 repository.setGpsRefreshInterval(newInterval)
+                            },
+                            onMapThemeChanged = { newTheme ->
+                                repository.setMapTheme(newTheme)
+                            },
+                            onLanguageChanged = { newLang ->
+                                repository.setLanguage(newLang)
                             },
                             onForceRefresh = {
                                 gpsEngine.forceRefreshLocation { loc ->

@@ -111,6 +111,38 @@ sealed interface GpsFixStatus {
     data class Error(val message: String) : GpsFixStatus
 }
 
+/**
+ * Thème d'affichage du fond de carte (OSM) :
+ * - DARK : rendu nocturne contrasté adapté aux écrans OLED de montre.
+ * - LIGHT : rendu clair natif OpenStreetMap (comme en plein soleil).
+ */
+enum class WearMapTheme(val label: String, val shortLabel: String) {
+    DARK("Sombre", "🌙 Sombre"),
+    LIGHT("Clair", "☀️ Clair");
+
+    fun next(): WearMapTheme = if (this == DARK) LIGHT else DARK
+}
+
+/**
+ * Choix de la langue de l'application sur la montre :
+ * - AUTO : suit la langue du système Android Wear OS.
+ * - FR, EN, DE, ES, IT, PT : langues prises en charge.
+ */
+enum class WearLanguage(val code: String, val label: String) {
+    AUTO("", "Automatique"),
+    FR("fr", "Français"),
+    EN("en", "English"),
+    DE("de", "Deutsch"),
+    ES("es", "Español"),
+    IT("it", "Italiano"),
+    PT("pt", "Português");
+
+    fun next(): WearLanguage {
+        val values = values()
+        return values[(ordinal + 1) % values.size]
+    }
+}
+
 enum class WearScreen {
     HOME,
     LIST,

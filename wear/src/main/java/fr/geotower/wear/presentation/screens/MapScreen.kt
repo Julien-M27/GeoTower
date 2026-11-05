@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
 import fr.geotower.wear.data.model.GpsFixStatus
+import fr.geotower.wear.data.model.WearMapTheme
 import fr.geotower.wear.data.model.WearTower
 import fr.geotower.wear.data.network.WearWebApiClient
 import fr.geotower.wear.presentation.theme.getOperatorColor
@@ -63,6 +64,7 @@ fun MapScreen(
     towers: List<WearTower>,
     selectedTower: WearTower?,
     gpsStatus: GpsFixStatus,
+    mapTheme: WearMapTheme = WearMapTheme.DARK,
     onTowerSelected: (WearTower) -> Unit,
     onOpenDetails: (WearTower) -> Unit,
     modifier: Modifier = Modifier
@@ -153,17 +155,19 @@ fun MapScreen(
         }
     }
 
+    val bgMapColor = if (mapTheme == WearMapTheme.DARK) Color(0xFF0F1218) else Color(0xFFE5E5EA)
+
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFF0F1218)),
+            .background(bgMapColor),
         contentAlignment = Alignment.Center
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val center = Offset(size.width / 2f, size.height / 2f)
             val mapRadius = (size.minDimension / 2f) * 0.74f
 
-            // 1. Dessin des tuiles OpenStreetMap avec filtre sombre si activé
+            // 1. Dessin des tuiles OpenStreetMap avec filtre sombre si thème DARK
             val n = 1 shl tileZoom
             val exactX = ((userLon + 180.0) / 360.0 * n)
             val latRad = Math.toRadians(userLat)
@@ -177,6 +181,7 @@ fun MapScreen(
 
             var drawnAnyTile = false
             if (isOsmMapEnabled) {
+                val activeTileFilter = if (mapTheme == WearMapTheme.DARK) nightFilter else null
                 for (dx in -1..1) {
                     for (dy in -1..1) {
                         val tx = centerTileX + dx
@@ -191,15 +196,15 @@ fun MapScreen(
                                 image = tile,
                                 dstOffset = IntOffset(drawX.toInt(), drawY.toInt()),
                                 dstSize = IntSize(tileSizePx.toInt(), tileSizePx.toInt()),
-                                colorFilter = nightFilter
+                                colorFilter = activeTileFilter
                             )
                         }
                     }
                 }
             }
 
-            // Calque sombre semi-transparent au-dessus des tuiles pour faire ressortir les antennes
-            if (drawnAnyTile) {
+            // Calque sombre semi-transparent uniquement en mode sombre pour faire ressortir les antennes
+            if (drawnAnyTile && mapTheme == WearMapTheme.DARK) {
                 drawCircle(
                     color = Color.Black.copy(alpha = 0.35f),
                     radius = size.minDimension / 2f,
@@ -210,10 +215,13 @@ fun MapScreen(
             // 2. Cercles de distance Garmin concentriques adaptés à l'échelle Mercator
             val metersPerPixel = (40075016.686 * cos(latRad)) / (n * tileSizePx)
             val ringStepMeters = maxRange / 3f
+            val ringColor = if (mapTheme == WearMapTheme.DARK) Color(0xFF2C3847).copy(alpha = 0.8f) else Color(0xFF555555).copy(alpha = 0.65f)
+            val crossColor = if (mapTheme == WearMapTheme.DARK) Color(0xFF2C3847).copy(alpha = 0.6f) else Color(0xFF555555).copy(alpha = 0.45f)
+
             for (step in 1..3) {
                 val ringRadius = (step * ringStepMeters / metersPerPixel).toFloat()
                 drawCircle(
-                    color = Color(0xFF2C3847).copy(alpha = 0.8f),
+                    color = ringColor,
                     radius = ringRadius,
                     center = center,
                     style = Stroke(width = 1.dp.toPx())
@@ -223,13 +231,13 @@ fun MapScreen(
             // 3. Axes Nord-Sud et Est-Ouest
             val maxRadiusPx = (maxRange / metersPerPixel).toFloat().coerceAtMost(size.minDimension / 2f)
             drawLine(
-                color = Color(0xFF2C3847).copy(alpha = 0.6f),
+                color = crossColor,
                 start = Offset(center.x, center.y - maxRadiusPx),
                 end = Offset(center.x, center.y + maxRadiusPx),
                 strokeWidth = 1.dp.toPx()
             )
             drawLine(
-                color = Color(0xFF2C3847).copy(alpha = 0.6f),
+                color = crossColor,
                 start = Offset(center.x - maxRadiusPx, center.y),
                 end = Offset(center.x + maxRadiusPx, center.y),
                 strokeWidth = 1.dp.toPx()

@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.SharedPreferences
 import fr.geotower.wear.data.model.DataSourceMode
 import fr.geotower.wear.data.model.GpsRefreshInterval
+import fr.geotower.wear.data.model.WearLanguage
+import fr.geotower.wear.data.model.WearMapTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -17,6 +19,12 @@ class WearPreferences(context: Context) {
 
     private val _gpsRefreshInterval = MutableStateFlow(loadGpsRefreshInterval())
     val gpsRefreshInterval: StateFlow<GpsRefreshInterval> = _gpsRefreshInterval.asStateFlow()
+
+    private val _mapTheme = MutableStateFlow(loadMapTheme())
+    val mapTheme: StateFlow<WearMapTheme> = _mapTheme.asStateFlow()
+
+    private val _language = MutableStateFlow(loadLanguage())
+    val language: StateFlow<WearLanguage> = _language.asStateFlow()
 
     private fun loadDataSourceMode(): DataSourceMode {
         val name = prefs.getString(KEY_DATA_SOURCE_MODE, DataSourceMode.AUTO.name)
@@ -46,8 +54,38 @@ class WearPreferences(context: Context) {
         _gpsRefreshInterval.value = interval
     }
 
+    private fun loadMapTheme(): WearMapTheme {
+        val name = prefs.getString(KEY_MAP_THEME, WearMapTheme.DARK.name)
+        return try {
+            WearMapTheme.valueOf(name ?: WearMapTheme.DARK.name)
+        } catch (e: Exception) {
+            WearMapTheme.DARK
+        }
+    }
+
+    fun setMapTheme(theme: WearMapTheme) {
+        prefs.edit().putString(KEY_MAP_THEME, theme.name).apply()
+        _mapTheme.value = theme
+    }
+
+    private fun loadLanguage(): WearLanguage {
+        val name = prefs.getString(KEY_LANGUAGE, WearLanguage.AUTO.name)
+        return try {
+            WearLanguage.valueOf(name ?: WearLanguage.AUTO.name)
+        } catch (e: Exception) {
+            WearLanguage.AUTO
+        }
+    }
+
+    fun setLanguage(language: WearLanguage) {
+        prefs.edit().putString(KEY_LANGUAGE, language.name).apply()
+        _language.value = language
+    }
+
     companion object {
         private const val KEY_DATA_SOURCE_MODE = "pref_data_source_mode"
         private const val KEY_GPS_REFRESH_INTERVAL = "pref_gps_refresh_interval"
+        private const val KEY_MAP_THEME = "pref_map_theme"
+        private const val KEY_LANGUAGE = "pref_language"
     }
 }

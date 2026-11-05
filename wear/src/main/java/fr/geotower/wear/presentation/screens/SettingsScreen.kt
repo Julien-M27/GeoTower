@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -31,6 +32,8 @@ import androidx.wear.compose.material.Text
 import fr.geotower.wear.data.model.DataSourceMode
 import fr.geotower.wear.data.model.GpsFixStatus
 import fr.geotower.wear.data.model.GpsRefreshInterval
+import fr.geotower.wear.data.model.WearLanguage
+import fr.geotower.wear.data.model.WearMapTheme
 import fr.geotower.wear.presentation.components.GpsStatusHeader
 
 @Composable
@@ -38,8 +41,12 @@ fun SettingsScreen(
     currentSource: DataSourceMode,
     gpsRefreshInterval: GpsRefreshInterval,
     gpsStatus: GpsFixStatus,
+    mapTheme: WearMapTheme,
+    currentLanguage: WearLanguage,
     onSourceChanged: (DataSourceMode) -> Unit,
     onGpsRefreshIntervalChanged: (GpsRefreshInterval) -> Unit,
+    onMapThemeChanged: (WearMapTheme) -> Unit,
+    onLanguageChanged: (WearLanguage) -> Unit,
     onForceRefresh: () -> Unit,
     onOpenAbout: () -> Unit,
     modifier: Modifier = Modifier
@@ -108,7 +115,86 @@ fun SettingsScreen(
             )
         }
 
-        // Section 2 : Actualisation du GPS (comme sur Garmin)
+        // Section 2 : Thème de la carte (Clair ou Sombre)
+        item {
+            Text(
+                text = "THÈME DE LA CARTE",
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colors.onSurfaceVariant,
+                modifier = Modifier.padding(start = 4.dp, top = 4.dp)
+            )
+        }
+
+        item {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                val isDark = mapTheme == WearMapTheme.DARK
+                CompactChip(
+                    onClick = { onMapThemeChanged(WearMapTheme.DARK) },
+                    label = {
+                        Text(
+                            text = if (isDark) "✓ Sombre" else "Sombre",
+                            fontSize = 11.sp,
+                            fontWeight = if (isDark) FontWeight.Bold else FontWeight.Normal,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    },
+                    colors = if (isDark) ChipDefaults.primaryChipColors() else ChipDefaults.secondaryChipColors(),
+                    modifier = Modifier.weight(1f)
+                )
+
+                val isLight = mapTheme == WearMapTheme.LIGHT
+                CompactChip(
+                    onClick = { onMapThemeChanged(WearMapTheme.LIGHT) },
+                    label = {
+                        Text(
+                            text = if (isLight) "✓ Clair" else "Clair",
+                            fontSize = 11.sp,
+                            fontWeight = if (isLight) FontWeight.Bold else FontWeight.Normal,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    },
+                    colors = if (isLight) ChipDefaults.primaryChipColors() else ChipDefaults.secondaryChipColors(),
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+
+        // Section 3 : Langue de l'application (comme sur le smartphone)
+        item {
+            Text(
+                text = "LANGUE",
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colors.onSurfaceVariant,
+                modifier = Modifier.padding(start = 4.dp, top = 4.dp)
+            )
+        }
+
+        items(WearLanguage.values().size) { index ->
+            val lang = WearLanguage.values()[index]
+            val isSelected = currentLanguage == lang
+            Chip(
+                onClick = { onLanguageChanged(lang) },
+                label = {
+                    Text(
+                        text = if (isSelected) "✓ ${lang.label}" else lang.label,
+                        fontSize = 11.sp,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                        color = if (isSelected) Color.White else MaterialTheme.colors.onSurfaceVariant
+                    )
+                },
+                colors = if (isSelected) ChipDefaults.primaryChipColors() else ChipDefaults.secondaryChipColors(),
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        // Section 4 : Actualisation du GPS (comme sur Garmin)
         item {
             Text(
                 text = "ACTUALISATION GPS (GARMIN)",
