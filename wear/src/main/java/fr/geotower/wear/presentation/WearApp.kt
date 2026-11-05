@@ -1,49 +1,49 @@
 package fr.geotower.wear.presentation
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
-import androidx.wear.compose.foundation.lazy.items
-import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
-import androidx.wear.compose.material.CircularProgressIndicator
-import androidx.wear.compose.material.CompactChip
 import androidx.wear.compose.material.MaterialTheme
-import androidx.wear.compose.material.PositionIndicator
 import androidx.wear.compose.material.Scaffold
 import androidx.wear.compose.material.Text
 import androidx.wear.compose.material.TimeText
-import androidx.wear.compose.material.Vignette
-import androidx.wear.compose.material.VignettePosition
 import fr.geotower.wear.data.location.WatchGpsEngine
-import fr.geotower.wear.data.model.DataSourceMode
 import fr.geotower.wear.data.model.GpsFixStatus
+import fr.geotower.wear.data.model.WearScreen
+import fr.geotower.wear.data.model.WearTower
 import fr.geotower.wear.data.repository.WearTowerRepository
-import fr.geotower.wear.presentation.components.GpsStatusHeader
-import fr.geotower.wear.presentation.components.SourceToggleChip
-import fr.geotower.wear.presentation.components.TowerCard
+import fr.geotower.wear.presentation.screens.RadarCompassScreen
+import fr.geotower.wear.presentation.screens.SettingsScreen
+import fr.geotower.wear.presentation.screens.TowerDetailScreen
+import fr.geotower.wear.presentation.screens.TowerListScreen
 import fr.geotower.wear.presentation.theme.GeoTowerWearTheme
 import kotlinx.coroutines.launch
 
@@ -55,14 +55,18 @@ fun WearApp(
     onRequestPermissions: () -> Unit = {}
 ) {
     GeoTowerWearTheme {
-        val listState = rememberScalingLazyListState()
         val scope = rememberCoroutineScope()
 
         val gpsStatus by gpsEngine.gpsStatus.collectAsStateWithLifecycle()
         val dataSourceMode by repository.dataSourceMode.collectAsStateWithLifecycle()
         val towers by repository.towers.collectAsStateWithLifecycle()
+        val selectedTowerId by repository.selectedTowerId.collectAsStateWithLifecycle()
+        val operatorFilter by repository.operatorFilter.collectAsStateWithLifecycle()
         val isLoading by repository.isLoading.collectAsStateWithLifecycle()
         val errorMessage by repository.errorMessage.collectAsStateWithLifecycle()
+
+        var currentScreen by remember { mutableStateOf(WearScreen.RADAR) }
+        var inspectedTower by remember { mutableStateOf<WearTower?>(null) }
 
         // Démarre l'écoute du GPS matériel interne de la montre
         DisposableEffect(Unit) {
@@ -72,7 +76,7 @@ fun WearApp(
             }
         }
 
-        // Lorsque le GPS de la montre obtient un fix pour la première fois, charger les antennes
+        // Chargement automatique lors du premier fix GPS
         LaunchedEffect(gpsStatus) {
             val status = gpsStatus
             if (status is GpsFixStatus.Fixed && towers.isEmpty() && !isLoading) {
@@ -80,129 +84,203 @@ fun WearApp(
             }
         }
 
+        // Filtrage des antennes selon le choix utilisateur (Tous / Orange / SFR / Bouygues / Free)
+        val filteredTowers = remember(towers, operatorFilter) {
+            val filter = operatorFilter
+            if (filter == null) {
+                towers
+            } else {
+                towers.filter { it.operator.uppercase().contains(filter.uppercase()) }
+            }
+        }
+
+        // Antenne active / cible verrouillée sur le radar
+        val selectedTower = remember(filteredTowers, selectedTowerId) {
+            filteredTowers.find { it.id == selectedTowerId } ?: filteredTowers.firstOrNull()
+        }
+
+        // Gestion du bouton retour physique / swipe
+        BackHandler(enabled = currentScreen != WearScreen.RADAR) {
+            if (currentScreen == WearScreen.DETAIL) {
+                currentScreen = WearScreen.LIST
+            } else {
+                currentScreen = WearScreen.RADAR
+            }
+        }
+
         Scaffold(
             timeText = { TimeText() },
-            vignette = { Vignette(vignettePosition = VignettePosition.TopAndBottom) },
-            positionIndicator = { PositionIndicator(scalingLazyListState = listState) },
-            modifier = modifier.fillMaxSize().background(MaterialTheme.colors.background)
+            modifier = modifier.fillMaxSize().background(Color.Black)
         ) {
-            ScalingLazyColumn(
-                state = listState,
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 28.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier.fillMaxSize()
-            ) {
-                // Titre de l'application
-                item {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp)
-                    ) {
-                        Text(
-                            text = "🗼 GeoTower",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colors.primary
+            Box(modifier = Modifier.fillMaxSize()) {
+                // Affichage de l'écran actif
+                when (currentScreen) {
+                    WearScreen.RADAR -> {
+                        RadarCompassScreen(
+                            towers = filteredTowers,
+                            selectedTower = selectedTower,
+                            gpsStatus = gpsStatus,
+                            dataSourceMode = dataSourceMode,
+                            onTowerSelected = { tower ->
+                                repository.selectTower(tower.id)
+                            },
+                            onOpenDetails = { tower ->
+                                inspectedTower = tower
+                                currentScreen = WearScreen.DETAIL
+                            },
+                            onNavigateToList = {
+                                currentScreen = WearScreen.LIST
+                            }
                         )
                     }
-                }
 
-                // Statut GPS Montre (utilise systématiquement la puce de la montre)
-                item {
-                    GpsStatusHeader(gpsStatus = gpsStatus)
-                }
-
-                // Sélecteur de source de données (Téléphone Room vs Web API)
-                item {
-                    SourceToggleChip(
-                        currentMode = dataSourceMode,
-                        onToggle = {
-                            val newMode = if (dataSourceMode == DataSourceMode.PHONE_LOCAL) {
-                                DataSourceMode.WEB_API
-                            } else {
-                                DataSourceMode.PHONE_LOCAL
-                            }
-                            repository.setDataSourceMode(newMode)
-                            val status = gpsStatus
-                            if (status is GpsFixStatus.Fixed) {
-                                scope.launch {
-                                    repository.loadTowers(status.latitude, status.longitude)
+                    WearScreen.LIST -> {
+                        TowerListScreen(
+                            towers = filteredTowers,
+                            selectedTower = selectedTower,
+                            isLoading = isLoading,
+                            errorMessage = errorMessage,
+                            onTowerSelected = { tower ->
+                                repository.selectTower(tower.id)
+                                currentScreen = WearScreen.RADAR // Verrouille et bascule directement sur le radar
+                            },
+                            onOpenDetails = { tower ->
+                                inspectedTower = tower
+                                currentScreen = WearScreen.DETAIL
+                            },
+                            onRefresh = {
+                                val status = gpsStatus
+                                if (status is GpsFixStatus.Fixed) {
+                                    scope.launch {
+                                        repository.loadTowers(status.latitude, status.longitude)
+                                    }
+                                } else if (status is GpsFixStatus.Error && status.message.contains("Permission")) {
+                                    onRequestPermissions()
+                                } else {
+                                    gpsEngine.startListening()
                                 }
                             }
-                        }
-                    )
-                }
-
-                // Indicateur de chargement
-                if (isLoading) {
-                    item {
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)
-                        ) {
-                            CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                        }
-                    }
-                }
-
-                // Message d'erreur s'il y a lieu
-                if (errorMessage != null && !isLoading) {
-                    item {
-                        Text(
-                            text = errorMessage ?: "",
-                            fontSize = 10.sp,
-                            color = MaterialTheme.colors.error,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)
-                        )
-                    }
-                }
-
-                // Liste des antennes relais
-                if (towers.isNotEmpty()) {
-                    item {
-                        Text(
-                            text = "Antennes proches (${towers.size}) :",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colors.onSurfaceVariant,
-                            modifier = Modifier.padding(start = 4.dp, top = 2.dp)
                         )
                     }
 
-                    items(towers) { tower ->
-                        TowerCard(tower = tower)
-                    }
-                }
-
-                // Bouton Rafraîchir
-                item {
-                    Spacer(Modifier.height(4.dp))
-                    CompactChip(
-                        onClick = {
-                            val status = gpsStatus
-                            if (status is GpsFixStatus.Fixed) {
-                                scope.launch {
-                                    repository.loadTowers(status.latitude, status.longitude)
+                    WearScreen.SETTINGS -> {
+                        SettingsScreen(
+                            currentSource = dataSourceMode,
+                            operatorFilter = operatorFilter,
+                            gpsStatus = gpsStatus,
+                            onSourceChanged = { newSource ->
+                                repository.setDataSourceMode(newSource)
+                                val status = gpsStatus
+                                if (status is GpsFixStatus.Fixed) {
+                                    scope.launch {
+                                        repository.loadTowers(status.latitude, status.longitude)
+                                    }
                                 }
-                            } else if (status is GpsFixStatus.Error && status.message.contains("Permission")) {
-                                onRequestPermissions()
-                            } else {
-                                gpsEngine.startListening()
+                            },
+                            onOperatorFilterChanged = { filter ->
+                                repository.setOperatorFilter(filter)
+                            },
+                            onForceRefresh = {
+                                val status = gpsStatus
+                                if (status is GpsFixStatus.Fixed) {
+                                    scope.launch {
+                                        repository.loadTowers(status.latitude, status.longitude)
+                                    }
+                                } else {
+                                    gpsEngine.startListening()
+                                }
                             }
-                        },
-                        label = {
-                            Text(
-                                text = "🔄 Rafraîchir",
-                                fontSize = 11.sp,
-                                modifier = Modifier.fillMaxWidth(),
-                                textAlign = TextAlign.Center
+                        )
+                    }
+
+                    WearScreen.DETAIL -> {
+                        val towerToShow = inspectedTower ?: selectedTower
+                        if (towerToShow != null) {
+                            TowerDetailScreen(
+                                tower = towerToShow,
+                                isTarget = selectedTower?.id == towerToShow.id,
+                                onLockTarget = {
+                                    repository.selectTower(towerToShow.id)
+                                    currentScreen = WearScreen.RADAR
+                                },
+                                onBack = {
+                                    currentScreen = WearScreen.LIST
+                                }
                             )
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                        } else {
+                            currentScreen = WearScreen.LIST
+                        }
+                    }
+                }
+
+                // Barre de menu de navigation rapide (identique à Garmin : Radar / Liste / Réglages)
+                if (currentScreen != WearScreen.DETAIL) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 2.dp)
+                    ) {
+                        QuickNavBar(
+                            currentScreen = currentScreen,
+                            onNavigate = { screen -> currentScreen = screen }
+                        )
+                    }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun QuickNavBar(
+    currentScreen: WearScreen,
+    onNavigate: (WearScreen) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color(0xFF1C1C1E).copy(alpha = 0.95f))
+            .padding(horizontal = 8.dp, vertical = 3.dp)
+    ) {
+        NavTabItem(
+            label = "🧭 Radar",
+            isSelected = currentScreen == WearScreen.RADAR,
+            onClick = { onNavigate(WearScreen.RADAR) }
+        )
+        NavTabItem(
+            label = "📋 Liste",
+            isSelected = currentScreen == WearScreen.LIST,
+            onClick = { onNavigate(WearScreen.LIST) }
+        )
+        NavTabItem(
+            label = "⚙️ Réglages",
+            isSelected = currentScreen == WearScreen.SETTINGS,
+            onClick = { onNavigate(WearScreen.SETTINGS) }
+        )
+    }
+}
+
+@Composable
+private fun NavTabItem(
+    label: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (isSelected) MaterialTheme.colors.primary else Color.Transparent)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 6.dp, vertical = 2.dp)
+    ) {
+        Text(
+            text = label,
+            fontSize = 9.sp,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+            color = if (isSelected) Color.White else MaterialTheme.colors.onSurfaceVariant
+        )
     }
 }

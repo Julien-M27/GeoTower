@@ -12,6 +12,8 @@ data class WearTower(
     val address: String,
     val latitude: Double,
     val longitude: Double,
+    val supportType: String = "Pylône",
+    val supportHeight: Int? = null,
     val source: String = "phone_db" // "phone_db" ou "web_api"
 ) {
     val cardinalDirection: String
@@ -64,3 +66,11 @@ sealed interface GpsFixStatus {
     ) : GpsFixStatus
     data class Error(val message: String) : GpsFixStatus
 }
+
+enum class WearScreen {
+    RADAR,
+    LIST,
+    SETTINGS,
+    DETAIL
+}
+

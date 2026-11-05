@@ -92,6 +92,8 @@ class WearDataLayerClient(private val context: Context) {
                     address = obj.optString("address", ""),
                     latitude = obj.optDouble("latitude", 0.0),
                     longitude = obj.optDouble("longitude", 0.0),
+                    supportType = obj.optString("supportType", "Pylône / Support"),
+                    supportHeight = if (obj.has("supportHeight") && !obj.isNull("supportHeight")) obj.getInt("supportHeight") else null,
                     source = "phone_db"
                 )
             )

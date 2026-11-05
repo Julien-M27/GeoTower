@@ -116,7 +116,9 @@ class WearablePhoneListenerService : WearableListenerService() {
                     technologies = parseTechnologies(loc.techMask ?: 0),
                     address = loc.codeInsee?.let { "Code Insee: $it" } ?: "",
                     latitude = lat,
-                    longitude = lon
+                    longitude = lon,
+                    supportType = if (loc.hasUndergroundSupport == 1) "Intérieur sous-terrain" else "Pylône / Support télécom",
+                    supportHeight = null
                 )
             } else {
                 null
@@ -134,6 +136,8 @@ class WearablePhoneListenerService : WearableListenerService() {
                 put("address", item.address)
                 put("latitude", item.latitude)
                 put("longitude", item.longitude)
+                put("supportType", item.supportType)
+                put("supportHeight", item.supportHeight)
             }
             jsonArray.put(obj)
         }
@@ -161,6 +165,8 @@ class WearablePhoneListenerService : WearableListenerService() {
         val technologies: String,
         val address: String,
         val latitude: Double,
-        val longitude: Double
+        val longitude: Double,
+        val supportType: String,
+        val supportHeight: Int?
     )
 }

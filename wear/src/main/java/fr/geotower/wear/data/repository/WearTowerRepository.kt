@@ -20,11 +20,25 @@ class WearTowerRepository(context: Context) {
     private val _towers = MutableStateFlow<List<WearTower>>(emptyList())
     val towers: StateFlow<List<WearTower>> = _towers.asStateFlow()
 
+    private val _selectedTowerId = MutableStateFlow<String?>(null)
+    val selectedTowerId: StateFlow<String?> = _selectedTowerId.asStateFlow()
+
+    private val _operatorFilter = MutableStateFlow<String?>(null) // null = Tous, ou "ORANGE", "SFR", "BOUYGUES", "FREE"
+    val operatorFilter: StateFlow<String?> = _operatorFilter.asStateFlow()
+
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
+
+    fun selectTower(id: String) {
+        _selectedTowerId.value = id
+    }
+
+    fun setOperatorFilter(filter: String?) {
+        _operatorFilter.value = filter
+    }
 
     fun setDataSourceMode(mode: DataSourceMode) {
         preferences.setDataSourceMode(mode)
@@ -46,6 +60,9 @@ class WearTowerRepository(context: Context) {
                 }
             }
             _towers.value = results
+            if (results.isNotEmpty() && (_selectedTowerId.value == null || results.none { it.id == _selectedTowerId.value })) {
+                _selectedTowerId.value = results.first().id
+            }
             if (results.isEmpty()) {
                 _errorMessage.value = "Aucune antenne dans un rayon de 5 km"
             }
