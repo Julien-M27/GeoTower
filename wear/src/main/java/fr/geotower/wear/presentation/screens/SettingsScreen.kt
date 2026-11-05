@@ -55,10 +55,11 @@ fun SettingsScreen(
     ScalingLazyColumn(
         state = listState,
         autoCentering = AutoCenteringParams(itemIndex = 1),
-        contentPadding = PaddingValues(start = 10.dp, top = 20.dp, end = 10.dp, bottom = 26.dp),
+        contentPadding = PaddingValues(start = 10.dp, top = 16.dp, end = 10.dp, bottom = 26.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
         modifier = modifier.fillMaxSize().background(Color.Black)
     ) {
+        // En-tête compactée pour placer le bandeau de sélection directement au centre
         item {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -70,20 +71,17 @@ fun SettingsScreen(
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colors.primary
                 )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = "SOURCE DES DONNÉES",
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colors.onSurfaceVariant
+                )
             }
         }
 
-        // Section 1 : Source des données (avec Auto, Phone, Web)
-        item {
-            Text(
-                text = "SOURCE DES DONNÉES",
-                fontSize = 9.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colors.onSurfaceVariant,
-                modifier = Modifier.padding(start = 4.dp, top = 2.dp)
-            )
-        }
-
+        // Section 1 : Source des données (avec Auto au centre de l'écran par défaut)
         items(sourceModes.size) { index ->
             val (mode, desc) = sourceModes[index]
             val isSelected = currentSource == mode

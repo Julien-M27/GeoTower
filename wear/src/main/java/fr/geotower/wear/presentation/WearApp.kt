@@ -1,5 +1,6 @@
 package fr.geotower.wear.presentation
 
+import android.location.Location
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -57,6 +58,7 @@ fun WearApp(
         var currentScreen by remember { mutableStateOf(WearScreen.HOME) }
         var inspectedTower by remember { mutableStateOf<WearTower?>(null) }
         var inspectedOperatorSite by remember { mutableStateOf<WearOperatorSite?>(null) }
+        var lastLoadedCoords by remember { mutableStateOf<Pair<Double, Double>?>(null) }
 
         // Démarre l'écoute du GPS matériel interne de la montre avec la fréquence sélectionnée
         LaunchedEffect(gpsRefreshInterval) {
@@ -70,11 +72,22 @@ fun WearApp(
             }
         }
 
-        // Chargement automatique dès que le fix GPS de la montre est obtenu
+        // Chargement automatique dès que le fix GPS de la montre est obtenu ou qu'on se déplace (> 50m)
         LaunchedEffect(gpsStatus) {
             val status = gpsStatus
-            if (status is GpsFixStatus.Fixed && towers.isEmpty() && !isLoading) {
-                repository.loadTowers(status.latitude, status.longitude)
+            if (status is GpsFixStatus.Fixed) {
+                val last = lastLoadedCoords
+                val shouldReload = if (last == null) {
+                    true
+                } else {
+                    val distResults = FloatArray(1)
+                    Location.distanceBetween(last.first, last.second, status.latitude, status.longitude, distResults)
+                    distResults[0] > 50f
+                }
+                if (shouldReload && !isLoading) {
+                    lastLoadedCoords = Pair(status.latitude, status.longitude)
+                    repository.loadTowers(status.latitude, status.longitude)
+                }
             }
         }
 
@@ -128,6 +141,12 @@ fun WearApp(
                                 currentScreen = WearScreen.SUPPORT_DETAIL
                             },
                             onRefresh = {
+                                gpsEngine.forceRefreshLocation { loc ->
+                                    lastLoadedCoords = Pair(loc.latitude, loc.longitude)
+                                    scope.launch {
+                                        repository.loadTowers(loc.latitude, loc.longitude)
+                                    }
+                                }
                                 val status = gpsStatus
                                 if (status is GpsFixStatus.Fixed) {
                                     scope.launch {
@@ -194,6 +213,12 @@ fun WearApp(
                                 repository.setGpsRefreshInterval(newInterval)
                             },
                             onForceRefresh = {
+                                gpsEngine.forceRefreshLocation { loc ->
+                                    lastLoadedCoords = Pair(loc.latitude, loc.longitude)
+                                    scope.launch {
+                                        repository.loadTowers(loc.latitude, loc.longitude)
+                                    }
+                                }
                                 val status = gpsStatus
                                 if (status is GpsFixStatus.Fixed) {
                                     scope.launch {

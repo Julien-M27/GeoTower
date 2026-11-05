@@ -91,6 +91,58 @@ class WatchGpsEngine(private val context: Context) {
         }
     }
 
+    /**
+     * Force une réactualisation immédiate des coordonnées GPS de la montre,
+     * qu'elle soit en veille ou en mode 'À l'ouverture'.
+     */
+    @SuppressLint("MissingPermission")
+    fun forceRefreshLocation(onLocationReceived: ((Location) -> Unit)? = null) {
+        if (!hasLocationPermission()) {
+            _gpsStatus.value = GpsFixStatus.Error("Permission GPS requise")
+            return
+        }
+
+        // 1. Tente d'abord de lire une position récente connue
+        val lastGps = try {
+            locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+        } catch (e: Exception) {
+            null
+        }
+
+        if (lastGps != null) {
+            _gpsStatus.value = GpsFixStatus.Fixed(
+                latitude = lastGps.latitude,
+                longitude = lastGps.longitude,
+                accuracyMeters = lastGps.accuracy,
+                provider = "GPS Montre"
+            )
+            onLocationReceived?.invoke(lastGps)
+        }
+
+        // 2. Demande une acquisition fraîche haute précision
+        try {
+            fusedClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
+                .addOnSuccessListener { loc ->
+                    if (loc != null) {
+                        _gpsStatus.value = GpsFixStatus.Fixed(
+                            latitude = loc.latitude,
+                            longitude = loc.longitude,
+                            accuracyMeters = loc.accuracy,
+                            provider = "GPS Montre"
+                        )
+                        onLocationReceived?.invoke(loc)
+                    }
+                }
+        } catch (e: Exception) {
+            Log.w(TAG, "getCurrentLocation a échoué", e)
+        }
+
+        // 3. Relance l'écoute continue ou temporaire si nécessaire
+        if (!isListening) {
+            startListening()
+        }
+    }
+
     fun hasLocationPermission(): Boolean {
         return androidx.core.content.ContextCompat.checkSelfPermission(
             context,

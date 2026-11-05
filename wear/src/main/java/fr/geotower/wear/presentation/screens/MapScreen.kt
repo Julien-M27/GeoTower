@@ -194,43 +194,45 @@ fun MapScreen(
                 )
             }
 
-            // 2. Cercles de distance Garmin concentriques
-            val ringSteps = 3
-            for (step in 1..ringSteps) {
-                val radius = mapRadius * (step / ringSteps.toFloat())
+            // 2. Cercles de distance Garmin concentriques adaptés à l'échelle Mercator
+            val metersPerPixel = (40075016.686 * cos(latRad)) / (n * tileSizePx)
+            val ringStepMeters = maxRange / 3f
+            for (step in 1..3) {
+                val ringRadius = (step * ringStepMeters / metersPerPixel).toFloat()
                 drawCircle(
                     color = Color(0xFF2C3847).copy(alpha = 0.8f),
-                    radius = radius,
+                    radius = ringRadius,
                     center = center,
                     style = Stroke(width = 1.dp.toPx())
                 )
             }
 
             // 3. Axes Nord-Sud et Est-Ouest
+            val maxRadiusPx = (maxRange / metersPerPixel).toFloat().coerceAtMost(size.minDimension / 2f)
             drawLine(
                 color = Color(0xFF2C3847).copy(alpha = 0.6f),
-                start = Offset(center.x, center.y - mapRadius),
-                end = Offset(center.x, center.y + mapRadius),
+                start = Offset(center.x, center.y - maxRadiusPx),
+                end = Offset(center.x, center.y + maxRadiusPx),
                 strokeWidth = 1.dp.toPx()
             )
             drawLine(
                 color = Color(0xFF2C3847).copy(alpha = 0.6f),
-                start = Offset(center.x - mapRadius, center.y),
-                end = Offset(center.x + mapRadius, center.y),
+                start = Offset(center.x - maxRadiusPx, center.y),
+                end = Offset(center.x + maxRadiusPx, center.y),
                 strokeWidth = 1.dp.toPx()
             )
 
             // 4. Tracé direct (Polyline) de l'utilisateur vers l'antenne sélectionnée
             val target = selectedTower ?: towers.firstOrNull()
             if (target != null) {
-                val targetDistFraction = (target.distanceMeters.toFloat() / maxRange).coerceAtMost(1.05f)
-                val targetCanvasDist = mapRadius * targetDistFraction
-                val targetAngleRad = Math.toRadians((target.bearingDegrees - 90).toDouble())
-                val targetPointX = center.x + (targetCanvasDist * cos(targetAngleRad)).toFloat()
-                val targetPointY = center.y + (targetCanvasDist * sin(targetAngleRad)).toFloat()
+                val targetExactX = (target.longitude + 180.0) / 360.0 * n
+                val targetLatRad = Math.toRadians(target.latitude.coerceIn(-85.0, 85.0))
+                val targetExactY = (1.0 - ln(tan(targetLatRad) + 1.0 / cos(targetLatRad)) / Math.PI) / 2.0 * n
+                val targetPointX = center.x + ((targetExactX - exactX) * tileSizePx).toFloat()
+                val targetPointY = center.y + ((targetExactY - exactY) * tileSizePx).toFloat()
                 val targetOpColor = getOperatorColor(target.operator)
 
-                // Ligne de liaison Garmin
+                // Ligne de liaison Garmin vers le point exact
                 drawLine(
                     color = targetOpColor.copy(alpha = 0.9f),
                     start = center,
@@ -239,22 +241,62 @@ fun MapScreen(
                 )
             }
 
-            // 5. Marqueurs des antennes relais spatialisées
+            // 5. Marqueurs des antennes relais spatialisées (découpées par opérateur comme sur smartphone)
             towers.forEach { tower ->
-                val distFraction = (tower.distanceMeters.toFloat() / maxRange).coerceAtMost(1.05f)
-                val canvasDist = mapRadius * distFraction
-                val angleRad = Math.toRadians((tower.bearingDegrees - 90).toDouble())
-                val pointX = center.x + (canvasDist * cos(angleRad)).toFloat()
-                val pointY = center.y + (canvasDist * sin(angleRad)).toFloat()
-                val opColor = getOperatorColor(tower.operator)
-                val isSelected = target?.id == tower.id
+                val towerExactX = (tower.longitude + 180.0) / 360.0 * n
+                val towerLatRad = Math.toRadians(tower.latitude.coerceIn(-85.0, 85.0))
+                val towerExactY = (1.0 - ln(tan(towerLatRad) + 1.0 / cos(towerLatRad)) / Math.PI) / 2.0 * n
 
-                // Point antenne
+                val pointX = center.x + ((towerExactX - exactX) * tileSizePx).toFloat()
+                val pointY = center.y + ((towerExactY - exactY) * tileSizePx).toFloat()
+
+                val isSelected = target?.id == tower.id
+                val pinRadius = if (isSelected) 6.dp.toPx() else 4.5.dp.toPx()
+                val pinRectSize = Size(pinRadius * 2f, pinRadius * 2f)
+                val pinTopLeft = Offset(pointX - pinRadius, pointY - pinRadius)
+
+                val ops = tower.operators.ifEmpty {
+                    listOf(fr.geotower.wear.data.model.WearOperatorSite(operator = tower.operator))
+                }
+
+                if (ops.size <= 1) {
+                    val opColor = getOperatorColor(ops.firstOrNull()?.operator ?: tower.operator)
+                    drawCircle(
+                        color = opColor,
+                        radius = pinRadius,
+                        center = Offset(pointX, pointY)
+                    )
+                } else {
+                    val sweepAngle = 360f / ops.size
+                    ops.forEachIndexed { i, op ->
+                        drawArc(
+                            color = getOperatorColor(op.operator),
+                            startAngle = -90f + (i * sweepAngle),
+                            sweepAngle = sweepAngle,
+                            useCenter = true,
+                            topLeft = pinTopLeft,
+                            size = pinRectSize
+                        )
+                    }
+                }
+
+                // Contour fin noir contrasté
                 drawCircle(
-                    color = opColor,
-                    radius = if (isSelected) 5.dp.toPx() else 4.dp.toPx(),
-                    center = Offset(pointX, pointY)
+                    color = Color.Black.copy(alpha = 0.85f),
+                    radius = pinRadius,
+                    center = Offset(pointX, pointY),
+                    style = Stroke(width = 1.dp.toPx())
                 )
+
+                // Si sélectionné : anneau de ciblage blanc distinctif
+                if (isSelected) {
+                    drawCircle(
+                        color = Color.White,
+                        radius = pinRadius + 3.dp.toPx(),
+                        center = Offset(pointX, pointY),
+                        style = Stroke(width = 2.dp.toPx())
+                    )
+                }
             }
 
             // 6. Marqueur Position Utilisateur (Moi)
@@ -271,6 +313,11 @@ fun MapScreen(
         }
 
         // Éléments d'interface superposés (Bandeaux style Garmin)
+        val activeTower = selectedTower ?: towers.firstOrNull()
+        val currentIndex = towers.indexOfFirst { it.id == activeTower?.id }.let { if (it >= 0) it else 0 }
+        val hasPrev = currentIndex > 0
+        val hasNext = currentIndex < towers.lastIndex
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -278,13 +325,11 @@ fun MapScreen(
             verticalArrangement = Arrangement.SpaceBetween,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Bandeau supérieur style Garmin (Opérateurs • Bascule OSM/RADAR • Échelle)
-            // Centré et ajusté pour ne pas être tronqué par le haut de l'écran circulaire
-            val activeTower = selectedTower ?: towers.firstOrNull()
+            // Bandeau supérieur style Garmin (Description Mini map • Bascule OSM/RADAR • Échelle)
             Box(
                 modifier = Modifier
                     .fillMaxWidth(0.68f)
-                    .padding(top = 38.dp)
+                    .padding(top = 34.dp)
                     .clip(RoundedCornerShape(12.dp))
                     .background(Color.Black.copy(alpha = 0.88f))
                     .padding(horizontal = 8.dp, vertical = 3.dp)
@@ -295,7 +340,7 @@ fun MapScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = activeTower?.let { getOperatorShortName(it.operator) } ?: "Mini map",
+                        text = "Mini map",
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colors.primary,
@@ -334,93 +379,155 @@ fun MapScreen(
 
             Spacer(Modifier.weight(1f))
 
-            // Bas : Commandes de zoom Garmin (+ / -) et Support sélectionné
-            // Espacé et surélevé pour être entièrement visible au-dessus du bord inférieur circulaire
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center,
-                modifier = Modifier
-                    .fillMaxWidth(0.82f)
-                    .padding(bottom = 22.dp)
+            // Bas de l'écran : Navigation entre sites et commandes de zoom
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxWidth()
             ) {
-                // Zoom Moins
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .size(26.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFF2C2C2E).copy(alpha = 0.95f))
-                        .clickable(enabled = zoomIndex < zoomScales.lastIndex) {
-                            if (zoomIndex < zoomScales.lastIndex) zoomIndex++
-                        }
-                ) {
-                    Text(
-                        text = "−",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (zoomIndex < zoomScales.lastIndex) Color.White else Color(0xFF666666)
-                    )
-                }
-
-                Spacer(Modifier.width(6.dp))
-
-                // Cartouche central : Support, distance et azimut (sans coupure)
+                // Rangée 1 : Navigation de site en site (flèche gauche ◀, fiche détails cliquable, flèche droite ▶)
                 if (activeTower != null) {
-                    Box(
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
                         modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Color.Black.copy(alpha = 0.90f))
-                            .clickable { onOpenDetails(activeTower) }
-                            .padding(horizontal = 5.dp, vertical = 3.dp)
+                            .fillMaxWidth(0.86f)
+                            .padding(bottom = 3.dp)
                     ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.fillMaxWidth()
+                        // Flèche précédent ◀
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clip(CircleShape)
+                                .background(if (hasPrev) Color(0xFF2C2C2E).copy(alpha = 0.95f) else Color(0x661E1E20))
+                                .clickable(enabled = hasPrev) {
+                                    if (hasPrev) onTowerSelected(towers[currentIndex - 1])
+                                }
                         ) {
                             Text(
-                                text = "${activeTower.distanceMeters} m • ${activeTower.cardinalDirection} (${activeTower.bearingDegrees}°)",
-                                fontSize = 8.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White,
-                                maxLines = 1,
-                                softWrap = false
+                                text = "◀",
+                                fontSize = 10.sp,
+                                color = if (hasPrev) Color.White else Color(0xFF555555)
                             )
-                            val supDesc = if (activeTower.supportHeight != null && activeTower.supportHeight > 0) {
-                                "${activeTower.supportType} (${activeTower.supportHeight}m)"
-                            } else {
-                                activeTower.supportType
+                        }
+
+                        Spacer(Modifier.width(4.dp))
+
+                        // Cartouche central cliquable : Fiche détails du site (comme sur Garmin)
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color.Black.copy(alpha = 0.92f))
+                                .clickable { onOpenDetails(activeTower) }
+                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                val opBadge = activeTower.operators.firstOrNull()?.operator ?: activeTower.operator
+                                Text(
+                                    text = "$opBadge • ${activeTower.distanceMeters} m • ${activeTower.cardinalDirection}",
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White,
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
+                                val supDesc = if (activeTower.supportHeight != null && activeTower.supportHeight > 0) {
+                                    "${activeTower.supportType} (${activeTower.supportHeight}m)"
+                                } else {
+                                    activeTower.supportType
+                                }
+                                Text(
+                                    text = if (towers.isNotEmpty()) "${currentIndex + 1}/${towers.size} • $supDesc" else supDesc,
+                                    fontSize = 7.sp,
+                                    color = Color(0xFFFFB300),
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
                             }
+                        }
+
+                        Spacer(Modifier.width(4.dp))
+
+                        // Flèche suivant ▶
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clip(CircleShape)
+                                .background(if (hasNext) Color(0xFF2C2C2E).copy(alpha = 0.95f) else Color(0x661E1E20))
+                                .clickable(enabled = hasNext) {
+                                    if (hasNext) onTowerSelected(towers[currentIndex + 1])
+                                }
+                        ) {
                             Text(
-                                text = supDesc,
-                                fontSize = 7.5.sp,
-                                color = Color(0xFFFFB300),
-                                maxLines = 1,
-                                softWrap = false
+                                text = "▶",
+                                fontSize = 10.sp,
+                                color = if (hasNext) Color.White else Color(0xFF555555)
                             )
                         }
                     }
                 }
 
-                Spacer(Modifier.width(6.dp))
-
-                // Zoom Plus
-                Box(
-                    contentAlignment = Alignment.Center,
+                // Rangée 2 : Boutons de zoom réhaussés et centrés (étroits, non mangés par les bords circulaires)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
                     modifier = Modifier
-                        .size(26.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFF2C2C2E).copy(alpha = 0.95f))
-                        .clickable(enabled = zoomIndex > 0) {
-                            if (zoomIndex > 0) zoomIndex--
-                        }
+                        .fillMaxWidth(0.52f)
+                        .padding(bottom = 14.dp)
                 ) {
+                    // Zoom Moins (−)
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(22.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF2C2C2E).copy(alpha = 0.95f))
+                            .clickable(enabled = zoomIndex < zoomScales.lastIndex) {
+                                if (zoomIndex < zoomScales.lastIndex) zoomIndex++
+                            }
+                    ) {
+                        Text(
+                            text = "−",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (zoomIndex < zoomScales.lastIndex) Color.White else Color(0xFF666666)
+                        )
+                    }
+
+                    Spacer(Modifier.width(10.dp))
+
                     Text(
-                        text = "+",
-                        fontSize = 14.sp,
+                        text = if (maxRange >= 1000f) "${(maxRange / 1000).toInt()} km" else "${maxRange.toInt()} m",
+                        fontSize = 8.5.sp,
                         fontWeight = FontWeight.Bold,
-                        color = if (zoomIndex > 0) Color.White else Color(0xFF666666)
+                        color = Color(0xFF30D158)
                     )
+
+                    Spacer(Modifier.width(10.dp))
+
+                    // Zoom Plus (+)
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(22.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF2C2C2E).copy(alpha = 0.95f))
+                            .clickable(enabled = zoomIndex > 0) {
+                                if (zoomIndex > 0) zoomIndex--
+                            }
+                    ) {
+                        Text(
+                            text = "+",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (zoomIndex > 0) Color.White else Color(0xFF666666)
+                        )
+                    }
                 }
             }
         }
