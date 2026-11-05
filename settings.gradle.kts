@@ -22,4 +22,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "GeoTower"
 include(":app")
+include(":wear")
  

@@ -214,6 +214,19 @@
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
+        <!-- Service d'écoute Wearable pour répondre aux requêtes de la montre Wear OS -->
+        <service
+            android:name=".services.wear.WearablePhoneListenerService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <data
+                    android:host="*"
+                    android:pathPrefix="/geotower"
+                    android:scheme="wear" />
+            </intent-filter>
+        </service>
+
         <!-- Android Auto must discover this exported CarAppService; release hosts are restricted in createHostValidator(). -->
         <service
             android:name=".services.GeoTowerCarAppService"

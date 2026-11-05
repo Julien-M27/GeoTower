@@ -29,6 +29,8 @@ glance = "1.1.1"
 work = "2.11.2"
 exifinterface = "1.4.2"
 garminConnectIq = "2.4.0"
+playServicesWearable = "19.0.0"
+wearCompose = "1.4.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -79,6 +81,10 @@ retrofit-converter-gson = { group = "com.squareup.retrofit2", name = "converter-
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coilCompose" }
 zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
 play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
+play-services-wearable = { group = "com.google.android.gms", name = "play-services-wearable", version.ref = "playServicesWearable" }
+androidx-wear-compose-material = { group = "androidx.wear.compose", name = "compose-material", version.ref = "wearCompose" }
+androidx-wear-compose-foundation = { group = "androidx.wear.compose", name = "compose-foundation", version.ref = "wearCompose" }
+androidx-wear-compose-navigation = { group = "androidx.wear.compose", name = "compose-navigation", version.ref = "wearCompose" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

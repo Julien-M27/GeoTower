@@ -191,4 +191,5 @@ dependencies {
 
     // Garmin Connect IQ Companion App SDK (communication BLE montre Garmin)
     implementation(libs.garmin.connectiq)
+    implementation(libs.play.services.wearable)
 }
