@@ -3478,6 +3478,7 @@
     <string name="appstrings_release_v217_summary_garmin_background_foreground_service">Servizio in background opzionale per mantenere la connessione Bluetooth con gli orologi Garmin a schermo spento</string>
     <string name="appstrings_release_v218_summary_garmin_switch_ui_styling">Armonizzazione visiva dell\'interruttore di collegamento con lo smartwatch Garmin con il design dell\'app (stili One UI e Material)</string>
     <string name="appstrings_release_v219_summary_garmin_notification_access_and_continuous_mode">Accesso diretto alle impostazioni Garmin dalla notifica permanente, funzionamento continuo in background e miglioramenti al registro di connessione</string>
+    <string name="appstrings_release_v2110_summary_garmin_duration_selector_and_countdown">Selettore di durata (illimitato, 1h, 2h, 4h, 8h) con conto alla rovescia in tempo reale e arresto automatico per il collegamento smartwatch Garmin in background</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registro richieste di rete</string>

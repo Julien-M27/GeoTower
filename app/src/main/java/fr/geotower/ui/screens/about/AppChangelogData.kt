@@ -27,10 +27,16 @@ data class ChangelogMilestone(
 object AppChangelogRepository {
     val milestones: List<ChangelogMilestone> = listOf(
         ChangelogMilestone(
-            versionName = "2.1.9",
+            versionName = "2.1.10",
             releaseDate = "2026-11-05",
             isCurrent = true,
             badge = MilestoneBadge.CURRENT,
+            summary = "Sélecteur de durée et décompte en direct pour la liaison montre Garmin écran éteint",
+            itemResIds = listOf(R.string.appstrings_release_v2110_summary_garmin_duration_selector_and_countdown)
+        ),
+        ChangelogMilestone(
+            versionName = "2.1.9",
+            releaseDate = "2026-11-05",
             summary = "Accès direct aux réglages Garmin depuis la notification et fonctionnement continu",
             itemResIds = listOf(R.string.appstrings_release_v219_summary_garmin_notification_access_and_continuous_mode)
         ),

@@ -3478,6 +3478,7 @@
     <string name="appstrings_release_v217_summary_garmin_background_foreground_service">Serviço em segundo plano opcional para manter a ligação Bluetooth com os relógios Garmin com o ecrã desligado</string>
     <string name="appstrings_release_v218_summary_garmin_switch_ui_styling">Harmonização visual do interruptor de ligação do relógio Garmin com o design da aplicação (estilos One UI e Material)</string>
     <string name="appstrings_release_v219_summary_garmin_notification_access_and_continuous_mode">Acesso direto às configurações Garmin a partir da notificação persistente, funcionamento contínuo em segundo plano e melhorias no registo de ligação</string>
+    <string name="appstrings_release_v2110_summary_garmin_duration_selector_and_countdown">Seletor de duração (ilimitado, 1h, 2h, 4h, 8h) com contagem decrescente em direto e paragem automática para a ligação ao relógio Garmin em segundo plano</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registo de pedidos de rede</string>
