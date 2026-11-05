@@ -51,7 +51,8 @@ import kotlinx.coroutines.launch
 fun WearApp(
     gpsEngine: WatchGpsEngine,
     repository: WearTowerRepository,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onRequestPermissions: () -> Unit = {}
 ) {
     GeoTowerWearTheme {
         val listState = rememberScalingLazyListState()
@@ -184,6 +185,8 @@ fun WearApp(
                                 scope.launch {
                                     repository.loadTowers(status.latitude, status.longitude)
                                 }
+                            } else if (status is GpsFixStatus.Error && status.message.contains("Permission")) {
+                                onRequestPermissions()
                             } else {
                                 gpsEngine.startListening()
                             }

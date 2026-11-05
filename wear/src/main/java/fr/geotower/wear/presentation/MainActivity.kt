@@ -35,7 +35,8 @@ class MainActivity : ComponentActivity() {
         setContent {
             WearApp(
                 gpsEngine = gpsEngine,
-                repository = repository
+                repository = repository,
+                onRequestPermissions = { checkAndRequestLocationPermissions() }
             )
         }
     }

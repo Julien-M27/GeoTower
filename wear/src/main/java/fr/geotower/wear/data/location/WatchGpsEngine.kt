@@ -74,8 +74,20 @@ class WatchGpsEngine(private val context: Context) {
         }
     }
 
+    fun hasLocationPermission(): Boolean {
+        return androidx.core.content.ContextCompat.checkSelfPermission(
+            context,
+            android.Manifest.permission.ACCESS_FINE_LOCATION
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+    }
+
     @SuppressLint("MissingPermission")
     fun startListening() {
+        if (!hasLocationPermission()) {
+            _gpsStatus.value = GpsFixStatus.Error("Permission GPS requise")
+            return
+        }
+
         if (isListening) return
         isListening = true
         _gpsStatus.value = GpsFixStatus.Searching
