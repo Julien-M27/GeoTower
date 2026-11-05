@@ -209,6 +209,11 @@
             android:exported="false"
             android:foregroundServiceType="location" />
 
+        <service
+            android:name=".services.garmin.GarminCompanionService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
         <!-- Android Auto must discover this exported CarAppService; release hosts are restricted in createHostValidator(). -->
         <service
             android:name=".services.GeoTowerCarAppService"

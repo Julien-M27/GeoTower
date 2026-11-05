@@ -118,6 +118,23 @@ object GarminCompanionManager {
     private val _lastStatusMessage = MutableStateFlow<String?>("Non initialisé")
     val lastStatusMessage: StateFlow<String?> = _lastStatusMessage.asStateFlow()
 
+    const val PREF_GARMIN_BACKGROUND_SERVICE = "garmin_background_service_enabled"
+    private val _isBackgroundServiceEnabled = MutableStateFlow(false)
+    val isBackgroundServiceEnabled: StateFlow<Boolean> = _isBackgroundServiceEnabled.asStateFlow()
+
+    fun setBackgroundServiceEnabled(context: Context, enabled: Boolean) {
+        val appCtx = context.applicationContext
+        _isBackgroundServiceEnabled.value = enabled
+        val prefs = appCtx.getSharedPreferences("geotower_prefs", Context.MODE_PRIVATE)
+        prefs.edit().putBoolean(PREF_GARMIN_BACKGROUND_SERVICE, enabled).apply()
+        log("GarminBridge", "Liaison montre écran éteint configurée : $enabled")
+        if (enabled) {
+            GarminCompanionService.start(appCtx)
+        } else {
+            GarminCompanionService.stop(appCtx)
+        }
+    }
+
     private val deviceEventListener: IQDeviceEventListener = IQDeviceEventListener { device, newStatus ->
         runCatching {
             val name = device?.friendlyName ?: "Inconnue"
@@ -177,6 +194,14 @@ object GarminCompanionManager {
         }
         if (connectIQ != null) return
         repository = anfrRepo
+
+        val prefs = appCtx.getSharedPreferences("geotower_prefs", Context.MODE_PRIVATE)
+        val bgEnabled = prefs.getBoolean(PREF_GARMIN_BACKGROUND_SERVICE, false)
+        _isBackgroundServiceEnabled.value = bgEnabled
+        if (bgEnabled) {
+            GarminCompanionService.start(appCtx)
+        }
+
         log("GarminBridge", "Initialisation du SDK Connect IQ...")
 
         try {
