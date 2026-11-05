@@ -27,10 +27,16 @@ data class ChangelogMilestone(
 object AppChangelogRepository {
     val milestones: List<ChangelogMilestone> = listOf(
         ChangelogMilestone(
-            versionName = "2.1.6",
-            releaseDate = "2026-11-04",
+            versionName = "2.1.7",
+            releaseDate = "2026-11-05",
             isCurrent = true,
             badge = MilestoneBadge.CURRENT,
+            summary = "Service d'arrière-plan optionnel pour la liaison Bluetooth Garmin écran éteint",
+            itemResIds = listOf(R.string.appstrings_release_v217_summary_garmin_background_foreground_service)
+        ),
+        ChangelogMilestone(
+            versionName = "2.1.6",
+            releaseDate = "2026-11-04",
             summary = "Reception directe et deduplication des requetes Bluetooth montres Garmin",
             itemResIds = listOf(R.string.appstrings_release_v216_summary_garmin_direct_broadcast_and_deduplication)
         ),

@@ -3477,6 +3477,7 @@
     <string name="appstrings_release_v214_summary_garmin_r8_proguard_and_persisted_diagnostics">Stabilité de l\'application compagnon Garmin en version release (R8/Proguard) et affichage des journaux persistés dans le diagnostic</string>
     <string name="appstrings_release_v215_summary_garmin_background_wake_and_screen_off_sync">Réveil en arrière-plan et communication fiable écran éteint pour les montres Garmin Connect IQ via le service Binder</string>
     <string name="appstrings_release_v216_summary_garmin_direct_broadcast_and_deduplication">Réception directe et fiabilisée des requêtes Bluetooth des montres Garmin Connect IQ avec déduplication des messages</string>
+    <string name="appstrings_release_v217_summary_garmin_background_foreground_service">Service d\'arrière-plan optionnel pour maintenir la liaison Bluetooth avec les montres Garmin écran éteint</string>
 
     <!-- Journal des requêtes réseau -->
     <string name="network_log_title">Journal des requêtes réseau</string>
