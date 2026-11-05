@@ -67,10 +67,23 @@ fun MapScreen(
     onOpenDetails: (WearTower) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val activeTower = selectedTower ?: towers.firstOrNull()
+
     // Échelle de portée de la carte en mètres : 250m, 500m, 1000m, 2000m, 5000m
     val zoomScales = listOf(250f, 500f, 1000f, 2000f, 5000f)
     val tileZooms = listOf(16, 15, 14, 13, 12)
     var zoomIndex by remember { mutableStateOf(2) } // 1000m (zoom 14) par défaut
+
+    // Auto-zoom dynamique : si l'antenne est trop loin/en dehors du champ de vision, on dézoome ;
+    // et inversement, lorsqu'on revient sur une antenne plus proche, on rezoome automatiquement
+    LaunchedEffect(activeTower?.id) {
+        if (activeTower != null) {
+            val idealIndex = zoomScales.indexOfFirst { it * 0.85f >= activeTower.distanceMeters }
+                .let { if (it >= 0) it else zoomScales.lastIndex }
+            zoomIndex = idealIndex
+        }
+    }
+
     val maxRange = zoomScales[zoomIndex]
     val tileZoom = tileZooms[zoomIndex]
 
@@ -313,7 +326,6 @@ fun MapScreen(
         }
 
         // Éléments d'interface superposés (Bandeaux style Garmin)
-        val activeTower = selectedTower ?: towers.firstOrNull()
         val currentIndex = towers.indexOfFirst { it.id == activeTower?.id }.let { if (it >= 0) it else 0 }
         val hasPrev = currentIndex > 0
         val hasNext = currentIndex < towers.lastIndex

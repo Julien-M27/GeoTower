@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -25,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -65,6 +67,15 @@ fun RadarCompassScreen(
     val activeTower = selectedTower ?: towers.firstOrNull()
     val currentIndex = towers.indexOfFirst { it.id == activeTower?.id }.let { if (it >= 0) it else 0 }
 
+    // Adaptation automatique du niveau de zoom à l'antenne sélectionnée
+    LaunchedEffect(activeTower?.id) {
+        if (activeTower != null) {
+            val idealIndex = zoomScales.indexOfFirst { it * 0.85f >= activeTower.distanceMeters }
+                .let { if (it >= 0) it else zoomScales.lastIndex }
+            zoomIndex = idealIndex
+        }
+    }
+
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -102,22 +113,61 @@ fun RadarCompassScreen(
                 strokeWidth = 1.dp.toPx()
             )
 
-            // 3. Points radar pour chaque antenne
-            towers.take(12).forEach { tower ->
-                val distFraction = (tower.distanceMeters / maxDist).coerceIn(0.12f, 1.05f)
+            // 3. Points radar pour chaque antenne découpés par opérateur (comme sur la carte et smartphone)
+            towers.take(15).forEach { tower ->
+                val distFraction = (tower.distanceMeters / maxDist).coerceIn(0.12f, 1.02f)
                 val radarDist = maxRadarRadius * distFraction
                 val angleRad = Math.toRadians((tower.bearingDegrees - 90).toDouble())
                 val pointX = center.x + (radarDist * cos(angleRad)).toFloat()
                 val pointY = center.y + (radarDist * sin(angleRad)).toFloat()
-                val opColor = getOperatorColor(tower.operator)
-                val isSelected = activeTower?.id == tower.id
 
-                // Point antenne (sans cible blanche)
+                val isSelected = activeTower?.id == tower.id
+                val pinRadius = if (isSelected) 5.5.dp.toPx() else 4.dp.toPx()
+                val pinRectSize = Size(pinRadius * 2f, pinRadius * 2f)
+                val pinTopLeft = Offset(pointX - pinRadius, pointY - pinRadius)
+
+                val ops = tower.operators.ifEmpty {
+                    listOf(fr.geotower.wear.data.model.WearOperatorSite(operator = tower.operator))
+                }
+
+                if (ops.size <= 1) {
+                    val opColor = getOperatorColor(ops.firstOrNull()?.operator ?: tower.operator)
+                    drawCircle(
+                        color = opColor,
+                        radius = pinRadius,
+                        center = Offset(pointX, pointY)
+                    )
+                } else {
+                    val sweepAngle = 360f / ops.size
+                    ops.forEachIndexed { i, op ->
+                        drawArc(
+                            color = getOperatorColor(op.operator),
+                            startAngle = -90f + (i * sweepAngle),
+                            sweepAngle = sweepAngle,
+                            useCenter = true,
+                            topLeft = pinTopLeft,
+                            size = pinRectSize
+                        )
+                    }
+                }
+
+                // Bordure fine noire pour détacher nettement les points
                 drawCircle(
-                    color = opColor,
-                    radius = if (isSelected) 5.dp.toPx() else 3.5.dp.toPx(),
-                    center = Offset(pointX, pointY)
+                    color = Color.Black.copy(alpha = 0.85f),
+                    radius = pinRadius,
+                    center = Offset(pointX, pointY),
+                    style = Stroke(width = 1.dp.toPx())
                 )
+
+                // Anneau blanc distinctif pour l'antenne sélectionnée
+                if (isSelected) {
+                    drawCircle(
+                        color = Color.White,
+                        radius = pinRadius + 2.5.dp.toPx(),
+                        center = Offset(pointX, pointY),
+                        style = Stroke(width = 1.5.dp.toPx())
+                    )
+                }
             }
 
             // 4. Aiguille de cap au centre vers l'antenne sélectionnée
@@ -185,12 +235,12 @@ fun RadarCompassScreen(
 
             Spacer(Modifier.weight(1f))
 
-            // Bas : Commandes interactives de Zoom & Défilement des sites + Cartouche info
+            // Bas : Commandes interactives de Zoom & Défilement des sites + Cartouche info resserré
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
-                    .fillMaxWidth(0.84f)
-                    .padding(bottom = 18.dp)
+                    .fillMaxWidth(0.76f)
+                    .padding(bottom = 27.dp)
             ) {
                 // Barre de commandes : [◀ Site] [− Zoom] [Échelle] [+ Zoom] [Site ▶]
                 Row(
@@ -202,7 +252,7 @@ fun RadarCompassScreen(
                     Box(
                         contentAlignment = Alignment.Center,
                         modifier = Modifier
-                            .size(26.dp)
+                            .size(24.dp)
                             .clip(CircleShape)
                             .background(Color(0xFF2C2C2E).copy(alpha = 0.95f))
                             .clickable(enabled = towers.size > 1) {
@@ -214,7 +264,7 @@ fun RadarCompassScreen(
                     ) {
                         Text(
                             text = "◀",
-                            fontSize = 10.sp,
+                            fontSize = 9.5.sp,
                             color = if (towers.size > 1) Color.White else Color(0xFF555555)
                         )
                     }
@@ -223,7 +273,7 @@ fun RadarCompassScreen(
                     Box(
                         contentAlignment = Alignment.Center,
                         modifier = Modifier
-                            .size(26.dp)
+                            .size(24.dp)
                             .clip(CircleShape)
                             .background(Color(0xFF2C2C2E).copy(alpha = 0.95f))
                             .clickable(enabled = zoomIndex < zoomScales.lastIndex) {
@@ -232,7 +282,7 @@ fun RadarCompassScreen(
                     ) {
                         Text(
                             text = "−",
-                            fontSize = 14.sp,
+                            fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
                             color = if (zoomIndex < zoomScales.lastIndex) Color.White else Color(0xFF555555)
                         )
@@ -241,7 +291,7 @@ fun RadarCompassScreen(
                     // Échelle de portée active (ex: 1 km)
                     Text(
                         text = if (maxDist >= 1000f) "${(maxDist / 1000).toInt()} km" else "${maxDist.toInt()} m",
-                        fontSize = 8.5.sp,
+                        fontSize = 8.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF30D158)
                     )
@@ -250,7 +300,7 @@ fun RadarCompassScreen(
                     Box(
                         contentAlignment = Alignment.Center,
                         modifier = Modifier
-                            .size(26.dp)
+                            .size(24.dp)
                             .clip(CircleShape)
                             .background(Color(0xFF2C2C2E).copy(alpha = 0.95f))
                             .clickable(enabled = zoomIndex > 0) {
@@ -259,7 +309,7 @@ fun RadarCompassScreen(
                     ) {
                         Text(
                             text = "+",
-                            fontSize = 14.sp,
+                            fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
                             color = if (zoomIndex > 0) Color.White else Color(0xFF555555)
                         )
@@ -269,7 +319,7 @@ fun RadarCompassScreen(
                     Box(
                         contentAlignment = Alignment.Center,
                         modifier = Modifier
-                            .size(26.dp)
+                            .size(24.dp)
                             .clip(CircleShape)
                             .background(Color(0xFF2C2C2E).copy(alpha = 0.95f))
                             .clickable(enabled = towers.size > 1) {
@@ -281,15 +331,15 @@ fun RadarCompassScreen(
                     ) {
                         Text(
                             text = "▶",
-                            fontSize = 10.sp,
+                            fontSize = 9.5.sp,
                             color = if (towers.size > 1) Color.White else Color(0xFF555555)
                         )
                     }
                 }
 
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(3.dp))
 
-                // Cartouche d'informations sur l'antenne sélectionnée
+                // Cartouche d'informations sur l'antenne sélectionnée (resserré et visible en entier)
                 if (activeTower != null) {
                     val opColor = getOperatorColor(activeTower.operator)
                     val shortOp = getOperatorShortName(activeTower.operator)
@@ -299,9 +349,9 @@ fun RadarCompassScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0xFF1C1C1E).copy(alpha = 0.92f))
+                            .background(Color(0xFF1C1C1E).copy(alpha = 0.94f))
                             .clickable { onOpenDetails(activeTower) }
-                            .padding(horizontal = 6.dp, vertical = 3.dp)
+                            .padding(horizontal = 4.dp, vertical = 2.dp)
                     ) {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
@@ -317,11 +367,11 @@ fun RadarCompassScreen(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(4.dp))
                                         .background(opColor)
-                                        .padding(horizontal = 4.dp, vertical = 1.dp)
+                                        .padding(horizontal = 3.dp, vertical = 1.dp)
                                 ) {
                                     Text(
                                         text = shortOp,
-                                        fontSize = 8.5.sp,
+                                        fontSize = 8.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = Color.White,
                                         maxLines = 1,
@@ -337,7 +387,7 @@ fun RadarCompassScreen(
                                 }
                                 Text(
                                     text = "$distText • ${activeTower.cardinalDirection} (${activeTower.bearingDegrees}°)",
-                                    fontSize = 9.sp,
+                                    fontSize = 8.5.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White,
                                     maxLines = 1,
@@ -347,7 +397,7 @@ fun RadarCompassScreen(
                                 // Index
                                 Text(
                                     text = siteIndexLabel,
-                                    fontSize = 8.sp,
+                                    fontSize = 7.5.sp,
                                     color = MaterialTheme.colors.onSurfaceVariant
                                 )
                             }
@@ -366,17 +416,17 @@ fun RadarCompassScreen(
                                 }
                                 Text(
                                     text = supDesc,
-                                    fontSize = 7.5.sp,
+                                    fontSize = 7.sp,
                                     color = Color(0xFFFFB300),
                                     maxLines = 1,
                                     softWrap = false,
                                     overflow = TextOverflow.Ellipsis,
                                     modifier = Modifier.weight(1f, fill = false)
                                 )
-                                Spacer(Modifier.width(4.dp))
+                                Spacer(Modifier.width(3.dp))
                                 Text(
                                     text = "Détails >",
-                                    fontSize = 7.5.sp,
+                                    fontSize = 7.sp,
                                     color = MaterialTheme.colors.primary
                                 )
                             }
