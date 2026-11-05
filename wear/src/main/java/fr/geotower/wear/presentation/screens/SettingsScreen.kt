@@ -11,7 +11,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,6 +30,7 @@ import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material.Chip
 import androidx.wear.compose.material.ChipDefaults
 import androidx.wear.compose.material.CompactChip
+import androidx.wear.compose.material.Icon
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
 import fr.geotower.wear.data.model.DataSourceMode
@@ -131,22 +135,6 @@ fun SettingsScreen(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                val isDark = mapTheme == WearMapTheme.DARK
-                CompactChip(
-                    onClick = { onMapThemeChanged(WearMapTheme.DARK) },
-                    label = {
-                        Text(
-                            text = if (isDark) "✓ Sombre" else "Sombre",
-                            fontSize = 11.sp,
-                            fontWeight = if (isDark) FontWeight.Bold else FontWeight.Normal,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    },
-                    colors = if (isDark) ChipDefaults.primaryChipColors() else ChipDefaults.secondaryChipColors(),
-                    modifier = Modifier.weight(1f)
-                )
-
                 val isLight = mapTheme == WearMapTheme.LIGHT
                 CompactChip(
                     onClick = { onMapThemeChanged(WearMapTheme.LIGHT) },
@@ -160,6 +148,22 @@ fun SettingsScreen(
                         )
                     },
                     colors = if (isLight) ChipDefaults.primaryChipColors() else ChipDefaults.secondaryChipColors(),
+                    modifier = Modifier.weight(1f)
+                )
+
+                val isDark = mapTheme == WearMapTheme.DARK
+                CompactChip(
+                    onClick = { onMapThemeChanged(WearMapTheme.DARK) },
+                    label = {
+                        Text(
+                            text = if (isDark) "✓ Sombre" else "Sombre",
+                            fontSize = 11.sp,
+                            fontWeight = if (isDark) FontWeight.Bold else FontWeight.Normal,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    },
+                    colors = if (isDark) ChipDefaults.primaryChipColors() else ChipDefaults.secondaryChipColors(),
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -272,9 +276,16 @@ fun SettingsScreen(
             Spacer(Modifier.height(4.dp))
             CompactChip(
                 onClick = onForceRefresh,
+                icon = {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "Actualiser",
+                        modifier = Modifier.size(16.dp)
+                    )
+                },
                 label = {
                     Text(
-                        text = "🔄 Forcer actualisation",
+                        text = "Forcer actualisation",
                         fontSize = 10.sp,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth()

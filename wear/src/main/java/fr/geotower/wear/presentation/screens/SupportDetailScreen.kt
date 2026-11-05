@@ -52,8 +52,8 @@ fun SupportDetailScreen(
 
     ScalingLazyColumn(
         state = listState,
-        autoCentering = AutoCenteringParams(itemIndex = 1),
-        contentPadding = PaddingValues(start = 10.dp, top = 20.dp, end = 10.dp, bottom = 26.dp),
+        autoCentering = AutoCenteringParams(itemIndex = 0),
+        contentPadding = PaddingValues(start = 10.dp, top = 24.dp, end = 10.dp, bottom = 26.dp),
         verticalArrangement = Arrangement.spacedBy(5.dp),
         modifier = modifier.fillMaxSize().background(Color.Black)
     ) {

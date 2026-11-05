@@ -77,7 +77,7 @@ fun AboutScreen(
                     text = "GeoTower",
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFFFF7900) // Orange Garmin
+                    color = MaterialTheme.colors.primary
                 )
                 Text(
                     text = "v2.0.0 • Wear OS Edition",
@@ -112,7 +112,7 @@ fun AboutScreen(
                 text = "NOUVEAUTÉS v2.0.0",
                 fontSize = 9.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFFFF7900),
+                color = MaterialTheme.colors.primary,
                 modifier = Modifier.padding(start = 4.dp, top = 4.dp)
             )
         }

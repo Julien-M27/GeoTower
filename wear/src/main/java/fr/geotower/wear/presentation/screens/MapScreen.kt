@@ -419,15 +419,18 @@ fun MapScreen(
                             modifier = Modifier
                                 .size(24.dp)
                                 .clip(CircleShape)
-                                .background(if (hasPrev) Color(0xFF2C2C2E).copy(alpha = 0.95f) else Color(0x661E1E20))
-                                .clickable(enabled = hasPrev) {
-                                    if (hasPrev) onTowerSelected(towers[currentIndex - 1])
+                                .background(if (towers.size > 1) Color(0xFF2C2C2E).copy(alpha = 0.95f) else Color(0x661E1E20))
+                                .clickable(enabled = towers.size > 1) {
+                                    if (towers.isNotEmpty()) {
+                                        val prev = if (currentIndex > 0) currentIndex - 1 else towers.lastIndex
+                                        onTowerSelected(towers[prev])
+                                    }
                                 }
                         ) {
                             Text(
                                 text = "◀",
                                 fontSize = 10.sp,
-                                color = if (hasPrev) Color.White else Color(0xFF555555)
+                                color = if (towers.size > 1) Color.White else Color(0xFF555555)
                             )
                         }
 
@@ -478,15 +481,18 @@ fun MapScreen(
                             modifier = Modifier
                                 .size(24.dp)
                                 .clip(CircleShape)
-                                .background(if (hasNext) Color(0xFF2C2C2E).copy(alpha = 0.95f) else Color(0x661E1E20))
-                                .clickable(enabled = hasNext) {
-                                    if (hasNext) onTowerSelected(towers[currentIndex + 1])
+                                .background(if (towers.size > 1) Color(0xFF2C2C2E).copy(alpha = 0.95f) else Color(0x661E1E20))
+                                .clickable(enabled = towers.size > 1) {
+                                    if (towers.isNotEmpty()) {
+                                        val next = if (currentIndex < towers.lastIndex) currentIndex + 1 else 0
+                                        onTowerSelected(towers[next])
+                                    }
                                 }
                         ) {
                             Text(
                                 text = "▶",
                                 fontSize = 10.sp,
-                                color = if (hasNext) Color.White else Color(0xFF555555)
+                                color = if (towers.size > 1) Color.White else Color(0xFF555555)
                             )
                         }
                     }

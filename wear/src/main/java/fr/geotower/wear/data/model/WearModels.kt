@@ -78,9 +78,9 @@ data class WearTower(
  * - WEB_API : appel direct à l'API Web GeoTower / ANFR en HTTPS (Wi-Fi / eSIM 4G de la montre).
  */
 enum class DataSourceMode(val label: String, val shortLabel: String) {
-    AUTO("Automatique", "🔄 Auto"),
-    PHONE_LOCAL("Base locale smartphone", "📱 Téléphone"),
-    WEB_API("API Web directe", "🌐 Web API")
+    AUTO("Automatique", "Auto"),
+    PHONE_LOCAL("Base locale smartphone", "Téléphone"),
+    WEB_API("API Web directe", "Web API")
 }
 
 /**
@@ -117,8 +117,8 @@ sealed interface GpsFixStatus {
  * - LIGHT : rendu clair natif OpenStreetMap (comme en plein soleil).
  */
 enum class WearMapTheme(val label: String, val shortLabel: String) {
-    DARK("Sombre", "🌙 Sombre"),
-    LIGHT("Clair", "☀️ Clair");
+    DARK("Sombre", "Sombre"),
+    LIGHT("Clair", "Clair");
 
     fun next(): WearMapTheme = if (this == DARK) LIGHT else DARK
 }

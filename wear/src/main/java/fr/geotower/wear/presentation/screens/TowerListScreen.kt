@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,6 +35,7 @@ import androidx.wear.compose.foundation.lazy.items
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material.CircularProgressIndicator
 import androidx.wear.compose.material.CompactChip
+import androidx.wear.compose.material.Icon
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
 import fr.geotower.wear.data.model.WearTower
@@ -254,9 +257,16 @@ fun TowerListScreen(
             Spacer(Modifier.height(4.dp))
             CompactChip(
                 onClick = onRefresh,
+                icon = {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "Actualiser",
+                        modifier = Modifier.size(16.dp)
+                    )
+                },
                 label = {
                     Text(
-                        text = "🔄 Actualiser",
+                        text = "Actualiser",
                         fontSize = 10.sp,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth()

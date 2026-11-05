@@ -50,23 +50,30 @@ fun OperatorDetailScreen(
 
     ScalingLazyColumn(
         state = listState,
-        autoCentering = AutoCenteringParams(itemIndex = 1),
-        contentPadding = PaddingValues(start = 10.dp, top = 20.dp, end = 10.dp, bottom = 26.dp),
+        autoCentering = AutoCenteringParams(itemIndex = 0),
+        contentPadding = PaddingValues(start = 10.dp, top = 24.dp, end = 10.dp, bottom = 26.dp),
         verticalArrangement = Arrangement.spacedBy(5.dp),
         modifier = modifier.fillMaxSize().background(Color.Black)
     ) {
-        // En-tête : Index de l'opérateur sur le site (ex: "Opérateur 1/2")
+        // En-tête : Titre "Détail du site" + Index de l'opérateur sur le site (ex: "Opérateur 1/2")
         item {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp)
             ) {
                 Text(
+                    text = "Détail du site",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colors.primary
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
                     text = "Opérateur $operatorIndex/$totalOperators",
                     fontSize = 9.sp,
                     color = MaterialTheme.colors.onSurfaceVariant
                 )
-                Spacer(Modifier.height(2.dp))
+                Spacer(Modifier.height(3.dp))
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(6.dp))
