@@ -3482,6 +3482,7 @@
     <string name="appstrings_release_v2111_summary_garmin_timer_permanent_preview_and_timer_reset">Dauerhafte Anzeige und Vorschau der Garmin-Smartwatch-Stoppuhr/des Countdowns (aktiv und im Standby) sowie Timer-Reset bei Daueränderung</string>
     <string name="appstrings_release_v2112_summary_wear_os_companion_and_sync">Unterstützung und Offline-Datenbank-Synchronisierung für Wear OS Smartwatches (Samsung Galaxy Watch usw.) über Bluetooth</string>
     <string name="appstrings_release_v2113_summary_wear_companion_details_and_multi_op">Unterstützung und Offline-Synchronisierung für Wear OS: echte Adressen, offizielle Trägertypen und -höhen, Betreiberbündelung und Tortendiagramme auf der Karte</string>
+    <string name="appstrings_release_v2114_summary_live_notif_wear_units_and_phone_guard">Garmin-Verbindung als Live-Benachrichtigung während des Countdowns, Wear OS: Karten-Schaltfläche in Details, Einheiten und Verbindungsschutz</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Netzwerkanfragen-Protokoll</string>

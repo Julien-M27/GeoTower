@@ -3484,6 +3484,7 @@
     <string name="appstrings_release_v2111_summary_garmin_timer_permanent_preview_and_timer_reset">Affichage permanent et aperçu du chronomètre/décompte montre Garmin (état actif et en attente) avec réinitialisation lors du changement de durée</string>
     <string name="appstrings_release_v2112_summary_wear_os_companion_and_sync">Support et synchronisation de la base locale hors-ligne pour montres connectées Wear OS (Samsung Galaxy Watch...) via Bluetooth</string>
     <string name="appstrings_release_v2113_summary_wear_companion_details_and_multi_op">Support et synchronisation Wear OS : adresses réelles, types et hauteurs de supports, regroupement multi-opérateurs et camemberts sur la carte</string>
+    <string name="appstrings_release_v2114_summary_live_notif_wear_units_and_phone_guard">Liaison Garmin en Live Notification pendant le décompte, Wear OS : bouton carte sur détail, unités métriques/impériales et sécurité connexion</string>
 
     <!-- Journal des requêtes réseau -->
     <string name="network_log_title">Journal des requêtes réseau</string>
