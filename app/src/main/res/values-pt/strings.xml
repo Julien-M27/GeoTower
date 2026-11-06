@@ -3480,6 +3480,7 @@
     <string name="appstrings_release_v219_summary_garmin_notification_access_and_continuous_mode">Acesso direto às configurações Garmin a partir da notificação persistente, funcionamento contínuo em segundo plano e melhorias no registo de ligação</string>
     <string name="appstrings_release_v2110_summary_garmin_duration_selector_and_countdown">Seletor de duração (ilimitado, 1h, 2h, 4h, 8h) com contagem decrescente em direto e paragem automática para a ligação ao relógio Garmin em segundo plano</string>
     <string name="appstrings_release_v2111_summary_garmin_timer_permanent_preview_and_timer_reset">Exibição permanente e pré-visualização do cronómetro/contagem decrescente do relógio Garmin (estados ativo e em espera) com reinício ao mudar a duração</string>
+    <string name="appstrings_release_v2112_summary_wear_os_companion_and_sync">Suporte e sincronização da base de dados offline para relógios Wear OS (Samsung Galaxy Watch...) via Bluetooth</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registo de pedidos de rede</string>

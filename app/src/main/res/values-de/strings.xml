@@ -3480,6 +3480,7 @@
     <string name="appstrings_release_v219_summary_garmin_notification_access_and_continuous_mode">Direkter Zugriff auf die Garmin-Einstellungen über die dauerhafte Benachrichtigung, kontinuierlicher Hintergrundbetrieb und Verbesserungen am Verbindungsprotokoll</string>
     <string name="appstrings_release_v2110_summary_garmin_duration_selector_and_countdown">Dauerauswahl (Unbegrenzt, 1h, 2h, 4h, 8h) mit Live-Countdown und automatischer Abschaltung für die Garmin-Smartwatch-Hintergrundverbindung</string>
     <string name="appstrings_release_v2111_summary_garmin_timer_permanent_preview_and_timer_reset">Dauerhafte Anzeige und Vorschau der Garmin-Smartwatch-Stoppuhr/des Countdowns (aktiv und im Standby) sowie Timer-Reset bei Daueränderung</string>
+    <string name="appstrings_release_v2112_summary_wear_os_companion_and_sync">Unterstützung und Offline-Datenbank-Synchronisierung für Wear OS Smartwatches (Samsung Galaxy Watch usw.) über Bluetooth</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Netzwerkanfragen-Protokoll</string>
