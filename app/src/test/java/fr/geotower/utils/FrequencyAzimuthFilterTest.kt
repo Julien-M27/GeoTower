@@ -67,6 +67,20 @@ class FrequencyAzimuthFilterTest {
         assertEquals("", azimuths)
     }
 
+    @Test
+    fun announcedSystemsFallBackToDetailsAzimutsFrequences() {
+        val detailsFrequences = "5G NR 3500 : Non precise | Projet approuve | 2026-05-07"
+        val detailsAzimutsFrequences = """{"5G NR 3500":[60,180,300]}"""
+
+        val azimuths = filteredAzimuthsForFrequencySelection(
+            detailsFrequences = detailsFrequences,
+            detailsAzimutsFrequences = detailsAzimutsFrequences,
+            filter = selection(f5G3500 = true)
+        )
+
+        assertEquals("60,180,300", azimuths)
+    }
+
     private fun sectorDetails(): String {
         return """
             5G NR 3500 : 3710-3800 MHz | Techniquement operationnel | 2026-05-07 | Panneau : 120 deg (24m)

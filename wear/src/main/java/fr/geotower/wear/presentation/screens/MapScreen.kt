@@ -272,13 +272,13 @@ fun MapScreen(
                 val pointY = center.y + ((towerExactY - exactY) * tileSizePx).toFloat()
 
                 val isSelected = target?.id == tower.id
-                val pinRadius = if (isSelected) 6.dp.toPx() else 4.5.dp.toPx()
+                val pinRadius = if (isSelected) 6.5.dp.toPx() else 5.dp.toPx()
                 val pinRectSize = Size(pinRadius * 2f, pinRadius * 2f)
                 val pinTopLeft = Offset(pointX - pinRadius, pointY - pinRadius)
 
-                val ops = tower.operators.ifEmpty {
+                val ops = (tower.operators.ifEmpty {
                     listOf(fr.geotower.wear.data.model.WearOperatorSite(operator = tower.operator))
-                }
+                }).distinctBy { getOperatorShortName(it.operator) }
 
                 if (ops.size <= 1) {
                     val opColor = getOperatorColor(ops.firstOrNull()?.operator ?: tower.operator)
@@ -289,11 +289,12 @@ fun MapScreen(
                     )
                 } else {
                     val sweepAngle = 360f / ops.size
+                    val overlap = 0.8f
                     ops.forEachIndexed { i, op ->
                         drawArc(
                             color = getOperatorColor(op.operator),
                             startAngle = -90f + (i * sweepAngle),
-                            sweepAngle = sweepAngle,
+                            sweepAngle = sweepAngle + overlap,
                             useCenter = true,
                             topLeft = pinTopLeft,
                             size = pinRectSize
@@ -303,10 +304,10 @@ fun MapScreen(
 
                 // Contour fin noir contrasté
                 drawCircle(
-                    color = Color.Black.copy(alpha = 0.85f),
+                    color = Color.Black.copy(alpha = 0.9f),
                     radius = pinRadius,
                     center = Offset(pointX, pointY),
-                    style = Stroke(width = 1.dp.toPx())
+                    style = Stroke(width = 1.2.dp.toPx())
                 )
 
                 // Si sélectionné : anneau de ciblage blanc distinctif
@@ -449,7 +450,11 @@ fun MapScreen(
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                val opBadge = activeTower.operators.firstOrNull()?.operator ?: activeTower.operator
+                                val opBadge = if (activeTower.operators.isNotEmpty()) {
+                                    activeTower.operators.map { getOperatorShortName(it.operator) }.distinct().joinToString(" / ")
+                                } else {
+                                    getOperatorShortName(activeTower.operator)
+                                }
                                 Text(
                                     text = "$opBadge • ${activeTower.distanceMeters} m • ${activeTower.cardinalDirection}",
                                     fontSize = 8.sp,

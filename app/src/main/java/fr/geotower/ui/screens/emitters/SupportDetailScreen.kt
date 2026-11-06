@@ -139,6 +139,7 @@ import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.PageScrollPrefs
 import fr.geotower.utils.SupportPagePrefs
 import fr.geotower.utils.isAnnouncedOnlyStation
+import fr.geotower.utils.FrequencyAzimuths
 import java.util.Locale
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
@@ -364,6 +365,16 @@ fun SupportDetailScreen(
 
                     // Une seule requête `IN (…)` au lieu d'une par antenne du support.
                     techMap.putAll(repository.getTechniqueDetailsByIds(sortedAntennas.map { it.idAnfr }))
+                    val resolvedSortedAntennas = sortedAntennas.map { ant ->
+                        if (ant.azimuts.isNullOrBlank()) {
+                            val az = techMap[ant.idAnfr]?.detailsAzimutsFrequences?.let {
+                                FrequencyAzimuths.decode(it).values.flatten().distinct().sorted().joinToString(",").takeIf { s -> s.isNotBlank() }
+                            }
+                            if (!az.isNullOrBlank()) ant.copy(azimuts = az) else ant
+                        } else ant
+                    }
+                    antennas = resolvedSortedAntennas
+                    loadedAntennas = resolvedSortedAntennas
                 } else {
                     radioSupportMarkers = radioRepository.getMarkersForSupport(siteId)
                 }

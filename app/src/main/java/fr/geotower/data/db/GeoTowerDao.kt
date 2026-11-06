@@ -15,6 +15,7 @@ import fr.geotower.data.models.OutageGeocodeSiteRow
 import fr.geotower.data.models.PhysiqueEntity
 import fr.geotower.data.models.RefTypeAntenneDbEntity
 import fr.geotower.data.models.TechniqueEntity
+import fr.geotower.data.models.WearNearbySiteRawRow
 
 data class SupportRadioStatsRow(
     @ColumnInfo(name = "id_support") val idSupport: String,
@@ -797,6 +798,42 @@ interface GeoTowerDao {
         minLon: Double,
         maxLon: Double
     ): List<LocalisationEntity>
+
+    @Query("""
+        SELECT
+            l.id_anfr,
+            s.id_support,
+            COALESCE(o.libelle, 'Inconnu') AS operateur,
+            l.latitude,
+            l.longitude,
+            l.azimuts,
+            l.code_insee,
+            c.nom AS commune,
+            t.adresse,
+            COALESCE(n.libelle, CASE WHEN s.nat_id IS NULL THEN NULL ELSE 'Code Nature ' || CAST(s.nat_id AS TEXT) END) AS nature_support,
+            s.hauteur,
+            l.tech_mask,
+            l.band_mask
+        FROM localisation l
+        LEFT JOIN support s ON l.id_anfr = s.id_anfr
+        LEFT JOIN technique t ON l.id_anfr = t.id_anfr
+        LEFT JOIN ref_nature n ON s.nat_id = n.nat_id
+        LEFT JOIN ref_operateur o ON l.operateur_id = o.id
+        LEFT JOIN ref_commune c ON l.code_insee = c.code_insee
+        LEFT JOIN ref_statut st ON t.statut_id = st.id
+        WHERE l.latitude BETWEEN :minLat AND :maxLat
+          AND l.longitude BETWEEN :minLon AND :maxLon
+          AND (
+              COALESCE(st.libelle, '') IN ('En service', 'Techniquement opérationnel', 'Techniquement operationnel')
+              OR COALESCE(t.has_active, 0) = 1
+          )
+    """)
+    suspend fun getWearNearbySiteRows(
+        minLat: Double,
+        maxLat: Double,
+        minLon: Double,
+        maxLon: Double
+    ): List<WearNearbySiteRawRow>
 
     @Query("""
         SELECT

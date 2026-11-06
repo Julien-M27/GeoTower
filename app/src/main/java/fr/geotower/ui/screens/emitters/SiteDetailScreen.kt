@@ -175,6 +175,7 @@ import fr.geotower.utils.SitePagePrefs
 import fr.geotower.utils.formatTechnologies
 import fr.geotower.utils.formatSiteDistanceMeters
 import fr.geotower.utils.isAnnouncedOnlyStation
+import fr.geotower.utils.FrequencyAzimuths
 import java.util.Locale
 import java.util.UUID
 import kotlin.math.roundToInt
@@ -444,7 +445,9 @@ fun SiteDetailScreen(
             val draftId = SignalQuestUploadDraftStore.put(selectedUris.map { it.toString() })
             val uploadSiteId = physique?.idSupport?.takeIf { it.isNotBlank() } ?: antenna!!.idAnfr
             val safeOperator = Uri.encode(antenna!!.operateur ?: unknownText)
-            val safeAzimuts = Uri.encode(antenna!!.azimuts ?: "")
+            val safeAzimuts = Uri.encode(antenna!!.azimuts ?: technique?.detailsAzimutsFrequences?.let {
+                FrequencyAzimuths.decode(it).values.flatten().distinct().sorted().joinToString(",").takeIf { s -> s.isNotBlank() }
+            } ?: "")
             navController.navigate("sq_upload/${uploadSiteId}/${safeOperator}?draftId=$draftId&lat=${antenna!!.latitude}&lon=${antenna!!.longitude}&azimuts=$safeAzimuts")
         }
     }
@@ -819,7 +822,17 @@ fun SiteDetailScreen(
                 val siblings = (listOf(anchor) + siteSiblings)
                     .distinctBy { it.idAnfr }
                     .filter { it.physicalSiteKey() == siteKey }
-                supportAntennas = siblings
+                val techMap = repository.getTechniqueDetailsByIds(siblings.map { it.idAnfr })
+                val resolvedSiblings = siblings.map { ant ->
+                    if (ant.azimuts.isNullOrBlank()) {
+                        val techForAnt = if (ant.idAnfr == localData.idAnfr) (technique ?: techMap[ant.idAnfr]) else techMap[ant.idAnfr]
+                        val az = techForAnt?.detailsAzimutsFrequences?.let {
+                            FrequencyAzimuths.decode(it).values.flatten().distinct().sorted().joinToString(",").takeIf { s -> s.isNotBlank() }
+                        }
+                        if (!az.isNullOrBlank()) ant.copy(azimuts = az) else ant
+                    } else ant
+                }
+                supportAntennas = resolvedSiblings
 
                 // Pannes réellement déclarées sur ce site physique (tous opérateurs confondus).
                 val declaredOnSite = mutableMapOf<String, fr.geotower.data.models.SiteHsEntity>()
@@ -1199,7 +1212,23 @@ fun SiteDetailScreen(
                 )
             }
         } else {
-            val info = antenna!!
+            val resolvedSiteAzimuths = remember(antenna?.azimuts, technique?.detailsAzimutsFrequences) {
+                if (!antenna?.azimuts.isNullOrBlank()) {
+                    antenna?.azimuts
+                } else {
+                    technique?.detailsAzimutsFrequences?.let {
+                        FrequencyAzimuths.decode(it).values.flatten().distinct().sorted().joinToString(",").takeIf { s -> s.isNotBlank() }
+                    }
+                }
+            }
+            val info = remember(antenna, resolvedSiteAzimuths) {
+                val base = antenna!!
+                if (base.azimuts.isNullOrBlank() && !resolvedSiteAzimuths.isNullOrBlank()) {
+                    base.copy(azimuts = resolvedSiteAzimuths)
+                } else {
+                    base
+                }
+            }
             val scrollState = rememberScrollState()
 
             val opColor = getOperatorColor(info.operateur)
@@ -1213,7 +1242,15 @@ fun SiteDetailScreen(
                 else -> null
             }
             val allSupportAntennas = remember(info, supportAntennas) {
-                supportAntennas.ifEmpty { listOf(info) }
+                if (supportAntennas.isEmpty()) {
+                    listOf(info)
+                } else {
+                    val hasCurrent = supportAntennas.any { it.idAnfr == info.idAnfr }
+                    val mapped = supportAntennas.map { ant ->
+                        if (ant.idAnfr == info.idAnfr) info else ant
+                    }
+                    if (hasCurrent) mapped else (listOf(info) + mapped)
+                }
             }
             val activeOperatorKeys = remember(
                 allSupportAntennas,

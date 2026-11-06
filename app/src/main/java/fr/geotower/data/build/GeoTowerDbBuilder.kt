@@ -820,6 +820,35 @@ object GeoTowerDbBuilder {
             if (++processed % EMIT_EVERY == 0L) onProgress(processed)
         }
         flush()
+
+        // Azimuts des systèmes de l'observatoire hebdomadaire (stg_sysazimut) :
+        // Pour les stations nouvellement déclarées ou sans azimuts dans SUP_ANTENNE (ou en complément),
+        // on intègre les azimuts déclarés dans l'hebdo.
+        var currentSysId: String? = null
+        val sysMobile = LinkedHashSet<String>()
+        fun flushSys() {
+            val stationIndex = currentSysId?.let { stations.indexOf(it) } ?: -1
+            if (stationIndex != -1 && sysMobile.isNotEmpty()) {
+                val existing = stations.azimuths(stationIndex)
+                if (existing.isNullOrBlank()) {
+                    stations.setAzimuths(stationIndex, azimutsToString(sysMobile), stations.fhAzimuths(stationIndex))
+                }
+            }
+            sysMobile.clear()
+        }
+        db.query("SELECT id_anfr, azimut FROM stg_sysazimut ORDER BY id_anfr") { row ->
+            val id = row.getString("id_anfr") ?: ""
+            if (id != currentSysId) {
+                flushSys()
+                currentSysId = id
+            }
+            val azimut = row.getIntOrNull("azimut")
+            if (azimut != null) {
+                sysMobile.add(azimut.toString())
+            }
+        }
+        flushSys()
+
         onProgress(processed)
     }
 

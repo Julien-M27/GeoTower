@@ -128,9 +128,9 @@ fun TowerListScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(3.dp)
                         ) {
-                            val opsToShow = if (tower.operators.isNotEmpty()) tower.operators else listOf(
+                            val opsToShow = (if (tower.operators.isNotEmpty()) tower.operators else listOf(
                                 fr.geotower.wear.data.model.WearOperatorSite(operator = tower.operator)
-                            )
+                            )).distinctBy { getOperatorShortName(it.operator) }
                             // Affiche jusqu'à 2 badges courts, puis +N pour ne jamais déborder
                             opsToShow.take(2).forEach { opSite ->
                                 val color = getOperatorColor(opSite.operator)

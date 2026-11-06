@@ -165,6 +165,16 @@ fun SiteFrequenciesBlock(
             if (parsedBands.isEmpty()) {
                 Text(text = txtBandsNotSpecified, style = sizing.textStyle(MaterialTheme.typography.bodyLarge), color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else {
+                val siteAzimuths = remember(info.azimuts, technique?.detailsAzimutsFrequences) {
+                    val rawSiteAzimuths = info.azimuts?.split(",")?.mapNotNull { it.substringBefore("°").trim().toIntOrNull() }
+                        ?.mapNotNull(FrequencyAzimuths::normalizeAzimuth)?.toSet() ?: emptySet()
+                    if (rawSiteAzimuths.isNotEmpty()) {
+                        rawSiteAzimuths
+                    } else {
+                        FrequencyAzimuths.decode(technique?.detailsAzimutsFrequences).values.flatten().toSet()
+                    }
+                }
+
                 // ✅ NOUVEAU : On vérifie l'option d'affichage
                 if (forceGridDisplay || AppConfig.siteFreqGridDisplay.value) {
                     FrequenciesGridView(
@@ -177,7 +187,8 @@ fun SiteFrequenciesBlock(
                         mapFrequencyFilter = mapFrequencyFilter,
                         txtPanelIdentifier = txtPanelIdentifier,
                         showAntennaTypeTable = showAntennaTypeTable,
-                        stationId = info.idAnfr
+                        stationId = info.idAnfr,
+                        siteAzimuths = siteAzimuths
                     )
                 } else {
                     // 👇 TON CODE ACTUEL COMMENCE ICI 👇
@@ -346,13 +357,33 @@ fun SiteFrequenciesBlock(
                                 // Système annoncé par l'ANFR dont le détail n'est pas encore publié :
                                 // ni spectre ni panneau à afficher sous la ligne, on le dit.
                                 if (band.isAnnouncedOnly()) {
-                                    Spacer(modifier = Modifier.height(sizing.spacing(4.dp)))
-                                    Text(
-                                        text = stringResource(R.string.appstrings_bands_announced_not_published),
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
-                                        fontSize = sizing.text(11.sp),
-                                        lineHeight = 13.sp
-                                    )
+                                    val azList = (band.activeAzimuths ?: siteAzimuths).sorted()
+                                    if (azList.isNotEmpty()) {
+                                        Spacer(modifier = Modifier.height(sizing.spacing(6.dp)))
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                Icons.Default.Explore,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(sizing.component(14.dp))
+                                            )
+                                            Spacer(modifier = Modifier.width(sizing.spacing(6.dp)))
+                                            Text(
+                                                text = "${stringResource(R.string.appstrings_col_azimuth)} : ${azList.joinToString("° - ")}°",
+                                                color = MaterialTheme.colorScheme.onSurface,
+                                                fontSize = sizing.text(12.sp),
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                        }
+                                    } else {
+                                        Spacer(modifier = Modifier.height(sizing.spacing(4.dp)))
+                                        Text(
+                                            text = stringResource(R.string.appstrings_bands_announced_not_published),
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
+                                            fontSize = sizing.text(11.sp),
+                                            lineHeight = 13.sp
+                                        )
+                                    }
                                 }
 
                                 // Affichage de tous les panneaux associés à cette fréquence
@@ -589,7 +620,8 @@ fun FrequenciesGridView(
     txtPanelIdentifier: String,
     showAntennaTypeTable: Boolean = false,
     /** Station affichée, transmise aux copies d'identifiant de panneau pour l'historique. */
-    stationId: String? = null
+    stationId: String? = null,
+    siteAzimuths: Set<Int> = emptySet()
 ) {
     val sizing = LocalGeoTowerUiSizing.current
     val borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
@@ -717,7 +749,8 @@ fun FrequenciesGridView(
             // Systèmes que l'ANFR annonce sans avoir encore publié leur spectre ni leur antenne :
             // la ligne existe (techno, statut, date) mais les deux tableaux suivants n'ont rien
             // à en dire. On l'explique ici plutôt que de laisser des cellules vides.
-            val announcedLabels = parsedBands.filter { it.isAnnouncedOnly() }.map { displayFrequencyBandLabel(it) }
+            val announcedLabels = parsedBands.filter { it.isAnnouncedOnly() && it.activeAzimuths.isNullOrEmpty() && siteAzimuths.isEmpty() }
+                .map { displayFrequencyBandLabel(it) }
             if (announcedLabels.isNotEmpty()) {
                 HorizontalDivider(color = borderColor)
                 Text(
@@ -749,9 +782,13 @@ fun FrequenciesGridView(
     )
     val groupedAntennas = mutableMapOf<String, MutableMap<String, MutableList<AntennaRow>>>()
 
-    // Une bande seulement annoncée n'a ni azimut ni spectre : l'afficher ici produirait une ligne
-    // « - | - | - » sans information. Elle reste listée dans le tableau des émetteurs ci-dessus.
-    val antennaBands = parsedBands.filter { !it.isAnnouncedOnly() }
+    val siteAzimuthsForAntennas = siteAzimuths
+
+    // Les bandes seulement annoncées qui portent des azimuts (provenant de l'observatoire hebdo)
+    // sont désormais affichées dans le tableau des antennes sous leurs azimuts respectifs.
+    val antennaBands = parsedBands.filter { band ->
+        !band.isAnnouncedOnly() || !band.activeAzimuths.isNullOrEmpty() || siteAzimuthsForAntennas.isNotEmpty()
+    }
 
     antennaBands.forEach { band ->
         // ✅ NOUVEAU : Formatage propre "4G 700"
@@ -781,10 +818,30 @@ fun FrequenciesGridView(
             !filter.isFullyEnabled && !filter.matchesBand(band.gen, band.value)
         } ?: false
 
+        val bandAzimuths = band.activeAzimuths.takeUnless { it.isNullOrEmpty() }
+            ?: if (band.isAnnouncedOnly()) siteAzimuthsForAntennas.takeIf { it.isNotEmpty() } else null
+
         if (band.physDetails.isEmpty()) {
-            groupedAntennas.getOrPut("-") { mutableMapOf() }
-                .getOrPut("-") { mutableListOf() }
-                .add(AntennaRow(technoName, bandEquivalent, displayFreqs, band.gen, band.value, null, null, isMutedByMapFilter))
+            if (!bandAzimuths.isNullOrEmpty()) {
+                bandAzimuths.sorted().forEach { az ->
+                    groupedAntennas.getOrPut(az.toString()) { mutableMapOf() }
+                        .getOrPut("-") { mutableListOf() }
+                        .add(AntennaRow(
+                            technoName,
+                            bandEquivalent,
+                            displayFreqs,
+                            band.gen,
+                            band.value,
+                            null,
+                            band.sectorMarkerColor(az),
+                            isMutedByMapFilter
+                        ))
+                }
+            } else if (!band.isAnnouncedOnly()) {
+                groupedAntennas.getOrPut("-") { mutableMapOf() }
+                    .getOrPut("-") { mutableListOf() }
+                    .add(AntennaRow(technoName, bandEquivalent, displayFreqs, band.gen, band.value, null, null, isMutedByMapFilter))
+            }
         } else {
             band.physDetails.forEach { phys ->
                 // Séparation robuste: "Panneau : 60° (28.9m)" -> On récupère "60" et "28.9m"

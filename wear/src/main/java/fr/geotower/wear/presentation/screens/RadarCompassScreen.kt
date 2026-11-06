@@ -122,13 +122,13 @@ fun RadarCompassScreen(
                 val pointY = center.y + (radarDist * sin(angleRad)).toFloat()
 
                 val isSelected = activeTower?.id == tower.id
-                val pinRadius = if (isSelected) 5.5.dp.toPx() else 4.dp.toPx()
+                val pinRadius = if (isSelected) 6.dp.toPx() else 4.5.dp.toPx()
                 val pinRectSize = Size(pinRadius * 2f, pinRadius * 2f)
                 val pinTopLeft = Offset(pointX - pinRadius, pointY - pinRadius)
 
-                val ops = tower.operators.ifEmpty {
+                val ops = (tower.operators.ifEmpty {
                     listOf(fr.geotower.wear.data.model.WearOperatorSite(operator = tower.operator))
-                }
+                }).distinctBy { getOperatorShortName(it.operator) }
 
                 if (ops.size <= 1) {
                     val opColor = getOperatorColor(ops.firstOrNull()?.operator ?: tower.operator)
@@ -139,11 +139,12 @@ fun RadarCompassScreen(
                     )
                 } else {
                     val sweepAngle = 360f / ops.size
+                    val overlap = 0.8f
                     ops.forEachIndexed { i, op ->
                         drawArc(
                             color = getOperatorColor(op.operator),
                             startAngle = -90f + (i * sweepAngle),
-                            sweepAngle = sweepAngle,
+                            sweepAngle = sweepAngle + overlap,
                             useCenter = true,
                             topLeft = pinTopLeft,
                             size = pinRectSize
@@ -153,10 +154,10 @@ fun RadarCompassScreen(
 
                 // Bordure fine noire pour détacher nettement les points
                 drawCircle(
-                    color = Color.Black.copy(alpha = 0.85f),
+                    color = Color.Black.copy(alpha = 0.9f),
                     radius = pinRadius,
                     center = Offset(pointX, pointY),
-                    style = Stroke(width = 1.dp.toPx())
+                    style = Stroke(width = 1.2.dp.toPx())
                 )
 
                 // Anneau blanc distinctif pour l'antenne sélectionnée

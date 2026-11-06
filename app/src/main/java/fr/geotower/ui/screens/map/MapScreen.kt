@@ -263,6 +263,7 @@ import fr.geotower.utils.OperatorColorSpec
 import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.parseServiceDateInt
 import fr.geotower.utils.filteredAzimuthsForFrequencySelection
+import fr.geotower.utils.FrequencyAzimuths
 import fr.geotower.utils.formatSiteDistanceMeters
 import fr.geotower.utils.isNetworkAvailable
 import kotlinx.coroutines.Job
@@ -4435,15 +4436,27 @@ fun MapScreen(
         val frequencyFilter = FrequencyFilterSelection.fromMapConfig()
         val shouldFilterAzimuthsByFrequency =
             !frequencyFilter.isFullyEnabled && (AppConfig.showAzimuths.value || AppConfig.showAzimuthsCone.value)
-        val azimuthTechniquesById = if (shouldFilterAzimuthsByFrequency) {
-            val detailIds = antennasList.asSequence()
+        val missingAzimuthIds = if (AppConfig.showAzimuths.value || AppConfig.showAzimuthsCone.value) {
+            antennasList.asSequence()
                 .filterNot { it.idAnfr.startsWith("CLUSTER_") }
-                .filter { !it.azimuts.isNullOrBlank() }
+                .filter { it.azimuts.isNullOrBlank() }
                 .map { it.idAnfr }
                 .distinct()
                 .take(MAP_AZIMUTH_DETAIL_LIMIT)
                 .toList()
-            viewModel.getMapAzimuthTechniqueDetails(detailIds)
+        } else emptyList()
+
+        val azimuthTechniquesById = if (shouldFilterAzimuthsByFrequency || missingAzimuthIds.isNotEmpty()) {
+            val detailIds = if (shouldFilterAzimuthsByFrequency) {
+                antennasList.asSequence()
+                    .filterNot { it.idAnfr.startsWith("CLUSTER_") }
+                    .filter { !it.azimuts.isNullOrBlank() }
+                    .map { it.idAnfr }
+                    .distinct()
+                    .take(MAP_AZIMUTH_DETAIL_LIMIT)
+                    .toList()
+            } else emptyList()
+            viewModel.getMapAzimuthTechniqueDetails((detailIds + missingAzimuthIds).distinct().take(MAP_AZIMUTH_DETAIL_LIMIT))
         } else {
             emptyMap()
         }
@@ -4485,18 +4498,30 @@ fun MapScreen(
                 antenna: LocalisationEntity,
                 activeOperatorKeys: List<String>
             ): LocalisationEntity {
+                val tech = azimuthTechniquesById[antenna.idAnfr]
                 val filteredAzimuths = if (shouldFilterAzimuthsByFrequency) {
                     filteredAzimuthsForFrequencySelection(
-                        detailsFrequences = azimuthTechniquesById[antenna.idAnfr]?.detailsFrequences,
-                        filter = frequencyFilter
+                        detailsFrequences = tech?.detailsFrequences,
+                        filter = frequencyFilter,
+                        detailsAzimutsFrequences = tech?.detailsAzimutsFrequences
                     )
                 } else {
                     null
                 }
 
+                val resolvedAzimuths = if (filteredAzimuths != null) {
+                    filteredAzimuths
+                } else if (!antenna.azimuts.isNullOrBlank()) {
+                    antenna.azimuts
+                } else {
+                    tech?.detailsAzimutsFrequences?.let {
+                        FrequencyAzimuths.decode(it).values.flatten().distinct().sorted().joinToString(",").takeIf { s -> s.isNotBlank() }
+                    }
+                }
+
                 return antenna.copy(
                     operateur = activeOperatorKeys.joinToString(", "),
-                    azimuts = filteredAzimuths ?: antenna.azimuts
+                    azimuts = resolvedAzimuths
                 )
             }
 

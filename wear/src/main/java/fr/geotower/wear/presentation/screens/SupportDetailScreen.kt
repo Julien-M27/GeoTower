@@ -126,9 +126,9 @@ fun SupportDetailScreen(
             )
         }
 
-        val operators = if (tower.operators.isNotEmpty()) tower.operators else listOf(
+        val operators = (if (tower.operators.isNotEmpty()) tower.operators else listOf(
             WearOperatorSite(operator = tower.operator, technologies = tower.technologies)
-        )
+        )).distinctBy { getOperatorShortName(it.operator) }
 
         items(operators.size) { index ->
             val op = operators[index]

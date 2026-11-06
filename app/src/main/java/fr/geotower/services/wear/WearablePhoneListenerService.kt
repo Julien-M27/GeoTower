@@ -6,6 +6,7 @@ import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Wearable
 import com.google.android.gms.wearable.WearableListenerService
 import fr.geotower.data.db.AppDatabase
+import fr.geotower.data.models.WearNearbySiteRawRow
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -92,7 +93,7 @@ class WearablePhoneListenerService : WearableListenerService() {
         val offsetLat = radiusKm / KM_PER_LAT_DEGREE
         val offsetLon = offsetLat / safeCos
 
-        val candidates = dao.getActiveLocalisationsInBox(
+        val rawRows = dao.getWearNearbySiteRows(
             minLat = centerLat - offsetLat,
             maxLat = centerLat + offsetLat,
             minLon = centerLon - offsetLon,
@@ -100,33 +101,121 @@ class WearablePhoneListenerService : WearableListenerService() {
         )
 
         val resultsArray = FloatArray(2)
-        val sortedTowers = candidates.mapNotNull { loc ->
-            val lat = loc.latitude ?: return@mapNotNull null
-            val lon = loc.longitude ?: return@mapNotNull null
+
+        data class RowWithDistance(
+            val row: WearNearbySiteRawRow,
+            val distance: Float,
+            val bearing: Float
+        )
+
+        val candidates = rawRows.mapNotNull { row ->
+            val lat = row.latitude
+            val lon = row.longitude
             Location.distanceBetween(centerLat, centerLon, lat, lon, resultsArray)
             val distance = resultsArray[0]
             val bearing = (resultsArray[1] + 360f) % 360f
-
             if (distance <= radiusKm * 1000.0) {
-                TowerNearbyItem(
-                    id = loc.idAnfr.toString(),
-                    operator = loc.operateur ?: "Inconnu",
-                    distanceMeters = distance.toInt(),
-                    bearingDegrees = bearing.toInt(),
-                    technologies = parseTechnologies(loc.techMask ?: 0),
-                    address = loc.codeInsee?.let { "Code Insee: $it" } ?: "",
-                    latitude = lat,
-                    longitude = lon,
-                    supportType = if (loc.hasUndergroundSupport == 1) "Intérieur sous-terrain" else "Pylône / Support télécom",
-                    supportHeight = null
-                )
+                RowWithDistance(row, distance, bearing)
             } else {
                 null
             }
+        }
+
+        // Regroupement par support physique :
+        // 1. id_support si présent et non vide
+        // 2. sinon regroupement géographique très fin par coordonnées arrondies (~11 mètres)
+        val groupedSupports = candidates.groupBy { item ->
+            val idSup = item.row.idSupport?.trim()
+            if (!idSup.isNullOrEmpty()) {
+                "SUP_$idSup"
+            } else {
+                val latRound = Math.round(item.row.latitude * 10000.0)
+                val lonRound = Math.round(item.row.longitude * 10000.0)
+                "GEO_${latRound}_${lonRound}"
+            }
+        }
+
+        val supportItems = groupedSupports.values.map { group ->
+            val first = group.first()
+            val minDistance = group.minOf { it.distance }
+            val bearing = first.bearing
+
+            // Adresse réelle : technique.adresse et ref_commune.nom (jamais "Code Insee")
+            val street = group.mapNotNull { it.row.adresse?.trim() }.firstOrNull { it.isNotBlank() }
+            val city = group.mapNotNull { it.row.commune?.trim() }.firstOrNull { it.isNotBlank() }
+            val resolvedAddress = when {
+                street != null && city != null -> {
+                    if (street.contains(city, ignoreCase = true)) street else "$street, $city"
+                }
+                street != null -> street
+                city != null -> city
+                else -> "Site télécom"
+            }
+
+            // Type de support physique réel (ref_nature)
+            val resolvedNature = group.mapNotNull { it.row.natureSupport?.trim() }
+                .firstOrNull { it.isNotBlank() && !it.startsWith("Code Nature") }
+                ?: group.mapNotNull { it.row.natureSupport?.trim() }.firstOrNull { it.isNotBlank() }
+                ?: "Pylône autostable"
+
+            // Hauteur du support réel
+            val resolvedHeight = group.mapNotNull { it.row.hauteur?.toInt() }.firstOrNull { it > 0 } ?: 30
+
+            // Regroupement des opérateurs présents sur ce support
+            val opGroups = group.groupBy { it.row.operateur?.trim() ?: "Inconnu" }
+            val operatorsList = opGroups.map { (opName, opRows) ->
+                var combinedTech = 0
+                var combinedBands = 0
+                val azimuthsSet = linkedSetOf<Int>()
+
+                for (opRow in opRows) {
+                    combinedTech = combinedTech or (opRow.row.techMask ?: 0)
+                    combinedBands = combinedBands or (opRow.row.bandMask ?: 0)
+                    opRow.row.azimuts?.split(",", ";")?.forEach { azStr ->
+                        azStr.replace("°", "").trim().toIntOrNull()?.let { azimuthsSet.add(it) }
+                    }
+                }
+
+                val techString = parseTechnologies(combinedTech)
+                val bandsString = parseBands(combinedBands)
+                val azSorted = azimuthsSet.sorted()
+
+                OperatorNearbyItem(
+                    name = opName,
+                    technologies = techString,
+                    bands = if (bandsString.isNotBlank()) bandsString else "4G / 5G",
+                    azimuths = azSorted
+                )
+            }.sortedBy { getOperatorPriority(it.name) }
+
+            val primaryOp = operatorsList.firstOrNull()?.name ?: "Inconnu"
+            val allTechs = operatorsList.flatMap { it.technologies.split("/", ",") }
+                .map { it.trim() }
+                .filter { it.isNotBlank() }
+                .distinct()
+                .joinToString(", ")
+                .ifEmpty { "4G / 5G" }
+
+            val supportId = group.mapNotNull { it.row.idSupport?.trim() }.firstOrNull { it.isNotBlank() }
+                ?: first.row.idAnfr
+
+            TowerNearbyItem(
+                id = supportId,
+                operator = primaryOp,
+                distanceMeters = minDistance.toInt(),
+                bearingDegrees = bearing.toInt(),
+                technologies = allTechs,
+                address = resolvedAddress,
+                latitude = first.row.latitude,
+                longitude = first.row.longitude,
+                supportType = resolvedNature,
+                supportHeight = resolvedHeight,
+                operators = operatorsList
+            )
         }.sortedBy { it.distanceMeters }.take(limit)
 
         val jsonArray = JSONArray()
-        for (item in sortedTowers) {
+        for (item in supportItems) {
             val obj = JSONObject().apply {
                 put("id", item.id)
                 put("operator", item.operator)
@@ -138,6 +227,21 @@ class WearablePhoneListenerService : WearableListenerService() {
                 put("longitude", item.longitude)
                 put("supportType", item.supportType)
                 put("supportHeight", item.supportHeight)
+
+                val opsArr = JSONArray()
+                for (op in item.operators) {
+                    val opObj = JSONObject().apply {
+                        put("name", op.name)
+                        put("tech", op.technologies)
+                        put("bands", op.bands)
+                        put("az", op.azimuths.joinToString(","))
+                        val azArr = JSONArray()
+                        op.azimuths.forEach { azArr.put(it) }
+                        put("azimuths", azArr)
+                    }
+                    opsArr.put(opObj)
+                }
+                put("operators", opsArr)
             }
             jsonArray.put(obj)
         }
@@ -157,6 +261,36 @@ class WearablePhoneListenerService : WearableListenerService() {
         return if (techs.isEmpty()) "Mobile" else techs.joinToString(", ")
     }
 
+    private fun parseBands(bandMask: Int): String {
+        val bands = mutableListOf<String>()
+        if (bandMask and (1 shl 4) != 0) bands.add("700")
+        if (bandMask and (1 shl 5) != 0) bands.add("800")
+        if (bandMask and (1 shl 6) != 0) bands.add("900")
+        if (bandMask and (1 shl 7) != 0) bands.add("1800")
+        if (bandMask and (1 shl 8) != 0) bands.add("2100")
+        if (bandMask and (1 shl 9) != 0) bands.add("2600")
+        if (bandMask and (1 shl 12) != 0) bands.add("3500")
+        return if (bands.isNotEmpty()) bands.joinToString(", ") + " MHz" else ""
+    }
+
+    private fun getOperatorPriority(name: String): Int {
+        val upper = name.uppercase(java.util.Locale.ROOT)
+        return when {
+            upper.contains("ORANGE") -> 1
+            upper.contains("SFR") -> 2
+            upper.contains("BOUYGUES") -> 3
+            upper.contains("FREE") -> 4
+            else -> 5
+        }
+    }
+
+    private data class OperatorNearbyItem(
+        val name: String,
+        val technologies: String,
+        val bands: String,
+        val azimuths: List<Int>
+    )
+
     private data class TowerNearbyItem(
         val id: String,
         val operator: String,
@@ -167,6 +301,7 @@ class WearablePhoneListenerService : WearableListenerService() {
         val latitude: Double,
         val longitude: Double,
         val supportType: String,
-        val supportHeight: Int?
+        val supportHeight: Int?,
+        val operators: List<OperatorNearbyItem>
     )
 }

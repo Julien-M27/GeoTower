@@ -3774,12 +3774,16 @@ internal fun buildPdfAntennaSummaryRows(bands: List<FreqBand>): List<PdfAntennaS
     return bands.map { band ->
         val details = band.physDetails.takeIf { it.isNotEmpty() } ?: listOf("-")
         val positions = details.map { pdfExtractShareAntennaPosition(it) }
-        val azimuths = positions
-            .map { it.azimuth }
-            .filter { it != "-" }
-            .distinct()
-            .joinToString(", ")
-            .ifBlank { "-" }
+        val azimuths = if (band.physDetails.isEmpty() && !band.activeAzimuths.isNullOrEmpty()) {
+            band.activeAzimuths.sorted().joinToString(", ") { "$it°" }
+        } else {
+            positions
+                .map { it.azimuth }
+                .filter { it != "-" }
+                .distinct()
+                .joinToString(", ")
+                .ifBlank { "-" }
+        }
         val heights = positions
             .map { it.height }
             .filter { it != "-" }
@@ -3800,8 +3804,12 @@ internal fun buildPdfAntennaSummaryRows(bands: List<FreqBand>): List<PdfAntennaS
             bands = pdfFrequencyBandLabel(band).replace("\n", " "),
             frequencies = pdfCompactFrequencyText(band),
             // Keep one marker per antenna row, including same-angle panels at different heights/IDs.
-            sectorMarkerAzimuths = details.mapNotNull { detail ->
-                extractPhysicalAzimuth(detail)?.takeIf(band::isActiveOnAzimuth)
+            sectorMarkerAzimuths = if (band.physDetails.isEmpty() && !band.activeAzimuths.isNullOrEmpty()) {
+                band.activeAzimuths.sorted()
+            } else {
+                details.mapNotNull { detail ->
+                    extractPhysicalAzimuth(detail)?.takeIf(band::isActiveOnAzimuth)
+                }
             },
             statusType = classifyFrequencyStatus(band.status)
         )

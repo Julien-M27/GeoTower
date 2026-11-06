@@ -99,11 +99,20 @@ class WearDataLayerClient(private val context: Context) {
                 val arr = obj.getJSONArray("operators")
                 for (j in 0 until arr.length()) {
                     val o = arr.getJSONObject(j)
+                    val azList = if (o.has("azimuths")) {
+                        val azArr = o.getJSONArray("azimuths")
+                        (0 until azArr.length()).map { azArr.getInt(it) }
+                    } else if (o.has("az")) {
+                        o.getString("az").split(",", ";").mapNotNull { it.replace("°", "").trim().toIntOrNull() }
+                    } else {
+                        emptyList()
+                    }
                     opList.add(
                         fr.geotower.wear.data.model.WearOperatorSite(
                             operator = o.optString("name", opName),
                             technologies = o.optString("tech", techStr),
-                            bands = o.optString("bands", "700, 1800, 2100 MHz")
+                            bands = o.optString("bands", "4G / 5G"),
+                            azimuths = azList
                         )
                     )
                 }

@@ -223,6 +223,23 @@ data class CoverageSiteLocationEntity(
     @ColumnInfo(name = "support_height") val supportHeight: Double?
 )
 
+/** Projection complète pour Wear OS : support physique, opérateur, adresse réelle, nature du support et azimuts. */
+data class WearNearbySiteRawRow(
+    @ColumnInfo(name = "id_anfr") val idAnfr: String,
+    @ColumnInfo(name = "id_support") val idSupport: String?,
+    @ColumnInfo(name = "operateur") val operateur: String?,
+    @ColumnInfo(name = "latitude") val latitude: Double,
+    @ColumnInfo(name = "longitude") val longitude: Double,
+    @ColumnInfo(name = "azimuts") val azimuts: String?,
+    @ColumnInfo(name = "code_insee") val codeInsee: String?,
+    @ColumnInfo(name = "commune") val commune: String?,
+    @ColumnInfo(name = "adresse") val adresse: String?,
+    @ColumnInfo(name = "nature_support") val natureSupport: String?,
+    @ColumnInfo(name = "hauteur") val hauteur: Double?,
+    @ColumnInfo(name = "tech_mask") val techMask: Int?,
+    @ColumnInfo(name = "band_mask") val bandMask: Int?
+)
+
 @Entity(tableName = "ref_systeme")
 data class RefSystemeDbEntity(
     @PrimaryKey

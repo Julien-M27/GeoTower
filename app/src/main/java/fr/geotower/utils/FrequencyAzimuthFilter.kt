@@ -10,12 +10,14 @@ private data class RadioBandKey(
 
 fun filteredAzimuthsForFrequencySelection(
     detailsFrequences: String?,
-    filter: FrequencyFilterSelection
+    filter: FrequencyFilterSelection,
+    detailsAzimutsFrequences: String? = null
 ): String? {
     if (detailsFrequences.isNullOrBlank() || filter.isFullyEnabled) return null
 
     val selectedAzimuths = linkedSetOf<Int>()
     var hasSelectedFrequencyLine = false
+    val azimuthsBySystem = detailsAzimutsFrequences?.let { FrequencyAzimuths.decode(it) }.orEmpty()
     detailsFrequences.lineSequence()
         .map { it.trim() }
         .filter { it.isNotBlank() }
@@ -23,14 +25,22 @@ fun filteredAzimuthsForFrequencySelection(
             val parts = line.split("|").map { it.trim() }
             val rawFrequency = parts.getOrNull(0).orEmpty()
             val physDetails = parts.getOrNull(3).orEmpty()
-            if (rawFrequency.isBlank() || physDetails.isBlank()) return@forEach
+            if (rawFrequency.isBlank()) return@forEach
 
             val matchesSelectedBand = radioBandKeysFromRawDetails(rawFrequency)
                 .any { key -> filter.matchesBand(key.gen, key.value) }
             if (!matchesSelectedBand) return@forEach
 
             hasSelectedFrequencyLine = true
-            selectedAzimuths.addAll(extractMobileAzimuths(physDetails))
+            val mobileAzimuths = extractMobileAzimuths(physDetails)
+            if (mobileAzimuths.isNotEmpty()) {
+                selectedAzimuths.addAll(mobileAzimuths)
+            } else if (azimuthsBySystem.isNotEmpty()) {
+                val sysName = FrequencyAzimuths.normalizeSystem(rawFrequency.substringBefore(":").trim())
+                azimuthsBySystem.entries
+                    .filter { FrequencyAzimuths.normalizeSystem(it.key) == sysName }
+                    .forEach { selectedAzimuths.addAll(it.value) }
+            }
         }
 
     return selectedAzimuths
