@@ -29,8 +29,11 @@ import androidx.wear.compose.material.ChipDefaults
 import androidx.wear.compose.material.CompactChip
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
+import fr.geotower.wear.data.model.DistanceUnit
 import fr.geotower.wear.data.model.WearOperatorSite
 import fr.geotower.wear.data.model.WearTower
+import fr.geotower.wear.data.model.formatDistance
+import fr.geotower.wear.data.model.formatHeight
 import fr.geotower.wear.presentation.theme.getOperatorColor
 import fr.geotower.wear.presentation.theme.getOperatorShortName
 import java.util.Locale
@@ -44,9 +47,11 @@ import java.util.Locale
 fun SupportDetailScreen(
     tower: WearTower,
     onOperatorClick: (WearOperatorSite) -> Unit,
+    onOpenMap: () -> Unit,
     onOpenCompass: () -> Unit,
     onBack: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    distanceUnit: DistanceUnit = DistanceUnit.METRIC
 ) {
     val listState = rememberScalingLazyListState()
 
@@ -74,8 +79,9 @@ fun SupportDetailScreen(
 
         // Support & Hauteur
         item {
-            val supTitle = if (tower.supportHeight != null && tower.supportHeight > 0) {
-                "${tower.supportType} (${tower.supportHeight} m)"
+            val formattedH = formatHeight(tower.supportHeight, distanceUnit)
+            val supTitle = if (formattedH != null) {
+                "${tower.supportType} ($formattedH)"
             } else {
                 tower.supportType
             }
@@ -88,9 +94,10 @@ fun SupportDetailScreen(
 
         // Distance & Cap
         item {
+            val distText = formatDistance(tower.distanceMeters, distanceUnit)
             DetailItemCard(
                 title = "Distance & Azimut",
-                value = "${tower.distanceMeters} m • ${tower.cardinalDirection} (${tower.bearingDegrees}°)",
+                value = "$distText • ${tower.cardinalDirection} (${tower.bearingDegrees}°)",
                 accentColor = MaterialTheme.colors.primary
             )
         }
@@ -174,9 +181,26 @@ fun SupportDetailScreen(
             )
         }
 
-        // Bouton Boussole
+        // Bouton Carte
         item {
             Spacer(Modifier.height(4.dp))
+            CompactChip(
+                onClick = onOpenMap,
+                label = {
+                    Text(
+                        text = "Voir sur la carte",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        // Bouton Boussole
+        item {
             CompactChip(
                 onClick = onOpenCompass,
                 label = {

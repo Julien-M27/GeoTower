@@ -3,6 +3,7 @@ package fr.geotower.wear.data.preferences
 import android.content.Context
 import android.content.SharedPreferences
 import fr.geotower.wear.data.model.DataSourceMode
+import fr.geotower.wear.data.model.DistanceUnit
 import fr.geotower.wear.data.model.GpsRefreshInterval
 import fr.geotower.wear.data.model.WearLanguage
 import fr.geotower.wear.data.model.WearMapTheme
@@ -25,6 +26,9 @@ class WearPreferences(context: Context) {
 
     private val _language = MutableStateFlow(loadLanguage())
     val language: StateFlow<WearLanguage> = _language.asStateFlow()
+
+    private val _distanceUnit = MutableStateFlow(loadDistanceUnit())
+    val distanceUnit: StateFlow<DistanceUnit> = _distanceUnit.asStateFlow()
 
     private fun loadDataSourceMode(): DataSourceMode {
         val name = prefs.getString(KEY_DATA_SOURCE_MODE, DataSourceMode.AUTO.name)
@@ -82,10 +86,25 @@ class WearPreferences(context: Context) {
         _language.value = language
     }
 
+    private fun loadDistanceUnit(): DistanceUnit {
+        val name = prefs.getString(KEY_DISTANCE_UNIT, DistanceUnit.METRIC.name)
+        return try {
+            DistanceUnit.valueOf(name ?: DistanceUnit.METRIC.name)
+        } catch (e: Exception) {
+            DistanceUnit.METRIC
+        }
+    }
+
+    fun setDistanceUnit(unit: DistanceUnit) {
+        prefs.edit().putString(KEY_DISTANCE_UNIT, unit.name).apply()
+        _distanceUnit.value = unit
+    }
+
     companion object {
         private const val KEY_DATA_SOURCE_MODE = "pref_data_source_mode"
         private const val KEY_GPS_REFRESH_INTERVAL = "pref_gps_refresh_interval"
         private const val KEY_MAP_THEME = "pref_map_theme"
         private const val KEY_LANGUAGE = "pref_language"
+        private const val KEY_DISTANCE_UNIT = "pref_distance_unit"
     }
 }

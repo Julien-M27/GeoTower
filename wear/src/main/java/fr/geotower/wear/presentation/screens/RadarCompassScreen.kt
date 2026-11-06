@@ -39,8 +39,11 @@ import androidx.wear.compose.material.CompactChip
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
 import fr.geotower.wear.data.model.DataSourceMode
+import fr.geotower.wear.data.model.DistanceUnit
 import fr.geotower.wear.data.model.GpsFixStatus
 import fr.geotower.wear.data.model.WearTower
+import fr.geotower.wear.data.model.formatDistance
+import fr.geotower.wear.data.model.formatHeight
 import fr.geotower.wear.presentation.theme.getOperatorColor
 import fr.geotower.wear.presentation.theme.getOperatorShortName
 import kotlin.math.cos
@@ -56,7 +59,8 @@ fun RadarCompassScreen(
     onTowerSelected: (WearTower) -> Unit,
     onOpenDetails: (WearTower) -> Unit,
     onNavigateToList: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    distanceUnit: DistanceUnit = DistanceUnit.METRIC
 ) {
     // Portées de zoom sélectionnables en mètres : 250m, 500m, 1000m, 2000m, 5000m
     val zoomScales = listOf(250f, 500f, 1000f, 2000f, 5000f)
@@ -381,11 +385,7 @@ fun RadarCompassScreen(
                                 }
 
                                 // Distance & Cap
-                                val distText = if (activeTower.distanceMeters >= 1000) {
-                                    String.format(java.util.Locale.US, "%.1f km", activeTower.distanceMeters / 1000f)
-                                } else {
-                                    "${activeTower.distanceMeters} m"
-                                }
+                                val distText = formatDistance(activeTower.distanceMeters, distanceUnit)
                                 Text(
                                     text = "$distText • ${activeTower.cardinalDirection} (${activeTower.bearingDegrees}°)",
                                     fontSize = 8.5.sp,
@@ -410,8 +410,9 @@ fun RadarCompassScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                val supDesc = if (activeTower.supportHeight != null && activeTower.supportHeight > 0) {
-                                    "${activeTower.supportType} (${activeTower.supportHeight}m)"
+                                val formattedH = formatHeight(activeTower.supportHeight, distanceUnit)
+                                val supDesc = if (formattedH != null) {
+                                    "${activeTower.supportType} ($formattedH)"
                                 } else {
                                     activeTower.supportType
                                 }

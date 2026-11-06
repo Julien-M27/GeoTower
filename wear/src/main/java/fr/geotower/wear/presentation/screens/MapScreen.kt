@@ -42,9 +42,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
+import fr.geotower.wear.data.model.DataSourceMode
+import fr.geotower.wear.data.model.DistanceUnit
 import fr.geotower.wear.data.model.GpsFixStatus
 import fr.geotower.wear.data.model.WearMapTheme
 import fr.geotower.wear.data.model.WearTower
+import fr.geotower.wear.data.model.formatDistance
+import fr.geotower.wear.data.model.formatHeight
 import fr.geotower.wear.data.network.WearWebApiClient
 import fr.geotower.wear.presentation.theme.getOperatorColor
 import fr.geotower.wear.presentation.theme.getOperatorShortName
@@ -67,7 +71,8 @@ fun MapScreen(
     mapTheme: WearMapTheme = WearMapTheme.DARK,
     onTowerSelected: (WearTower) -> Unit,
     onOpenDetails: (WearTower) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    distanceUnit: DistanceUnit = DistanceUnit.METRIC
 ) {
     val activeTower = selectedTower ?: towers.firstOrNull()
 
@@ -390,7 +395,7 @@ fun MapScreen(
                     Spacer(Modifier.width(4.dp))
 
                     Text(
-                        text = if (maxRange >= 1000f) "${(maxRange / 1000).toInt()} km" else "${maxRange.toInt()} m",
+                        text = formatDistance(maxRange.toInt(), distanceUnit),
                         fontSize = 8.5.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF30D158)
@@ -455,16 +460,18 @@ fun MapScreen(
                                 } else {
                                     getOperatorShortName(activeTower.operator)
                                 }
+                                val distFormatted = formatDistance(activeTower.distanceMeters, distanceUnit)
                                 Text(
-                                    text = "$opBadge • ${activeTower.distanceMeters} m • ${activeTower.cardinalDirection}",
+                                    text = "$opBadge • $distFormatted • ${activeTower.cardinalDirection}",
                                     fontSize = 8.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White,
                                     maxLines = 1,
                                     softWrap = false
                                 )
-                                val supDesc = if (activeTower.supportHeight != null && activeTower.supportHeight > 0) {
-                                    "${activeTower.supportType} (${activeTower.supportHeight}m)"
+                                val formattedH = formatHeight(activeTower.supportHeight, distanceUnit)
+                                val supDesc = if (formattedH != null) {
+                                    "${activeTower.supportType} ($formattedH)"
                                 } else {
                                     activeTower.supportType
                                 }
@@ -533,7 +540,7 @@ fun MapScreen(
                     Spacer(Modifier.width(10.dp))
 
                     Text(
-                        text = if (maxRange >= 1000f) "${(maxRange / 1000).toInt()} km" else "${maxRange.toInt()} m",
+                        text = formatDistance(maxRange.toInt(), distanceUnit),
                         fontSize = 8.5.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF30D158)

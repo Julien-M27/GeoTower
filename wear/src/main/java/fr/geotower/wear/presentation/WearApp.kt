@@ -50,6 +50,7 @@ fun WearApp(
         val gpsRefreshInterval by repository.gpsRefreshInterval.collectAsStateWithLifecycle()
         val mapTheme by repository.mapTheme.collectAsStateWithLifecycle()
         val currentLanguage by repository.language.collectAsStateWithLifecycle()
+        val distanceUnit by repository.distanceUnit.collectAsStateWithLifecycle()
         val towers by repository.towers.collectAsStateWithLifecycle()
         val selectedTowerId by repository.selectedTowerId.collectAsStateWithLifecycle()
         val operatorFilter by repository.operatorFilter.collectAsStateWithLifecycle()
@@ -138,6 +139,7 @@ fun WearApp(
                             towers = filteredTowers,
                             isLoading = isLoading,
                             errorMessage = errorMessage,
+                            distanceUnit = distanceUnit,
                             onSupportSelected = { tower ->
                                 inspectedTower = tower
                                 currentScreen = WearScreen.SUPPORT_DETAIL
@@ -169,6 +171,7 @@ fun WearApp(
                             selectedTower = selectedTower,
                             gpsStatus = gpsStatus,
                             dataSourceMode = dataSourceMode,
+                            distanceUnit = distanceUnit,
                             onTowerSelected = { tower ->
                                 repository.selectTower(tower.id)
                             },
@@ -188,6 +191,7 @@ fun WearApp(
                             selectedTower = selectedTower,
                             gpsStatus = gpsStatus,
                             mapTheme = mapTheme,
+                            distanceUnit = distanceUnit,
                             onTowerSelected = { tower ->
                                 repository.selectTower(tower.id)
                             },
@@ -205,6 +209,7 @@ fun WearApp(
                             gpsStatus = gpsStatus,
                             mapTheme = mapTheme,
                             currentLanguage = currentLanguage,
+                            distanceUnit = distanceUnit,
                             onSourceChanged = { newSource ->
                                 repository.setDataSourceMode(newSource)
                                 val status = gpsStatus
@@ -222,6 +227,9 @@ fun WearApp(
                             },
                             onLanguageChanged = { newLang ->
                                 repository.setLanguage(newLang)
+                            },
+                            onDistanceUnitChanged = { newUnit ->
+                                repository.setDistanceUnit(newUnit)
                             },
                             onForceRefresh = {
                                 gpsEngine.forceRefreshLocation { loc ->
@@ -262,13 +270,18 @@ fun WearApp(
                                     inspectedOperatorSite = opSite
                                     currentScreen = WearScreen.OPERATOR_DETAIL
                                 },
+                                onOpenMap = {
+                                    repository.selectTower(towerToShow.id)
+                                    currentScreen = WearScreen.MAP
+                                },
                                 onOpenCompass = {
                                     repository.selectTower(towerToShow.id)
                                     currentScreen = WearScreen.RADAR
                                 },
                                 onBack = {
                                     currentScreen = WearScreen.LIST
-                                }
+                                },
+                                distanceUnit = distanceUnit
                             )
                         } else {
                             currentScreen = WearScreen.LIST
@@ -285,6 +298,10 @@ fun WearApp(
                                 operatorSite = opToShow,
                                 operatorIndex = opIndex,
                                 totalOperators = towerToShow.operators.size.coerceAtLeast(1),
+                                onOpenMap = {
+                                    repository.selectTower(towerToShow.id)
+                                    currentScreen = WearScreen.MAP
+                                },
                                 onOpenCompass = {
                                     repository.selectTower(towerToShow.id)
                                     currentScreen = WearScreen.RADAR

@@ -26,6 +26,7 @@ class WearTowerRepository(context: Context) {
     val gpsRefreshInterval: StateFlow<fr.geotower.wear.data.model.GpsRefreshInterval> = preferences.gpsRefreshInterval
     val mapTheme: StateFlow<fr.geotower.wear.data.model.WearMapTheme> = preferences.mapTheme
     val language: StateFlow<fr.geotower.wear.data.model.WearLanguage> = preferences.language
+    val distanceUnit: StateFlow<fr.geotower.wear.data.model.DistanceUnit> = preferences.distanceUnit
 
     private val _towers = MutableStateFlow<List<WearTower>>(emptyList())
     val towers: StateFlow<List<WearTower>> = _towers.asStateFlow()
@@ -64,6 +65,10 @@ class WearTowerRepository(context: Context) {
 
     fun setLanguage(language: fr.geotower.wear.data.model.WearLanguage) {
         preferences.setLanguage(language)
+    }
+
+    fun setDistanceUnit(unit: fr.geotower.wear.data.model.DistanceUnit) {
+        preferences.setDistanceUnit(unit)
     }
 
     suspend fun loadTowers(latitude: Double, longitude: Double) = withContext(Dispatchers.IO) {

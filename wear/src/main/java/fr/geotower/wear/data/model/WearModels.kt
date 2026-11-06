@@ -154,3 +154,44 @@ enum class WearScreen {
     ABOUT
 }
 
+/**
+ * Unités de mesure des distances et des hauteurs :
+ * - METRIC : mètres (m), kilomètres (km)
+ * - IMPERIAL : pieds (ft), miles (mi)
+ */
+enum class DistanceUnit(val label: String, val shortLabel: String) {
+    METRIC("Métrique (m, km)", "Métrique"),
+    IMPERIAL("Impérial (ft, mi)", "Impérial");
+
+    fun next(): DistanceUnit = if (this == METRIC) IMPERIAL else METRIC
+}
+
+fun formatDistance(meters: Int, unit: DistanceUnit): String {
+    return when (unit) {
+        DistanceUnit.METRIC -> {
+            if (meters >= 1000) {
+                String.format(java.util.Locale.US, "%.1f km", meters / 1000f)
+            } else {
+                "$meters m"
+            }
+        }
+        DistanceUnit.IMPERIAL -> {
+            val feet = (meters * 3.28084).toInt()
+            val miles = meters / 1609.344f
+            if (miles >= 0.2f) {
+                String.format(java.util.Locale.US, "%.1f mi", miles)
+            } else {
+                "$feet ft"
+            }
+        }
+    }
+}
+
+fun formatHeight(meters: Int?, unit: DistanceUnit): String? {
+    if (meters == null || meters <= 0) return null
+    return when (unit) {
+        DistanceUnit.METRIC -> "$meters m"
+        DistanceUnit.IMPERIAL -> "${(meters * 3.28084).toInt()} ft"
+    }
+}
+

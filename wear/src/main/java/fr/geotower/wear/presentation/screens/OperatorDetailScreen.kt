@@ -41,6 +41,7 @@ fun OperatorDetailScreen(
     operatorSite: WearOperatorSite,
     operatorIndex: Int,
     totalOperators: Int,
+    onOpenMap: () -> Unit,
     onOpenCompass: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
@@ -134,9 +135,26 @@ fun OperatorDetailScreen(
             )
         }
 
-        // Bouton Boussole / Radar
+        // Bouton Carte
         item {
             Spacer(Modifier.height(4.dp))
+            CompactChip(
+                onClick = onOpenMap,
+                label = {
+                    Text(
+                        text = "Voir sur la carte",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        // Bouton Boussole / Radar
+        item {
             CompactChip(
                 onClick = onOpenCompass,
                 label = {

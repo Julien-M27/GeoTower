@@ -35,6 +35,7 @@ import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
 import fr.geotower.wear.BuildConfig
 import fr.geotower.wear.data.model.DataSourceMode
+import fr.geotower.wear.data.model.DistanceUnit
 import fr.geotower.wear.data.model.GpsFixStatus
 import fr.geotower.wear.data.model.GpsRefreshInterval
 import fr.geotower.wear.data.model.WearLanguage
@@ -48,10 +49,12 @@ fun SettingsScreen(
     gpsStatus: GpsFixStatus,
     mapTheme: WearMapTheme,
     currentLanguage: WearLanguage,
+    distanceUnit: DistanceUnit,
     onSourceChanged: (DataSourceMode) -> Unit,
     onGpsRefreshIntervalChanged: (GpsRefreshInterval) -> Unit,
     onMapThemeChanged: (WearMapTheme) -> Unit,
     onLanguageChanged: (WearLanguage) -> Unit,
+    onDistanceUnitChanged: (DistanceUnit) -> Unit,
     onForceRefresh: () -> Unit,
     onOpenAbout: () -> Unit,
     modifier: Modifier = Modifier
@@ -170,7 +173,57 @@ fun SettingsScreen(
             }
         }
 
-        // Section 3 : Langue de l'application (comme sur le smartphone)
+        // Section 3 : Unités de mesure (Métrique / Impérial)
+        item {
+            Text(
+                text = "UNITÉS DE MESURE",
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colors.onSurfaceVariant,
+                modifier = Modifier.padding(start = 4.dp, top = 4.dp)
+            )
+        }
+
+        item {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                val isMetric = distanceUnit == DistanceUnit.METRIC
+                CompactChip(
+                    onClick = { onDistanceUnitChanged(DistanceUnit.METRIC) },
+                    label = {
+                        Text(
+                            text = if (isMetric) "✓ Métrique" else "Métrique",
+                            fontSize = 11.sp,
+                            fontWeight = if (isMetric) FontWeight.Bold else FontWeight.Normal,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    },
+                    colors = if (isMetric) ChipDefaults.primaryChipColors() else ChipDefaults.secondaryChipColors(),
+                    modifier = Modifier.weight(1f)
+                )
+
+                val isImperial = distanceUnit == DistanceUnit.IMPERIAL
+                CompactChip(
+                    onClick = { onDistanceUnitChanged(DistanceUnit.IMPERIAL) },
+                    label = {
+                        Text(
+                            text = if (isImperial) "✓ Impérial" else "Impérial",
+                            fontSize = 11.sp,
+                            fontWeight = if (isImperial) FontWeight.Bold else FontWeight.Normal,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    },
+                    colors = if (isImperial) ChipDefaults.primaryChipColors() else ChipDefaults.secondaryChipColors(),
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+
+        // Section 4 : Langue de l'application (comme sur le smartphone)
         item {
             Text(
                 text = "LANGUE",

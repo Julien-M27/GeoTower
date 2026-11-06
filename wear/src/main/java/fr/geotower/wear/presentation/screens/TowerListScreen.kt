@@ -38,7 +38,10 @@ import androidx.wear.compose.material.CompactChip
 import androidx.wear.compose.material.Icon
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
+import fr.geotower.wear.data.model.DistanceUnit
 import fr.geotower.wear.data.model.WearTower
+import fr.geotower.wear.data.model.formatDistance
+import fr.geotower.wear.data.model.formatHeight
 import fr.geotower.wear.presentation.theme.getOperatorColor
 import fr.geotower.wear.presentation.theme.getOperatorShortName
 
@@ -49,7 +52,8 @@ fun TowerListScreen(
     errorMessage: String?,
     onSupportSelected: (WearTower) -> Unit,
     onRefresh: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    distanceUnit: DistanceUnit = DistanceUnit.METRIC
 ) {
     val listState = rememberScalingLazyListState()
 
@@ -204,11 +208,7 @@ fun TowerListScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        val distanceText = if (tower.distanceMeters >= 1000) {
-                            String.format(java.util.Locale.US, "%.1f km", tower.distanceMeters / 1000f)
-                        } else {
-                            "${tower.distanceMeters} m"
-                        }
+                        val distanceText = formatDistance(tower.distanceMeters, distanceUnit)
 
                         Text(
                             text = distanceText,
@@ -221,8 +221,9 @@ fun TowerListScreen(
 
                         Spacer(Modifier.width(4.dp))
 
-                        val supDesc = if (tower.supportHeight != null && tower.supportHeight > 0) {
-                            "${tower.supportType} (${tower.supportHeight}m)"
+                        val formattedH = formatHeight(tower.supportHeight, distanceUnit)
+                        val supDesc = if (formattedH != null) {
+                            "${tower.supportType} ($formattedH)"
                         } else {
                             tower.supportType
                         }
