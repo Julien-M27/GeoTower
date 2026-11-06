@@ -2,12 +2,16 @@ package fr.geotower.wear.data.wearable
 
 import android.content.Context
 import android.util.Log
+import com.google.android.gms.wearable.CapabilityClient
 import com.google.android.gms.wearable.MessageClient
 import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Wearable
 import fr.geotower.wear.data.model.WearTower
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -20,13 +24,84 @@ class WearDataLayerClient(private val context: Context) {
 
     private val messageClient: MessageClient = Wearable.getMessageClient(context)
     private val nodeClient = Wearable.getNodeClient(context)
+    private val capabilityClient: CapabilityClient = Wearable.getCapabilityClient(context)
+
+    private val _isPhoneAppInstalled = MutableStateFlow(false)
+    val isPhoneAppInstalled: StateFlow<Boolean> = _isPhoneAppInstalled.asStateFlow()
+
+    init {
+        runCatching {
+            capabilityClient.addListener(
+                { capabilityInfo ->
+                    val hasNodes = capabilityInfo.nodes.isNotEmpty()
+                    Log.d(TAG, "Statut capacité $CAPABILITY_PHONE_APP mis à jour : hasNodes=$hasNodes")
+                    _isPhoneAppInstalled.value = hasNodes
+                },
+                CAPABILITY_PHONE_APP
+            )
+        }
+    }
 
     companion object {
         private const val TAG = "WearDataLayerClient"
+        const val CAPABILITY_PHONE_APP = "geotower_phone_app"
         const val PATH_REQUEST_NEARBY = "/geotower/request_nearby"
         const val PATH_RESPONSE_NEARBY = "/geotower/response_nearby"
+        const val PATH_PING_PHONE = "/geotower/ping_phone"
+        const val PATH_PONG_PHONE = "/geotower/pong_phone"
         // 12 secondes pour laisser le temps au smartphone de se réveiller et d'interroger SQLite
         private const val TIMEOUT_MS = 12000L
+    }
+
+    suspend fun checkPhoneAppInstalled(): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val capabilityInfo = capabilityClient.getCapability(
+                CAPABILITY_PHONE_APP,
+                CapabilityClient.FILTER_ALL
+            ).await()
+            val hasCapability = capabilityInfo.nodes.isNotEmpty()
+            if (hasCapability) {
+                _isPhoneAppInstalled.value = true
+                return@withContext true
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Erreur vérification capability: ${e.message}")
+        }
+
+        // Repli par ping direct si les capacités ne sont pas encore propagées par Play Services
+        try {
+            val nodes = nodeClient.connectedNodes.await()
+            if (nodes.isEmpty()) {
+                _isPhoneAppInstalled.value = false
+                return@withContext false
+            }
+
+            val phoneNode = nodes.find { it.isNearby } ?: nodes.first()
+            val pongDeferred = CompletableDeferred<Boolean>()
+            val pingListener = object : MessageClient.OnMessageReceivedListener {
+                override fun onMessageReceived(event: MessageEvent) {
+                    if (event.path == PATH_PONG_PHONE) {
+                        pongDeferred.complete(true)
+                    }
+                }
+            }
+            try {
+                messageClient.addListener(pingListener).await()
+                messageClient.sendMessage(phoneNode.id, PATH_PING_PHONE, byteArrayOf(1)).await()
+                val pong = withTimeout(1500L) { pongDeferred.await() }
+                _isPhoneAppInstalled.value = pong
+                return@withContext pong
+            } catch (_: Exception) {
+                // Pas de réponse dans les 1.5s -> appli non présente ou non active
+            } finally {
+                runCatching { messageClient.removeListener(pingListener) }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Erreur ping téléphone: ${e.message}")
+        }
+
+        _isPhoneAppInstalled.value = false
+        false
     }
 
     suspend fun fetchNearbyFromPhone(lat: Double, lon: Double, radiusKm: Double = 5.0, limit: Int = 15): List<WearTower> = withContext(Dispatchers.IO) {
@@ -66,10 +141,13 @@ class WearDataLayerClient(private val context: Context) {
                     responseDeferred.await()
                 }
             } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+                _isPhoneAppInstalled.value = false
                 throw RuntimeException("Le smartphone ne répond pas. Assurez-vous que GeoTower y est installé et à jour.")
             }
 
-            return@withContext parsePhoneResponse(rawResponse)
+            val parsedTowers = parsePhoneResponse(rawResponse)
+            _isPhoneAppInstalled.value = true
+            return@withContext parsedTowers
         } finally {
             try {
                 messageClient.removeListener(listener)

@@ -45,6 +45,7 @@ import fr.geotower.wear.presentation.components.GpsStatusHeader
 @Composable
 fun SettingsScreen(
     currentSource: DataSourceMode,
+    isPhoneAppInstalled: Boolean,
     gpsRefreshInterval: GpsRefreshInterval,
     gpsStatus: GpsFixStatus,
     mapTheme: WearMapTheme,
@@ -100,22 +101,37 @@ fun SettingsScreen(
         items(sourceModes.size) { index ->
             val (mode, desc) = sourceModes[index]
             val isSelected = currentSource == mode
+            val isAvailable = mode != DataSourceMode.PHONE_LOCAL || isPhoneAppInstalled
+            val subtitle = if (mode == DataSourceMode.PHONE_LOCAL && !isPhoneAppInstalled) {
+                "Non dispo (appli absente sur tél.)"
+            } else {
+                desc
+            }
 
             Chip(
-                onClick = { onSourceChanged(mode) },
+                onClick = {
+                    if (isAvailable) {
+                        onSourceChanged(mode)
+                    }
+                },
+                enabled = isAvailable,
                 label = {
                     Text(
                         text = if (isSelected) "✓ ${mode.label}" else mode.label,
                         fontSize = 11.sp,
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                        color = if (isSelected) Color.White else MaterialTheme.colors.onSurfaceVariant
+                        color = when {
+                            !isAvailable -> Color.Gray
+                            isSelected -> Color.White
+                            else -> MaterialTheme.colors.onSurfaceVariant
+                        }
                     )
                 },
                 secondaryLabel = {
                     Text(
-                        text = desc,
+                        text = subtitle,
                         fontSize = 9.sp,
-                        color = MaterialTheme.colors.onSurfaceVariant
+                        color = if (!isAvailable) Color(0xFFFF453A) else MaterialTheme.colors.onSurfaceVariant
                     )
                 },
                 colors = if (isSelected) ChipDefaults.primaryChipColors() else ChipDefaults.secondaryChipColors(),

@@ -47,6 +47,7 @@ fun WearApp(
 
         val gpsStatus by gpsEngine.gpsStatus.collectAsStateWithLifecycle()
         val dataSourceMode by repository.dataSourceMode.collectAsStateWithLifecycle()
+        val isPhoneAppInstalled by repository.isPhoneAppInstalled.collectAsStateWithLifecycle()
         val gpsRefreshInterval by repository.gpsRefreshInterval.collectAsStateWithLifecycle()
         val mapTheme by repository.mapTheme.collectAsStateWithLifecycle()
         val currentLanguage by repository.language.collectAsStateWithLifecycle()
@@ -66,6 +67,11 @@ fun WearApp(
         // Démarre l'écoute du GPS matériel interne de la montre avec la fréquence sélectionnée
         LaunchedEffect(gpsRefreshInterval) {
             gpsEngine.setRefreshInterval(gpsRefreshInterval)
+        }
+
+        // Vérification de la présence de l'application sur le smartphone
+        LaunchedEffect(Unit) {
+            repository.checkPhoneAppInstalled()
         }
 
         DisposableEffect(Unit) {
@@ -205,6 +211,7 @@ fun WearApp(
                     WearScreen.SETTINGS -> {
                         SettingsScreen(
                             currentSource = dataSourceMode,
+                            isPhoneAppInstalled = isPhoneAppInstalled,
                             gpsRefreshInterval = gpsRefreshInterval,
                             gpsStatus = gpsStatus,
                             mapTheme = mapTheme,

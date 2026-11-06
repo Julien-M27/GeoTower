@@ -32,6 +32,8 @@ class WearablePhoneListenerService : WearableListenerService() {
         private const val TAG = "WearablePhoneListener"
         const val PATH_REQUEST_NEARBY = "/geotower/request_nearby"
         const val PATH_RESPONSE_NEARBY = "/geotower/response_nearby"
+        const val PATH_PING_PHONE = "/geotower/ping_phone"
+        const val PATH_PONG_PHONE = "/geotower/pong_phone"
         private const val KM_PER_LAT_DEGREE = 111.0
     }
 
@@ -41,12 +43,25 @@ class WearablePhoneListenerService : WearableListenerService() {
     }
 
     override fun onMessageReceived(messageEvent: MessageEvent) {
+        val senderNodeId = messageEvent.sourceNodeId
+
+        if (messageEvent.path == PATH_PING_PHONE) {
+            Log.d(TAG, "Ping reçu de la montre ($senderNodeId), réponse pong envoyée")
+            serviceScope.launch {
+                runCatching {
+                    Wearable.getMessageClient(this@WearablePhoneListenerService)
+                        .sendMessage(senderNodeId, PATH_PONG_PHONE, byteArrayOf(1))
+                        .await()
+                }
+            }
+            return
+        }
+
         if (messageEvent.path != PATH_REQUEST_NEARBY) {
             super.onMessageReceived(messageEvent)
             return
         }
 
-        val senderNodeId = messageEvent.sourceNodeId
         val payload = String(messageEvent.data, Charsets.UTF_8)
         Log.d(TAG, "Requête reçue de la montre ($senderNodeId) : $payload")
 

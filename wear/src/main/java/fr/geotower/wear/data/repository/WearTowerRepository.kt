@@ -23,6 +23,7 @@ class WearTowerRepository(context: Context) {
     private val dataLayerClient = WearDataLayerClient(context)
 
     val dataSourceMode: StateFlow<DataSourceMode> = preferences.dataSourceMode
+    val isPhoneAppInstalled: StateFlow<Boolean> = dataLayerClient.isPhoneAppInstalled
     val gpsRefreshInterval: StateFlow<fr.geotower.wear.data.model.GpsRefreshInterval> = preferences.gpsRefreshInterval
     val mapTheme: StateFlow<fr.geotower.wear.data.model.WearMapTheme> = preferences.mapTheme
     val language: StateFlow<fr.geotower.wear.data.model.WearLanguage> = preferences.language
@@ -51,7 +52,21 @@ class WearTowerRepository(context: Context) {
         _operatorFilter.value = filter
     }
 
+    suspend fun checkPhoneAppInstalled(): Boolean {
+        val installed = dataLayerClient.checkPhoneAppInstalled()
+        if (!installed && preferences.dataSourceMode.value == DataSourceMode.PHONE_LOCAL) {
+            Log.w(TAG, "Application smartphone GeoTower non détectée : repli automatique sur AUTO")
+            preferences.setDataSourceMode(DataSourceMode.AUTO)
+        }
+        return installed
+    }
+
     fun setDataSourceMode(mode: DataSourceMode) {
+        if (mode == DataSourceMode.PHONE_LOCAL && !isPhoneAppInstalled.value) {
+            Log.w(TAG, "Refus de verrouiller sur PHONE_LOCAL : application smartphone non installée")
+            preferences.setDataSourceMode(DataSourceMode.AUTO)
+            return
+        }
         preferences.setDataSourceMode(mode)
     }
 
