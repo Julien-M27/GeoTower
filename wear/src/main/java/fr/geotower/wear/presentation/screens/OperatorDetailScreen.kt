@@ -102,9 +102,13 @@ fun OperatorDetailScreen(
 
         // Section 2 : Fréquences & Bandes actives (défilement continu Marquee comme sur Garmin)
         item {
+            val formattedBands = fr.geotower.wear.data.model.BandFormatter.normalizeBandsString(
+                operatorSite.bands,
+                operatorSite.technologies
+            )
             OperatorDetailCard(
                 title = "Fréquences actives",
-                value = operatorSite.bands,
+                value = formattedBands,
                 accentColor = Color.White,
                 isMarquee = true
             )

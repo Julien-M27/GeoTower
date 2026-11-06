@@ -185,11 +185,13 @@ class WearDataLayerClient(private val context: Context) {
                     } else {
                         emptyList()
                     }
+                    val opTech = o.optString("tech", techStr)
+                    val rawBands = o.optString("bands", "")
                     opList.add(
                         fr.geotower.wear.data.model.WearOperatorSite(
                             operator = o.optString("name", opName),
-                            technologies = o.optString("tech", techStr),
-                            bands = o.optString("bands", "4G / 5G"),
+                            technologies = opTech,
+                            bands = fr.geotower.wear.data.model.BandFormatter.normalizeBandsString(rawBands, opTech),
                             azimuths = azList
                         )
                     )

@@ -141,7 +141,7 @@ object WearWebApiClient {
                 WearOperatorSite(
                     operator = opName,
                     technologies = parseTechMask(s.techMask ?: 0),
-                    bands = parseTechBands(s.techMask ?: 0),
+                    bands = fr.geotower.wear.data.model.BandFormatter.formatBands(s.bandMask ?: 0, s.techMask ?: 0),
                     azimuths = azList
                 )
             }.distinctBy { it.operator }
@@ -195,7 +195,14 @@ object WearWebApiClient {
                         else -> "AUTRE"
                     }
                     val t = opObj.optString("t", "4G / 5G")
-                    val bands = opObj.optString("bands", "700, 1800, 2100 MHz")
+                    val rawBands = opObj.optString("bands", "")
+                    val bandMask = opObj.optInt("band_mask", 0)
+                    val techMask = opObj.optInt("tech_mask", 0)
+                    val formattedBands = if (bandMask != 0 || techMask != 0) {
+                        fr.geotower.wear.data.model.BandFormatter.formatBands(bandMask, techMask)
+                    } else {
+                        fr.geotower.wear.data.model.BandFormatter.normalizeBandsString(rawBands, t)
+                    }
                     val azArray = opObj.optJSONArray("az")
                     val azimList = mutableListOf<Int>()
                     if (azArray != null) {
@@ -207,7 +214,7 @@ object WearWebApiClient {
                         WearOperatorSite(
                             operator = opName,
                             technologies = t,
-                            bands = bands,
+                            bands = formattedBands,
                             azimuths = azimList.ifEmpty { listOf(0, 120, 240) }
                         )
                     )
