@@ -3481,6 +3481,7 @@
     <string name="appstrings_release_v2110_summary_garmin_duration_selector_and_countdown">Selector de duración (ilimitado, 1h, 2h, 4h, 8h) con cuenta atrás en directo y parada automática para el enlace en segundo plano con el reloj Garmin</string>
     <string name="appstrings_release_v2111_summary_garmin_timer_permanent_preview_and_timer_reset">Visualización permanente y vista previa del cronómetro/cuenta atrás del reloj Garmin (estados activo y en espera) con reinicio al cambiar la duración</string>
     <string name="appstrings_release_v2112_summary_wear_os_companion_and_sync">Compatibilidad y sincronización de la base de datos sin conexión para relojes Wear OS (Samsung Galaxy Watch...) por Bluetooth</string>
+    <string name="appstrings_release_v2113_summary_wear_companion_details_and_multi_op">Compatibilidad y sincronización para Wear OS: direcciones reales, tipos y alturas de soporte, agrupación multioperador y sectores circulares en el mapa</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registro de solicitudes de red</string>
