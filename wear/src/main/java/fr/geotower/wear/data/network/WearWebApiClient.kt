@@ -77,7 +77,30 @@ object WearWebApiClient {
     suspend fun fetchNearbyTowers(lat: Double, lon: Double, radiusKm: Double = 5.0, limit: Int = 15): List<WearTower> = withContext(Dispatchers.IO) {
         Log.i(TAG, "fetchNearbyTowers début : lat=$lat, lon=$lon, radius=$radiusKm, limit=$limit")
 
-        // 1. Interroger en priorité l'API Live v2 (support complet des 20 opérateurs ANFR)
+        // 1. Tenter l'endpoint dédié ultra-léger aux montres (groupé par support avec multi-opérateurs 1..20)
+        try {
+            val watchUrl = "${BASE_URL}api/v1/watch/nearby?lat=$lat&lon=$lon&limit=$limit&radius_km=$radiusKm"
+            val request = Request.Builder().url(watchUrl).build()
+            okHttpClient.newCall(request).execute().use { response ->
+                if (response.isSuccessful) {
+                    val body = response.body?.string()
+                    if (!body.isNullOrBlank()) {
+                        val parsed = parseWatchApiJson(body, lat, lon)
+                        if (parsed.isNotEmpty()) {
+                            Log.i(TAG, "Succès Watch API : ${parsed.size} supports chargés")
+                            return@withContext parsed
+                        }
+                    }
+                } else {
+                    Log.w(TAG, "Watch API code retour : ${response.code}")
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Watch API endpoint non disponible, bascule sur l'API Live v2 : ${e.message}", e)
+        }
+
+        // 2. Repli sur l'API Live v2 avec regroupement par support physique
+        Log.i(TAG, "Interrogation de l'API Live v2 de secours...")
         try {
             val resp = api.getNearbySites(lat = lat, lon = lon, limit = limit * 2, radiusKm = radiusKm)
             if (resp.isSuccessful) {
@@ -137,33 +160,13 @@ object WearWebApiClient {
                     }.sortedBy { it.distanceMeters }.take(limit)
 
                     if (parsedV2.isNotEmpty()) {
-                        Log.i(TAG, "Succès API Live v2 : ${parsedV2.size} supports chargés avec opérateurs réels")
+                        Log.i(TAG, "Succès API Live v2 : ${parsedV2.size} supports agrégés")
                         return@withContext parsedV2
                     }
                 }
             }
         } catch (e: Exception) {
-            Log.w(TAG, "API Live v2 indisponible, repli sur l'endpoint watch : ${e.message}", e)
-        }
-
-        // 2. Repli sur l'endpoint watch
-        try {
-            val watchUrl = "${BASE_URL}api/v1/watch/nearby?lat=$lat&lon=$lon&limit=$limit&radius_km=$radiusKm"
-            val request = Request.Builder().url(watchUrl).build()
-            okHttpClient.newCall(request).execute().use { response ->
-                if (response.isSuccessful) {
-                    val body = response.body?.string()
-                    if (!body.isNullOrBlank()) {
-                        val parsed = parseWatchApiJson(body, lat, lon)
-                        if (parsed.isNotEmpty()) {
-                            Log.i(TAG, "Succès Watch API repli : ${parsed.size} supports chargés")
-                            return@withContext parsed
-                        }
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "Erreur Watch API repli : ${e.message}", e)
+            Log.e(TAG, "Erreur API Live v2 de secours : ${e.message}", e)
         }
 
         emptyList()
