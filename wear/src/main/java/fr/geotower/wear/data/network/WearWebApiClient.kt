@@ -77,7 +77,76 @@ object WearWebApiClient {
     suspend fun fetchNearbyTowers(lat: Double, lon: Double, radiusKm: Double = 5.0, limit: Int = 15): List<WearTower> = withContext(Dispatchers.IO) {
         Log.i(TAG, "fetchNearbyTowers début : lat=$lat, lon=$lon, radius=$radiusKm, limit=$limit")
 
-        // 1. Tenter l'endpoint dédié aux montres (identique à Garmin, groupé par support physique avec multi-opérateurs)
+        // 1. Interroger en priorité l'API Live v2 (support complet des 20 opérateurs ANFR)
+        try {
+            val resp = api.getNearbySites(lat = lat, lon = lon, limit = limit * 2, radiusKm = radiusKm)
+            if (resp.isSuccessful) {
+                val rawSites = resp.body()?.sites.orEmpty()
+                if (rawSites.isNotEmpty()) {
+                    val resultsArray = FloatArray(2)
+                    val supportMap = mutableMapOf<String, MutableList<WearLiveSiteSummaryDto>>()
+
+                    for (site in rawSites) {
+                        val siteLat = site.latitude ?: continue
+                        val siteLon = site.longitude ?: continue
+                        val key = "${roundTo4(siteLat)}_${roundTo4(siteLon)}"
+                        supportMap.getOrPut(key) { mutableListOf() }.add(site)
+                    }
+
+                    val parsedV2 = supportMap.values.mapNotNull { group ->
+                        val first = group.first()
+                        val siteLat = first.latitude ?: return@mapNotNull null
+                        val siteLon = first.longitude ?: return@mapNotNull null
+
+                        Location.distanceBetween(lat, lon, siteLat, siteLon, resultsArray)
+                        val distance = resultsArray[0]
+                        val bearing = (resultsArray[1] + 360f) % 360f
+
+                        val addressParts = listOfNotNull(first.adresse, first.commune).filter { it.isNotBlank() }
+                        val formattedAddress = if (addressParts.isEmpty()) "Site relais" else addressParts.joinToString(", ")
+
+                        val operatorsList = group.map { s ->
+                            val opName = s.operatorName ?: "Inconnu"
+                            val azList = s.azimuts?.split(",", ";", "-")
+                                ?.mapNotNull { it.replace("°", "").trim().toIntOrNull() }
+                                ?.distinct()
+                                ?.sorted() ?: listOf(0, 120, 240)
+
+                            WearOperatorSite(
+                                operator = opName,
+                                technologies = parseTechMask(s.techMask ?: 0),
+                                bands = fr.geotower.wear.data.model.BandFormatter.formatBands(s.bandMask ?: 0, s.techMask ?: 0),
+                                azimuths = azList,
+                                rawTechMask = s.techMask ?: 0,
+                                rawBandMask = s.bandMask ?: 0
+                            )
+                        }.distinctBy { it.operator }
+
+                        WearTower(
+                            id = first.idAnfr ?: first.hashCode().toString(),
+                            distanceMeters = distance.toInt(),
+                            bearingDegrees = bearing.toInt(),
+                            address = formattedAddress,
+                            latitude = siteLat,
+                            longitude = siteLon,
+                            supportType = first.natureSupport ?: "Pylône autostable",
+                            supportHeight = first.hauteur?.toInt() ?: 35,
+                            operators = operatorsList,
+                            source = "web_api"
+                        )
+                    }.sortedBy { it.distanceMeters }.take(limit)
+
+                    if (parsedV2.isNotEmpty()) {
+                        Log.i(TAG, "Succès API Live v2 : ${parsedV2.size} supports chargés avec opérateurs réels")
+                        return@withContext parsedV2
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "API Live v2 indisponible, repli sur l'endpoint watch : ${e.message}", e)
+        }
+
+        // 2. Repli sur l'endpoint watch
         try {
             val watchUrl = "${BASE_URL}api/v1/watch/nearby?lat=$lat&lon=$lon&limit=$limit&radius_km=$radiusKm"
             val request = Request.Builder().url(watchUrl).build()
@@ -87,83 +156,17 @@ object WearWebApiClient {
                     if (!body.isNullOrBlank()) {
                         val parsed = parseWatchApiJson(body, lat, lon)
                         if (parsed.isNotEmpty()) {
-                            Log.i(TAG, "Succès Watch API : ${parsed.size} supports chargés")
+                            Log.i(TAG, "Succès Watch API repli : ${parsed.size} supports chargés")
                             return@withContext parsed
                         }
                     }
-                } else {
-                    Log.w(TAG, "Watch API code retour : ${response.code}")
                 }
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Watch API endpoint non disponible, bascule sur l'API Live v2 : ${e.message}", e)
+            Log.w(TAG, "Erreur Watch API repli : ${e.message}", e)
         }
 
-        // 2. Repli sur l'API Live v2 avec regroupement par support physique
-        Log.i(TAG, "Interrogation de l'API Live v2 de secours...")
-        val resp = api.getNearbySites(lat = lat, lon = lon, limit = limit * 2, radiusKm = radiusKm)
-        if (!resp.isSuccessful) {
-            throw RuntimeException("Erreur serveur API (${resp.code()})")
-        }
-
-        val rawSites = resp.body()?.sites.orEmpty()
-        val resultsArray = FloatArray(2)
-
-        // Regroupement par support (coordonnées très proches ~15m ou idAnfr)
-        val supportMap = mutableMapOf<String, MutableList<WearLiveSiteSummaryDto>>()
-
-        for (site in rawSites) {
-            val siteLat = site.latitude ?: continue
-            val siteLon = site.longitude ?: continue
-            val key = "${roundTo4(siteLat)}_${roundTo4(siteLon)}"
-            supportMap.getOrPut(key) { mutableListOf() }.add(site)
-        }
-
-        val parsedV2 = supportMap.values.mapNotNull { group ->
-            val first = group.first()
-            val siteLat = first.latitude ?: return@mapNotNull null
-            val siteLon = first.longitude ?: return@mapNotNull null
-
-            Location.distanceBetween(lat, lon, siteLat, siteLon, resultsArray)
-            val distance = resultsArray[0]
-            val bearing = (resultsArray[1] + 360f) % 360f
-
-            val addressParts = listOfNotNull(first.adresse, first.commune).filter { it.isNotBlank() }
-            val formattedAddress = if (addressParts.isEmpty()) "Site relais" else addressParts.joinToString(", ")
-
-            val operatorsList = group.map { s ->
-                val opName = s.operatorName ?: "Inconnu"
-                val azList = s.azimuts?.split(",", ";", "-")
-                    ?.mapNotNull { it.replace("°", "").trim().toIntOrNull() }
-                    ?.distinct()
-                    ?.sorted() ?: listOf(0, 120, 240)
-
-                WearOperatorSite(
-                    operator = opName,
-                    technologies = parseTechMask(s.techMask ?: 0),
-                    bands = fr.geotower.wear.data.model.BandFormatter.formatBands(s.bandMask ?: 0, s.techMask ?: 0),
-                    azimuths = azList,
-                    rawTechMask = s.techMask ?: 0,
-                    rawBandMask = s.bandMask ?: 0
-                )
-            }.distinctBy { it.operator }
-
-            WearTower(
-                id = first.idAnfr ?: first.hashCode().toString(),
-                distanceMeters = distance.toInt(),
-                bearingDegrees = bearing.toInt(),
-                address = formattedAddress,
-                latitude = siteLat,
-                longitude = siteLon,
-                supportType = first.natureSupport ?: "Pylône autostable",
-                supportHeight = first.hauteur?.toInt() ?: 35,
-                operators = operatorsList,
-                source = "web_api"
-            )
-        }.sortedBy { it.distanceMeters }.take(limit)
-
-        Log.i(TAG, "Succès API Live v2 : ${parsedV2.size} supports agrégés")
-        parsedV2
+        emptyList()
     }
 
     private fun parseWatchApiJson(jsonStr: String, userLat: Double, userLon: Double): List<WearTower> {
