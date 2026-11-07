@@ -606,12 +606,51 @@ object GarminCompanionManager {
         val result = mutableListOf<Map<String, Any>>()
 
         for ((rawOp, opAntennas) in byOperator) {
-            val opId = when {
-                rawOp.contains("ORANGE") -> 1
-                rawOp.contains("SFR") -> 2
-                rawOp.contains("BOUYGUES") -> 3
-                rawOp.contains("FREE") -> 4
-                else -> 5
+            val opKey = fr.geotower.utils.OperatorColors.keyFor(rawOp)
+            val opId = when (opKey) {
+                fr.geotower.utils.OperatorColors.ORANGE_KEY -> 1
+                fr.geotower.utils.OperatorColors.SFR_KEY -> 2
+                fr.geotower.utils.OperatorColors.BOUYGUES_KEY -> 3
+                fr.geotower.utils.OperatorColors.FREE_KEY -> 4
+                fr.geotower.utils.OperatorColors.DIGICEL_KEY -> 5
+                fr.geotower.utils.OperatorColors.FREE_CARAIBE_KEY -> 6
+                fr.geotower.utils.OperatorColors.OUTREMER_TELECOM_KEY -> 7
+                fr.geotower.utils.OperatorColors.UTS_CARAIBE_KEY -> 8
+                fr.geotower.utils.OperatorColors.DAUPHIN_TELECOM_KEY -> 9
+                fr.geotower.utils.OperatorColors.SRR_KEY -> 10
+                fr.geotower.utils.OperatorColors.TELCO_OI_KEY -> 11
+                fr.geotower.utils.OperatorColors.ZEOP_KEY -> 12
+                fr.geotower.utils.OperatorColors.MAORE_MOBILE_KEY -> 13
+                fr.geotower.utils.OperatorColors.SPM_TELECOM_KEY -> 14
+                fr.geotower.utils.OperatorColors.GLOBALTEL_KEY -> 15
+                fr.geotower.utils.OperatorColors.OPT_NC_KEY -> 16
+                fr.geotower.utils.OperatorColors.ONATI_KEY -> 17
+                fr.geotower.utils.OperatorColors.PMT_VODAFONE_KEY -> 18
+                fr.geotower.utils.OperatorColors.VITI_KEY -> 19
+                fr.geotower.utils.OperatorColors.SPT_KEY -> 20
+                else -> when {
+                    rawOp.contains("FREE CARAIB") || rawOp.contains("FREE CARAÏB") -> 6
+                    rawOp.contains("ORANGE") -> 1
+                    rawOp.contains("SFR") -> 2
+                    rawOp.contains("BOUYGUES") || rawOp.contains("BYTEL") -> 3
+                    rawOp.contains("FREE") -> 4
+                    rawOp.contains("DIGICEL") -> 5
+                    rawOp.contains("OUTREMER") || rawOp.contains("OMT") -> 7
+                    rawOp.contains("UTS") -> 8
+                    rawOp.contains("DAUPHIN") -> 9
+                    rawOp.contains("SRR") -> 10
+                    rawOp.contains("TELCO") || rawOp.contains("ONLY") -> 11
+                    rawOp.contains("ZEOP") -> 12
+                    rawOp.contains("MAORE") || rawOp.contains("MAORÉ") -> 13
+                    rawOp.contains("SPM") -> 14
+                    rawOp.contains("GLOBALTEL") -> 15
+                    rawOp.contains("OPT") || rawOp.contains("CALEDONIE") || rawOp.contains("CALÉDONIE") -> 16
+                    rawOp.contains("ONATI") || rawOp.contains("VINI") -> 17
+                    rawOp.contains("VODAFONE") || rawOp.contains("PMT") -> 18
+                    rawOp.contains("VITI") || rawOp.contains("ORA") -> 19
+                    rawOp.contains("SPT") -> 20
+                    else -> 0
+                }
             }
 
             val techMask = opAntennas.fold(0) { acc, a -> acc or a.techMask }
@@ -624,6 +663,10 @@ object GarminCompanionManager {
 
             val opMap = HashMap<String, Any>()
             opMap["id"] = opId
+            val opLabel = fr.geotower.utils.OperatorColors.specForKey(opKey ?: "")?.label ?: rawOp
+            if (opLabel.isNotBlank()) {
+                opMap["name"] = opLabel
+            }
             opMap["t"] = techStr
             opMap["bands"] = bandsStr.take(35)
             opMap["az"] = azimuths

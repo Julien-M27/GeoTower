@@ -189,11 +189,28 @@ object WearWebApiClient {
                 for (j in 0 until opsArray.length()) {
                     val opObj = opsArray.getJSONObject(j)
                     val opId = opObj.optInt("id", 1)
-                    val opName = when (opId) {
+                    val directName = opObj.optString("name", "").ifBlank { null }
+                    val opName = directName ?: when (opId) {
                         1 -> "ORANGE"
                         2 -> "SFR"
                         3 -> "BOUYGUES TELECOM"
                         4 -> "FREE"
+                        5 -> "DIGICEL"
+                        6 -> "FREE CARAÏBE"
+                        7 -> "OUTREMER TELECOM"
+                        8 -> "UTS CARAÏBE"
+                        9 -> "DAUPHIN TELECOM"
+                        10 -> "SRR"
+                        11 -> "TELCO OI"
+                        12 -> "ZEOP"
+                        13 -> "MAORÉ MOBILE"
+                        14 -> "SPM TELECOM"
+                        15 -> "GLOBALTEL"
+                        16 -> "OPT NC"
+                        17 -> "ONATi"
+                        18 -> "PMT / VODAFONE"
+                        19 -> "ORA"
+                        20 -> "SPT"
                         else -> "AUTRE"
                     }
                     val t = opObj.optString("t", "4G / 5G")
