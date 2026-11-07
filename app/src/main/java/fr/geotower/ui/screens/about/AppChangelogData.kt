@@ -27,10 +27,46 @@ data class ChangelogMilestone(
 object AppChangelogRepository {
     val milestones: List<ChangelogMilestone> = listOf(
         ChangelogMilestone(
-            versionName = "2.1.11",
-            releaseDate = "2026-11-05",
+            versionName = "2.1.18",
+            releaseDate = "2026-11-07",
             isCurrent = true,
             badge = MilestoneBadge.CURRENT,
+            summary = "Prise en charge intégrale des 20 opérateurs télécoms sur montres connectées et harmonisation",
+            itemResIds = listOf(R.string.appstrings_release_v2118_summary_full_twenty_operators_web_api_and_watch_sync)
+        ),
+        ChangelogMilestone(
+            versionName = "2.1.16",
+            releaseDate = "2026-11-07",
+            summary = "Ordre personnalisable des technologies et fréquences (5G/2G) et réglages Wear OS",
+            itemResIds = listOf(R.string.appstrings_release_v2116_summary_tech_frequency_order_and_wear_settings)
+        ),
+        ChangelogMilestone(
+            versionName = "2.1.15",
+            releaseDate = "2026-11-06",
+            summary = "Format harmonisé des fréquences en MHz sur montres et alignement GPS boussole et carte",
+            itemResIds = listOf(R.string.appstrings_release_v2115_summary_frequencies_format_and_gps_compass_harmonization)
+        ),
+        ChangelogMilestone(
+            versionName = "2.1.14",
+            releaseDate = "2026-11-06",
+            summary = "Liaison Garmin en Live Notification, Wear OS : bouton carte, unités et sécurité de liaison",
+            itemResIds = listOf(R.string.appstrings_release_v2114_summary_live_notif_wear_units_and_phone_guard)
+        ),
+        ChangelogMilestone(
+            versionName = "2.1.13",
+            releaseDate = "2026-11-06",
+            summary = "Wear OS : adresses réelles, supports et hauteurs, multi-opérateurs et carte camemberts",
+            itemResIds = listOf(R.string.appstrings_release_v2113_summary_wear_companion_details_and_multi_op)
+        ),
+        ChangelogMilestone(
+            versionName = "2.1.12",
+            releaseDate = "2026-11-06",
+            summary = "Application compagnon et synchronisation hors-ligne pour montres Wear OS via Bluetooth",
+            itemResIds = listOf(R.string.appstrings_release_v2112_summary_wear_os_companion_and_sync)
+        ),
+        ChangelogMilestone(
+            versionName = "2.1.11",
+            releaseDate = "2026-11-05",
             summary = "Affichage permanent du décompte et réinitialisation de durée pour liaison montre Garmin",
             itemResIds = listOf(R.string.appstrings_release_v2111_summary_garmin_timer_permanent_preview_and_timer_reset)
         ),

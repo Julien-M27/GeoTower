@@ -3486,8 +3486,9 @@
     <string name="appstrings_release_v2113_summary_wear_companion_details_and_multi_op">Support et synchronisation Wear OS : adresses réelles, types et hauteurs de supports, regroupement multi-opérateurs et camemberts sur la carte</string>
     <string name="appstrings_release_v2114_summary_live_notif_wear_units_and_phone_guard">Liaison Garmin en Live Notification pendant le décompte, Wear OS : bouton carte sur détail, unités métriques/impériales et sécurité connexion</string>
     <string name="appstrings_release_v2115_summary_frequencies_format_and_gps_compass_harmonization">Harmonisation du format des fréquences par technologie et MHz sur montres connectées, et alignement de la recherche GPS boussole et carte</string>
-    <string name="appstrings_release_v2116_summary_tech_frequency_order_and_wear_settings">Ordre personnalisable des technologies et frÃ©quences (5G â†’ 2G ou 2G â†’ 5G) au niveau global et par page (fiche, carte, recherche, live), et rÃ©glages Wear OS</string>
+    <string name="appstrings_release_v2116_summary_tech_frequency_order_and_wear_settings">Ordre personnalisable des technologies et fréquences (5G → 2G ou 2G → 5G) au niveau global et par page (fiche, carte, recherche, live), et réglages Wear OS</string>
     <string name="appstrings_release_v2117_summary_twenty_operators_support_and_watch_enhancements">Prise en charge intégrale des 20 opérateurs télécoms (Métropole et Outre-mer) sur montres connectées (Wear OS et Garmin) avec couleurs officielles et détection harmonisée</string>
+    <string name="appstrings_release_v2118_summary_full_twenty_operators_web_api_and_watch_sync">Support complet et synchronisation directe des 20 opérateurs télécoms (Métropole et Outre-mer) via l\'API Web et Bluetooth sur montres connectées (Wear OS et Garmin)</string>
 
     <!-- Journal des requêtes réseau -->
     <string name="network_log_title">Journal des requêtes réseau</string>

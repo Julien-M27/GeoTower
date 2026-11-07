@@ -1,6 +1,7 @@
 package fr.geotower.data.api
 
 import okhttp3.MultipartBody
+import okhttp3.OkHttpClient
 import okhttp3.RequestBody
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -237,10 +238,22 @@ interface SignalQuestApiService {
 }
 
 object SignalQuestClient {
+    private val client: OkHttpClient by lazy {
+        RetrofitClient.currentClient.newBuilder()
+            .addInterceptor { chain ->
+                val request = chain.request().newBuilder()
+                    .header("X-GeoTower-Client", "android")
+                    .header("User-Agent", "GeoTower-Android")
+                    .build()
+                chain.proceed(request)
+            }
+            .build()
+    }
+
     val api: SignalQuestApiService by lazy {
         Retrofit.Builder()
             .baseUrl(RetrofitClient.BASE_URL)
-            .client(RetrofitClient.currentClient)
+            .client(client)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(SignalQuestApiService::class.java)
