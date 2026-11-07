@@ -1688,7 +1688,8 @@ fun SiteDetailScreen(
                                             Text(text = opNameDisplay, style = sizing.textStyle(MaterialTheme.typography.titleLarge), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                                             Spacer(modifier = Modifier.height(sizing.spacing(4.dp)))
                                             val rawTechs = technique?.technologies?.takeIf { it.isNotBlank() } ?: info.frequences
-                                            val realTechs = formatTechnologies(rawTechs, stringResource(R.string.appstrings_unknown))
+                                            val siteDetailOrder = AppConfig.resolveOrderForScreen(fr.geotower.utils.ScreenPageTarget.SITE_DETAIL)
+                                            val realTechs = formatTechnologies(rawTechs, stringResource(R.string.appstrings_unknown), siteDetailOrder)
                                             Text(text = realTechs, style = sizing.textStyle(MaterialTheme.typography.bodyLarge), color = MaterialTheme.colorScheme.onSurfaceVariant)
                                         }
                                         if (info.isZb == 1) {

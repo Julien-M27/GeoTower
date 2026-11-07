@@ -27,6 +27,7 @@ import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material.CompactChip
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
+import fr.geotower.wear.data.model.TechOrder
 import fr.geotower.wear.data.model.WearOperatorSite
 import fr.geotower.wear.data.model.WearTower
 import fr.geotower.wear.presentation.theme.getOperatorColor
@@ -44,6 +45,7 @@ fun OperatorDetailScreen(
     onOpenMap: () -> Unit,
     onOpenCompass: () -> Unit,
     onBack: () -> Unit,
+    techOrder: TechOrder = TechOrder.DESCENDING,
     modifier: Modifier = Modifier
 ) {
     val listState = rememberScalingLazyListState()
@@ -95,17 +97,14 @@ fun OperatorDetailScreen(
         item {
             OperatorDetailCard(
                 title = "Technologies",
-                value = operatorSite.technologies,
+                value = operatorSite.formattedTechnologies(techOrder),
                 accentColor = Color.White
             )
         }
 
         // Section 2 : Fréquences & Bandes actives (défilement continu Marquee comme sur Garmin)
         item {
-            val formattedBands = fr.geotower.wear.data.model.BandFormatter.normalizeBandsString(
-                operatorSite.bands,
-                operatorSite.technologies
-            )
+            val formattedBands = operatorSite.formattedBands(techOrder)
             OperatorDetailCard(
                 title = "Fréquences actives",
                 value = formattedBands,

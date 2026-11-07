@@ -38,6 +38,7 @@ import fr.geotower.wear.data.model.DataSourceMode
 import fr.geotower.wear.data.model.DistanceUnit
 import fr.geotower.wear.data.model.GpsFixStatus
 import fr.geotower.wear.data.model.GpsRefreshInterval
+import fr.geotower.wear.data.model.TechOrder
 import fr.geotower.wear.data.model.WearLanguage
 import fr.geotower.wear.data.model.WearMapTheme
 import fr.geotower.wear.presentation.components.GpsStatusHeader
@@ -51,11 +52,13 @@ fun SettingsScreen(
     mapTheme: WearMapTheme,
     currentLanguage: WearLanguage,
     distanceUnit: DistanceUnit,
+    techOrder: TechOrder,
     onSourceChanged: (DataSourceMode) -> Unit,
     onGpsRefreshIntervalChanged: (GpsRefreshInterval) -> Unit,
     onMapThemeChanged: (WearMapTheme) -> Unit,
     onLanguageChanged: (WearLanguage) -> Unit,
     onDistanceUnitChanged: (DistanceUnit) -> Unit,
+    onTechOrderChanged: (TechOrder) -> Unit,
     onForceRefresh: () -> Unit,
     onOpenAbout: () -> Unit,
     modifier: Modifier = Modifier
@@ -234,6 +237,56 @@ fun SettingsScreen(
                         )
                     },
                     colors = if (isImperial) ChipDefaults.primaryChipColors() else ChipDefaults.secondaryChipColors(),
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+
+        // Section : Ordre d'affichage des techno & fréquences
+        item {
+            Text(
+                text = "ORDRE TECHNO / FRÉQUENCES",
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colors.onSurfaceVariant,
+                modifier = Modifier.padding(start = 4.dp, top = 4.dp)
+            )
+        }
+
+        item {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                val isDesc = techOrder == TechOrder.DESCENDING
+                CompactChip(
+                    onClick = { onTechOrderChanged(TechOrder.DESCENDING) },
+                    label = {
+                        Text(
+                            text = if (isDesc) "✓ 5G → 2G" else "5G → 2G",
+                            fontSize = 11.sp,
+                            fontWeight = if (isDesc) FontWeight.Bold else FontWeight.Normal,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    },
+                    colors = if (isDesc) ChipDefaults.primaryChipColors() else ChipDefaults.secondaryChipColors(),
+                    modifier = Modifier.weight(1f)
+                )
+
+                val isAsc = techOrder == TechOrder.ASCENDING
+                CompactChip(
+                    onClick = { onTechOrderChanged(TechOrder.ASCENDING) },
+                    label = {
+                        Text(
+                            text = if (isAsc) "✓ 2G → 5G" else "2G → 5G",
+                            fontSize = 11.sp,
+                            fontWeight = if (isAsc) FontWeight.Bold else FontWeight.Normal,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    },
+                    colors = if (isAsc) ChipDefaults.primaryChipColors() else ChipDefaults.secondaryChipColors(),
                     modifier = Modifier.weight(1f)
                 )
             }

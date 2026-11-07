@@ -53,6 +53,8 @@ import kotlin.math.roundToInt
 import java.util.Locale
 import androidx.compose.ui.res.stringResource
 import fr.geotower.R
+import fr.geotower.utils.ScreenPageTarget
+import fr.geotower.utils.TechFrequencyOrder
 import fr.geotower.utils.ThroughputDisplayText
 
 @Composable
@@ -88,6 +90,7 @@ fun SiteFrequenciesBlock(
 
     val rawFreqs = technique?.detailsFrequences ?: info.frequences
     val mapFrequencyFilter = if (applyMapFilters) FrequencyFilterSelection.fromMapConfig() else null
+    val detailOrder = AppConfig.resolveOrderForScreen(ScreenPageTarget.SITE_DETAIL)
 
     // ✅ ON INTÈGRE NOS NOUVEAUX FILTRES DYNAMIQUES
     val parsedBands = remember(
@@ -106,17 +109,20 @@ fun SiteFrequenciesBlock(
         AppConfig.siteShowTechno3G.value, AppConfig.siteF3G_900.value, AppConfig.siteF3G_2100.value,
         AppConfig.siteShowTechno4G.value, AppConfig.siteF4G_700.value, AppConfig.siteF4G_800.value, AppConfig.siteF4G_900.value, AppConfig.siteF4G_1800.value, AppConfig.siteF4G_2100.value, AppConfig.siteF4G_2600.value,
         AppConfig.siteShowTechno5G.value, AppConfig.siteF5G_700.value, AppConfig.siteF5G_1400.value, AppConfig.siteF5G_2100.value, AppConfig.siteF5G_3500.value, AppConfig.siteF5G_4200.value, AppConfig.siteF5G_26000.value,
-        AppConfig.siteShowTechnoFH.value
+        AppConfig.siteShowTechnoFH.value,
+        detailOrder
     ) {
         addMicrowaveFallbackBands(
             bands = parseAndSortFrequencies(
                 rawFreqs, txtUnknown, txtAzimuthNotSpecified,
                 FrequencyAzimuths.decode(technique?.detailsAzimutsFrequences),
+                order = detailOrder
             ),
             info = info,
             technique = technique,
             rawFreqs = rawFreqs,
-            txtUnknown = txtUnknown
+            txtUnknown = txtUnknown,
+            order = detailOrder
         ).filter { band ->
             shouldDisplayFrequencyBand(band)
         }

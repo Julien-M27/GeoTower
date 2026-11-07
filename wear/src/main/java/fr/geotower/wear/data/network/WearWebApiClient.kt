@@ -142,7 +142,9 @@ object WearWebApiClient {
                     operator = opName,
                     technologies = parseTechMask(s.techMask ?: 0),
                     bands = fr.geotower.wear.data.model.BandFormatter.formatBands(s.bandMask ?: 0, s.techMask ?: 0),
-                    azimuths = azList
+                    azimuths = azList,
+                    rawTechMask = s.techMask ?: 0,
+                    rawBandMask = s.bandMask ?: 0
                 )
             }.distinctBy { it.operator }
 
@@ -215,7 +217,9 @@ object WearWebApiClient {
                             operator = opName,
                             technologies = t,
                             bands = formattedBands,
-                            azimuths = azimList.ifEmpty { listOf(0, 120, 240) }
+                            azimuths = azimList.ifEmpty { listOf(0, 120, 240) },
+                            rawTechMask = opObj.optInt("tm", 0),
+                            rawBandMask = opObj.optInt("bm", 0)
                         )
                     )
                 }

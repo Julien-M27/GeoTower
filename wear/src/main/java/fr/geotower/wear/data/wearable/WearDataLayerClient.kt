@@ -192,7 +192,9 @@ class WearDataLayerClient(private val context: Context) {
                             operator = o.optString("name", opName),
                             technologies = opTech,
                             bands = fr.geotower.wear.data.model.BandFormatter.normalizeBandsString(rawBands, opTech),
-                            azimuths = azList
+                            azimuths = azList,
+                            rawTechMask = o.optInt("tm", 0),
+                            rawBandMask = o.optInt("bm", 0)
                         )
                     )
                 }

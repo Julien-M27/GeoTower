@@ -22,13 +22,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
+import fr.geotower.wear.data.model.TechOrder
 import fr.geotower.wear.data.model.WearTower
 import fr.geotower.wear.presentation.theme.getOperatorColor
 
 @Composable
 fun TowerCard(
     tower: WearTower,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    techOrder: TechOrder = TechOrder.DESCENDING
 ) {
     val operatorColor = getOperatorColor(tower.operator)
 
@@ -101,7 +103,7 @@ fun TowerCard(
                 )
 
                 Text(
-                    text = tower.technologies,
+                    text = tower.formattedTechnologies(techOrder),
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colors.secondary

@@ -2157,17 +2157,22 @@ private fun extractNearbyCity(fullAddress: String): String? {
         .takeIf { it.isNotBlank() }
 }
 
-private fun extractNearbyTechnologies(values: List<String>): List<String> {
+private fun extractNearbyTechnologies(
+    values: List<String>,
+    order: fr.geotower.utils.TechFrequencyOrder = fr.geotower.utils.AppConfig.resolveOrderForScreen(fr.geotower.utils.ScreenPageTarget.SEARCH_LIST)
+): List<String> {
     val text = values.joinToString(" ").uppercase(Locale.ROOT)
-    val technologies = mutableListOf<String>()
+    val found = mutableSetOf<String>()
     listOf("5G", "4G", "3G", "2G").forEach { generation ->
-        if (text.contains(generation)) technologies.add(generation)
+        if (text.contains(generation)) found.add(generation)
     }
-    if (Regex("""\bNR\b""").containsMatchIn(text) && "5G" !in technologies) technologies.add("5G")
-    if (Regex("""\bLTE\b""").containsMatchIn(text) && "4G" !in technologies) technologies.add("4G")
-    if (Regex("""\bUMTS\b""").containsMatchIn(text) && "3G" !in technologies) technologies.add("3G")
-    if (Regex("""\bGSM\b""").containsMatchIn(text) && "2G" !in technologies) technologies.add("2G")
-    return technologies
+    if (Regex("""\bNR\b""").containsMatchIn(text)) found.add("5G")
+    if (Regex("""\bLTE\b""").containsMatchIn(text)) found.add("4G")
+    if (Regex("""\bUMTS\b""").containsMatchIn(text)) found.add("3G")
+    if (Regex("""\bGSM\b""").containsMatchIn(text)) found.add("2G")
+
+    val techOrder = fr.geotower.utils.TechFrequencyOrderHelper.technologiesOrder(order)
+    return techOrder.filter { it in found }
 }
 
 @SuppressLint("MissingPermission")

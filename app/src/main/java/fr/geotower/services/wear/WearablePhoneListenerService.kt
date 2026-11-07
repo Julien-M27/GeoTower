@@ -191,8 +191,9 @@ class WearablePhoneListenerService : WearableListenerService() {
                     }
                 }
 
-                val techString = parseTechnologies(combinedTech)
-                val bandsString = formatBandsString(combinedBands, combinedTech)
+                val liveOrder = fr.geotower.utils.AppConfig.resolveOrderForScreen(fr.geotower.utils.ScreenPageTarget.LIVE_MONITOR)
+                val techString = fr.geotower.utils.BandFormatter.formatTechnologies(combinedTech, liveOrder)
+                val bandsString = fr.geotower.utils.BandFormatter.formatBands(combinedBands, combinedTech, liveOrder)
                 val azSorted = azimuthsSet.sorted()
 
                 OperatorNearbyItem(

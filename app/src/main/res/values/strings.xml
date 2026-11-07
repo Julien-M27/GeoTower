@@ -3507,6 +3507,7 @@
     <string name="appstrings_release_v2113_summary_wear_companion_details_and_multi_op">Support and offline synchronization for Wear OS: real addresses, official support types and heights, multi-operator grouping and map pie charts</string>
     <string name="appstrings_release_v2114_summary_live_notif_wear_units_and_phone_guard">Garmin link promoted to Live Notification during countdown, Wear OS: map button on details, metric/imperial units, and phone guard</string>
     <string name="appstrings_release_v2115_summary_frequencies_format_and_gps_compass_harmonization">Harmonized frequency formatting by technology with MHz across watches, and GPS search layout unified between compass and map</string>
+    <string name="appstrings_release_v2116_summary_tech_frequency_order_and_wear_settings">Customizable technology and frequency order (5G â†’ 2G or 2G â†’ 5G) globally and per page (details, map, search, live), and Wear OS settings</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Network requests log</string>
@@ -3597,4 +3598,20 @@
     <string name="changelogs_option_expand_all">Expand all by default</string>
     <string name="changelogs_option_show_dates">Show release dates</string>
     <string name="changelogs_option_show_badges">Show milestone badges</string>
+
+    <string name="settings_tech_order_title">Technology &amp; frequency order</string>
+    <string name="settings_tech_order_desc">Ascending or descending order (global and per page)</string>
+    <string name="pref_order_global">Global</string>
+    <string name="pref_order_global_title">Default global order</string>
+    <string name="pref_order_global_desc">Applies by default across the entire application.</string>
+    <string name="pref_order_descending">5G → 2G (Descending)</string>
+    <string name="pref_order_descending_sub">5G, 4G, 3G, 2G and frequencies from highest to lowest</string>
+    <string name="pref_order_ascending">2G → 5G (Ascending)</string>
+    <string name="pref_order_ascending_sub">2G, 3G, 4G, 5G and frequencies from lowest to highest</string>
+    <string name="pref_order_per_page_title">Customization per screen</string>
+    <string name="pref_order_inherit_global">Inherit global choice</string>
+    <string name="pref_order_page_detail">Detailed site sheet</string>
+    <string name="pref_order_page_map">Map &amp; preview</string>
+    <string name="pref_order_page_search">Search &amp; Nearby</string>
+    <string name="pref_order_page_live">Network monitoring &amp; Live</string>
 </resources>

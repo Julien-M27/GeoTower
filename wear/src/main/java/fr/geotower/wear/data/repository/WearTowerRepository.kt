@@ -28,6 +28,7 @@ class WearTowerRepository(context: Context) {
     val mapTheme: StateFlow<fr.geotower.wear.data.model.WearMapTheme> = preferences.mapTheme
     val language: StateFlow<fr.geotower.wear.data.model.WearLanguage> = preferences.language
     val distanceUnit: StateFlow<fr.geotower.wear.data.model.DistanceUnit> = preferences.distanceUnit
+    val techOrder: StateFlow<fr.geotower.wear.data.model.TechOrder> = preferences.techOrder
 
     private val _towers = MutableStateFlow<List<WearTower>>(emptyList())
     val towers: StateFlow<List<WearTower>> = _towers.asStateFlow()
@@ -84,6 +85,10 @@ class WearTowerRepository(context: Context) {
 
     fun setDistanceUnit(unit: fr.geotower.wear.data.model.DistanceUnit) {
         preferences.setDistanceUnit(unit)
+    }
+
+    fun setTechOrder(order: fr.geotower.wear.data.model.TechOrder) {
+        preferences.setTechOrder(order)
     }
 
     suspend fun loadTowers(latitude: Double, longitude: Double) = withContext(Dispatchers.IO) {

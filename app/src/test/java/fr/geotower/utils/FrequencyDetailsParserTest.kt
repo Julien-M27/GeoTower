@@ -1,8 +1,10 @@
 package fr.geotower.utils
 
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 
 /**
@@ -14,6 +16,18 @@ class FrequencyDetailsParserTest {
 
     private val txtUnknown = "Inconnu"
     private val txtAzimuthNotSpecified = "Azimut non spécifié"
+
+    @Before
+    fun setUp() {
+        AppConfig.globalTechOrder.value = TechFrequencyOrder.DESCENDING
+        AppConfig.pageOrders.values.forEach { it.value = "global" }
+    }
+
+    @After
+    fun tearDown() {
+        AppConfig.globalTechOrder.value = TechFrequencyOrder.DESCENDING
+        AppConfig.pageOrders.values.forEach { it.value = "global" }
+    }
 
     private fun parse(details: String) =
         parseAndSortFrequencies(details, txtUnknown, txtAzimuthNotSpecified)
@@ -207,5 +221,87 @@ class FrequencyDetailsParserTest {
         )
 
         assertEquals(emptyList<Double>(), heights)
+    }
+
+    @Test
+    fun sortsFrequencyBandsDescending() {
+        val sample = "GSM 900 : 935-945 MHz | En service\n" +
+            "LTE 800 : 791-801 MHz | En service\n" +
+            "5G NR 3500 : 3490-3540 MHz | En service\n" +
+            "5G NR 700 : 758-768 MHz | En service\n" +
+            "LTE 1800 : 1805-1825 MHz | En service\n" +
+            "UMTS 900 : 925-930 MHz | En service\n" +
+            "UMTS 2100 : 2110-2125 MHz | En service\n" +
+            "FH : 18 GHz | En service"
+
+        val bandsDesc = parseAndSortFrequencies(
+            sample, txtUnknown, txtAzimuthNotSpecified,
+            order = TechFrequencyOrder.DESCENDING
+        )
+
+        val keysDesc = bandsDesc.map { "${it.gen}G:${it.value}" }
+        assertEquals(
+            listOf("5G:3500", "5G:700", "4G:1800", "4G:800", "3G:2100", "3G:900", "2G:900", "0G:18"),
+            keysDesc
+        )
+    }
+
+    @Test
+    fun sortsFrequencyBandsAscending() {
+        val sample = "GSM 900 : 935-945 MHz | En service\n" +
+            "LTE 800 : 791-801 MHz | En service\n" +
+            "5G NR 3500 : 3490-3540 MHz | En service\n" +
+            "5G NR 700 : 758-768 MHz | En service\n" +
+            "LTE 1800 : 1805-1825 MHz | En service\n" +
+            "UMTS 900 : 925-930 MHz | En service\n" +
+            "UMTS 2100 : 2110-2125 MHz | En service\n" +
+            "FH : 18 GHz | En service"
+
+        val bandsAsc = parseAndSortFrequencies(
+            sample, txtUnknown, txtAzimuthNotSpecified,
+            order = TechFrequencyOrder.ASCENDING
+        )
+
+        val keysAsc = bandsAsc.map { "${it.gen}G:${it.value}" }
+        assertEquals(
+            listOf("2G:900", "3G:900", "3G:2100", "4G:800", "4G:1800", "5G:700", "5G:3500", "0G:18"),
+            keysAsc
+        )
+    }
+
+    @Test
+    fun resolvesScreenOrderWithFallbackToGlobal() {
+        AppConfig.globalTechOrder.value = TechFrequencyOrder.DESCENDING
+        AppConfig.pageOrders[ScreenPageTarget.SITE_DETAIL]?.value = "global"
+        AppConfig.pageOrders[ScreenPageTarget.MAP]?.value = "ascending"
+        AppConfig.pageOrders[ScreenPageTarget.SEARCH_LIST]?.value = "descending"
+
+        assertEquals(TechFrequencyOrder.DESCENDING, AppConfig.resolveOrderForScreen(ScreenPageTarget.SITE_DETAIL))
+        assertEquals(TechFrequencyOrder.ASCENDING, AppConfig.resolveOrderForScreen(ScreenPageTarget.MAP))
+        assertEquals(TechFrequencyOrder.DESCENDING, AppConfig.resolveOrderForScreen(ScreenPageTarget.SEARCH_LIST))
+
+        // Change global
+        AppConfig.globalTechOrder.value = TechFrequencyOrder.ASCENDING
+        assertEquals(TechFrequencyOrder.ASCENDING, AppConfig.resolveOrderForScreen(ScreenPageTarget.SITE_DETAIL))
+        assertEquals(TechFrequencyOrder.ASCENDING, AppConfig.resolveOrderForScreen(ScreenPageTarget.MAP))
+    }
+
+    @Test
+    fun formatsTechnologiesAccordingToOrder() {
+        val raw = "5G / 2G / 4G / 3G"
+        assertEquals("5G - 4G - 3G - 2G", formatTechnologies(raw, "Inconnu", TechFrequencyOrder.DESCENDING))
+        assertEquals("2G - 3G - 4G - 5G", formatTechnologies(raw, "Inconnu", TechFrequencyOrder.ASCENDING))
+    }
+
+    @Test
+    fun bandFormatterFormatsBandsAccordingToOrder() {
+        val bandMask = (1 shl 12) or (1 shl 7) or (1 shl 5) or (1 shl 0)
+        val techMask = 8 or 4 or 1
+
+        val desc = BandFormatter.formatBands(bandMask, techMask, TechFrequencyOrder.DESCENDING)
+        assertEquals("5G: 3500 • 4G: 1800, 800 • 2G: 900 MHz", desc)
+
+        val asc = BandFormatter.formatBands(bandMask, techMask, TechFrequencyOrder.ASCENDING)
+        assertEquals("2G: 900 • 4G: 800, 1800 • 5G: 3500 MHz", asc)
     }
 }

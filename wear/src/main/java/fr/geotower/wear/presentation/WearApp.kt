@@ -52,6 +52,7 @@ fun WearApp(
         val mapTheme by repository.mapTheme.collectAsStateWithLifecycle()
         val currentLanguage by repository.language.collectAsStateWithLifecycle()
         val distanceUnit by repository.distanceUnit.collectAsStateWithLifecycle()
+        val techOrder by repository.techOrder.collectAsStateWithLifecycle()
         val towers by repository.towers.collectAsStateWithLifecycle()
         val selectedTowerId by repository.selectedTowerId.collectAsStateWithLifecycle()
         val operatorFilter by repository.operatorFilter.collectAsStateWithLifecycle()
@@ -217,6 +218,7 @@ fun WearApp(
                             mapTheme = mapTheme,
                             currentLanguage = currentLanguage,
                             distanceUnit = distanceUnit,
+                            techOrder = techOrder,
                             onSourceChanged = { newSource ->
                                 repository.setDataSourceMode(newSource)
                                 val status = gpsStatus
@@ -237,6 +239,9 @@ fun WearApp(
                             },
                             onDistanceUnitChanged = { newUnit ->
                                 repository.setDistanceUnit(newUnit)
+                            },
+                            onTechOrderChanged = { newOrder ->
+                                repository.setTechOrder(newOrder)
                             },
                             onForceRefresh = {
                                 gpsEngine.forceRefreshLocation { loc ->
@@ -288,7 +293,8 @@ fun WearApp(
                                 onBack = {
                                     currentScreen = WearScreen.LIST
                                 },
-                                distanceUnit = distanceUnit
+                                distanceUnit = distanceUnit,
+                                techOrder = techOrder
                             )
                         } else {
                             currentScreen = WearScreen.LIST
@@ -315,7 +321,8 @@ fun WearApp(
                                 },
                                 onBack = {
                                     currentScreen = WearScreen.SUPPORT_DETAIL
-                                }
+                                },
+                                techOrder = techOrder
                             )
                         } else {
                             currentScreen = WearScreen.SUPPORT_DETAIL

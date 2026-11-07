@@ -7,10 +7,28 @@ data class WearOperatorSite(
     val operator: String, // "ORANGE", "SFR", "BOUYGUES", "FREE"
     val technologies: String = "4G / 5G", // "2G / 3G / 4G / 5G"
     val bands: String = "4G: 700, 1800, 2100 • 5G: 3500 MHz",
-    val azimuths: List<Int> = listOf(0, 120, 240)
+    val azimuths: List<Int> = listOf(0, 120, 240),
+    val rawTechMask: Int = 0,
+    val rawBandMask: Int = 0
 ) {
     val azimuthsString: String
         get() = if (azimuths.isEmpty()) "Omnidirectionnel (360°)" else azimuths.joinToString(", ") { "$it°" }
+
+    fun formattedTechnologies(order: TechOrder = TechOrder.DESCENDING): String {
+        return if (rawTechMask != 0) {
+            BandFormatter.formatTechnologies(rawTechMask, order)
+        } else {
+            BandFormatter.formatTechnologies(technologies, order)
+        }
+    }
+
+    fun formattedBands(order: TechOrder = TechOrder.DESCENDING): String {
+        return if (rawBandMask != 0 || rawTechMask != 0) {
+            BandFormatter.formatBands(rawBandMask, rawTechMask, order)
+        } else {
+            BandFormatter.reorderBandsString(bands, technologies, order)
+        }
+    }
 }
 
 /**
@@ -40,6 +58,14 @@ data class WearTower(
             .distinct()
             .joinToString(", ")
             .ifEmpty { "4G / 5G" }
+
+    fun formattedTechnologies(order: TechOrder = TechOrder.DESCENDING): String {
+        val allTechs = operators.flatMap { it.formattedTechnologies(order).split("/", ",") }
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .distinct()
+        return BandFormatter.formatTechnologies(allTechs.joinToString(" / "), order)
+    }
 
     val operatorNamesSummary: String
         get() = if (operators.isEmpty()) "Inconnu" else operators.joinToString(" / ") { it.operator }
@@ -193,5 +219,17 @@ fun formatHeight(meters: Int?, unit: DistanceUnit): String? {
         DistanceUnit.METRIC -> "$meters m"
         DistanceUnit.IMPERIAL -> "${(meters * 3.28084).toInt()} ft"
     }
+}
+
+/**
+ * Ordre d'affichage des technologies et des fréquences :
+ * - DESCENDING : 5G / 4G / 3G / 2G (3500 → 700 MHz, décroissant)
+ * - ASCENDING : 2G / 3G / 4G / 5G (700 → 3500 MHz, croissant)
+ */
+enum class TechOrder(val label: String, val shortLabel: String, val description: String) {
+    DESCENDING("5G / 4G / 3G / 2G", "5G → 2G", "Plus récente à plus ancienne (décroissant)"),
+    ASCENDING("2G / 3G / 4G / 5G", "2G → 5G", "Plus ancienne à plus récente (croissant)");
+
+    fun next(): TechOrder = if (this == DESCENDING) ASCENDING else DESCENDING
 }
 

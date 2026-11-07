@@ -3484,6 +3484,7 @@
     <string name="appstrings_release_v2113_summary_wear_companion_details_and_multi_op">Suporte e sincronização para Wear OS: moradas reais, tipos e alturas de suporte, agrupamento multi-operador e gráficos circulares no mapa</string>
     <string name="appstrings_release_v2114_summary_live_notif_wear_units_and_phone_guard">Ligação Garmin em Live Notification durante a contagem decrescente, Wear OS: botão de mapa nos detalhes, unidades métricas/imperiais e proteção de ligação</string>
     <string name="appstrings_release_v2115_summary_frequencies_format_and_gps_compass_harmonization">Formatação de frequências harmonizada por tecnologia e MHz em smartwatches, e unificação da pesquisa GPS entre bússola e mapa</string>
+    <string name="appstrings_release_v2116_summary_tech_frequency_order_and_wear_settings">Ordem personalizÃ¡vel de tecnologias e frequÃªncias (5G â†’ 2G ou 2G â†’ 5G) a nÃ­vel global e por pÃ¡gina (detalhes, mapa, pesquisa, live) e definiÃ§Ãµes Wear OS</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registo de pedidos de rede</string>
@@ -3574,4 +3575,20 @@
     <string name="changelogs_option_expand_all">Expandir tudo por padrão</string>
     <string name="changelogs_option_show_dates">Mostrar datas de lançamento</string>
     <string name="changelogs_option_show_badges">Mostrar emblemas de marcos principais</string>
+
+    <string name="settings_tech_order_title">Ordem de tecnologias e frequências</string>
+    <string name="settings_tech_order_desc">Ordem crescente ou decrescente (global e por página)</string>
+    <string name="pref_order_global">Global</string>
+    <string name="pref_order_global_title">Ordem global padrão</string>
+    <string name="pref_order_global_desc">Aplica-se por padrão a todo o aplicativo.</string>
+    <string name="pref_order_descending">5G → 2G (Decrescente)</string>
+    <string name="pref_order_descending_sub">5G, 4G, 3G, 2G e frequências da mais alta para a mais baixa</string>
+    <string name="pref_order_ascending">2G → 5G (Crescente)</string>
+    <string name="pref_order_ascending_sub">2G, 3G, 4G, 5G e frequências da mais baixa para a mais alta</string>
+    <string name="pref_order_per_page_title">Personalização por tela</string>
+    <string name="pref_order_inherit_global">Herdar escolha global</string>
+    <string name="pref_order_page_detail">Ficha detalhada do site</string>
+    <string name="pref_order_page_map">Mapa e prévia</string>
+    <string name="pref_order_page_search">Busca e proximidade</string>
+    <string name="pref_order_page_live">Monitoramento de rede e Ao vivo</string>
 </resources>

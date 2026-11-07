@@ -44,7 +44,8 @@ fun parseAndSortFrequencies(
     freqStr: String?,
     txtUnknown: String,
     txtAzimuthNotSpecified: String,
-    frequencyAzimuthsBySystem: Map<String, Set<Int>> = emptyMap()
+    frequencyAzimuthsBySystem: Map<String, Set<Int>> = emptyMap(),
+    order: TechFrequencyOrder = AppConfig.resolveOrderForScreen(ScreenPageTarget.SITE_DETAIL)
 ): List<FreqBand> {
     if (freqStr.isNullOrBlank()) return emptyList()
 
@@ -113,7 +114,7 @@ fun parseAndSortFrequencies(
                 { it }
             ))
         )
-    })
+    }, order = order)
 }
 
 /**
@@ -199,7 +200,8 @@ internal fun addMicrowaveFallbackBands(
     info: LocalisationEntity,
     technique: TechniqueEntity?,
     rawFreqs: String?,
-    txtUnknown: String
+    txtUnknown: String,
+    order: TechFrequencyOrder = AppConfig.resolveOrderForScreen(ScreenPageTarget.SITE_DETAIL)
 ): List<FreqBand> {
     val fallbackPhysDetails = microwavePhysicalDetailsFromAzimuths(info.azimutsFh)
     val enrichedBands = bands.map { band ->
@@ -234,18 +236,30 @@ internal fun addMicrowaveFallbackBands(
         physDetails = fallbackPhysDetails,
         gen = 0,
         value = 0
-    ))
+    ), order = order)
 }
 
-private fun sortFrequencyBandsForDisplay(bands: List<FreqBand>): List<FreqBand> {
+fun sortFrequencyBandsForDisplay(
+    bands: List<FreqBand>,
+    order: TechFrequencyOrder = AppConfig.resolveOrderForScreen(ScreenPageTarget.SITE_DETAIL)
+): List<FreqBand> {
+    val technoOrder = TechFrequencyOrderHelper.technologiesOrder(order)
+    val freqOrder5G = TechFrequencyOrderHelper.frequenciesOrder5G(order)
+    val freqOrder4G = TechFrequencyOrderHelper.frequenciesOrder4G(order)
+    val freqOrder3G = TechFrequencyOrderHelper.frequenciesOrder3G(order)
+    val freqOrder2G = TechFrequencyOrderHelper.frequenciesOrder2G(order)
+
     return bands.sortedWith(compareBy(
-        { band -> AppConfig.siteTechnoOrder.value.indexOf(band.technologyOrderKey()) },
+        { band ->
+            val idx = technoOrder.indexOf(band.technologyOrderKey())
+            if (idx == -1) 999 else idx
+        },
         { band ->
             val orderList = when (band.gen) {
-                5 -> AppConfig.siteFreqOrder5G.value
-                4 -> AppConfig.siteFreqOrder4G.value
-                3 -> AppConfig.siteFreqOrder3G.value
-                2 -> AppConfig.siteFreqOrder2G.value
+                5 -> freqOrder5G
+                4 -> freqOrder4G
+                3 -> freqOrder3G
+                2 -> freqOrder2G
                 else -> emptyList()
             }
             val index = orderList.indexOf(band.value.toString())

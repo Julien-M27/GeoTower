@@ -491,7 +491,8 @@ fun DateLine(label: String, value: String) {
 private fun formatSiteTechnologies(
     tech: String?,
     txtUnknown: String,
-    s2G: Boolean, s3G: Boolean, s4G: Boolean, s5G: Boolean, sFh: Boolean
+    s2G: Boolean, s3G: Boolean, s4G: Boolean, s5G: Boolean, sFh: Boolean,
+    order: fr.geotower.utils.TechFrequencyOrder = AppConfig.resolveOrderForScreen(fr.geotower.utils.ScreenPageTarget.SITE_DETAIL)
 ): String {
     if (tech.isNullOrBlank()) return txtUnknown
     val parts = tech.split(Regex("[/,\\-]")).map { it.trim().uppercase() }.filter { it.isNotEmpty() }
@@ -505,12 +506,18 @@ private fun formatSiteTechnologies(
         if (t.contains("5G") && !s5G) keep = false
         if (t.contains("FH") && !sFh) keep = false
         keep
-    }
+    }.distinct()
 
     // Si tout a été masqué par les filtres, on affiche "Non spécifié"
     if (filtered.isEmpty()) return stringResource(R.string.appstrings_not_specified)
 
-    return filtered.sortedDescending().joinToString(" - ")
+    val technoOrder = fr.geotower.utils.TechFrequencyOrderHelper.technologiesOrder(order)
+    val sorted = filtered.sortedWith(compareBy { t ->
+        val idx = technoOrder.indexOfFirst { t.contains(it) }
+        if (idx == -1) 99 else idx
+    })
+
+    return sorted.joinToString(" - ")
 }
 
 private fun getLocalLogoRes(opName: String): Int? {

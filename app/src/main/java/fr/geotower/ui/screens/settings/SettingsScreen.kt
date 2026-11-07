@@ -54,6 +54,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.NetworkCheck
 import androidx.compose.material.icons.filled.Refresh
@@ -363,6 +364,7 @@ fun SettingsScreen(
     val featureFlags by RemoteFeatureFlags.config
     val uiStyle = LocalGeoTowerUiStyle.current
     var showUnitSheet by remember { mutableStateOf(false) }
+    var showTechOrderSheet by remember { mutableStateOf(false) }
     var showNavModeSheet by remember { mutableStateOf(false) }
     var showColorPalettePage by rememberSaveable { mutableStateOf(false) }
     // Actualisation de la section « Base de données » : les quatre cartes relisent la base installée
@@ -1104,6 +1106,7 @@ fun SettingsScreen(
             entry(context.getString(R.string.settings_default_operator), "operateur operator orange sfr free bouygues sim defaut", SECTION_PREFERENCES) { showOperatorSheet = true }
             entry(context.getString(R.string.settings_app_language), "langue language francais anglais traduction locale", SECTION_PREFERENCES) { showLanguageSheet = true }
             entry(context.getString(R.string.settings_units_title), "unites units distance vitesse metre km mesure imperial", SECTION_PREFERENCES) { showUnitSheet = true }
+            entry(context.getString(R.string.settings_tech_order_title), "ordre tri technologies frequences 5g 4g 3g 2g croissant decroissant", SECTION_PREFERENCES) { showTechOrderSheet = true }
             if (featureFlags.isMenuEnabled(RemoteFeatureFlags.Menus.EXTERNAL_LINKS_SETTINGS)) {
                 entry(context.getString(R.string.settings_external_links_title), "liens externes links cartoradio sites web", SECTION_PREFERENCES) { showExternalLinksSheet = true }
             }
@@ -1738,6 +1741,7 @@ fun SettingsScreen(
                                     lang = appLanguage,
                                     onLang = { showLanguageSheet = true },
                                     onUnitSettings = { showUnitSheet = true },
+                                    onTechOrderSettings = { showTechOrderSheet = true },
                                     pagesActions = pagesSectionActions,
                                     showPagesSection = pagesCustomizationEnabled,
                                     onExternalLinks = { showExternalLinksSheet = true },
@@ -1871,6 +1875,7 @@ fun SettingsScreen(
                                         appLanguage,
                                         { showLanguageSheet = true },
                                         { showUnitSheet = true },
+                                        { showTechOrderSheet = true },
                                         { showExternalLinksSheet = true },
                                         { showShareSelectorSheet = true },
                                         cardShape,
@@ -2051,6 +2056,14 @@ fun SettingsScreen(
             fr.geotower.ui.components.UnitSettingsSheet(
                 onDismiss = { showUnitSheet = false },
                 sheetState = sheetState,
+                useOneUi = useOneUi,
+                bubbleColor = bubbleBaseColor
+            )
+        }
+
+        if (showTechOrderSheet) {
+            fr.geotower.ui.screens.settings.TechOrderSettingsSheet(
+                onDismiss = { showTechOrderSheet = false },
                 useOneUi = useOneUi,
                 bubbleColor = bubbleBaseColor
             )
@@ -3051,6 +3064,7 @@ fun SectionTitle(title: String) {
 fun AllSettingsContent(
     isWide: Boolean, theme: Int, onTheme: (Int) -> Unit, oled: Boolean, onOled: (Boolean) -> Unit, oneUi: Boolean, onOneUi: (Boolean) -> Unit, blur: Boolean, onBlur: (Boolean) -> Unit, logo: Int, onIcon: () -> Unit, onLogoDrawing: () -> Unit, logoMaterialWavesEnabled: Boolean, onLogoMaterialWavesChange: (Boolean) -> Unit, op: String, onOp: () -> Unit, lang: String, onLang: () -> Unit,
     onUnitSettings: () -> Unit,
+    onTechOrderSettings: () -> Unit = {},
     pagesActions: PagesSectionActions,
     showPagesSection: Boolean,
     onExternalLinks: () -> Unit,
@@ -3122,7 +3136,7 @@ fun AllSettingsContent(
     }
     Spacer(Modifier.height(sizing.spacing(32.dp)))
     Column(modifier = preferencesSectionModifier.fillMaxWidth()) {
-        SectionPreferences(op, onOp, lang, onLang, onUnitSettings, onExternalLinks, onSharePrefs, shape, border, bubbleColor, useOneUi, safeClick)
+        SectionPreferences(op, onOp, lang, onLang, onUnitSettings, onTechOrderSettings, onExternalLinks, onSharePrefs, shape, border, bubbleColor, useOneUi, safeClick)
     }
     Spacer(Modifier.height(sizing.spacing(32.dp)))
     if (showPagesSection) {
@@ -3449,6 +3463,7 @@ fun SectionCartographie(
 fun SectionPreferences(
     op: String, onOp: () -> Unit, lang: String, onLang: () -> Unit,
     onUnitSettings: () -> Unit,
+    onTechOrderSettings: () -> Unit = {},
     onExternalLinks: () -> Unit,
     onSharePrefs: () -> Unit,
     shape: Shape, border: BorderStroke?, bubbleColor: Color, useOneUi: Boolean, safeClick: SafeClick
@@ -3474,6 +3489,19 @@ fun SectionPreferences(
         useOneUi = useOneUi,
         safeClick = safeClick,
         icon = Icons.Default.Straighten
+    )
+    Spacer(Modifier.height(sizing.spacing(12.dp)))
+
+    PreferenceActionCard(
+        title = stringResource(R.string.settings_tech_order_title),
+        desc = stringResource(R.string.settings_tech_order_desc),
+        onClick = onTechOrderSettings,
+        shape = shape,
+        border = border,
+        bubbleColor = bubbleColor,
+        useOneUi = useOneUi,
+        safeClick = safeClick,
+        icon = Icons.Default.FilterList
     )
 
     if (featureFlags.isMenuEnabled(RemoteFeatureFlags.Menus.EXTERNAL_LINKS_SETTINGS)) {

@@ -27,6 +27,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Help
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.Launch
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BarChart
@@ -4804,6 +4805,7 @@ fun SiteFreqFiltersSheet(
         }
     )
     val emptyFreqOrderState = remember { mutableStateOf(emptyList<String>()) }
+    var showTechOrderSheet by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
 
     val txtMinOneTechno = stringResource(R.string.appstrings_min_one_techno_warning)
@@ -4888,6 +4890,37 @@ fun SiteFreqFiltersSheet(
                         useOneUi = useOneUi,
                         checkedColor = switchColor
                     )
+                }
+            }
+
+            // Sélecteur Ordre des technologies & fréquences
+            Card(
+                onClick = { showTechOrderSheet = true },
+                modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(16.dp)),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(sizing.spacing(16.dp)),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.FilterList, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(sizing.component(20.dp)))
+                    Spacer(Modifier.width(sizing.spacing(12.dp)))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.settings_tech_order_title),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = sizing.text(16.sp),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        val currentDetailOrder = AppConfig.resolveOrderForScreen(fr.geotower.utils.ScreenPageTarget.SITE_DETAIL)
+                        val orderText = if (currentDetailOrder == fr.geotower.utils.TechFrequencyOrder.DESCENDING) "5G → 2G" else "2G → 5G"
+                        Text(
+                            text = "${stringResource(R.string.settings_tech_order_desc)} ($orderText)",
+                            style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
 
@@ -5131,6 +5164,10 @@ fun SiteFreqFiltersSheet(
                 Text(stringResource(R.string.appstrings_reset_to_default), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             }
             Spacer(modifier = Modifier.height(sizing.spacing(32.dp)).navigationBarsPadding())
+        }
+
+        if (showTechOrderSheet) {
+            TechOrderSettingsSheet(onDismiss = { showTechOrderSheet = false })
         }
     }
 }

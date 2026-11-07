@@ -30,6 +30,7 @@ import androidx.wear.compose.material.CompactChip
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
 import fr.geotower.wear.data.model.DistanceUnit
+import fr.geotower.wear.data.model.TechOrder
 import fr.geotower.wear.data.model.WearOperatorSite
 import fr.geotower.wear.data.model.WearTower
 import fr.geotower.wear.data.model.formatDistance
@@ -51,7 +52,8 @@ fun SupportDetailScreen(
     onOpenCompass: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
-    distanceUnit: DistanceUnit = DistanceUnit.METRIC
+    distanceUnit: DistanceUnit = DistanceUnit.METRIC,
+    techOrder: TechOrder = TechOrder.DESCENDING
 ) {
     val listState = rememberScalingLazyListState()
 
@@ -134,7 +136,7 @@ fun SupportDetailScreen(
         }
 
         val operators = (if (tower.operators.isNotEmpty()) tower.operators else listOf(
-            WearOperatorSite(operator = tower.operator, technologies = tower.technologies)
+            WearOperatorSite(operator = tower.operator, technologies = tower.formattedTechnologies(techOrder))
         )).distinctBy { getOperatorShortName(it.operator) }
 
         items(operators.size) { index ->
@@ -162,7 +164,7 @@ fun SupportDetailScreen(
                         }
                         Spacer(Modifier.padding(start = 6.dp))
                         Text(
-                            text = op.technologies,
+                            text = op.formattedTechnologies(techOrder),
                             fontSize = 10.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = Color.White

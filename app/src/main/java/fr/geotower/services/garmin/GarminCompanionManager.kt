@@ -617,14 +617,9 @@ object GarminCompanionManager {
             val techMask = opAntennas.fold(0) { acc, a -> acc or a.techMask }
             val bandMask = opAntennas.fold(0) { acc, a -> acc or a.bandMask }
 
-            val techs = mutableListOf<String>()
-            if (techMask and 1 != 0) techs.add("2G")
-            if (techMask and 2 != 0) techs.add("3G")
-            if (techMask and 4 != 0) techs.add("4G")
-            if (techMask and 8 != 0) techs.add("5G")
-            val techStr = if (techs.isNotEmpty()) techs.joinToString(" / ") else "4G"
-
-            val bandsStr = formatBandsString(bandMask, techMask)
+            val liveOrder = fr.geotower.utils.AppConfig.resolveOrderForScreen(fr.geotower.utils.ScreenPageTarget.LIVE_MONITOR)
+            val techStr = fr.geotower.utils.BandFormatter.formatTechnologies(techMask, liveOrder)
+            val bandsStr = fr.geotower.utils.BandFormatter.formatBands(bandMask, techMask, liveOrder)
             val azimuths = opAntennas.flatMap { parseAzimuths(it.azimuts) }.distinct().sorted()
 
             val opMap = HashMap<String, Any>()
@@ -632,6 +627,8 @@ object GarminCompanionManager {
             opMap["t"] = techStr
             opMap["bands"] = bandsStr.take(35)
             opMap["az"] = azimuths
+            opMap["bm"] = bandMask
+            opMap["tm"] = techMask
             result.add(opMap)
         }
 
@@ -651,27 +648,27 @@ object GarminCompanionManager {
         }
 
         val f5g = mutableListOf<String>()
+        if (bandMask and (1 shl 13) != 0) f5g.add("26G")
         if (bandMask and (1 shl 12) != 0) f5g.add("3500")
-        if (bandMask and (1 shl 10) != 0) f5g.add("700")
         if (bandMask and (1 shl 11) != 0) f5g.add("2100")
         if (bandMask and (1 shl 21) != 0) f5g.add("1400")
-        if (bandMask and (1 shl 13) != 0) f5g.add("26G")
+        if (bandMask and (1 shl 10) != 0) f5g.add("700")
 
         val f4g = mutableListOf<String>()
-        if (bandMask and (1 shl 4) != 0) f4g.add("700")
-        if (bandMask and (1 shl 5) != 0) f4g.add("800")
-        if (bandMask and (1 shl 6) != 0) f4g.add("900")
-        if (bandMask and (1 shl 7) != 0) f4g.add("1800")
-        if (bandMask and (1 shl 8) != 0) f4g.add("2100")
         if (bandMask and (1 shl 9) != 0) f4g.add("2600")
+        if (bandMask and (1 shl 8) != 0) f4g.add("2100")
+        if (bandMask and (1 shl 7) != 0) f4g.add("1800")
+        if (bandMask and (1 shl 6) != 0) f4g.add("900")
+        if (bandMask and (1 shl 5) != 0) f4g.add("800")
+        if (bandMask and (1 shl 4) != 0) f4g.add("700")
 
         val f3g = mutableListOf<String>()
-        if (bandMask and (1 shl 2) != 0) f3g.add("900")
         if (bandMask and (1 shl 3) != 0) f3g.add("2100")
+        if (bandMask and (1 shl 2) != 0) f3g.add("900")
 
         val f2g = mutableListOf<String>()
-        if (bandMask and (1 shl 0) != 0) f2g.add("900")
         if (bandMask and (1 shl 1) != 0) f2g.add("1800")
+        if (bandMask and (1 shl 0) != 0) f2g.add("900")
 
         val groups = mutableListOf<String>()
         if (f5g.isNotEmpty()) groups.add("5G: ${f5g.joinToString(", ")}")

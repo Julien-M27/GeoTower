@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.Color
@@ -440,6 +441,53 @@ object AppConfig {
     var siteShowSpectrumRanges = mutableStateOf(true)
 
     // --- ORDRE DES TECHNOLOGIES ET FRÉQUENCES (SITE) ---
+    val globalTechOrder = mutableStateOf(TechFrequencyOrder.DESCENDING)
+
+    val pageOrders: Map<ScreenPageTarget, MutableState<String>> = mapOf(
+        ScreenPageTarget.SITE_DETAIL to mutableStateOf("global"),
+        ScreenPageTarget.MAP to mutableStateOf("global"),
+        ScreenPageTarget.SEARCH_LIST to mutableStateOf("global"),
+        ScreenPageTarget.LIVE_MONITOR to mutableStateOf("global")
+    )
+
+    fun resolveOrderForScreen(target: ScreenPageTarget): TechFrequencyOrder {
+        if (target == ScreenPageTarget.GLOBAL) return globalTechOrder.value
+        val specific = pageOrders[target]?.value ?: "global"
+        return if (specific == "global") {
+            globalTechOrder.value
+        } else {
+            TechFrequencyOrder.fromId(specific)
+        }
+    }
+
+    fun setGlobalTechOrder(context: Context, order: TechFrequencyOrder) {
+        globalTechOrder.value = order
+        context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
+            .edit()
+            .putString(ScreenPageTarget.GLOBAL.prefKey, order.id)
+            .apply()
+        syncLegacyOrders(resolveOrderForScreen(ScreenPageTarget.SITE_DETAIL))
+    }
+
+    fun setScreenTechOrder(context: Context, target: ScreenPageTarget, value: String) {
+        pageOrders[target]?.value = value
+        context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
+            .edit()
+            .putString(target.prefKey, value)
+            .apply()
+        if (target == ScreenPageTarget.SITE_DETAIL) {
+            syncLegacyOrders(resolveOrderForScreen(ScreenPageTarget.SITE_DETAIL))
+        }
+    }
+
+    fun syncLegacyOrders(order: TechFrequencyOrder) {
+        siteTechnoOrder.value = TechFrequencyOrderHelper.technologiesOrder(order)
+        siteFreqOrder5G.value = TechFrequencyOrderHelper.frequenciesOrder5G(order)
+        siteFreqOrder4G.value = TechFrequencyOrderHelper.frequenciesOrder4G(order)
+        siteFreqOrder3G.value = TechFrequencyOrderHelper.frequenciesOrder3G(order)
+        siteFreqOrder2G.value = TechFrequencyOrderHelper.frequenciesOrder2G(order)
+    }
+
     var siteTechnoOrder = mutableStateOf(listOf("5G", "4G", "3G", "2G", "FH"))
 
     var siteFreqOrder5G = mutableStateOf(listOf("26000", "4200", "3500", "2100", "1400", "700"))
@@ -1220,22 +1268,34 @@ object AppConfig {
         siteShowPhotoExif.value = prefs.getBoolean("site_show_photo_exif", true)
 
         // --- CHARGEMENT DE L'ORDRE DES TECHNOLOGIES ET FRÉQUENCES ---
-        val tOrder = prefs.getString("site_techno_order", "5G,4G,3G,2G,FH")
-        siteTechnoOrder.value = tOrder?.split(",") ?: listOf("5G", "4G", "3G", "2G", "FH")
+        val globalOrderStr = prefs.getString(ScreenPageTarget.GLOBAL.prefKey, TechFrequencyOrder.DESCENDING.id)
+        globalTechOrder.value = TechFrequencyOrder.fromId(globalOrderStr)
 
-        val f5gDefaultOrder = listOf("26000", "4200", "3500", "2100", "1400", "700")
+        ScreenPageTarget.entries.filter { it != ScreenPageTarget.GLOBAL }.forEach { target ->
+            val pageVal = prefs.getString(target.prefKey, "global") ?: "global"
+            pageOrders[target]?.value = pageVal
+        }
+
+        val resolvedDetailOrder = resolveOrderForScreen(ScreenPageTarget.SITE_DETAIL)
+        val defaultTechnoOrder = TechFrequencyOrderHelper.technologiesOrder(resolvedDetailOrder).joinToString(",")
+        val tOrder = prefs.getString("site_techno_order", defaultTechnoOrder)
+        siteTechnoOrder.value = tOrder?.split(",") ?: TechFrequencyOrderHelper.technologiesOrder(resolvedDetailOrder)
+
+        val f5gDefaultOrder = TechFrequencyOrderHelper.frequenciesOrder5G(resolvedDetailOrder)
         val f5gOrder = prefs.getString("site_freq_5g_order", f5gDefaultOrder.joinToString(","))
         siteFreqOrder5G.value = normalizeSavedOrder(f5gOrder?.split(",") ?: f5gDefaultOrder, f5gDefaultOrder)
 
-        val f4gDefaultOrder = listOf("2600", "2100", "1800", "900", "800", "700")
+        val f4gDefaultOrder = TechFrequencyOrderHelper.frequenciesOrder4G(resolvedDetailOrder)
         val f4gOrder = prefs.getString("site_freq_4g_order", f4gDefaultOrder.joinToString(","))
         siteFreqOrder4G.value = normalizeSavedOrder(f4gOrder?.split(",") ?: f4gDefaultOrder, f4gDefaultOrder)
 
-        val f3gOrder = prefs.getString("site_freq_3g_order", "2100,900")
-        siteFreqOrder3G.value = f3gOrder?.split(",") ?: listOf("2100", "900")
+        val f3gDefaultOrder = TechFrequencyOrderHelper.frequenciesOrder3G(resolvedDetailOrder)
+        val f3gOrder = prefs.getString("site_freq_3g_order", f3gDefaultOrder.joinToString(","))
+        siteFreqOrder3G.value = f3gOrder?.split(",") ?: f3gDefaultOrder
 
-        val f2gOrder = prefs.getString("site_freq_2g_order", "1800,900")
-        siteFreqOrder2G.value = f2gOrder?.split(",") ?: listOf("1800", "900")
+        val f2gDefaultOrder = TechFrequencyOrderHelper.frequenciesOrder2G(resolvedDetailOrder)
+        val f2gOrder = prefs.getString("site_freq_2g_order", f2gDefaultOrder.joinToString(","))
+        siteFreqOrder2G.value = f2gOrder?.split(",") ?: f2gDefaultOrder
 
         // --- CHARGEMENT PARTAGE DE LA CARTE ---
         shareMapAzimuths.value = prefs.getBoolean("share_map_azimuths", true)
