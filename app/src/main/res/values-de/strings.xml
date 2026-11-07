@@ -3485,6 +3485,7 @@
     <string name="appstrings_release_v2114_summary_live_notif_wear_units_and_phone_guard">Garmin-Verbindung als Live-Benachrichtigung während des Countdowns, Wear OS: Karten-Schaltfläche in Details, Einheiten und Verbindungsschutz</string>
     <string name="appstrings_release_v2115_summary_frequencies_format_and_gps_compass_harmonization">Harmonisiertes Frequenzformat nach Technologie mit MHz auf Smartwatches sowie einheitliche GPS-Suche auf Kompass und Karte</string>
     <string name="appstrings_release_v2116_summary_tech_frequency_order_and_wear_settings">Anpassbare Technologie- und Frequenzreihenfolge (5G â†’ 2G oder 2G â†’ 5G) global und pro Seite (Details, Karte, Suche, Live) sowie Wear OS-Einstellungen</string>
+    <string name="appstrings_release_v2117_summary_twenty_operators_support_and_watch_enhancements">Vollständige Unterstützung aller 20 Mobilfunkbetreiber (Festland und Übersee) auf Smartwatches (Wear OS und Garmin) mit offiziellen Farben und einheitlicher Erkennung</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Netzwerkanfragen-Protokoll</string>

@@ -3485,6 +3485,7 @@
     <string name="appstrings_release_v2114_summary_live_notif_wear_units_and_phone_guard">Collegamento Garmin in Live Notification durante il conto alla rovescia, Wear OS: pulsante mappa nei dettagli, unità metriche/imperiali e protezione connessione</string>
     <string name="appstrings_release_v2115_summary_frequencies_format_and_gps_compass_harmonization">Formato frequenze armonizzato per tecnologia e MHz sugli smartwatch, e unificazione della ricerca GPS tra bussola e mappa</string>
     <string name="appstrings_release_v2116_summary_tech_frequency_order_and_wear_settings">Ordine personalizzabile di tecnologie e frequenze (5G â†’ 2G o 2G â†’ 5G) a livello globale e per pagina (scheda, mappa, ricerca, live) e impostazioni Wear OS</string>
+    <string name="appstrings_release_v2117_summary_twenty_operators_support_and_watch_enhancements">Supporto completo per tutti i 20 operatori di telecomunicazioni (Francia e Oltremare) su smartwatch (Wear OS e Garmin) con colori ufficiali e rilevamento armonizzato</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registro richieste di rete</string>

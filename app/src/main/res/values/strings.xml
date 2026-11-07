@@ -3508,6 +3508,7 @@
     <string name="appstrings_release_v2114_summary_live_notif_wear_units_and_phone_guard">Garmin link promoted to Live Notification during countdown, Wear OS: map button on details, metric/imperial units, and phone guard</string>
     <string name="appstrings_release_v2115_summary_frequencies_format_and_gps_compass_harmonization">Harmonized frequency formatting by technology with MHz across watches, and GPS search layout unified between compass and map</string>
     <string name="appstrings_release_v2116_summary_tech_frequency_order_and_wear_settings">Customizable technology and frequency order (5G â†’ 2G or 2G â†’ 5G) globally and per page (details, map, search, live), and Wear OS settings</string>
+    <string name="appstrings_release_v2117_summary_twenty_operators_support_and_watch_enhancements">Full support for all 20 telecom operators (Mainland and Overseas) on smartwatches (Wear OS &amp; Garmin) with official colors and harmonized detection</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Network requests log</string>
