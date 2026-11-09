@@ -3487,6 +3487,7 @@
     <string name="appstrings_release_v2116_summary_tech_frequency_order_and_wear_settings">Ordem personalizável de tecnologias e frequências (5G → 2G ou 2G → 5G) a nível global e por página (detalhes, mapa, pesquisa, live) e definições Wear OS</string>
     <string name="appstrings_release_v2117_summary_twenty_operators_support_and_watch_enhancements">Suporte completo para todos os 20 operadores de telecomunicações (França e Ultramar) em smartwatches (Wear OS e Garmin) com cores oficiais e deteção harmonizada</string>
     <string name="appstrings_release_v2118_summary_full_twenty_operators_web_api_and_watch_sync">Suporte completo e sincronização direta de todos os 20 operadores de telecomunicações (França e Ultramar) via API Web e Bluetooth em smartwatches (Wear OS e Garmin)</string>
+    <string name="appstrings_release_v2119_summary_changes_map_and_live_tracking_improvements">Mapa interativo de alterações da ANFR (novas antenas, atualizações e desativações), filtros dedicados e melhorias no rastreamento em direto</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registo de pedidos de rede</string>

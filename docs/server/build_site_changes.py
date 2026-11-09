@@ -479,6 +479,19 @@ def station_dept(row, header, columns):
     return ""
 
 
+def station_address(row, header):
+    """Reconstitue l'adresse textuelle a partir des colonnes adresse de l'observatoire."""
+    parts = []
+    for col_name in ("adr_lb_add1", "adr_lb_add2", "adr_lb_add3", "adr_lb_lieu", "adr_nm_cp"):
+        if col_name in header:
+            idx = header.index(col_name)
+            if idx < len(row):
+                val = clean_text(row[idx])
+                if val and val not in parts:
+                    parts.append(val)
+    return ", ".join(parts) if parts else ""
+
+
 def build_diff(previous: Publication, current: Publication):
     """Retourne (stations, stats). `stations` est la liste des objets JSONL."""
     keys = changed_keys(previous, current)
@@ -519,6 +532,9 @@ def build_diff(previous: Publication, current: Publication):
 
         support = clean_text(value_of(reference, header, columns, "support"))
         dept = station_dept(reference, header, columns)
+        address = station_address(reference, header)
+        if not address and entry["old_any"] is not None:
+            address = station_address(entry["old_any"], previous.header)
         point = parse_coordinates(value_of(reference, header, columns, "coords"))
         if point is None and entry["old_any"] is not None:
             # Site disparu : ses coordonnees n'existent plus que dans l'ancienne
@@ -607,14 +623,36 @@ def build_diff(previous: Publication, current: Publication):
             codes = []
             seen_codes = set()
             stats["codes"][CODE_SITE_ADDED] = stats["codes"].get(CODE_SITE_ADDED, 0) + 1
-            codes.append({"c": CODE_SITE_ADDED, "ops": operators_of(changes)})
+            ops = operators_of(changes)
+            all_systems = systems_of(changes)
+            if len(ops) <= 1:
+                codes.append({
+                    "c": CODE_SITE_ADDED,
+                    "op": ops[0] if ops else None,
+                    "ops": ops,
+                    "systems": all_systems,
+                })
+            else:
+                for op in ops:
+                    codes.append({
+                        "c": CODE_SITE_ADDED,
+                        "op": op,
+                        "ops": ops,
+                        "systems": systems_of(changes, for_operator=op),
+                    })
         elif station_removed:
             codes = []
             seen_codes = set()
             stats["codes"][CODE_SITE_REMOVED] = (
                 stats["codes"].get(CODE_SITE_REMOVED, 0) + 1
             )
-            codes.append({"c": CODE_SITE_REMOVED, "ops": operators_of(changes)})
+            ops = operators_of(changes)
+            all_systems = systems_of(changes)
+            codes.append({
+                "c": CODE_SITE_REMOVED,
+                "ops": ops,
+                "systems": all_systems,
+            })
 
         record = {"sta": station}
         if station_added:
@@ -628,6 +666,8 @@ def build_diff(previous: Publication, current: Publication):
             record["lon"] = round(point[1], 6)
         if dept:
             record["dept"] = dept
+        if address:
+            record["adr"] = address
         record["chg"] = changes
         record["codes"] = codes
         stations.append(record)
@@ -640,6 +680,17 @@ def column_name(header, columns, role):
     if index is None or index >= len(header):
         return None
     return header[index]
+
+
+def systems_of(changes, for_operator=None):
+    systems = []
+    for change in changes:
+        if for_operator is not None and change["key"][0] != for_operator:
+            continue
+        system = change["key"][1]
+        if system and system not in systems:
+            systems.append(system)
+    return systems
 
 
 def operators_of(changes):
@@ -676,6 +727,8 @@ def build_map_points(stations):
                 point["lon"] = lon
             if station.get("dept"):
                 point["dept"] = station["dept"]
+            if station.get("adr"):
+                point["adr"] = station["adr"]
             points[group] = point
         elif "lat" not in point and lat is not None:
             point["lat"] = lat

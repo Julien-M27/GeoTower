@@ -182,4 +182,13 @@ object RetrofitClient {
             .build()
             .create(AnfrService::class.java)
     }
+
+    val changesApi: ChangesApiService by lazy {
+        Retrofit.Builder()
+            .baseUrl(BASE_URL)
+            .client(currentClient)
+            .addConverterFactory(GsonConverterFactory.create(gson))
+            .build()
+            .create(ChangesApiService::class.java)
+    }
 }

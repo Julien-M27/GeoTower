@@ -8,6 +8,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.res.Configuration
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
@@ -40,6 +41,7 @@ import fr.geotower.MainActivity
 import fr.geotower.R
 import fr.geotower.data.AnfrRepository
 import fr.geotower.data.api.RetrofitClient
+import fr.geotower.data.community.CommunityDataPreferences
 import fr.geotower.data.db.AppDatabase
 import fr.geotower.data.db.GeoTowerDao
 import fr.geotower.data.models.LocalisationEntity
@@ -111,6 +113,15 @@ class LiveTrackingService : Service() {
         val operatorKeys: Set<String>
     )
 
+    private val favoritePhotoPrefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key != null && key.startsWith(CommunityDataPreferences.SITE_PHOTO_FAVORITE_KEY_PREFIX)) {
+            clearLiveSitePhotoCache()
+            if (trackingState != LiveTrackingSessionState.State.PAUSED) {
+                refreshFromLastProcessedLocation()
+            }
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
         isRunning = true
@@ -120,6 +131,8 @@ class LiveTrackingService : Service() {
             context = applicationContext
         )
         createNotificationChannel()
+        getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
+            .registerOnSharedPreferenceChangeListener(favoritePhotoPrefsListener)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -143,6 +156,7 @@ class LiveTrackingService : Service() {
         val operatorChanged = resetIfOperatorChanged(defaultOp)
 
         if (intent?.action == ACTION_REFRESH_NOTIFICATION) {
+            clearLiveSitePhotoCache()
             if (trackingState == LiveTrackingSessionState.State.PAUSED) {
                 refreshFrozenNotification()
                 return START_STICKY
@@ -388,7 +402,7 @@ class LiveTrackingService : Service() {
                     displayOperator,
                     distanceWithDirectionStr + hsSuffix
                 )
-                val photoCacheKey = liveSitePhotoCacheKey(displayOperator, sitePhotoId)
+                val photoCacheKey = liveSitePhotoCacheKey(displayOperator, sitePhotoId, closestAntenna.idAnfr)
                 val liveSitePhotoBitmap = cachedLiveSitePhotoBitmap(photoCacheKey)
 
                 updateNotification(
@@ -399,12 +413,14 @@ class LiveTrackingService : Service() {
                     progress = progress,
                     address = fullAddress,
                     sitePhotoBitmap = liveSitePhotoBitmap,
-                    mirrorTrackerIcon = isMovingAwayFromAntenna
+                    mirrorTrackerIcon = isMovingAwayFromAntenna,
+                    supportId = sitePhotoId
                 )
 
                 requestLiveSitePhotoBitmapIfNeeded(
                     cacheKey = photoCacheKey,
                     siteId = sitePhotoId,
+                    anfrId = closestAntenna.idAnfr,
                     operator = displayOperator,
                     trackingOperator = defaultOp,
                     text = notificationText,
@@ -412,7 +428,8 @@ class LiveTrackingService : Service() {
                     antLoc = closestAntenna,
                     progress = progress,
                     address = fullAddress,
-                    mirrorTrackerIcon = isMovingAwayFromAntenna
+                    mirrorTrackerIcon = isMovingAwayFromAntenna,
+                    supportId = sitePhotoId
                 )
             } catch (_: CancellationException) {
                 // Newer GPS updates replace older calculations.
@@ -571,7 +588,8 @@ class LiveTrackingService : Service() {
         progress: Int = 0,
         address: String = "",
         sitePhotoBitmap: Bitmap? = null,
-        mirrorTrackerIcon: Boolean = false
+        mirrorTrackerIcon: Boolean = false,
+        supportId: String? = null
     ) {
         val state = LiveTrackingNotificationState(
             contentText = text,
@@ -582,6 +600,7 @@ class LiveTrackingService : Service() {
             address = address,
             sitePhotoBitmap = sitePhotoBitmap,
             mirrorTrackerIcon = mirrorTrackerIcon,
+            supportId = supportId,
         )
         if (trackingState == LiveTrackingSessionState.State.ACTIVE) {
             lastNotificationState = state
@@ -622,6 +641,7 @@ class LiveTrackingService : Service() {
                 address = state.address,
                 sitePhotoBitmap = state.sitePhotoBitmap,
                 mirrorTrackerIcon = state.mirrorTrackerIcon,
+                supportId = state.supportId,
             )
         } else {
             buildNotification(
@@ -633,6 +653,7 @@ class LiveTrackingService : Service() {
                 address = state.address,
                 sitePhotoBitmap = state.sitePhotoBitmap,
                 mirrorTrackerIcon = state.mirrorTrackerIcon,
+                supportId = state.supportId,
             )
         }
     }
@@ -640,6 +661,7 @@ class LiveTrackingService : Service() {
     private fun requestLiveSitePhotoBitmapIfNeeded(
         cacheKey: String,
         siteId: String,
+        anfrId: String? = null,
         operator: String,
         trackingOperator: String,
         text: String,
@@ -647,7 +669,8 @@ class LiveTrackingService : Service() {
         antLoc: LocalisationEntity,
         progress: Int,
         address: String,
-        mirrorTrackerIcon: Boolean
+        mirrorTrackerIcon: Boolean = false,
+        supportId: String? = null
     ) {
         if (siteId.isBlank() || hasLiveSitePhotoCacheEntry(cacheKey)) return
         if (liveSitePhotoLoadingKey == cacheKey) return
@@ -656,7 +679,7 @@ class LiveTrackingService : Service() {
         liveSitePhotoLoadingKey = cacheKey
         liveSitePhotoJob = serviceScope.launch {
             try {
-                val bitmap = loadLiveSitePhotoBitmap(siteId, operator)
+                val bitmap = loadLiveSitePhotoBitmap(siteId, operator, anfrId)
                 putLiveSitePhotoBitmap(cacheKey, bitmap)
 
                 if (
@@ -673,7 +696,8 @@ class LiveTrackingService : Service() {
                         progress = progress,
                         address = address,
                         sitePhotoBitmap = bitmap,
-                        mirrorTrackerIcon = mirrorTrackerIcon
+                        mirrorTrackerIcon = mirrorTrackerIcon,
+                        supportId = supportId
                     )
                 }
             } catch (e: CancellationException) {
@@ -689,8 +713,8 @@ class LiveTrackingService : Service() {
         }
     }
 
-    private suspend fun loadLiveSitePhotoBitmap(siteId: String, operator: String): Bitmap? {
-        val candidate = LiveSitePhotoSelector.firstCandidate(applicationContext, siteId, operator) ?: return null
+    private suspend fun loadLiveSitePhotoBitmap(siteId: String, operator: String, anfrId: String? = null): Bitmap? {
+        val candidate = LiveSitePhotoSelector.firstCandidate(applicationContext, siteId, operator, anfrId) ?: return null
         return downloadLiveSitePhotoBitmap(candidate.url, candidate.maxBytes)
     }
 
@@ -801,8 +825,8 @@ class LiveTrackingService : Service() {
             .coerceAtLeast(MIN_LIVE_SITE_PHOTO_ICON_PX)
     }
 
-    private fun liveSitePhotoCacheKey(operator: String, siteId: String): String {
-        return LiveSitePhotoSelector.cacheKey(applicationContext, operator, siteId)
+    private fun liveSitePhotoCacheKey(operator: String, siteId: String, anfrId: String? = null): String {
+        return LiveSitePhotoSelector.cacheKey(applicationContext, operator, siteId, anfrId)
     }
 
     private fun hasLiveSitePhotoCacheEntry(cacheKey: String): Boolean {
@@ -850,12 +874,13 @@ class LiveTrackingService : Service() {
         antLoc: LocalisationEntity?,
         address: String,
         sitePhotoBitmap: Bitmap?,
-        mirrorTrackerIcon: Boolean
+        mirrorTrackerIcon: Boolean = false,
+        supportId: String? = null
     ): Notification {
         val pendingIntent = PendingIntent.getActivity(
             this,
             notificationRequestCode(antLoc),
-            notificationIntent(antLoc),
+            notificationIntent(antLoc, supportId, operator),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
@@ -950,12 +975,13 @@ class LiveTrackingService : Service() {
         progress: Int = 0,
         address: String = "",
         sitePhotoBitmap: Bitmap? = null,
-        mirrorTrackerIcon: Boolean = false
+        mirrorTrackerIcon: Boolean = false,
+        supportId: String? = null
     ): Notification {
         val pendingIntent = PendingIntent.getActivity(
             this,
             notificationRequestCode(antLoc),
-            notificationIntent(antLoc),
+            notificationIntent(antLoc, supportId, operator),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
@@ -1035,16 +1061,27 @@ class LiveTrackingService : Service() {
         }
     )
 
-    private fun notificationIntent(antLoc: LocalisationEntity?): Intent {
+    private fun notificationIntent(
+        antLoc: LocalisationEntity?,
+        supportId: String? = null,
+        operator: String? = null
+    ): Intent {
         return Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            val siteId = antLoc?.idAnfr?.takeIf { it.isNotBlank() }
-            if (siteId != null) {
-                data = Uri.parse("geotower://site/${Uri.encode(siteId)}")
-                putExtra("TARGET_SITE_ID", siteId)
+            val supId = supportId?.takeIf { it.isNotBlank() }
+            val anfrId = antLoc?.idAnfr?.takeIf { it.isNotBlank() }
+            if (supId != null) {
+                data = Uri.parse("geotower://support/${Uri.encode(supId)}")
+                putExtra("TARGET_SUPPORT_ID", supId)
+                if (anfrId != null) putExtra("TARGET_SITE_ID", anfrId)
+                if (!operator.isNullOrBlank()) putExtra("TARGET_OPERATOR", operator)
+            } else if (anfrId != null) {
+                data = Uri.parse("geotower://site/${Uri.encode(anfrId)}")
+                putExtra("TARGET_SITE_ID", anfrId)
             } else {
                 putExtra("widget_dest", "nearby")
             }
+
         }
     }
 
@@ -1084,7 +1121,8 @@ class LiveTrackingService : Service() {
         secondaryInfo: String,
         shortCriticalText: String?,
         sitePhotoBitmap: Bitmap?,
-        mirrorTrackerIcon: Boolean
+        mirrorTrackerIcon: Boolean = false,
+        supportId: String? = null
     ): Bundle {
         if (!DeviceProfile.supportsSamsungOngoingActivity) return Bundle.EMPTY
 
@@ -1381,6 +1419,8 @@ class LiveTrackingService : Service() {
         runCatching { stopForeground(STOP_FOREGROUND_REMOVE) }
         stopLocationUpdates()
         clearLiveSitePhotoCache()
+        getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
+            .unregisterOnSharedPreferenceChangeListener(favoritePhotoPrefsListener)
         serviceScope.cancel()
     }
 

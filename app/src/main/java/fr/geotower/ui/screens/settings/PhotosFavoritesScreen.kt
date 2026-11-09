@@ -280,6 +280,7 @@ fun PhotosFavoritesScreen(
                         sourceId = target.entry.bucketId,
                         photoId = null
                     )
+                    fr.geotower.services.LiveTrackingController.refreshNotification(context)
                     // Mise à jour optimiste : on évite un re-fetch réseau après le retrait.
                     groups = groups?.mapNotNull { group ->
                         if (group.siteId != target.entry.siteId) {

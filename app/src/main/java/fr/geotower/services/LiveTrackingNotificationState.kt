@@ -14,6 +14,7 @@ internal data class LiveTrackingNotificationState(
     val address: String = "",
     val sitePhotoBitmap: Bitmap? = null,
     val mirrorTrackerIcon: Boolean = false,
+    val supportId: String? = null,
 ) {
     companion object {
         fun forPause(

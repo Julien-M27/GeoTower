@@ -24,8 +24,8 @@ android {
         targetSdk = 35
         // Google Play exige un versionCode unique pour chaque artefact sous le même applicationId.
         // Mobile utilise 114, Automotive utilise 10114 (offset 10 000), Wear OS utilise 20115 (offset 20 000).
-        versionCode = 20122
-        versionName = "2.0.8"
+        versionCode = 20123
+        versionName = "2.0.9"
     }
 
     buildFeatures {

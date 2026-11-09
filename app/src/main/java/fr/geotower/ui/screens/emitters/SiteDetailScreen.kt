@@ -899,14 +899,19 @@ fun SiteDetailScreen(
                         val response = fr.geotower.data.api.SignalQuestClient.api.getSitePhotos(
                             siteId = supportSiteId
                         )
+                        val allowedOperators = (listOfNotNull(signalQuestOperator) + supportAntennas.mapNotNull { it.operateur }).distinct()
                         response.body()?.data
                             ?.filter { photo ->
                                 val photoOperator = photo.operator
                                 photoOperator.isNullOrBlank() ||
-                                    photoOperator.equals(signalQuestOperator, ignoreCase = true) ||
-                                    SignalQuestOperators.operatorParamFor(photoOperator).equals(signalQuestOperator, ignoreCase = true)
+                                    allowedOperators.any { op ->
+                                        photoOperator.equals(op, ignoreCase = true) ||
+                                            SignalQuestOperators.operatorParamFor(photoOperator).equals(op, ignoreCase = true)
+                                    }
                             }
                             ?.forEach {
+                                val photoOpKey = OperatorColors.keyFor(it.operator) ?: signalQuestOperatorKey
+                                val photoOpLabel = OperatorColors.specForKey(photoOpKey)?.label ?: signalQuestOperatorLabel
                                 photosTemp.add(
                                     CommunityPhoto(
                                         url = it.imageUrl,
@@ -916,8 +921,8 @@ fun SiteDetailScreen(
                                         exifMetadata = it.publicMetadata,
                                         sourceId = CommunityDataPreferences.SOURCE_SIGNALQUEST,
                                         stableId = it.id ?: it.imageUrl,
-                                        operatorKey = signalQuestOperatorKey,
-                                        operatorLabel = signalQuestOperatorLabel
+                                        operatorKey = photoOpKey,
+                                        operatorLabel = photoOpLabel
                                     )
                                 )
                             }
@@ -1799,6 +1804,7 @@ fun SiteDetailScreen(
                                 CommunityPhotosSectionShared(
                                     photos = communityPhotos,
                                     operatorName = opName,
+                                    operatorNames = (listOf(opName) + supportAntennas.mapNotNull { it.operateur }).distinct(),
                                     supportNature = physique?.natureSupport, // ✅ LE BON NOM DE VARIABLE
                                     supportOwner = physique?.proprietaire,
                                     bgColor = cardBgColor,

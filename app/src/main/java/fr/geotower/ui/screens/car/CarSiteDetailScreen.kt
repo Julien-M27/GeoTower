@@ -51,12 +51,17 @@ class CarSiteDetailScreen(
 
     private fun startNavigation() {
         val label = Uri.encode("GeoTower ${site.idAnfr}")
-        val uri = Uri.parse("geo:${site.latitude},${site.longitude}?q=${site.latitude},${site.longitude}($label)")
-        val intent = Intent(Intent.ACTION_VIEW, uri)
-        // L'hôte refuse l'appel s'il n'a aucune app de navigation à qui le passer : sans garde,
-        // l'exception remonte au host et on retombe sur son écran d'erreur générique.
-        runCatching { carContext.startCarApp(intent) }
-            .onFailure { AppFileLog.e(CAR_LOG_TAG, "Echec du lancement de la navigation vers ${site.idAnfr}", it) }
+        val uriWithLabel = Uri.parse("geo:${site.latitude},${site.longitude}?q=${site.latitude},${site.longitude}($label)")
+        val simpleUri = Uri.parse("geo:${site.latitude},${site.longitude}")
+        carLog("Lancement navigation vers ${site.idAnfr} (${site.latitude}, ${site.longitude})")
+        runCatching {
+            carContext.startCarApp(Intent(CarContext.ACTION_NAVIGATE, uriWithLabel))
+        }.recoverCatching {
+            // Repli avec coordonnées directes si le host refuse le paramètre query
+            carContext.startCarApp(Intent(CarContext.ACTION_NAVIGATE, simpleUri))
+        }.onFailure {
+            AppFileLog.e(CAR_LOG_TAG, "Echec du lancement de la navigation vers ${site.idAnfr}", it)
+        }
     }
 
     private fun formatCoordinates(): String {

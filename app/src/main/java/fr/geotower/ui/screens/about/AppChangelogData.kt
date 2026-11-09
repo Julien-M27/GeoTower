@@ -27,10 +27,16 @@ data class ChangelogMilestone(
 object AppChangelogRepository {
     val milestones: List<ChangelogMilestone> = listOf(
         ChangelogMilestone(
-            versionName = "2.1.18",
-            releaseDate = "2026-11-07",
+            versionName = "2.1.19",
+            releaseDate = "2026-11-09",
             isCurrent = true,
             badge = MilestoneBadge.CURRENT,
+            summary = "Carte interactive des changements ANFR (nouvelles antennes, évolutions et extinctions) et améliorations",
+            itemResIds = listOf(R.string.appstrings_release_v2119_summary_changes_map_and_live_tracking_improvements)
+        ),
+        ChangelogMilestone(
+            versionName = "2.1.18",
+            releaseDate = "2026-11-07",
             summary = "Prise en charge intégrale des 20 opérateurs télécoms sur montres connectées et harmonisation",
             itemResIds = listOf(R.string.appstrings_release_v2118_summary_full_twenty_operators_web_api_and_watch_sync)
         ),

@@ -1055,6 +1055,7 @@ fun CommunityPhotosSectionShared(
         } else {
             favoritePhotoIdsByBucket + (bucketId to nextFavoriteId)
         }
+        fr.geotower.services.LiveTrackingController.refreshNotification(context)
     }
     val sourceEnabledById = mapOf(
         CommunityDataPreferences.SOURCE_CELLULARFR to showCellularFr,

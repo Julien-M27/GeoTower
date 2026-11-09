@@ -31,7 +31,7 @@ object CommunityDataPreferences {
 
     private const val LEGACY_CELLULARFR_PHOTOS_KEY = "site_show_cellularfr_photos"
     private const val LEGACY_SIGNALQUEST_PHOTOS_KEY = "site_show_signalquest_photos"
-    private const val SITE_PHOTO_FAVORITE_KEY_PREFIX = "site_photo_favorite_"
+    const val SITE_PHOTO_FAVORITE_KEY_PREFIX = "site_photo_favorite_"
     private const val HIDE_DUPLICATE_PHOTOS_KEY = "community_photos_hide_duplicates"
 
     private val signalQuestPhotos = CommunityDataSource(

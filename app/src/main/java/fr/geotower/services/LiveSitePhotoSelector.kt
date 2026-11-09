@@ -24,57 +24,78 @@ internal object LiveSitePhotoSelector {
     private const val MAX_THUMBNAIL_BYTES = 3 * 1024 * 1024
     private const val MAX_IMAGE_BYTES = 10 * 1024 * 1024
     private const val SIGNALQUEST_PHOTOS_TIMEOUT_MS = 5_000L
-    private const val CACHE_VERSION = "v2"
+    private const val CACHE_VERSION = "v3"
+
+    fun allFavoritePhotoIdsForSite(
+        prefs: SharedPreferences,
+        vararg siteIds: String?
+    ): Set<String> {
+        val cleanIds = siteIds.filterNotNull().map { it.trim() }.filter { it.isNotBlank() }
+        if (cleanIds.isEmpty()) return emptySet()
+        val prefixes = cleanIds.map { "${CommunityDataPreferences.SITE_PHOTO_FAVORITE_KEY_PREFIX}${it}_" }
+        return prefs.all.entries.asSequence()
+            .filter { (key, _) -> prefixes.any { prefix -> key.startsWith(prefix, ignoreCase = true) } }
+            .mapNotNull { it.value as? String }
+            .filter { it.isNotBlank() }
+            .toSet()
+    }
 
     suspend fun firstCandidate(
         context: Context,
         siteId: String,
-        operator: String
+        operator: String,
+        anfrId: String? = null
     ): LiveSitePhotoCandidate? {
         val normalizedSiteId = siteId.trim().takeIf { it.isNotBlank() } ?: return null
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val operatorKey = CommunityDataPreferences.operatorKeyFor(operator) ?: return null
-        val photoFeature = photoFeature(operatorKey) ?: return null
-        val sources = CommunityDataPreferences
-            .orderedSources(prefs, operatorKey, photoFeature)
-            .filter { source ->
-                CommunityDataPreferences.isEnabled(
-                    prefs,
-                    operatorKey,
-                    CommunityDataPreferences.FEATURE_PHOTOS,
-                    source.id
-                )
-            }
+        val siteFavoritePhotoIds = allFavoritePhotoIdsForSite(prefs, normalizedSiteId, anfrId)
+        val hasFavoritePhoto = siteFavoritePhotoIds.isNotEmpty()
+
+        val operatorKey = CommunityDataPreferences.operatorKeyFor(operator)
+        val photoFeature = operatorKey?.let { photoFeature(it) }
+        val sources = if (operatorKey != null && photoFeature != null) {
+            CommunityDataPreferences
+                .orderedSources(prefs, operatorKey, photoFeature)
+                .filter { source ->
+                    CommunityDataPreferences.isEnabled(
+                        prefs,
+                        operatorKey,
+                        CommunityDataPreferences.FEATURE_PHOTOS,
+                        source.id
+                    )
+                }
+        } else {
+            listOf(
+                CommunityDataSource(CommunityDataPreferences.SOURCE_SIGNALQUEST, "Signal Quest"),
+                CommunityDataSource(CommunityDataPreferences.SOURCE_CELLULARFR, "CellularFR")
+            )
+        }
 
         var previousEnabledSourceHasPhotos = false
         val visiblePhotos = mutableListOf<SourcePhoto>()
-        val favoriteIdsBySource = sources.associate { source ->
-            source.id to favoritePhotoIdForSource(
-                prefs = prefs,
-                siteId = normalizedSiteId,
-                source = source,
-                operatorKey = operatorKey
-            )
-        }
-        val hasFavoritePhoto = favoriteIdsBySource.values.any { !it.isNullOrBlank() }
 
         for (source in sources) {
-            val sourceFavoriteId = favoriteIdsBySource[source.id]
             val sourcePhotos = sourcePhotos(
                 sourceId = source.id,
                 siteId = normalizedSiteId,
                 operator = operator,
-                favoriteId = sourceFavoriteId
+                favoriteIds = siteFavoritePhotoIds
             )
             val sourceHasPhotos = sourcePhotos.isNotEmpty()
-            val isVisibleSource = isVisibleSource(
-                prefs = prefs,
-                operatorKey = operatorKey,
-                source = source,
-                previousEnabledSourceHasPhotos = previousEnabledSourceHasPhotos
-            )
+            val isVisibleSource = if (operatorKey != null) {
+                isVisibleSource(
+                    prefs = prefs,
+                    operatorKey = operatorKey,
+                    source = source,
+                    previousEnabledSourceHasPhotos = previousEnabledSourceHasPhotos
+                )
+            } else {
+                true
+            }
 
-            if (isVisibleSource) {
+            val containsFavorite = sourcePhotos.any { it.stableId in siteFavoritePhotoIds }
+
+            if (isVisibleSource || containsFavorite) {
                 if (!hasFavoritePhoto) {
                     sourcePhotos.firstNotNullOfOrNull { photo -> photo.toCandidate() }?.let { candidate ->
                         return candidate
@@ -88,22 +109,22 @@ internal object LiveSitePhotoSelector {
             }
         }
 
-        val favoriteIdsByBucket = visiblePhotos
-            .mapNotNull { photo ->
-                favoriteIdForBucket(prefs, normalizedSiteId, photo.favoriteBucketId())
-                    ?.let { favoriteId -> photo.favoriteBucketId() to favoriteId }
+        // Si un favori est enregistré mais n'était pas dans la première source, on vérifie CellularFR
+        if (hasFavoritePhoto && visiblePhotos.none { it.stableId in siteFavoritePhotoIds }) {
+            val cellularPhotos = cellularFrPhotos(normalizedSiteId)
+            val favCellular = cellularPhotos.firstOrNull { it.stableId in siteFavoritePhotoIds }
+            if (favCellular != null) {
+                visiblePhotos += favCellular
             }
-            .toMap()
+        }
+
         val sourceRank = sources.withIndex().associate { (index, source) -> source.id to index }
         val signalQuestOperatorOrder = signalQuestOperatorOrder(operator)
 
         return visiblePhotos
             .sortedWith(
                 compareBy<SourcePhoto>(
-                    { photo ->
-                        val bucketId = photo.favoriteBucketId()
-                        if (bucketId != null && favoriteIdsByBucket[bucketId] == photo.stableId) 0 else 1
-                    },
+                    { photo -> if (photo.stableId in siteFavoritePhotoIds) 0 else 1 },
                     { photo -> sourceRank[photo.sourceId] ?: 99 },
                     { photo ->
                         if (photo.sourceId == CommunityDataPreferences.SOURCE_SIGNALQUEST) {
@@ -118,12 +139,20 @@ internal object LiveSitePhotoSelector {
             ?.toCandidate()
     }
 
-    fun cacheKey(context: Context, operator: String, siteId: String): String {
+    fun cacheKey(
+        context: Context,
+        operator: String,
+        siteId: String,
+        anfrId: String? = null
+    ): String {
         val normalizedSiteId = siteId.trim()
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val operatorKey = CommunityDataPreferences.operatorKeyFor(operator)
             ?: operator.trim().uppercase(Locale.US)
-        return "$CACHE_VERSION:$operatorKey:$normalizedSiteId:${sourceSignature(prefs, operatorKey, normalizedSiteId)}"
+        val favoritesSignature = allFavoritePhotoIdsForSite(prefs, normalizedSiteId, anfrId)
+            .sorted()
+            .joinToString(",")
+        return "$CACHE_VERSION:$operatorKey:$normalizedSiteId:${sourceSignature(prefs, operatorKey, normalizedSiteId)}:$favoritesSignature"
     }
 
     private fun isVisibleSource(
@@ -144,10 +173,10 @@ internal object LiveSitePhotoSelector {
         sourceId: String,
         siteId: String,
         operator: String,
-        favoriteId: String?
+        favoriteIds: Set<String>
     ): List<SourcePhoto> {
         return when (sourceId) {
-            CommunityDataPreferences.SOURCE_SIGNALQUEST -> signalQuestPhotos(siteId, operator, favoriteId)
+            CommunityDataPreferences.SOURCE_SIGNALQUEST -> signalQuestPhotos(siteId, operator, favoriteIds)
             // CellularFR masqué — voir CellularFrApi.ENABLED
             CommunityDataPreferences.SOURCE_CELLULARFR -> cellularFrPhotos(siteId)
             else -> emptyList()
@@ -157,17 +186,15 @@ internal object LiveSitePhotoSelector {
     private suspend fun signalQuestPhotos(
         siteId: String,
         operator: String,
-        favoriteId: String?
+        favoriteIds: Set<String>
     ): List<SourcePhoto> {
-        val signalQuestOperator = SignalQuestOperators.operatorParamFor(operator) ?: return emptyList()
-        val signalQuestOperatorKey = OperatorColors.keyFor(signalQuestOperator)
-            ?: OperatorColors.keyFor(operator)
+        val signalQuestOperator = SignalQuestOperators.operatorParamFor(operator)
 
         val response = withTimeoutOrNull(SIGNALQUEST_PHOTOS_TIMEOUT_MS) {
             SignalQuestClient.api.getSitePhotos(
                 siteId = siteId,
-                operator = signalQuestOperator,
-                limit = if (favoriteId.isNullOrBlank()) DEFAULT_QUERY_LIMIT else FAVORITE_QUERY_LIMIT
+                operator = null,
+                limit = if (favoriteIds.isEmpty()) DEFAULT_QUERY_LIMIT else FAVORITE_QUERY_LIMIT
             )
         } ?: return emptyList()
         if (!response.isSuccessful) return emptyList()
@@ -177,6 +204,10 @@ internal object LiveSitePhotoSelector {
             .orEmpty()
             .asSequence()
             .filter { photo ->
+                val stableId = photo.id?.takeIf { it.isNotBlank() } ?: photo.imageUrl
+                if (stableId in favoriteIds) return@filter true
+                if (signalQuestOperator == null) return@filter true
+
                 val photoOperator = photo.operator
                 photoOperator.isNullOrBlank() ||
                     photoOperator.equals(signalQuestOperator, ignoreCase = true) ||
@@ -192,15 +223,16 @@ internal object LiveSitePhotoSelector {
                     ?: thumbnailUrl
                     ?: return@mapNotNull null
 
+                val photoOperatorKey = SignalQuestOperators.operatorParamFor(photoOperator)
+                    ?.let { OperatorColors.keyFor(it) }
+                    ?: OperatorColors.keyFor(photoOperator)
+
                 SourcePhoto(
                     sourceId = CommunityDataPreferences.SOURCE_SIGNALQUEST,
                     stableId = stableId,
                     imageUrl = imageUrl,
                     thumbnailUrl = thumbnailUrl,
-                    operatorKey = SignalQuestOperators.operatorParamFor(photoOperator)
-                        ?.let { OperatorColors.keyFor(it) }
-                        ?: OperatorColors.keyFor(photoOperator)
-                        ?: signalQuestOperatorKey
+                    operatorKey = photoOperatorKey
                 )
             }
             .toList()

@@ -3487,6 +3487,7 @@
     <string name="appstrings_release_v2116_summary_tech_frequency_order_and_wear_settings">Anpassbare Technologie- und Frequenzreihenfolge (5G → 2G oder 2G → 5G) global und pro Seite (Details, Karte, Suche, Live) sowie Wear OS-Einstellungen</string>
     <string name="appstrings_release_v2117_summary_twenty_operators_support_and_watch_enhancements">Vollständige Unterstützung aller 20 Mobilfunkbetreiber (Festland und Übersee) auf Smartwatches (Wear OS und Garmin) mit offiziellen Farben und einheitlicher Erkennung</string>
     <string name="appstrings_release_v2118_summary_full_twenty_operators_web_api_and_watch_sync">Vollständige Unterstützung und direkte Synchronisierung aller 20 Mobilfunkbetreiber (Festland und Übersee) über Web-API und Bluetooth auf Smartwatches (Wear OS und Garmin)</string>
+    <string name="appstrings_release_v2119_summary_changes_map_and_live_tracking_improvements">Interaktive Karte der ANFR-Änderungen (neue Antennen, Upgrades und Stilllegungen), spezielle Filter und Verbesserungen der Live-Benachrichtigung</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Netzwerkanfragen-Protokoll</string>

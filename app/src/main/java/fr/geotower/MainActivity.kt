@@ -123,6 +123,8 @@ import fr.geotower.ui.screens.stats.DepartmentStatDetailScreen
 import fr.geotower.ui.screens.stats.DepartmentStatsScreen
 import fr.geotower.ui.screens.stats.FrequencyStatsDetailScreen
 import fr.geotower.ui.screens.stats.StatisticsScreen
+import fr.geotower.ui.screens.changes.ChangesMapScreen
+import fr.geotower.ui.screens.changes.CHANGES_MAP_ROUTE
 import fr.geotower.ui.screens.about.AboutScreen
 import fr.geotower.ui.screens.about.ChangelogHistoryScreen
 import fr.geotower.ui.screens.about.PhotoUploadHistoryScreen
@@ -529,9 +531,14 @@ class MainActivity : ComponentActivity() {
         }
 
         // On garde la gestion des anciens Extras si jamais l'URL est absente
+        val supportIdFromNotif = intent.getStringExtra("TARGET_SUPPORT_ID")
         val siteIdFromNotif = intent.getStringExtra("TARGET_SITE_ID")
+        val operatorFromNotif = intent.getStringExtra("TARGET_OPERATOR")
         val widgetDest = intent.getStringExtra("widget_dest")
-        if (siteIdFromNotif != null && intent.data == null) {
+        if (supportIdFromNotif != null && intent.data == null) {
+            val op = operatorFromNotif?.let { "?operator=${Uri.encode(it)}" }.orEmpty()
+            navigateToSiteFlow.tryEmit("support_detail/$supportIdFromNotif$op")
+        } else if (siteIdFromNotif != null && intent.data == null) {
             navigateToSiteFlow.tryEmit("site_detail/$siteIdFromNotif")
         } else if (widgetDest == "map") {
             applyWidgetMapTarget(intent)
@@ -725,7 +732,9 @@ class MainActivity : ComponentActivity() {
         val widgetSiteId = intent.getStringExtra("widget_site_id")
 
         // 🌟 3. LECTURE DE L'ID SI L'APP ÉTAIT TOTALEMENT FERMÉE
+        val notifSupportId = intent.getStringExtra("TARGET_SUPPORT_ID")
         val notifSiteId = intent.getStringExtra("TARGET_SITE_ID")
+        val notifOperator = intent.getStringExtra("TARGET_OPERATOR")
 
         // 🌟 3. DÉTECTION DU LIEN (QR CODE OU NOTIFICATION)
         val deepLinkUri = intent.data
@@ -766,6 +775,9 @@ class MainActivity : ComponentActivity() {
                 bottomNavAtLaunch -> bottomNavDefaultStartupRoute
                 else -> "home"
             }
+        } else if (notifSupportId != null) {
+            val op = notifOperator?.let { "?operator=${Uri.encode(it)}" }.orEmpty()
+            "support_detail/$notifSupportId$op"
         } else if (notifSiteId != null) {
             "site_detail/$notifSiteId" // 🌟 Ouvre le détail si on vient de la notif
         } else if (widgetDest == "nearby") {
@@ -801,7 +813,7 @@ class MainActivity : ComponentActivity() {
         // 🌟 Si on vient du widget, de l'assistant, de la notification OU d'un QR CODE, on saute le Splash Screen !
         val isUploadResultNotif = intent.getBooleanExtra(AppGlobalState.EXTRA_SHOW_UPLOAD_RESULT_POPUP, false)
         val startRoute =
-            if ((widgetDest != null || assistantFeature != null || notifSiteId != null || isDeepLink || sharedPhotoRoute != null || isUploadResultNotif) && !isFirstRun) destinationApresSplash else "splash"
+            if ((widgetDest != null || assistantFeature != null || notifSupportId != null || notifSiteId != null || isDeepLink || sharedPhotoRoute != null || isUploadResultNotif) && !isFirstRun) destinationApresSplash else "splash"
         // ========================================================
 
         // --- LECTURE ET DÉTECTION DE LA LANGUE DÈS LE LANCEMENT ---
@@ -1308,6 +1320,18 @@ class MainActivity : ComponentActivity() {
                                     } else {
                                         DisabledFeatureRoute(navController, txtUnavailable)
                                     }
+                                }
+                            }
+
+                            // Carte des changements et nouveautés ANFR (plein écran / borderless)
+                            composable(CHANGES_MAP_ROUTE) {
+                                Box(modifier = Modifier.padding(bottom = rootBottomPadding)) {
+                                    ChangesMapScreen(
+                                        navController = navController,
+                                        onOpenSupportDetail = { supId ->
+                                            navController.navigate("support_detail/$supId")
+                                        }
+                                    )
                                 }
                             }
 

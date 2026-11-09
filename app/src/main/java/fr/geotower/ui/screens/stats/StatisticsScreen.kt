@@ -8,7 +8,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -26,9 +25,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
@@ -41,7 +38,6 @@ import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.ui.components.SecureScreenEffect
 import fr.geotower.data.ActiveSupportRadioCounts
 import fr.geotower.data.db.RadioStatRow
-import fr.geotower.data.db.WeeklyRadioStatRow
 import fr.geotower.data.models.RadioFilterMasks
 import fr.geotower.ui.components.GeoTowerBackTopBar
 import androidx.compose.foundation.layout.Box
@@ -53,6 +49,8 @@ import fr.geotower.utils.PageScrollPrefs
 import fr.geotower.ui.navigation.ROOT_FALLBACK_ROUTE
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.ui.screens.settings.StatsSettingsSheet
+import fr.geotower.ui.screens.changes.ChangesMapEntryCard
+import fr.geotower.ui.screens.changes.CHANGES_MAP_ROUTE
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.OperatorColors
@@ -78,8 +76,7 @@ private data class StatisticsData(
     val supports2G: List<OperatorStatValue>,
     val supports3G: List<OperatorStatValue>,
     val supports4G: List<OperatorStatValue>,
-    val supports5G: List<OperatorStatValue>,
-    val weeklyByItem: Map<String, List<WeeklyStatValue>>
+    val supports5G: List<OperatorStatValue>
 )
 
 private data class FrequencyBandSpec(
@@ -93,8 +90,7 @@ private data class FrequencyBandStats(
     val frequencyId: String,
     val title: String,
     @param:StringRes val descriptionRes: Int,
-    val data: List<OperatorStatValue>,
-    val weeklyData: List<WeeklyStatValue>
+    val data: List<OperatorStatValue>
 )
 
 private data class OperatorStatsTarget(
@@ -111,7 +107,6 @@ private data class StatsCardSpec(
     val title: String,
     val description: String,
     val data: List<OperatorStatValue>,
-    val weeklyData: List<WeeklyStatValue>,
     val onClick: (() -> Unit)? = null
 )
 
@@ -128,22 +123,6 @@ private data class OperatorStatValue(
     @param:StringRes val regionSuffixRes: Int? = null,
     val totalCount: Int,
     val activeCount: Int
-)
-
-private data class WeeklyStatValue(
-    val weekKey: String,
-    val weekStart: String?,
-    val sourceDate: String?,
-    val totalCount: Int,
-    val activeCount: Int
-)
-
-private data class WeeklyStatAccumulator(
-    val weekKey: String,
-    val weekStart: String?,
-    val sourceDate: String?,
-    var totalCount: Int,
-    var activeCount: Int
 )
 
 private object StatisticsScreenCache {
@@ -238,45 +217,6 @@ private fun statCount(rows: List<RadioStatRow>, category: String, itemKey: Strin
     ).normalized()
 }
 
-private fun aggregateWeeklyStats(
-    rows: List<WeeklyRadioStatRow>,
-    accumulator: MutableMap<String, MutableMap<String, WeeklyStatAccumulator>>
-) {
-    rows.forEach { row ->
-        val itemStats = accumulator.getOrPut(statsKey(row.category, row.itemKey)) { mutableMapOf() }
-        val weekStats = itemStats.getOrPut(row.weekKey) {
-            WeeklyStatAccumulator(
-                weekKey = row.weekKey,
-                weekStart = row.weekStart,
-                sourceDate = row.sourceDate,
-                totalCount = 0,
-                activeCount = 0
-            )
-        }
-        weekStats.totalCount += row.totalCount
-        weekStats.activeCount += row.activeCount
-    }
-}
-
-private fun weeklyAccumulatorToMap(
-    accumulator: Map<String, Map<String, WeeklyStatAccumulator>>
-): Map<String, List<WeeklyStatValue>> {
-    return accumulator.mapValues { (_, weeks) ->
-        weeks.values
-            .sortedWith(compareBy<WeeklyStatAccumulator> { it.weekStart ?: it.sourceDate ?: it.weekKey }.thenBy { it.weekKey })
-            .map {
-                val active = it.activeCount.coerceIn(0, it.totalCount.coerceAtLeast(0))
-                WeeklyStatValue(
-                    weekKey = it.weekKey,
-                    weekStart = it.weekStart,
-                    sourceDate = it.sourceDate,
-                    totalCount = it.totalCount,
-                    activeCount = active
-                )
-            }
-    }
-}
-
 private fun frequencyBandsForTech(tech: String): List<FrequencyBandSpec> {
     return when (normalizeTech(tech)) {
         "2G" -> listOf(
@@ -337,7 +277,6 @@ private suspend fun loadStatisticsData(
     val counts3GMap = mutableMapOf<String, StatCount>()
     val counts4GMap = mutableMapOf<String, StatCount>()
     val counts5GMap = mutableMapOf<String, StatCount>()
-    val weeklyAccumulator = mutableMapOf<String, MutableMap<String, WeeklyStatAccumulator>>()
     val targets = operatorStatsTargets(defaultOp)
 
     for (target in targets) {
@@ -379,17 +318,12 @@ private suspend fun loadStatisticsData(
         }
     }
 
-    for (operator in OperatorColors.all) {
-        aggregateWeeklyStats(repository.getWeeklyRadioStatsByOperator(operatorQueryNames(operator.key)), weeklyAccumulator)
-    }
-
     StatisticsData(
         supports = formatOperatorData(totalMap, targets),
         supports2G = formatOperatorData(counts2GMap, targets),
         supports3G = formatOperatorData(counts3GMap, targets),
         supports4G = formatOperatorData(counts4GMap, targets),
-        supports5G = formatOperatorData(counts5GMap, targets),
-        weeklyByItem = weeklyAccumulatorToMap(weeklyAccumulator)
+        supports5G = formatOperatorData(counts5GMap, targets)
     )
 }
 
@@ -403,7 +337,6 @@ private suspend fun loadFrequencyStatsData(
     val bands = frequencyBandsForTech(normalizedTech)
     val currentRowsByTarget = mutableMapOf<String, List<RadioStatRow>>()
     val activeCountsByTarget = mutableMapOf<String, ActiveSupportRadioCounts>()
-    val weeklyAccumulator = mutableMapOf<String, MutableMap<String, WeeklyStatAccumulator>>()
 
     for (target in targets) {
         val currentStats = repository.getCurrentRadioStatsByOperator(target.queryNames)
@@ -412,12 +345,6 @@ private suspend fun loadFrequencyStatsData(
             activeCountsByTarget[target.id] = repository.getActiveSupportRadioCountsByOperator(target.queryNames)
         }
     }
-
-    for (operator in OperatorColors.all) {
-        val queryNames = operatorQueryNames(operator.key)
-        aggregateWeeklyStats(repository.getWeeklyRadioStatsByOperator(queryNames), weeklyAccumulator)
-    }
-    val weeklyByItem = weeklyAccumulatorToMap(weeklyAccumulator)
 
     val stats = bands.map { band ->
         val countsMap = mutableMapOf<String, StatCount>()
@@ -441,8 +368,7 @@ private suspend fun loadFrequencyStatsData(
             frequencyId = band.frequencyId,
             title = "$normalizedTech ${band.label}",
             descriptionRes = R.string.appstrings_stats_frequency_supports_desc,
-            data = formatOperatorData(countsMap, targets),
-            weeklyData = weeklyByItem[statsKey(CATEGORY_BAND, band.itemKey)].orEmpty()
+            data = formatOperatorData(countsMap, targets)
         )
     }
 
@@ -482,7 +408,6 @@ fun StatisticsScreen(navController: NavController, repository: AnfrRepository) {
     var support3GCounts by remember { mutableStateOf(cachedStats?.supports3G ?: emptyList()) }
     var support4GCounts by remember { mutableStateOf(cachedStats?.supports4G ?: emptyList()) }
     var support5GCounts by remember { mutableStateOf(cachedStats?.supports5G ?: emptyList()) }
-    var weeklyByItem by remember { mutableStateOf(cachedStats?.weeklyByItem ?: emptyMap()) }
     var isLoading by remember { mutableStateOf(cachedStats == null) }
     val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = ROOT_FALLBACK_ROUTE)
     val lazyListState = rememberLazyListState()
@@ -504,7 +429,6 @@ fun StatisticsScreen(navController: NavController, repository: AnfrRepository) {
             support3GCounts = refreshedStats.supports3G
             support4GCounts = refreshedStats.supports4G
             support5GCounts = refreshedStats.supports5G
-            weeklyByItem = refreshedStats.weeklyByItem
         }
         isLoading = false
     }
@@ -539,15 +463,13 @@ fun StatisticsScreen(navController: NavController, repository: AnfrRepository) {
                 blockId = "supports",
                 title = stringResource(R.string.appstrings_stats_supports_title),
                 description = stringResource(R.string.appstrings_stats_supports_desc),
-                data = supportCounts,
-                weeklyData = weeklyByItem[statsKey(CATEGORY_SUPPORT, ITEM_ALL)].orEmpty()
+                data = supportCounts
             ),
             StatsCardSpec(
                 blockId = "5G",
                 title = stringResource(R.string.appstrings_stats5_g_title),
                 description = stringResource(R.string.appstrings_stats5_g_desc),
                 data = support5GCounts,
-                weeklyData = weeklyByItem[statsKey(CATEGORY_TECH, "5G")].orEmpty(),
                 onClick = { navController.navigate(statsFrequenciesRoute("5G")) }
             ),
             StatsCardSpec(
@@ -555,7 +477,6 @@ fun StatisticsScreen(navController: NavController, repository: AnfrRepository) {
                 title = stringResource(R.string.appstrings_stats4_g_title),
                 description = stringResource(R.string.appstrings_stats4_g_desc),
                 data = support4GCounts,
-                weeklyData = weeklyByItem[statsKey(CATEGORY_TECH, "4G")].orEmpty(),
                 onClick = { navController.navigate(statsFrequenciesRoute("4G")) }
             ),
             StatsCardSpec(
@@ -563,7 +484,6 @@ fun StatisticsScreen(navController: NavController, repository: AnfrRepository) {
                 title = stringResource(R.string.appstrings_stats3_g_title),
                 description = stringResource(R.string.appstrings_stats3_g_desc),
                 data = support3GCounts,
-                weeklyData = weeklyByItem[statsKey(CATEGORY_TECH, "3G")].orEmpty(),
                 onClick = { navController.navigate(statsFrequenciesRoute("3G")) }
             ),
             StatsCardSpec(
@@ -571,7 +491,6 @@ fun StatisticsScreen(navController: NavController, repository: AnfrRepository) {
                 title = stringResource(R.string.appstrings_stats2_g_title),
                 description = stringResource(R.string.appstrings_stats2_g_desc),
                 data = support2GCounts,
-                weeklyData = weeklyByItem[statsKey(CATEGORY_TECH, "2G")].orEmpty(),
                 onClick = { navController.navigate(statsFrequenciesRoute("2G")) }
             )
         ).associateBy { it.blockId }
@@ -603,6 +522,14 @@ fun StatisticsScreen(navController: NavController, repository: AnfrRepository) {
                     )
                 }
 
+                item(key = "changes_map_entry") {
+                    Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
+                    ChangesMapEntryCard(
+                        bgColor = cardBgColor,
+                        onClick = { navController.navigate(CHANGES_MAP_ROUTE) }
+                    )
+                }
+
                 items(
                     items = visibleCards,
                     key = { it.blockId }
@@ -616,7 +543,6 @@ fun StatisticsScreen(navController: NavController, repository: AnfrRepository) {
                             isLoading = isLoading,
                             bgColor = cardBgColor,
                             displayMode = displayMode,
-                            weeklyData = card.weeklyData,
                             onClick = card.onClick
                         )
                     }
@@ -786,8 +712,7 @@ fun FrequencyStatsDetailScreen(navController: NavController, repository: AnfrRep
                                 data = band.data,
                                 isLoading = false,
                                 bgColor = cardBgColor,
-                                displayMode = displayMode,
-                                weeklyData = band.weeklyData
+                                displayMode = displayMode
                             )
                         }
                     }
@@ -900,7 +825,6 @@ private fun StatCard(
     isLoading: Boolean,
     bgColor: Color,
     displayMode: StatsDisplayMode,
-    weeklyData: List<WeeklyStatValue> = emptyList(),
     onClick: (() -> Unit)? = null
 ) {
     val cardShape = RoundedCornerShape(20.dp)
@@ -931,7 +855,6 @@ private fun StatCard(
                 }
             } else {
                 SupportBarChart(data = data, displayMode = displayMode)
-                WeeklyTrendChart(data = weeklyData, displayMode = displayMode)
             }
         }
     }
@@ -1005,147 +928,6 @@ private fun SupportBarChart(data: List<OperatorStatValue>, displayMode: StatsDis
             )
         }
     }
-}
-
-@Composable
-private fun WeeklyTrendChart(data: List<WeeklyStatValue>, displayMode: StatsDisplayMode) {
-    fun displayCount(stat: WeeklyStatValue): Int {
-        return when (displayMode) {
-            StatsDisplayMode.Sites -> stat.totalCount
-            StatsDisplayMode.Active -> stat.activeCount
-            StatsDisplayMode.Both -> maxOf(stat.totalCount, stat.activeCount)
-        }
-    }
-
-    val points = remember(data, displayMode) { data.filter { displayCount(it) > 0 } }
-    if (points.size < 2) return
-
-    val maxCount = remember(points, displayMode) { points.maxOf(::displayCount).coerceAtLeast(1) }
-    val activeColor = MaterialTheme.colorScheme.primary
-    val totalColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
-    val sizing = LocalGeoTowerUiStyle.current.sizing
-
-    Spacer(modifier = Modifier.height(sizing.spacing(18.dp)))
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.42f))
-            .padding(sizing.spacing(12.dp))
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = stringResource(R.string.appstrings_stats_weekly_trend_title),
-                style = sizing.textStyle(MaterialTheme.typography.labelLarge),
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.weight(1f)
-            )
-            when (displayMode) {
-                StatsDisplayMode.Sites -> TrendLegend(color = totalColor, label = stringResource(R.string.appstrings_sites_label))
-                StatsDisplayMode.Active -> TrendLegend(color = activeColor, label = stringResource(R.string.appstrings_active_sites_label))
-                StatsDisplayMode.Both -> {
-                    TrendLegend(color = activeColor, label = stringResource(R.string.appstrings_active_sites_label))
-                    Spacer(modifier = Modifier.width(sizing.spacing(10.dp)))
-                    TrendLegend(color = totalColor, label = stringResource(R.string.appstrings_sites_label))
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(sizing.spacing(10.dp)))
-
-        Canvas(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(sizing.component(94.dp))
-        ) {
-            val left = 6f
-            val right = size.width - 6f
-            val top = 8f
-            val bottom = size.height - 8f
-            val usableWidth = (right - left).coerceAtLeast(1f)
-            val usableHeight = (bottom - top).coerceAtLeast(1f)
-
-            fun pointAt(index: Int, value: Int): Offset {
-                val x = left + usableWidth * (index.toFloat() / (points.lastIndex).coerceAtLeast(1).toFloat())
-                val y = bottom - usableHeight * (value.toFloat() / maxCount.toFloat()).coerceIn(0f, 1f)
-                return Offset(x, y)
-            }
-
-            for (index in 0 until points.lastIndex) {
-                if (displayMode != StatsDisplayMode.Active) {
-                    drawLine(
-                        color = totalColor,
-                        start = pointAt(index, points[index].totalCount),
-                        end = pointAt(index + 1, points[index + 1].totalCount),
-                        strokeWidth = 4f,
-                        cap = StrokeCap.Round
-                    )
-                }
-                if (displayMode != StatsDisplayMode.Sites) {
-                    drawLine(
-                        color = activeColor,
-                        start = pointAt(index, points[index].activeCount),
-                        end = pointAt(index + 1, points[index + 1].activeCount),
-                        strokeWidth = 5f,
-                        cap = StrokeCap.Round
-                    )
-                }
-            }
-
-            points.forEachIndexed { index, value ->
-                if (displayMode != StatsDisplayMode.Active) {
-                    drawCircle(totalColor, radius = 4f, center = pointAt(index, value.totalCount))
-                }
-                if (displayMode != StatsDisplayMode.Sites) {
-                    drawCircle(activeColor, radius = 5f, center = pointAt(index, value.activeCount))
-                }
-            }
-        }
-
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(
-                text = points.first().shortWeekLabel(),
-                style = sizing.textStyle(MaterialTheme.typography.labelSmall),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = points.last().shortWeekLabel(),
-                style = sizing.textStyle(MaterialTheme.typography.labelSmall),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-    }
-}
-
-@Composable
-private fun TrendLegend(color: Color, label: String) {
-    val sizing = LocalGeoTowerUiStyle.current.sizing
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            modifier = Modifier
-                .size(sizing.component(8.dp))
-                .clip(RoundedCornerShape(3.dp))
-                .background(color)
-        )
-        Spacer(modifier = Modifier.width(sizing.spacing(4.dp)))
-        Text(
-            text = label,
-            style = sizing.textStyle(MaterialTheme.typography.labelSmall),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1
-        )
-    }
-}
-
-private fun WeeklyStatValue.shortWeekLabel(): String {
-    return sourceDate?.take(10)?.takeIf { it.isNotBlank() }
-        ?: weekStart?.take(10)?.takeIf { it.isNotBlank() }
-        ?: weekKey
 }
 
 @Composable

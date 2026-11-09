@@ -25,8 +25,10 @@ import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.NewReleases
 import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.Settings
+import fr.geotower.ui.screens.changes.CHANGES_MAP_ROUTE
 import androidx.compose.material.icons.filled.SystemUpdateAlt
 import androidx.compose.material.icons.filled.ToggleOff
 import androidx.compose.material3.DrawerState
@@ -292,6 +294,24 @@ private fun SimpleModeDrawerContent(
                                         onCloseDrawer()
                                         if (!isCurrent) {
                                             navController.navigate("stats") { launchSingleTop = true }
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                            )
+                        })
+
+                        list.add(SimpleDrawerButtonEntry("changes_map") {
+                            val isChanges = currentRoute?.startsWith(CHANGES_MAP_ROUTE) == true
+                            NavigationDrawerItem(
+                                icon = { Icon(Icons.Default.NewReleases, contentDescription = null) },
+                                label = { Text("Changements") },
+                                selected = isChanges,
+                                onClick = {
+                                    safeClick {
+                                        onCloseDrawer()
+                                        if (!isChanges) {
+                                            navController.navigate(CHANGES_MAP_ROUTE) { launchSingleTop = true }
                                         }
                                     }
                                 },

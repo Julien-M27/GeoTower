@@ -39,10 +39,8 @@ object SharedMapTileCacheHolder {
 
     @Synchronized
     fun onTileSourceChanged(newTileSourceName: String) {
-        if (currentTileSourceName != newTileSourceName) {
-            currentTileSourceName = newTileSourceName
-            tileCache?.clear()
-        }
+        currentTileSourceName = newTileSourceName
+        tileCache?.clear()
     }
 
     @Synchronized
@@ -65,13 +63,20 @@ class PersistentMapTileProvider(
     tileSource: ITileSource
 ) : MapTileProviderBasic(context, tileSource) {
 
+    private var isDetaching = false
+
     override fun createTileCache(): MapTileCache {
         return SharedMapTileCacheHolder.getOrCreateTileCache(tileSource?.name())
     }
 
     override fun clearTileCache() {
-        // Ignorer les purges automatiques déclenchées lors du detach() de la MapView
-        // afin de préserver les tuiles chaudes en RAM pour le prochain passage sur la carte.
+        // En cas de detach() de la MapView (navigation Compose entre écrans),
+        // on ignore la purge pour préserver les tuiles chaudes en RAM.
+        // En revanche, lors d'un vrai changement de source de tuiles (setTileSource),
+        // osmdroid appelle clearTileCache() et on purge immédiatement le cache partagé.
+        if (!isDetaching) {
+            SharedMapTileCacheHolder.clear()
+        }
     }
 
     override fun setTileSource(pTileSource: ITileSource) {
@@ -83,7 +88,11 @@ class PersistentMapTileProvider(
     }
 
     override fun detach() {
-        // Détache les threads d'arrière-plan sans vider le cache RAM partagé
-        super.detach()
+        isDetaching = true
+        try {
+            super.detach()
+        } finally {
+            isDetaching = false
+        }
     }
 }

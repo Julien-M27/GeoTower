@@ -27,7 +27,6 @@ import fr.geotower.R
 import fr.geotower.data.AnfrRepository
 import fr.geotower.utils.AppFileLog
 import fr.geotower.utils.AppConfig
-import fr.geotower.utils.MapUtils
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -50,7 +49,7 @@ class CarAntennaMapScreen(
     private var lifecycleEventCount = 0L
 
     init {
-        carLog("Carte: création de CarAntennaMapScreen, renderer=HOST_PLACE_LIST_V2_AZIMUTH_IMAGE (${mapDiagnosticState()})")
+        carLog("Carte: création de CarAntennaMapScreen, renderer=HOST_PLACE_LIST_V3_OPERATOR_ICON (${mapDiagnosticState()})")
         lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStart(owner: LifecycleOwner) {
                 carLog("Carte: onStart #${++lifecycleEventCount} (${mapDiagnosticState()})")
@@ -144,7 +143,7 @@ class CarAntennaMapScreen(
     }
 
     private fun loadedTemplate(sites: List<CarSiteListItem>): Template {
-        carLog("Carte: renderer=HOST_PLACE_LIST_V2_AZIMUTH_IMAGE, sites=${sites.size}, carte fournie par l'hôte")
+        carLog("Carte: renderer=HOST_PLACE_LIST_V3_OPERATOR_ICON, sites=${sites.size}, carte fournie par l'hôte")
         return placeListMapTemplate(sites)
     }
 
@@ -163,12 +162,11 @@ class CarAntennaMapScreen(
 
         val items = ItemList.Builder()
         shownSites.forEachIndexed { index, site ->
-            // Le marqueur appartient au Place : l'hôte le rend sur la carte et dans la liste.
-            // Une image d'opérateurs séparée n'est pas autorisée sur cette Row.
             val place = Place.Builder(CarLocation.create(site.latitude, site.longitude))
                 .setMarker(antennaPlaceMarker(site, index))
                 .build()
             val row = Row.Builder()
+                .setImage(carOperatorGridIcon(carContext, site.operators), Row.IMAGE_TYPE_LARGE)
                 .setTitle(site.title)
                 .addText(distanceLineWithSpan(site))
                 .addText(carSiteDescriptionLine(site))
@@ -249,30 +247,14 @@ class CarAntennaMapScreen(
         return distance
     }
 
-    /** Réutilise le dessin des marqueurs de la carte téléphone, y compris les secteurs azimutés. */
+    /** Marqueur opérateur pour la carte et la liste du volet Android Auto. */
     private fun antennaPlaceMarker(site: CarSiteListItem, index: Int): PlaceMarker {
-        if (site.antennas.isEmpty()) {
-            return PlaceMarker.Builder().setLabel((index + 1).toString()).build()
-        }
-
         return runCatching {
-            val markerDrawable = MapUtils.createAdaptiveMarker(
-                context = carContext,
-                siteAntennas = site.antennas,
-                showAzimuths = true,
-                defaultOp = AppConfig.defaultOperator.value
-            )
-            val markerIcon = CarIcon.Builder(
-                IconCompat.createWithBitmap(markerDrawable.bitmap)
-            ).build()
-            // TYPE_ICON est teinté par l'hôte et réduit à 64 dp : les secteurs colorés
-            // deviennent illisibles. TYPE_IMAGE conserve les couleurs du bitmap et autorise
-            // une zone de 72 dp, même si l'hôte peut encore encadrer le repère.
             PlaceMarker.Builder()
-                .setIcon(markerIcon, PlaceMarker.TYPE_IMAGE)
+                .setIcon(carOperatorGridIcon(carContext, site.operators), PlaceMarker.TYPE_IMAGE)
                 .build()
         }.onFailure {
-            AppFileLog.e(CAR_LOG_TAG, "Impossible de dessiner le marqueur antenne ${site.idAnfr}", it)
+            AppFileLog.e(CAR_LOG_TAG, "Impossible de composer le marqueur opérateur pour ${site.idAnfr}", it)
         }.getOrElse {
             PlaceMarker.Builder().setLabel((index + 1).toString()).build()
         }
