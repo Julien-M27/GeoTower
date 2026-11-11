@@ -46,12 +46,13 @@
         android:name="android.hardware.bluetooth_le"
         android:required="false" />
 
-    <!-- MapLibre requiert OpenGL ES 3.0 par défaut. En le déclarant optionnel, les anciens
-         appareils (OpenGL ES 2.0) restent éligibles sur Google Play et conservent la 2D. -->
+    <!-- MapLibre requiert OpenGL ES 3.0 dans son manifeste AAR, ce qui fait filtrer par Google Play
+         tous les appareils n'ayant qu'OpenGL ES 2.0. On retire cette exigence stricte du manifeste
+         fusionné pour préserver l'accès 2D à tous les anciens appareils, la 3D étant protégée
+         par une vérification dynamique au runtime dans le code Kotlin. -->
     <uses-feature
         android:glEsVersion="0x00030000"
-        android:required="false"
-        tools:replace="android:required" />
+        tools:node="remove" />
 
     <queries>
         <!-- Hôte Android Auto : la visibilité du paquet est nécessaire pour lire sa version dans
