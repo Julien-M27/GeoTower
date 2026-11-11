@@ -132,6 +132,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -208,6 +209,7 @@ import fr.geotower.data.trip.computeTripFollowStatus
 import fr.geotower.data.trip.haversineMeters
 import fr.geotower.data.trip.navigationCameraTarget
 import fr.geotower.data.trip.routeHeadingAhead
+import fr.geotower.data.trip.tripRouteErrorMessageRes
 import fr.geotower.data.trip.TripRouteProgress
 import fr.geotower.data.trip.headingAlignedToRoute
 import fr.geotower.data.trip.remainingLegPoints
@@ -420,7 +422,7 @@ private const val NAV_ORIENTATION_EASING = 0.12f
 /** En deçà, on laisse la carte tranquille : redresser un dixième de degré ne se voit pas. */
 private const val NAV_ORIENTATION_DEAD_ZONE_DEG = 0.2f
 
-private const val HS_OPERATOR_WILDCARD = "*"
+internal const val HS_OPERATOR_WILDCARD = "*"
 private const val MOUSE_WHEEL_ZOOM_STEP = 1.0
 private const val MOUSE_WHEEL_ZOOM_ANIMATION_MS = 80L
 private const val WEB_MERCATOR_WORLD_TILE_SIZE_PX = 256.0
@@ -1070,12 +1072,12 @@ private fun measureLabelPosition(path: List<GeoPoint>): GeoPoint {
     return path[path.size / 2]
 }
 
-private fun normalizedAnfrId(value: String): String {
+internal fun normalizedAnfrId(value: String): String {
     val trimmed = value.trim()
     return trimmed.toLongOrNull()?.toString() ?: trimmed
 }
 
-private fun extractOperatorKeys(value: String?): List<String> {
+internal fun extractOperatorKeys(value: String?): List<String> {
     return OperatorColors.keysFor(value)
 }
 
@@ -1319,7 +1321,7 @@ private fun toCommuneSuggestion(row: CommuneNameRow): MapSearchSuggestion.Commun
     )
 }
 
-private fun buildHsOperatorMap(sitesHs: List<SiteHsEntity>): Map<String, Set<String>> {
+internal fun buildHsOperatorMap(sitesHs: List<SiteHsEntity>): Map<String, Set<String>> {
     val result = mutableMapOf<String, MutableSet<String>>()
 
     sitesHs.forEach { hs ->
@@ -1334,14 +1336,14 @@ private fun buildHsOperatorMap(sitesHs: List<SiteHsEntity>): Map<String, Set<Str
     return result
 }
 
-private fun isOperatorSelected(
+internal fun isOperatorSelected(
     operatorKey: String,
     selectedOperatorKeys: Set<String>
 ): Boolean {
     return operatorKey in selectedOperatorKeys
 }
 
-private fun isOperatorDeclaredHs(
+internal fun isOperatorDeclaredHs(
     antenna: LocalisationEntity,
     operatorKey: String,
     hsOperatorMap: Map<String, Set<String>>
@@ -1350,7 +1352,7 @@ private fun isOperatorDeclaredHs(
     return HS_OPERATOR_WILDCARD in hsOperators || operatorKey in hsOperators
 }
 
-private fun visibleOperatorKeysForAntenna(
+internal fun visibleOperatorKeysForAntenna(
     antenna: LocalisationEntity,
     hsOperatorMap: Map<String, Set<String>>,
     showSitesInService: Boolean,
@@ -1406,7 +1408,7 @@ private fun passesSiteDisplayFilters(
     return frequencyFilter.matchesAntenna(antenna)
 }
 
-private fun hasVisibleHsOperator(
+internal fun hasVisibleHsOperator(
     antenna: LocalisationEntity,
     hsOperatorMap: Map<String, Set<String>>
 ): Boolean {
@@ -1886,7 +1888,8 @@ fun MapScreen(
     val canUseCompassPage = AppConfig.hasCompass.value &&
         featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.COMPASS)
     val canUseMapLocation = featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.MAP_LOCATION)
-    val canUseLayerSelector = listOf(0, 1, 3, 4).any(::isMapProviderEnabled)
+    var is3DMode by rememberSaveable { mutableStateOf(false) }
+    val canUseLayerSelector = is3DMode || listOf(0, 1, 3, 4).any(::isMapProviderEnabled)
 
     LaunchedEffect(Unit) {
         AppConfig.loadMapDisplayPreferences(prefs)
@@ -1930,6 +1933,11 @@ fun MapScreen(
 
     var currentZoom by rememberSaveable { mutableStateOf(15.0) }
     var currentLat by rememberSaveable { mutableStateOf(48.8584) }
+    var map3dLat by rememberSaveable { mutableDoubleStateOf(48.8584) }
+    var map3dLon by rememberSaveable { mutableDoubleStateOf(2.2137) }
+    var map3dZoom by rememberSaveable { mutableDoubleStateOf(15.0) }
+    var map3dBearing by rememberSaveable { mutableFloatStateOf(0f) }
+    var map3dRecenterTrigger by remember { mutableLongStateOf(0L) }
     var isMeasuringMode by rememberSaveable { mutableStateOf(false) }
     var trackNearestAll by rememberSaveable { mutableStateOf(false) }
     var trackNearestFav by rememberSaveable { mutableStateOf(false) }
@@ -2211,6 +2219,9 @@ fun MapScreen(
     // Hauteur réellement mesurée de la barre du trajet : les trois barres (consultation, édition,
     // suivi) n'ont pas la même, et c'est elle qui dit de combien remonter ce qui vit en bas.
     var tripBarHeightPx by remember { mutableIntStateOf(0) }
+    // Erreur éventuelle lors du calcul des segments d'itinéraire (serveur indisponible, réseau...)
+    var plannerRouteErrorRes by remember { mutableStateOf<Int?>(null) }
+    var plannerRouteRetryTrigger by remember { mutableIntStateOf(0) }
     // Sortie de l'édition : on demande s'il faut enregistrer, et on nomme/date la tournée si oui.
     var plannerAskToSave by remember { mutableStateOf(false) }
     var plannerSaving by remember { mutableStateOf(false) }
@@ -2453,19 +2464,30 @@ fun MapScreen(
             plan.steps.forEach { append('|').append(it.latitude).append(',').append(it.longitude) }
         }
     }
-    LaunchedEffect(tripRouteSignature) {
+    LaunchedEffect(tripRouteSignature, plannerRouteRetryTrigger) {
         val current = plannerPlan ?: return@LaunchedEffect
         if (current.steps.size < 2) {
+            plannerRouteErrorRes = null
             mapViewRef?.let { refreshTripLayers(it) }
             return@LaunchedEffect
         }
         plannerBusy = true
+        val force = plannerRouteRetryTrigger > 0 && !current.isRouteComplete()
         val outcome = runCatching {
-            TripRouteCalculator.computeRoute(current, optimization = tripRouteOptimization)
+            TripRouteCalculator.computeRoute(current, force = force, optimization = tripRouteOptimization)
         }.getOrNull()
         plannerBusy = false
-        if (outcome != null && outcome.plan.legs != current.legs) {
-            savePlan(outcome.plan)
+        if (outcome != null) {
+            plannerRouteErrorRes = if (outcome.hasFailures) {
+                tripRouteErrorMessageRes(outcome.lastError)
+            } else {
+                null
+            }
+            if (outcome.plan.legs != current.legs) {
+                savePlan(outcome.plan)
+            }
+        } else {
+            plannerRouteErrorRes = R.string.trips_route_error_server
         }
         mapViewRef?.let { refreshTripLayers(it) }
     }
@@ -2587,7 +2609,12 @@ fun MapScreen(
     // le capteur reprendrait la main dans la foulée.
     val resetMapOrientation: () -> Unit = {
         if (AppConfig.mapFollowOrientation.value) setFollowOrientation(false)
-        mapViewRef?.applyOrientation(0f)
+        if (is3DMode) {
+            map3dBearing = 0f
+            map3dRecenterTrigger++
+        } else {
+            mapViewRef?.applyOrientation(0f)
+        }
         mapOrientationState.floatValue = 0f
     }
 
@@ -2614,6 +2641,23 @@ fun MapScreen(
         val status = computeTripFollowStatus(plan, location.latitude, location.longitude)
         plannerFollowStatus = status
 
+        // Si l'utilisateur est déjà sur l'itinéraire (sur un tronçon menant à une étape précise),
+        // et que cette étape n'est pas encore la première non visitée, on prend en compte sa position
+        // et on recalcule pour optimiser la suite de la tournée à partir de cette étape.
+        val currentLeg = status.currentLeg
+        if (currentLeg != null && currentLeg.toStepIndex in plan.steps.indices) {
+            val toIndex = currentLeg.toStepIndex
+            val firstUnvisited = plan.steps.indexOfFirst { it.visitedAtMillis == null }
+            if (plan.steps[toIndex].visitedAtMillis == null && firstUnvisited >= 0 && toIndex != firstUnvisited) {
+                val outcome = TripOrderOptimizer.optimizeRemainingSteps(plan, toIndex)
+                if (outcome.changed) {
+                    savePlan(outcome.plan)
+                    mapViewRef?.let { refreshTripLayers(it) }
+                    return@LaunchedEffect
+                }
+            }
+        }
+
         // Où l'on en est sur le tracé : c'est ce qui l'efface derrière nous. On repart des points
         // déjà décodés pour le calque plutôt que de redécoder toutes les géométries à chaque relevé.
         tripProgress = tripRouteProgress(
@@ -2632,9 +2676,11 @@ fun MapScreen(
         // on est chez soi, la tournée commence ailleurs. On calcule donc la route qui y mène depuis
         // là où l'on est, recalculée seulement si l'étape change ou si l'on s'est notablement
         // déplacé, pour ne pas solliciter le service à chaque position reçue.
+        // Si l'on est déjà sur le tronçon menant à la prochaine étape, le tracé de la tournée suffit.
         val nextIndex = status.nextStepIndex
         val nextStep = nextIndex?.let { plan.steps.getOrNull(it) }
-        if (nextStep == null || (status.distanceToNextMeters ?: 0.0) <= NAV_APPROACH_MIN_METERS) {
+        val isOnLegToNext = currentLeg != null && currentLeg.toStepIndex == nextIndex
+        if (nextStep == null || (status.distanceToNextMeters ?: 0.0) <= NAV_APPROACH_MIN_METERS || isOnLegToNext) {
             plannerApproachLoading = false
             if (plannerApproachPoints != null) {
                 plannerApproachPoints = null
@@ -2924,6 +2970,16 @@ fun MapScreen(
     }
 
     val ignStyle by AppConfig.ignStyle
+    var map3dStyleId by rememberSaveable {
+        mutableIntStateOf(prefs.getInt("map_3d_style_id", -1))
+    }
+    val current3dStyleUri = when (if (map3dStyleId != -1) map3dStyleId else if (ignStyle == 1) 1 else 0) {
+        1 -> "https://tiles.openfreemap.org/styles/dark"
+        2 -> "https://tiles.openfreemap.org/styles/positron"
+        3 -> "https://tiles.openfreemap.org/styles/bright"
+        else -> "https://tiles.openfreemap.org/styles/liberty"
+    }
+    val is3dDark = current3dStyleUri.contains("dark")
     val shouldInvertColors = ((mapProvider == 0 || mapProvider == 1) && ignStyle == 1)
     // Sur orthophoto seulement, les marqueurs sont cernés d'un liseré de contraste (cf. MapUtils).
     val satelliteMarkerContrast = MapUtils.isSatelliteBasemap(effectiveProvider, ignStyle)
@@ -3092,6 +3148,33 @@ fun MapScreen(
     var showCityStatsPopup by rememberSaveable { mutableStateOf(false) }
     var showCityStatsDetail by rememberSaveable { mutableStateOf(false) }
     var isTrackingActive by rememberSaveable { mutableStateOf(false) }
+
+    val toggle3DMode: () -> Unit = {
+        if (!is3DMode) {
+            val center = mapViewRef?.mapCenter ?: GeoPoint(currentLat, map3dLon)
+            map3dLat = center.latitude
+            map3dLon = center.longitude
+            map3dZoom = (mapViewRef?.zoomLevelDouble ?: currentZoom).coerceIn(2.0, 20.0)
+            map3dBearing = -(mapViewRef?.mapOrientation ?: 0f)
+            isTrackingActive = false
+            navCameraLocked = false
+            mapViewRef?.onPause()
+            is3DMode = true
+        } else {
+            is3DMode = false
+            mapViewRef?.let { map ->
+                map.onResume()
+                map.controller.setCenter(GeoPoint(map3dLat, map3dLon))
+                map.controller.setZoom(map3dZoom)
+                map.mapOrientation = -map3dBearing
+                currentLat = map3dLat
+                currentZoom = map3dZoom
+                mapOrientationState.floatValue = map3dBearing
+                map.invalidate()
+                map.loadVisibleAntennas(viewModel)
+            }
+        }
+    }
 
     // ================= CAMÉRA DE SUIVI DE TOURNÉE =================
     // Posé ici, après `isTrackingActive` : la poursuite d'osmdroid recentre la position au milieu
@@ -5305,6 +5388,7 @@ fun MapScreen(
         AndroidView(
             modifier = Modifier
                 .fillMaxSize()
+                .then(if (is3DMode) Modifier.alpha(0f) else Modifier)
                 // Origine de la MapView dans la composition : l'ancre du repère de suivi est
                 // mesurée sur les boutons de zoom, en coordonnées racine. Sans ce décalage, on
                 // diviserait une hauteur mesurée depuis le haut de l'écran par la hauteur de la
@@ -5679,6 +5763,85 @@ fun MapScreen(
             }
         )
 
+        // --- Vue carte 3D alternative (MapLibre) ---
+        if (is3DMode) {
+            val userLoc = myCurrentLoc ?: locationOverlayRef?.myLocation
+            Map3DView(
+                centerLat = map3dLat,
+                centerLon = map3dLon,
+                zoom = map3dZoom,
+                bearing = map3dBearing,
+                userLatitude = userLoc?.latitude,
+                userLongitude = userLoc?.longitude,
+                userHeading = azimuth,
+                primaryColorInt = safePrimaryColor,
+                antennas = filteredAntennas,
+                sitesHs = sitesHs,
+                clusterStrength = clusterStrength,
+                satelliteMarkerContrast = satelliteMarkerContrast || is3dDark,
+                radioMarkers = radioMarkers,
+                recenterTrigger = map3dRecenterTrigger,
+                styleUri = current3dStyleUri,
+                tripPlan = plannerPlan,
+                tripApproachPoints = plannerApproachPoints,
+                tripApproachRouted = plannerApproachRouted,
+                tripProgress = tripProgress,
+                tripMode = tripMode,
+                navCameraLocked = navCameraLocked,
+                onStepClick = { stepIndex ->
+                    if (tripMode != TRIP_MODE_VIEW) {
+                        plannerStepMenuIndex = stepIndex
+                    }
+                },
+                onMapClick = { lat, lon ->
+                    if (plannerPlan != null && tripMode == TRIP_MODE_EDIT) {
+                        addTripStep(lat, lon, "", TripStep.KIND_MANUAL)
+                        mapViewRef?.let { refreshTripLayers(it) }
+                    }
+                },
+                onUserInteraction = {
+                    if (tripMode == TRIP_MODE_FOLLOW) {
+                        navCameraLocked = false
+                    }
+                },
+                onCameraChange = { lat, lon, zoom, bearing ->
+                    map3dLat = lat
+                    map3dLon = lon
+                    map3dZoom = zoom
+                    map3dBearing = bearing
+                    currentLat = lat
+                    currentZoom = zoom
+                    mapOrientationState.floatValue = bearing
+                },
+                onViewportChanged = { zoom, latNorth, lonEast, latSouth, lonWest ->
+                    viewModel.loadAntennasInBox(
+                        zoom = zoom,
+                        latNorth = latNorth,
+                        lonEast = lonEast,
+                        latSouth = latSouth,
+                        lonWest = lonWest
+                    )
+                },
+                onSiteClick = { site ->
+                    if (plannerPlan != null && tripMode == TRIP_MODE_EDIT) {
+                        addTripStep(
+                            latitude = site.latitude,
+                            longitude = site.longitude,
+                            label = site.operateur.orEmpty(),
+                            kind = TripStep.KIND_SITE,
+                            supportId = site.idAnfr
+                        )
+                        mapViewRef?.let { refreshTripLayers(it) }
+                    } else {
+                        mapViewRef?.let { map ->
+                            openSupportDetailFromMap(map, site)
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+
         // --- Alignement de la carte sur le cap de l'appareil ------------------------------------
         // Piloté image par image, et à partir du cap déjà lissé du capteur plutôt que de l'état
         // d'interface : ce dernier est bridé en cadence pour ne pas rejouer l'écran à chaque
@@ -5746,6 +5909,7 @@ fun MapScreen(
             val flowPoint = remember { GeoPoint(0.0, 0.0) }
 
             ComposeCanvas(modifier = Modifier.fillMaxSize()) {
+                if (is3DMode) return@ComposeCanvas
                 val map = mapViewRef ?: return@ComposeCanvas
                 // La MapView n'est pas observable : sans cette lecture, un déplacement de la carte
                 // laisserait la lueur collée à ses anciens pixels.
@@ -5804,7 +5968,7 @@ fun MapScreen(
         // Le repère est peint ICI, au-dessus de la MapView, et non dans un calque osmdroid : un
         // calque imposerait de réinvalider toute la carte — donc de redessiner les milliers de
         // marqueurs d'antennes — à chaque image, alors que cette couche ne repeint qu'un rond.
-        if (smoothLocationEnabled) {
+        if (smoothLocationEnabled && !is3DMode) {
             val markerPainter = locationMarkerPainter
             val drawPixel = remember { android.graphics.Point() }
             val drawPoint = remember { GeoPoint(0.0, 0.0) }
@@ -7484,7 +7648,12 @@ fun MapScreen(
                             ),
                             onClick = {
                                 releaseNavCameraForManualZoom()
-                                mapViewRef?.controller?.zoomIn()
+                                if (is3DMode) {
+                                    map3dZoom = (map3dZoom + 1.0).coerceAtMost(20.0)
+                                    map3dRecenterTrigger++
+                                } else {
+                                    mapViewRef?.controller?.zoomIn()
+                                }
                             }
                         )
                         HorizontalDivider(
@@ -7501,12 +7670,45 @@ fun MapScreen(
                             ),
                             onClick = {
                                 releaseNavCameraForManualZoom()
-                                mapViewRef?.controller?.zoomOut()
+                                if (is3DMode) {
+                                    map3dZoom = (map3dZoom - 1.0).coerceAtLeast(2.0)
+                                    map3dRecenterTrigger++
+                                } else {
+                                    mapViewRef?.controller?.zoomOut()
+                                }
                             }
                         )
                     }
                 }
             }
+
+            // --- Bouton circulaire de bascule 2D / 3D ---
+            Surface(
+                onClick = { safeClick { toggle3DMode() } },
+                shape = CircleShape,
+                color = if (is3DMode) MaterialTheme.colorScheme.primaryContainer.copy(alpha = AppConfig.floatingUiAlpha) else MaterialTheme.colorScheme.surface.copy(alpha = AppConfig.floatingUiAlpha),
+                shadowElevation = AppConfig.floatingUiShadowElevation(6.dp),
+                border = BorderStroke(
+                    width = if (is3DMode) 2.dp else 1.dp,
+                    color = if (is3DMode) MaterialTheme.colorScheme.primary else AppConfig.floatingUiBorderColor()
+                ),
+                modifier = Modifier.size(mapControlButtonDiameter)
+            ) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = if (is3DMode) stringResource(R.string.appstrings_map_mode_2d) else stringResource(R.string.appstrings_map_mode_3d),
+                        style = MaterialTheme.typography.labelLarge.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        ),
+                        color = if (is3DMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+
             if (showLocationBtn && canUseMapLocation) {
                     val isLocTracking = isTrackingActive || (tripMode == TRIP_MODE_FOLLOW && navCameraLocked)
                     Surface(
@@ -7516,6 +7718,17 @@ fun MapScreen(
                                 // un recentrage qui échouerait en silence, on invite à la réactiver.
                                 if (!isLocationReady) {
                                     onFixLocation()
+                                    return@safeClick
+                                }
+
+                                if (is3DMode) {
+                                    val known = myCurrentLoc ?: locationOverlayRef?.myLocation
+                                    if (known != null) {
+                                        map3dLat = known.latitude
+                                        map3dLon = known.longitude
+                                        map3dZoom = preferredLocationZoom()
+                                        map3dRecenterTrigger++
+                                    }
                                     return@safeClick
                                 }
 
@@ -7674,8 +7887,10 @@ fun MapScreen(
                 TRIP_MODE_FOLLOW -> TripFollowBar(
                     plan = plan,
                     status = plannerFollowStatus,
-                    routeLoading = plannerApproachLoading,
+                    routeLoading = plannerApproachLoading || plannerBusy,
                     distanceUnit = AppConfig.distanceUnit.intValue,
+                    routeErrorRes = plannerRouteErrorRes,
+                    onRetryRoute = { plannerRouteRetryTrigger++ },
                     onCheckNext = {
                         val index = plannerFollowStatus?.nextStepIndex
                         if (index != null && index in plan.steps.indices) {
@@ -7692,6 +7907,16 @@ fun MapScreen(
                     // Arrêter le suivi ramène à la consultation, pas à l'édition : on vient de
                     // parcourir la tournée, pas de vouloir la redessiner.
                     onStop = { tripMode = TRIP_MODE_VIEW },
+                    onOptimizeRemaining = {
+                        val nextIdx = plannerFollowStatus?.nextStepIndex
+                        if (nextIdx != null && nextIdx in plan.steps.indices) {
+                            val outcome = TripOrderOptimizer.optimizeRemainingSteps(plan, nextIdx)
+                            if (outcome.changed) {
+                                savePlan(outcome.plan)
+                                mapViewRef?.let { refreshTripLayers(it) }
+                            }
+                        }
+                    },
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .onGloballyPositioned { tripBarHeightPx = it.size.height }
@@ -7700,6 +7925,8 @@ fun MapScreen(
                 TRIP_MODE_VIEW -> TripViewBar(
                     plan = plan,
                     distanceUnit = AppConfig.distanceUnit.intValue,
+                    routeErrorRes = plannerRouteErrorRes,
+                    onRetryRoute = { plannerRouteRetryTrigger++ },
                     onFollow = { tripMode = TRIP_MODE_FOLLOW },
                     onEdit = { tripMode = TRIP_MODE_EDIT },
                     modifier = Modifier
@@ -7711,6 +7938,8 @@ fun MapScreen(
                 plan = plan,
                 busy = plannerBusy,
                 distanceUnit = AppConfig.distanceUnit.intValue,
+                routeErrorRes = plannerRouteErrorRes,
+                onRetryRoute = { plannerRouteRetryTrigger++ },
                 onToggleProfile = {
                     val next = if (plan.profile == RouteApi.PROFILE_PEDESTRIAN) {
                         RouteApi.PROFILE_CAR
@@ -7933,8 +8162,8 @@ fun MapScreen(
             if (showAttribution) {
                 // On crédite le fond RÉELLEMENT affiché (effectiveProvider) : la bascule
                 // silencieuse en hors-ligne change les tuiles sans toucher à mapProvider.
-                val attributionText = MapUtils.MapAttribution.text(effectiveProvider, ignStyle)
-                val attributionUrl = MapUtils.MapAttribution.url(effectiveProvider, ignStyle)
+                val attributionText = if (is3DMode) "© OpenFreeMap © OpenStreetMap" else MapUtils.MapAttribution.text(effectiveProvider, ignStyle)
+                val attributionUrl = if (is3DMode) "https://openfreemap.org" else MapUtils.MapAttribution.url(effectiveProvider, ignStyle)
 
                 Surface(
                     color = Color.White.copy(alpha = 0.8f),
@@ -7951,7 +8180,7 @@ fun MapScreen(
                     ) {
                         // Drapeau uniquement pour l'IGN (service public français) : les autres
                         // fonds sont internationaux et n'ont pas de pays à afficher.
-                        if (effectiveProvider == 0) {
+                        if (effectiveProvider == 0 && !is3DMode) {
                             Row(modifier = Modifier.size(width = sizing.component(14.dp), height = sizing.component(10.dp))) {
                                 Box(
                                     modifier = Modifier.weight(1f).fillMaxHeight()
@@ -8055,89 +8284,126 @@ fun MapScreen(
                 Column(
                     modifier = Modifier.padding(horizontal = sizing.spacing(24.dp)).padding(bottom = sizing.spacing(24.dp))
                 ) {
+                    if (is3DMode) {
+                        // Choix des calques / styles pour le mode 3D
+                        val selected3d = if (map3dStyleId != -1) map3dStyleId else if (ignStyle == 1) 1 else 0
+                        Text(
+                            text = stringResource(R.string.appstrings_map_3d_style_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(bottom = sizing.spacing(12.dp))
+                        )
+                        Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp))) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp))) {
+                                MapLayerButton(stringResource(R.string.appstrings_map_3d_style_liberty), selected3d == 0, Modifier.weight(1f)) {
+                                    map3dStyleId = 0
+                                    prefs.edit().putInt("map_3d_style_id", 0).apply()
+                                    AppConfig.ignStyle.value = 0
+                                    prefs.edit().putInt("ign_style", 0).apply()
+                                }
+                                MapLayerButton(stringResource(R.string.appstrings_map_3d_style_dark), selected3d == 1, Modifier.weight(1f)) {
+                                    map3dStyleId = 1
+                                    prefs.edit().putInt("map_3d_style_id", 1).apply()
+                                    AppConfig.ignStyle.value = 1
+                                    prefs.edit().putInt("ign_style", 1).apply()
+                                }
+                            }
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp))) {
+                                MapLayerButton(stringResource(R.string.appstrings_map_3d_style_positron), selected3d == 2, Modifier.weight(1f)) {
+                                    map3dStyleId = 2
+                                    prefs.edit().putInt("map_3d_style_id", 2).apply()
+                                }
+                                MapLayerButton(stringResource(R.string.appstrings_map_3d_style_bright), selected3d == 3, Modifier.weight(1f)) {
+                                    map3dStyleId = 3
+                                    prefs.edit().putInt("map_3d_style_id", 3).apply()
+                                }
+                            }
+                        }
+                    } else {
+                        // ✅ 2. LA COLONNE DES PREMIERS BOUTONS
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp))
+                        ) {
+                            // 🌐 ON N'AFFICHE LES CARTES EN LIGNE QUE SI ON A INTERNET
+                            if (isOnline) {
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp))) {
+                                    if (isMapProviderEnabled(1)) {
+                                        MapLayerButton(txtMapOsmLayer, mapProvider == 1, Modifier.weight(1f)) {
+                                            AppConfig.mapProvider.value = 1
+                                            prefs.edit().putInt("map_provider", 1).apply()
+                                            effectiveProvider = 1
+                                            mapViewRef?.loadVisibleAntennas(viewModel)
+                                        }
+                                    }
+                                    if (isMapProviderEnabled(0)) {
+                                        MapLayerButton(txtMapIgnLayer, mapProvider == 0, Modifier.weight(1f)) {
+                                            AppConfig.mapProvider.value = 0
+                                            prefs.edit().putInt("map_provider", 0).apply()
+                                            effectiveProvider = 0
+                                            mapViewRef?.loadVisibleAntennas(viewModel)
+                                        }
+                                    }
+                                }
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp))) {
+                                    if (isMapProviderEnabled(3)) {
+                                        MapLayerButton(txtMapTopo, mapProvider == 3, Modifier.weight(1f)) {
+                                            AppConfig.mapProvider.value = 3
+                                            prefs.edit().putInt("map_provider", 3).apply()
+                                            effectiveProvider = 3
+                                            mapViewRef?.loadVisibleAntennas(viewModel)
+                                        }
+                                    }
+                                }
+                            } else {
+                                // 📵 MESSAGE HORS-LIGNE
+                                Text(
+                                    text = "⚠️ $txtOfflineMessage",
+                                    color = MaterialTheme.colorScheme.error,
+                                    fontWeight = FontWeight.Bold,
+                                    style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
+                                    modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = sizing.spacing(4.dp), top = sizing.spacing(8.dp))
+                                )
+                            }
 
-                    // ✅ 2. LA COLONNE DES PREMIERS BOUTONS
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp))
-                    ) {
-                        // 🌐 ON N'AFFICHE LES CARTES EN LIGNE QUE SI ON A INTERNET
-                        if (isOnline) {
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp))) {
-                                if (isMapProviderEnabled(1)) {
-                                    MapLayerButton(txtMapOsmLayer, mapProvider == 1, Modifier.weight(1f)) {
-                                        AppConfig.mapProvider.value = 1
-                                        prefs.edit().putInt("map_provider", 1).apply()
-                                        effectiveProvider = 1
-                                        mapViewRef?.loadVisibleAntennas(viewModel)
-                                    }
+                            // 🗺️ LE BOUTON HORS-LIGNE NE S'AFFICHE QUE SI UNE CARTE EXISTE
+                            if (hasOfflineMaps && isMapProviderEnabled(4)) {
+                                MapLayerButton(txtMapOfflineLayer, mapProvider == 4, Modifier.fillMaxWidth()) {
+                                    AppConfig.mapProvider.value = 4
+                                    prefs.edit().putInt("map_provider", 4).apply()
+                                    effectiveProvider = 4
+                                    mapViewRef?.loadVisibleAntennas(viewModel)
                                 }
-                                if (isMapProviderEnabled(0)) {
-                                    MapLayerButton(txtMapIgnLayer, mapProvider == 0, Modifier.weight(1f)) {
-                                        AppConfig.mapProvider.value = 0
-                                        prefs.edit().putInt("map_provider", 0).apply()
-                                        effectiveProvider = 0
-                                        mapViewRef?.loadVisibleAntennas(viewModel)
-                                    }
-                                }
+                            } else if (!isOnline) {
+                                // Optionnel : un petit message pour dire qu'aucune carte n'est dispo si on est hors ligne
+                                Text(
+                                    text = stringResource(R.string.appstrings_no_offline_maps_installed),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontSize = sizing.text(12.sp),
+                                    modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = sizing.spacing(8.dp))
+                                )
                             }
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp))) {
-                                if (isMapProviderEnabled(3)) {
-                                    MapLayerButton(txtMapTopo, mapProvider == 3, Modifier.weight(1f)) {
-                                        AppConfig.mapProvider.value = 3
-                                        prefs.edit().putInt("map_provider", 3).apply()
-                                        effectiveProvider = 3
-                                        mapViewRef?.loadVisibleAntennas(viewModel)
-                                    }
-                                }
-                            }
-                        } else {
-                            // 📵 MESSAGE HORS-LIGNE
-                            Text(
-                                text = "⚠️ $txtOfflineMessage",
-                                color = MaterialTheme.colorScheme.error,
-                                fontWeight = FontWeight.Bold,
-                                style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
-                                modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = sizing.spacing(4.dp), top = sizing.spacing(8.dp))
-                            )
                         }
 
-                        // 🗺️ LE BOUTON HORS-LIGNE NE S'AFFICHE QUE SI UNE CARTE EXISTE
-                        if (hasOfflineMaps && isMapProviderEnabled(4)) {
-                            MapLayerButton(txtMapOfflineLayer, mapProvider == 4, Modifier.fillMaxWidth()) {
-                                AppConfig.mapProvider.value = 4
-                                prefs.edit().putInt("map_provider", 4).apply()
-                                effectiveProvider = 4
-                                mapViewRef?.loadVisibleAntennas(viewModel)
-                            }
-                        } else if (!isOnline) {
-                            // Optionnel : un petit message pour dire qu'aucune carte n'est dispo si on est hors ligne
-                            Text(
-                                text = stringResource(R.string.appstrings_no_offline_maps_installed),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontSize = sizing.text(12.sp),
-                                modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = sizing.spacing(8.dp))
-                            )
-                        }
-                    }
-
-                    // ✅ 3. L'ANIMATION DES STYLES (Cachée si on est hors ligne !)
-                    AnimatedVisibility(
-                        visible = isOnline && (mapProvider == 0 || mapProvider == 1),
-                        enter = fadeIn() + slideInHorizontally(initialOffsetX = { it }) + expandVertically(expandFrom = Alignment.Top),
-                        exit = fadeOut() + slideOutHorizontally(targetOffsetX = { it }) + shrinkVertically(shrinkTowards = Alignment.Top)
-                    ) {
-                        Column {
-                            Spacer(Modifier.height(sizing.spacing(12.dp)))
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp))) {
-                                MapLayerButton(txtMapLight, ignStyle == 0, Modifier.weight(1f)) {
-                                    AppConfig.ignStyle.value = 0; prefs.edit().putInt("ign_style", 0).apply()
-                                }
-                                MapLayerButton(txtMapDark, ignStyle == 1, Modifier.weight(1f)) {
-                                    AppConfig.ignStyle.value = 1; prefs.edit().putInt("ign_style", 1).apply()
-                                }
-                                if (mapProvider == 0 || mapProvider == 1) {
-                                    MapLayerButton(txtMapSatellite, ignStyle == 2, Modifier.weight(1f)) {
-                                        AppConfig.ignStyle.value = 2; prefs.edit().putInt("ign_style", 2).apply()
+                        // ✅ 3. L'ANIMATION DES STYLES (Cachée si on est hors ligne !)
+                        AnimatedVisibility(
+                            visible = isOnline && (mapProvider == 0 || mapProvider == 1),
+                            enter = fadeIn() + slideInHorizontally(initialOffsetX = { it }) + expandVertically(expandFrom = Alignment.Top),
+                            exit = fadeOut() + slideOutHorizontally(targetOffsetX = { it }) + shrinkVertically(shrinkTowards = Alignment.Top)
+                        ) {
+                            Column {
+                                Spacer(Modifier.height(sizing.spacing(12.dp)))
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp))) {
+                                    MapLayerButton(txtMapLight, ignStyle == 0, Modifier.weight(1f)) {
+                                        AppConfig.ignStyle.value = 0; prefs.edit().putInt("ign_style", 0).apply()
+                                    }
+                                    MapLayerButton(txtMapDark, ignStyle == 1, Modifier.weight(1f)) {
+                                        AppConfig.ignStyle.value = 1; prefs.edit().putInt("ign_style", 1).apply()
+                                    }
+                                    if (mapProvider == 0 || mapProvider == 1) {
+                                        MapLayerButton(txtMapSatellite, ignStyle == 2, Modifier.weight(1f)) {
+                                            AppConfig.ignStyle.value = 2; prefs.edit().putInt("ign_style", 2).apply()
+                                        }
                                     }
                                 }
                             }
@@ -10499,7 +10765,7 @@ fun createHsBadge(
     }
 }
 
-private fun createHsMarkerIcon(
+internal fun createHsMarkerIcon(
     context: Context,
     baseIcon: BitmapDrawable,
     clusterStrength: Int

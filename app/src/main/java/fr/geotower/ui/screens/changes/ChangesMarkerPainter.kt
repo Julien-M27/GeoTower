@@ -24,7 +24,7 @@ object ChangesMarkerPainter {
         satelliteContrast: Boolean = false
     ): BitmapDrawable {
         val opsSignature = operators.sorted().joinToString(",")
-        val cacheKey = "chg_marker|$opsSignature|${changeType.name}|$satelliteContrast"
+        val cacheKey = "chg_marker_v3|$opsSignature|${changeType.name}|$satelliteContrast"
 
         markerCache.get(cacheKey)?.let { return it }
 
@@ -74,16 +74,12 @@ object ChangesMarkerPainter {
         val pieRect = RectF(center - pieRadius, center - pieRadius, center + pieRadius, center + pieRadius)
         drawSlices(canvas, pieRect, opsOnSite, paint, ::colorForOperator)
 
-        // Disque intérieur blanc
+        // Disque intérieur blanc (épaisseur de bordure strictement identique aux clusters : 0.80f du rayon, soit 4.5 dp)
         paint.color = android.graphics.Color.WHITE
-        canvas.drawCircle(center, center, pieRadius * 0.72f, paint)
+        canvas.drawCircle(center, center, pieRadius * 0.80f, paint)
 
-        // Disque central gris très clair pour faire ressortir l'icône
-        paint.color = android.graphics.Color.parseColor("#F5F7FA")
-        canvas.drawCircle(center, center, pieRadius * 0.65f, paint)
-
-        // Tracé du pictogramme central selon le changement (agrandi à 0.70f pour une visibilité nette)
-        drawCenterIcon(context, canvas, center, pieRadius * 0.70f, changeType)
+        // Tracé du pictogramme central selon le changement
+        drawCenterIcon(context, canvas, center, pieRadius * 0.68f, changeType)
 
         val drawable = BitmapDrawable(context.resources, bitmap)
         markerCache.put(cacheKey, drawable)

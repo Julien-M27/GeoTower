@@ -20,6 +20,7 @@ preferenceKtx = "1.2.1"
 osmdroid = "6.1.18"
 osmbonuspack = "6.9.0"
 mapsforge = "0.20.0"
+maplibre = "11.8.0"
 room = "2.8.4"
 retrofit = "2.11.0"
 coilCompose = "2.6.0"
@@ -76,6 +77,7 @@ osmdroid-mapsforge = { group = "org.osmdroid", name = "osmdroid-mapsforge", vers
 mapsforge-map-android = { group = "org.mapsforge", name = "mapsforge-map-android", version.ref = "mapsforge" }
 mapsforge-map-reader = { group = "org.mapsforge", name = "mapsforge-map-reader", version.ref = "mapsforge" }
 mapsforge-themes = { group = "org.mapsforge", name = "mapsforge-themes", version.ref = "mapsforge" }
+maplibre-android = { group = "org.maplibre.gl", name = "android-sdk", version.ref = "maplibre" }
 retrofit = { group = "com.squareup.retrofit2", name = "retrofit", version.ref = "retrofit" }
 retrofit-converter-gson = { group = "com.squareup.retrofit2", name = "converter-gson", version.ref = "retrofit" }
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coilCompose" }

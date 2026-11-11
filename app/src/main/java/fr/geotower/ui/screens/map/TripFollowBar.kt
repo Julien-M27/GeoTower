@@ -1,5 +1,6 @@
 package fr.geotower.ui.screens.map
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.LowPriority
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -48,13 +50,18 @@ fun TripFollowBar(
     status: TripFollowStatus?,
     routeLoading: Boolean = false,
     distanceUnit: Int,
+    routeErrorRes: Int? = null,
+    onRetryRoute: (() -> Unit)? = null,
     onCheckNext: () -> Unit,
     onStop: () -> Unit,
+    onOptimizeRemaining: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
     val nextIndex = status?.nextStepIndex
     val nextStep = nextIndex?.let { plan.steps.getOrNull(it) }
+    val unvisitedCount = plan.steps.count { it.visitedAtMillis == null }
+    val canOptimize = onOptimizeRemaining != null && unvisitedCount >= 2 && !routeLoading
 
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -105,6 +112,43 @@ fun TripFollowBar(
                 }
             }
 
+            if (routeErrorRes != null || (!plan.isRouteComplete() && plan.steps.size >= 2)) {
+                val errorText = routeErrorRes?.let { stringResource(it) }
+                    ?: stringResource(R.string.trips_route_incomplete)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(bottom = sizing.spacing(4.dp))
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Warning,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(sizing.component(16.dp))
+                    )
+                    Text(
+                        text = errorText,
+                        fontSize = sizing.text(12.sp),
+                        color = MaterialTheme.colorScheme.error,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(start = sizing.spacing(6.dp))
+                    )
+                    if (onRetryRoute != null) {
+                        Text(
+                            text = stringResource(R.string.trips_route_retry),
+                            fontSize = sizing.text(12.sp),
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .clickable(onClick = onRetryRoute)
+                                .padding(horizontal = sizing.spacing(6.dp), vertical = sizing.spacing(2.dp))
+                        )
+                    }
+                }
+            }
+
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
@@ -129,6 +173,15 @@ fun TripFollowBar(
                     )
                 }
 
+                if (canOptimize) {
+                    IconButton(onClick = onOptimizeRemaining) {
+                        Icon(
+                            imageVector = Icons.Default.LowPriority,
+                            contentDescription = stringResource(R.string.trips_follow_optimize),
+                            modifier = Modifier.size(sizing.component(22.dp))
+                        )
+                    }
+                }
                 if (nextStep != null) {
                     IconButton(onClick = onCheckNext) {
                         Icon(

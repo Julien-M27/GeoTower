@@ -854,6 +854,15 @@
     <string name="appstrings_loading_frequencies">Caricamento frequenze...</string>
     <string name="appstrings_loading_operator_stats">Caricamento operatori...</string>
     <string name="appstrings_locate">Localizza</string>
+    <string name="appstrings_map_mode_3d">3D</string>
+    <string name="appstrings_map_mode_2d">2D</string>
+    <string name="appstrings_map_switch_to_3d">Passa alla vista 3D</string>
+    <string name="appstrings_map_switch_to_2d">Passa alla vista 2D</string>
+    <string name="appstrings_map_3d_style_title">Stile mappa 3D</string>
+    <string name="appstrings_map_3d_style_liberty">Liberty (Giorno)</string>
+    <string name="appstrings_map_3d_style_dark">Dark (Notte)</string>
+    <string name="appstrings_map_3d_style_positron">Positron (Pulito)</string>
+    <string name="appstrings_map_3d_style_bright">Bright (Luminoso)</string>
     <string name="appstrings_location_not_found">Luogo non trovato</string>
     <string name="appstrings_search_data_unavailable">Dati non disponibili per questa zona.</string>
     <string name="appstrings_logo_app">Applicazione</string>
@@ -3171,6 +3180,7 @@
     <string name="trips_follow_off_route">Ti stai allontanando dal tracciato</string>
     <string name="trips_follow_done">Giro completato</string>
     <string name="trips_follow_check">Segna la tappa come rilevata</string>
+    <string name="trips_follow_optimize">Ottimizza le tappe rimanenti</string>
     <string name="trips_follow_finish">Interrompi il percorso</string>
     <string name="trips_view_follow">Segui</string>
     <string name="trips_view_edit">Modifica</string>
@@ -3316,6 +3326,11 @@
     <string name="appstrings_local_build_source_progress">Fonte %1$s: %2$s / %3$s righe</string>
     <string name="appstrings_local_build_source_processed">Fonte %1$s: %2$s righe elaborate</string>
     <string name="appstrings_local_build_source_started">Fonte %1$s: lettura in corso</string>
+    <string name="trips_route_error_server">Servizio di itinerario IGN temporaneamente non disponibile</string>
+    <string name="trips_route_error_network">Connessione internet richiesta per calcolare il percorso</string>
+    <string name="trips_route_error_timeout">Il servizio di itinerario non risponde (tempo scaduto)</string>
+    <string name="trips_route_error_coverage">Fuori dall\'area di copertura della rete stradale</string>
+    <string name="trips_route_retry">Riprova</string>
     <string name="trips_route_calculating">Calcolo del percorso…</string>
     <!-- Note di versione 2.0.34 -->
     <string name="appstrings_release_v2034_database_updates">Un solo pulsante controlla i database mobile, radio ed eNB/gNB e mette in coda solo gli aggiornamenti necessari</string>
@@ -3488,6 +3503,7 @@
     <string name="appstrings_release_v2117_summary_twenty_operators_support_and_watch_enhancements">Supporto completo per tutti i 20 operatori di telecomunicazioni (Francia e Oltremare) su smartwatch (Wear OS e Garmin) con colori ufficiali e rilevamento armonizzato</string>
     <string name="appstrings_release_v2118_summary_full_twenty_operators_web_api_and_watch_sync">Supporto completo e sincronizzazione diretta di tutti i 20 operatori di telecomunicazioni (Francia e Oltremare) tramite API Web e Bluetooth su smartwatch (Wear OS e Garmin)</string>
     <string name="appstrings_release_v2119_summary_changes_map_and_live_tracking_improvements">Mappa interattiva delle modifiche ANFR (nuove antenne, aggiornamenti e disattivazioni), filtri dedicati e miglioramenti al rilevamento in tempo reale</string>
+    <string name="appstrings_release_v2120_summary_map_3d_mode_and_trip_planner_optimizations">Nuova modalità mappa 3D immersiva (MapLibre), stili personalizzabili e ottimizzazioni avanzate per il tracciamento dei percorsi e itinerari</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registro richieste di rete</string>

@@ -14,6 +14,7 @@ import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.OutageGeocodeSiteRow
 import fr.geotower.data.models.PhysiqueEntity
 import fr.geotower.data.models.RefTypeAntenneDbEntity
+import fr.geotower.data.models.SiteSupportInfoRow
 import fr.geotower.data.models.TechniqueEntity
 import fr.geotower.data.models.WearNearbySiteRawRow
 
@@ -1265,6 +1266,18 @@ interface GeoTowerDao {
         LIMIT 1
     """)
     suspend fun getCoverageSiteLocation(idAnfr: String): CoverageSiteLocationEntity?
+
+    @Query("""
+        SELECT 
+            s.id_anfr,
+            s.hauteur AS hauteur,
+            n.libelle AS nature
+        FROM support s
+        LEFT JOIN ref_nature n ON s.nat_id = n.nat_id
+        WHERE s.id_anfr IN (:idAnfrs)
+        ORDER BY s.hauteur DESC
+    """)
+    suspend fun getSupportInfoForAnfrIds(idAnfrs: List<String>): List<SiteSupportInfoRow>
 
     @Query("""
         SELECT

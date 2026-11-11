@@ -123,6 +123,7 @@ import fr.geotower.ui.screens.stats.DepartmentStatDetailScreen
 import fr.geotower.ui.screens.stats.DepartmentStatsScreen
 import fr.geotower.ui.screens.stats.FrequencyStatsDetailScreen
 import fr.geotower.ui.screens.stats.StatisticsScreen
+import fr.geotower.ui.screens.stats.StatisticsWrapperScreen
 import fr.geotower.ui.screens.changes.ChangesMapScreen
 import fr.geotower.ui.screens.changes.CHANGES_MAP_ROUTE
 import fr.geotower.ui.screens.about.AboutScreen
@@ -1316,7 +1317,7 @@ class MainActivity : ComponentActivity() {
                                 Box(modifier = Modifier.padding(screenPadding)) {
                                     // ✅ AJOUT DU REPOSITORY ICI 👇
                                     if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.STATS)) {
-                                        StatisticsScreen(navController = navController, repository = repository)
+                                        StatisticsWrapperScreen(navController = navController, repository = repository)
                                     } else {
                                         DisabledFeatureRoute(navController, txtUnavailable)
                                     }

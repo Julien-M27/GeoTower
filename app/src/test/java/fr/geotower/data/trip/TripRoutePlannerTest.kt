@@ -102,4 +102,28 @@ class TripRoutePlannerTest {
 
         assertEquals(listOf(listOf(2, 0)), requests)
     }
+
+    @Test
+    fun mapsRoutingExceptionsToExplicitResourceMessages() {
+        assertEquals(
+            fr.geotower.R.string.trips_route_error_server,
+            tripRouteErrorMessageRes(IllegalStateException("HTTP 504"))
+        )
+        assertEquals(
+            fr.geotower.R.string.trips_route_error_server,
+            tripRouteErrorMessageRes(IllegalStateException("The upstream server is timing out"))
+        )
+        assertEquals(
+            fr.geotower.R.string.trips_route_error_network,
+            tripRouteErrorMessageRes(java.net.UnknownHostException("data.geopf.fr"))
+        )
+        assertEquals(
+            fr.geotower.R.string.trips_route_error_timeout,
+            tripRouteErrorMessageRes(java.net.SocketTimeoutException("Read timed out"))
+        )
+        assertEquals(
+            fr.geotower.R.string.trips_route_error_coverage,
+            tripRouteErrorMessageRes(IllegalStateException("Route snapped outside the requested area"))
+        )
+    }
 }

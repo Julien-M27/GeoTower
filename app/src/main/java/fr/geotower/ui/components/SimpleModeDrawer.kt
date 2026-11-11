@@ -305,7 +305,7 @@ private fun SimpleModeDrawerContent(
                             val isChanges = currentRoute?.startsWith(CHANGES_MAP_ROUTE) == true
                             NavigationDrawerItem(
                                 icon = { Icon(Icons.Default.NewReleases, contentDescription = null) },
-                                label = { Text("Changements") },
+                                label = { Text("Carte des évolutions") },
                                 selected = isChanges,
                                 onClick = {
                                     safeClick {

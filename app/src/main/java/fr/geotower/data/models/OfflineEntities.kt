@@ -223,6 +223,13 @@ data class CoverageSiteLocationEntity(
     @ColumnInfo(name = "support_height") val supportHeight: Double?
 )
 
+/** Projection légère de la hauteur et de la nature de support d'un site ANFR (pour la vue 3D). */
+data class SiteSupportInfoRow(
+    @ColumnInfo(name = "id_anfr") val idAnfr: String,
+    @ColumnInfo(name = "hauteur") val hauteur: Double?,
+    @ColumnInfo(name = "nature") val nature: String?
+)
+
 /** Projection complète pour Wear OS : support physique, opérateur, adresse réelle, nature du support et azimuts. */
 data class WearNearbySiteRawRow(
     @ColumnInfo(name = "id_anfr") val idAnfr: String,

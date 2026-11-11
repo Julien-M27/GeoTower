@@ -992,6 +992,15 @@
     <string name="appstrings_loading_frequencies">Loading frequencies...</string>
     <string name="appstrings_loading_operator_stats">Loading operators...</string>
     <string name="appstrings_locate">Locate</string>
+    <string name="appstrings_map_mode_3d">3D</string>
+    <string name="appstrings_map_mode_2d">2D</string>
+    <string name="appstrings_map_switch_to_3d">Switch to 3D view</string>
+    <string name="appstrings_map_switch_to_2d">Switch to 2D view</string>
+    <string name="appstrings_map_3d_style_title">3D Map Style</string>
+    <string name="appstrings_map_3d_style_liberty">Liberty (Day)</string>
+    <string name="appstrings_map_3d_style_dark">Dark (Night)</string>
+    <string name="appstrings_map_3d_style_positron">Positron (Clean)</string>
+    <string name="appstrings_map_3d_style_bright">Bright (Contrast)</string>
     <string name="appstrings_location_not_found">Location not found</string>
     <string name="appstrings_search_data_unavailable">Data unavailable for this area.</string>
     <string name="appstrings_logo_app">Application</string>
@@ -3202,6 +3211,11 @@
     <string name="trips_delete_message">“%1$s” will be permanently deleted.</string>
     <string name="trips_progress">%1$d/%2$d visited</string>
     <string name="trips_route_incomplete">Incomplete route</string>
+    <string name="trips_route_error_server">IGN routing service temporarily unavailable</string>
+    <string name="trips_route_error_network">Internet connection required for route calculation</string>
+    <string name="trips_route_error_timeout">Routing service did not respond (timed out)</string>
+    <string name="trips_route_error_coverage">Outside road network coverage area</string>
+    <string name="trips_route_retry">Retry</string>
     <string name="trips_route_calculating">Calculating route…</string>
     <string name="trips_duration_hour_short">h</string>
     <string name="trips_duration_minute_short">min</string>
@@ -3260,6 +3274,7 @@
     <string name="trips_follow_off_route">You are drifting off the route</string>
     <string name="trips_follow_done">Tour complete</string>
     <string name="trips_follow_check">Mark the step as surveyed</string>
+    <string name="trips_follow_optimize">Optimise remaining steps</string>
     <string name="trips_follow_finish">Stop following</string>
     <string name="trips_view_follow">Follow</string>
     <string name="trips_view_edit">Edit</string>
@@ -3511,6 +3526,7 @@
     <string name="appstrings_release_v2117_summary_twenty_operators_support_and_watch_enhancements">Full support for all 20 telecom operators (Mainland and Overseas) on smartwatches (Wear OS &amp; Garmin) with official colors and harmonized detection</string>
     <string name="appstrings_release_v2118_summary_full_twenty_operators_web_api_and_watch_sync">Full support and direct synchronization for all 20 telecom operators (Mainland and Overseas) via Web API and Bluetooth on smartwatches (Wear OS and Garmin)</string>
     <string name="appstrings_release_v2119_summary_changes_map_and_live_tracking_improvements">Interactive ANFR changes map (new antennas, upgrades, and removals), dedicated filters, and live tracking notification improvements</string>
+    <string name="appstrings_release_v2120_summary_map_3d_mode_and_trip_planner_optimizations">New immersive 3D map mode (MapLibre), customizable styles, and advanced optimizations for trip following and routing</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Network requests log</string>

@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Loop
 import androidx.compose.material.icons.filled.LowPriority
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -56,6 +57,8 @@ fun TripPlannerBar(
     plan: TripPlan,
     busy: Boolean,
     distanceUnit: Int,
+    routeErrorRes: Int? = null,
+    onRetryRoute: (() -> Unit)? = null,
     onToggleProfile: () -> Unit,
     onToggleReturnToStart: () -> Unit,
     onOptimize: () -> Unit,
@@ -128,6 +131,41 @@ fun TripPlannerBar(
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(start = sizing.spacing(8.dp))
                     )
+                }
+            } else if (routeErrorRes != null || (!plan.isRouteComplete() && plan.steps.size >= 2)) {
+                val errorText = routeErrorRes?.let { stringResource(it) }
+                    ?: stringResource(R.string.trips_route_incomplete)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(top = sizing.spacing(6.dp))
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Warning,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(sizing.component(16.dp))
+                    )
+                    Text(
+                        text = errorText,
+                        fontSize = sizing.text(12.sp),
+                        color = MaterialTheme.colorScheme.error,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(start = sizing.spacing(6.dp))
+                    )
+                    if (onRetryRoute != null) {
+                        Text(
+                            text = stringResource(R.string.trips_route_retry),
+                            fontSize = sizing.text(12.sp),
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .clickable(onClick = onRetryRoute)
+                                .padding(horizontal = sizing.spacing(6.dp), vertical = sizing.spacing(2.dp))
+                        )
+                    }
                 }
             }
 

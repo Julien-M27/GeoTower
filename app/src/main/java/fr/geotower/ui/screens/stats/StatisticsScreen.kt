@@ -377,7 +377,12 @@ private suspend fun loadFrequencyStatsData(
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun StatisticsScreen(navController: NavController, repository: AnfrRepository) {
+fun StatisticsScreen(
+    navController: NavController,
+    repository: AnfrRepository,
+    onOpenChangesMap: (() -> Unit)? = null,
+    isChangesMapOpen: Boolean = false
+) {
     SecureScreenEffect(RemoteFeatureFlags.SecureScreens.STATS)
     val themeMode by AppConfig.themeMode
     val isOledMode by AppConfig.isOledMode
@@ -412,7 +417,7 @@ fun StatisticsScreen(navController: NavController, repository: AnfrRepository) {
     val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = ROOT_FALLBACK_ROUTE)
     val lazyListState = rememberLazyListState()
 
-    BackHandler(enabled = !safeBackNavigation.isLocked) {
+    BackHandler(enabled = !isChangesMapOpen && !safeBackNavigation.isLocked) {
         safeBackNavigation.navigateBack()
     }
 
@@ -526,7 +531,14 @@ fun StatisticsScreen(navController: NavController, repository: AnfrRepository) {
                     Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
                     ChangesMapEntryCard(
                         bgColor = cardBgColor,
-                        onClick = { navController.navigate(CHANGES_MAP_ROUTE) }
+                        onClick = {
+                            if (onOpenChangesMap != null) {
+                                onOpenChangesMap()
+                            } else {
+                                navController.navigate(CHANGES_MAP_ROUTE)
+                            }
+                        },
+                        isSelected = isChangesMapOpen
                     )
                 }
 

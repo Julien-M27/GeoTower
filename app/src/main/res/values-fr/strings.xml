@@ -888,6 +888,15 @@
     <string name="appstrings_loading_frequencies">Chargement des fréquences...</string>
     <string name="appstrings_loading_operator_stats">Chargement des opérateurs...</string>
     <string name="appstrings_locate">Localiser</string>
+    <string name="appstrings_map_mode_3d">3D</string>
+    <string name="appstrings_map_mode_2d">2D</string>
+    <string name="appstrings_map_switch_to_3d">Basculer en vue 3D</string>
+    <string name="appstrings_map_switch_to_2d">Basculer en vue 2D</string>
+    <string name="appstrings_map_3d_style_title">Style de la carte 3D</string>
+    <string name="appstrings_map_3d_style_liberty">Liberty (Jour)</string>
+    <string name="appstrings_map_3d_style_dark">Dark (Nuit)</string>
+    <string name="appstrings_map_3d_style_positron">Positron (Épuré)</string>
+    <string name="appstrings_map_3d_style_bright">Bright (Lumineux)</string>
     <string name="appstrings_location_not_found">Lieu introuvable</string>
     <string name="appstrings_search_data_unavailable">Donn&#233;es indisponibles pour cette zone.</string>
     <string name="appstrings_logo_app">Application</string>
@@ -3180,6 +3189,11 @@
     <string name="trips_delete_message">« %1$s » sera définitivement supprimé.</string>
     <string name="trips_progress">%1$d/%2$d visitées</string>
     <string name="trips_route_incomplete">Itinéraire incomplet</string>
+    <string name="trips_route_error_server">Service d\'itinéraire IGN temporairement indisponible</string>
+    <string name="trips_route_error_network">Connexion internet requise pour calculer l\'itinéraire</string>
+    <string name="trips_route_error_timeout">Le service d\'itinéraire ne répond pas (délai dépassé)</string>
+    <string name="trips_route_error_coverage">Hors zone de couverture du réseau routier</string>
+    <string name="trips_route_retry">Réessayer</string>
     <string name="trips_route_calculating">Calcul de l\'itinéraire…</string>
     <string name="trips_duration_hour_short">h</string>
     <string name="trips_duration_minute_short">min</string>
@@ -3238,6 +3252,7 @@
     <string name="trips_follow_off_route">Vous vous écartez du tracé</string>
     <string name="trips_follow_done">Tournée terminée</string>
     <string name="trips_follow_check">Marquer l\'étape comme relevée</string>
+    <string name="trips_follow_optimize">Optimiser la suite</string>
     <string name="trips_follow_finish">Arrêter le suivi</string>
     <string name="trips_view_follow">Suivre</string>
     <string name="trips_view_edit">Modifier</string>
@@ -3490,6 +3505,7 @@
     <string name="appstrings_release_v2117_summary_twenty_operators_support_and_watch_enhancements">Prise en charge intégrale des 20 opérateurs télécoms (Métropole et Outre-mer) sur montres connectées (Wear OS et Garmin) avec couleurs officielles et détection harmonisée</string>
     <string name="appstrings_release_v2118_summary_full_twenty_operators_web_api_and_watch_sync">Support complet et synchronisation directe des 20 opérateurs télécoms (Métropole et Outre-mer) via l\'API Web et Bluetooth sur montres connectées (Wear OS et Garmin)</string>
     <string name="appstrings_release_v2119_summary_changes_map_and_live_tracking_improvements">Carte interactive des changements ANFR (nouvelles antennes, évolutions et extinctions), filtres dédiés et améliorations du suivi en direct</string>
+    <string name="appstrings_release_v2120_summary_map_3d_mode_and_trip_planner_optimizations">Nouveau mode Carte 3D immersive (MapLibre), styles personnalisables et optimisations avancées du suivi de tournée et des itinéraires</string>
 
     <!-- Journal des requêtes réseau -->
     <string name="network_log_title">Journal des requêtes réseau</string>

@@ -1,5 +1,6 @@
 package fr.geotower.ui.screens.map
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -43,6 +45,8 @@ import fr.geotower.utils.formatSiteDistanceMeters
 fun TripViewBar(
     plan: TripPlan,
     distanceUnit: Int,
+    routeErrorRes: Int? = null,
+    onRetryRoute: (() -> Unit)? = null,
     onFollow: () -> Unit,
     onEdit: () -> Unit,
     modifier: Modifier = Modifier
@@ -73,6 +77,43 @@ fun TripViewBar(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = sizing.spacing(2.dp))
             )
+
+            if (routeErrorRes != null || (!plan.isRouteComplete() && plan.steps.size >= 2)) {
+                val errorText = routeErrorRes?.let { stringResource(it) }
+                    ?: stringResource(R.string.trips_route_incomplete)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(top = sizing.spacing(6.dp))
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Warning,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(sizing.component(16.dp))
+                    )
+                    Text(
+                        text = errorText,
+                        fontSize = sizing.text(12.sp),
+                        color = MaterialTheme.colorScheme.error,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(start = sizing.spacing(6.dp))
+                    )
+                    if (onRetryRoute != null) {
+                        Text(
+                            text = stringResource(R.string.trips_route_retry),
+                            fontSize = sizing.text(12.sp),
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .clickable(onClick = onRetryRoute)
+                                .padding(horizontal = sizing.spacing(6.dp), vertical = sizing.spacing(2.dp))
+                        )
+                    }
+                }
+            }
 
             Row(
                 modifier = Modifier

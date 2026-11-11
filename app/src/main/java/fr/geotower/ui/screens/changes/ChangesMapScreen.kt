@@ -79,7 +79,9 @@ const val CHANGES_MAP_ROUTE = "changes_map"
 @Composable
 fun ChangesMapScreen(
     navController: NavController,
-    onOpenSupportDetail: ((String) -> Unit)? = null
+    onOpenSupportDetail: ((String) -> Unit)? = null,
+    isSplitScreen: Boolean = false,
+    onCloseSplitScreen: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val sizing = LocalGeoTowerUiStyle.current.sizing
@@ -470,10 +472,16 @@ fun ChangesMapScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     SmallFloatingCircleButton(
-                        icon = Icons.AutoMirrored.Filled.ArrowBack,
-                        desc = "Retour",
+                        icon = if (isSplitScreen) Icons.Default.Close else Icons.AutoMirrored.Filled.ArrowBack,
+                        desc = if (isSplitScreen) "Fermer" else "Retour",
                         size = 44.dp,
-                        onClick = { navController.popBackStack() }
+                        onClick = {
+                            if (isSplitScreen && onCloseSplitScreen != null) {
+                                onCloseSplitScreen()
+                            } else {
+                                navController.popBackStack()
+                            }
+                        }
                     )
 
                     Surface(
@@ -494,7 +502,7 @@ fun ChangesMapScreen(
                                 .padding(horizontal = sizing.spacing(8.dp))
                         ) {
                             Text(
-                                text = "Changements",
+                                text = "Carte des évolutions",
                                 style = sizing.textStyle(MaterialTheme.typography.titleSmall),
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface,
@@ -927,7 +935,11 @@ private fun formatDisplayDate(rawDate: String): String {
  * Carte d'accès vers la carte des changements depuis l'écran Statistiques.
  */
 @Composable
-fun ChangesMapEntryCard(bgColor: Color, onClick: () -> Unit) {
+fun ChangesMapEntryCard(
+    bgColor: Color,
+    onClick: () -> Unit,
+    isSelected: Boolean = false
+) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
     val shape = if (fr.geotower.utils.AppConfig.useOneUiDesign) RoundedCornerShape(24.dp) else RoundedCornerShape(12.dp)
 
@@ -935,6 +947,7 @@ fun ChangesMapEntryCard(bgColor: Color, onClick: () -> Unit) {
         onClick = onClick,
         color = bgColor,
         shape = shape,
+        border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = sizing.spacing(16.dp))
@@ -954,12 +967,12 @@ fun ChangesMapEntryCard(bgColor: Color, onClick: () -> Unit) {
             Spacer(modifier = Modifier.width(sizing.spacing(12.dp)))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Changements",
+                    text = "Carte des évolutions",
                     style = sizing.textStyle(MaterialTheme.typography.titleSmall),
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
-                    text = "Nouveaux sites, allumages 5G et évolutions hebdomadaires",
+                    text = "Historique cartographié des activations et démantèlements",
                     style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

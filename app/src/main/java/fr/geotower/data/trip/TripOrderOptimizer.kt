@@ -8,9 +8,10 @@ package fr.geotower.data.trip
 data class TripOrderOutcome(
     val plan: TripPlan,
     val straightBeforeMeters: Double,
-    val straightAfterMeters: Double
+    val straightAfterMeters: Double,
+    val stepsReordered: Boolean = false
 ) {
-    val changed: Boolean get() = straightAfterMeters < straightBeforeMeters - 1.0
+    val changed: Boolean get() = stepsReordered || straightAfterMeters < straightBeforeMeters - 1.0
 }
 
 /**
@@ -52,13 +53,66 @@ object TripOrderOptimizer {
 
         val before = straightLength(initial, matrix, plan.returnToStart)
         val after = straightLength(order, matrix, plan.returnToStart)
-        if (after >= before - 1.0) return TripOrderOutcome(plan, before, before)
+        if (after >= before - 1.0) return TripOrderOutcome(plan, before, before, stepsReordered = false)
 
         return TripOrderOutcome(
             // Les segments sont tous périmés : ils reliaient d'autres couples d'étapes.
             plan = plan.copy(steps = order.map { steps[it] }, legs = emptyList()),
             straightBeforeMeters = before,
-            straightAfterMeters = after
+            straightAfterMeters = after,
+            stepsReordered = true
+        )
+    }
+
+    /**
+     * Réorganise les étapes non encore visitées à partir de [targetStepIndex],
+     * en figeant les étapes déjà visitées dans leur ordre et en plaçant [targetStepIndex]
+     * en tête des étapes restantes.
+     */
+    fun optimizeRemainingSteps(plan: TripPlan, targetStepIndex: Int): TripOrderOutcome {
+        val steps = plan.steps
+        if (targetStepIndex !in steps.indices) {
+            val length = straightLength(List(steps.size) { it }, distances(steps), plan.returnToStart)
+            return TripOrderOutcome(plan, length, length, stepsReordered = false)
+        }
+
+        val targetStep = steps[targetStepIndex]
+        val visitedSteps = steps.filter { it.visitedAtMillis != null && it != targetStep }
+        val unvisitedSteps = steps.filter { it.visitedAtMillis == null || it == targetStep }
+
+        val otherUnvisited = unvisitedSteps.filter { it != targetStep }
+        if (otherUnvisited.isEmpty()) {
+            val length = straightLength(List(steps.size) { it }, distances(steps), plan.returnToStart)
+            return TripOrderOutcome(plan, length, length, stepsReordered = false)
+        }
+
+        val toOptimize = listOf(targetStep) + otherUnvisited
+        val matrix = distances(toOptimize)
+        val initialOrder = List(toOptimize.size) { it }
+        val cycle = plan.returnToStart && visitedSteps.isEmpty()
+        val optimizedIndices = if (toOptimize.size in 3..MAX_OPTIMIZABLE_STEPS) {
+            twoOpt(nearestNeighbour(matrix), matrix, cycle)
+        } else {
+            initialOrder
+        }
+
+        val orderedUnvisited = optimizedIndices.map { toOptimize[it] }
+        val newSteps = visitedSteps + orderedUnvisited
+
+        val oldMatrix = distances(steps)
+        val before = straightLength(List(steps.size) { it }, oldMatrix, plan.returnToStart)
+        val newMatrix = distances(newSteps)
+        val after = straightLength(List(newSteps.size) { it }, newMatrix, plan.returnToStart)
+
+        if (newSteps == steps) {
+            return TripOrderOutcome(plan, before, before, stepsReordered = false)
+        }
+
+        return TripOrderOutcome(
+            plan = plan.copy(steps = newSteps, legs = emptyList()),
+            straightBeforeMeters = before,
+            straightAfterMeters = after,
+            stepsReordered = true
         )
     }
 

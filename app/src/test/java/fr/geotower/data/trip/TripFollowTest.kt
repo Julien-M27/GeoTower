@@ -144,4 +144,32 @@ class TripFollowTest {
         // Distance à l'étape 2 (~730 m) + le segment 1→2 qui suit. Le segment 0→1 est derrière nous.
         assertEquals(730.0 + 7_300.0, status.remainingDistanceMeters, 60.0)
     }
+
+    @Test
+    fun detectsCurrentLegAndTargetsAheadWhenOnRoute() {
+        val route01 = listOf(doubleArrayOf(48.800, 2.300), doubleArrayOf(48.800, 2.400))
+        val route12 = listOf(doubleArrayOf(48.800, 2.400), doubleArrayOf(48.800, 2.500))
+        val tour = plan(
+            listOf(
+                step(48.800, 2.300),
+                step(48.800, 2.400),
+                step(48.800, 2.500)
+            ),
+            legs = listOf(
+                routedLeg(0, 1, route01, meters = 7_300.0),
+                routedLeg(1, 2, route12, meters = 7_300.0)
+            )
+        )
+
+        val detected = detectCurrentLeg(tour, latitude = 48.800, longitude = 2.450)
+        assertTrue(detected != null)
+        assertEquals(1, detected?.legOrdinal)
+        assertEquals(1, detected?.fromStepIndex)
+        assertEquals(2, detected?.toStepIndex)
+
+        val status = computeTripFollowStatus(tour, latitude = 48.800, longitude = 2.450)
+        assertEquals(2, status.nextStepIndex)
+        assertEquals(detected?.remainingDistanceOnLegMeters ?: 0.0, status.distanceToNextMeters ?: 0.0, 1.0)
+        assertTrue(!status.isOffRoute)
+    }
 }

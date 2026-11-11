@@ -46,6 +46,11 @@ class GeoTowerApp : Application() {
         osmdroidConfig.osmdroidTileCache = java.io.File(osmdroidBasePath, "tiles")
         osmdroidConfig.expirationExtendedDuration = 30L * 24 * 3600 * 1000L
         osmdroidConfig.expirationOverrideDuration = 30L * 24 * 3600 * 1000L
+        try {
+            org.maplibre.android.MapLibre.getInstance(applicationContext)
+        } catch (e: Exception) {
+            fr.geotower.utils.AppLogger.w("GeoTowerApp", "MapLibre init error", e)
+        }
         RemoteFeatureFlags.loadCached(applicationContext)
         // Origine de l'installation : doit précéder AppUpdateState, qui s'en sert pour ne jamais
         // afficher de bandeau « nouvelle version » sur une installation venue du Play Store.

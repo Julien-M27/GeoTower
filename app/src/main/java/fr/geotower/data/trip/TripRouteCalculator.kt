@@ -1,10 +1,12 @@
 package fr.geotower.data.trip
 
+import fr.geotower.R
 import fr.geotower.data.api.RouteApi
 import fr.geotower.utils.AppLogger
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.util.Locale
 
 /**
  * Résultat d'un calcul d'itinéraire sur un trajet. [failedRequests] compte les requêtes perdues :
@@ -14,9 +16,37 @@ import kotlinx.coroutines.withContext
 data class TripRouteOutcome(
     val plan: TripPlan,
     val requestCount: Int,
-    val failedRequests: Int
+    val failedRequests: Int,
+    val lastError: Throwable? = null
 ) {
     val hasFailures: Boolean get() = failedRequests > 0
+}
+
+/**
+ * Traduit une exception d'itinéraire en ressource de chaîne explicite pour l'utilisateur.
+ */
+fun tripRouteErrorMessageRes(error: Throwable?): Int? {
+    if (error == null) return null
+    val message = error.message.orEmpty().lowercase(Locale.ROOT)
+    val causeMessage = error.cause?.message.orEmpty().lowercase(Locale.ROOT)
+    val full = "$message $causeMessage"
+
+    return when {
+        error is java.net.UnknownHostException || error is java.net.ConnectException ->
+            R.string.trips_route_error_network
+        error is java.net.SocketTimeoutException || full.contains("timed out") || full.contains("timeout") ->
+            if (full.contains("http 504") || full.contains("upstream")) {
+                R.string.trips_route_error_server
+            } else {
+                R.string.trips_route_error_timeout
+            }
+        full.contains("http 5") || full.contains("bad gateway") || full.contains("gateway time-out") ||
+            full.contains("service unavailable") || full.contains("internal server error") ->
+            R.string.trips_route_error_server
+        full.contains("outside the requested area") || full.contains("snapped outside") ->
+            R.string.trips_route_error_coverage
+        else -> R.string.trips_route_error_server
+    }
 }
 
 /**
@@ -52,9 +82,15 @@ object TripRouteCalculator {
 
         val computed = ArrayList<TripLeg>()
         var failed = 0
+        var lastThrownError: Throwable? = null
         for (request in requests) {
-            val legs = runRequest(plan, request, optimization)
-            if (legs == null) failed++ else computed += legs
+            val (legs, error) = runRequest(plan, request, optimization)
+            if (legs == null) {
+                failed++
+                if (lastThrownError == null && error != null) lastThrownError = error
+            } else {
+                computed += legs
+            }
         }
 
         // Les segments recalculés remplacent les anciens ; ceux qu'on n'a pas touchés survivent —
@@ -70,25 +106,26 @@ object TripRouteCalculator {
         return TripRouteOutcome(
             plan = plan.copy(legs = nextLegs),
             requestCount = requests.size,
-            failedRequests = failed
+            failedRequests = failed,
+            lastError = lastThrownError
         )
     }
 
-    /** Rend les segments d'une tranche, ou `null` si la requête a échoué en entier. */
+    /** Rend les segments d'une tranche et l'erreur éventuelle si la requête a échoué. */
     private suspend fun runRequest(
         plan: TripPlan,
         stepIndices: List<Int>,
         optimization: String
-    ): List<TripLeg>? {
+    ): Pair<List<TripLeg>?, Throwable?> {
         val points = stepIndices.map { doubleArrayOf(plan.steps[it].latitude, plan.steps[it].longitude) }
-        if (points.size < 2) return null
+        if (points.size < 2) return Pair(null, null)
 
         // Deux points trop éloignés ne partagent aucun réseau : inutile d'interroger le service, il
         // répondrait un rabattement absurde que l'ancrage rejetterait de toute façon.
         val tooFar = points.zipWithNext().any { (from, to) ->
             haversineMeters(from[0], from[1], to[0], to[1]) > RouteApi.MAX_ROUTABLE_DISTANCE_METERS
         }
-        if (tooFar) return null
+        if (tooFar) return Pair(null, IllegalArgumentException("Points too far"))
 
         val portions = try {
             withContext(Dispatchers.IO) { RouteApi.getRoutePortions(points, plan.profile, optimization) }
@@ -96,10 +133,10 @@ object TripRouteCalculator {
             throw cancellation
         } catch (error: Throwable) {
             AppLogger.w(TAG, "Trip route unavailable for ${stepIndices.size} points", error)
-            return null
+            return Pair(null, error)
         }
 
-        return portions.mapIndexed { index, portion ->
+        val legs = portions.mapIndexed { index, portion ->
             TripLeg(
                 fromIndex = stepIndices[index],
                 toIndex = stepIndices[index + 1],
@@ -121,5 +158,6 @@ object TripRouteCalculator {
                 optimization = optimization
             )
         }
+        return Pair(legs, null)
     }
 }

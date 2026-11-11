@@ -20,7 +20,25 @@ data class TripFollowStatus(
     val offRouteMeters: Double?,
     val isOffRoute: Boolean,
     /** Étapes atteintes à l'instant, à cocher : indices dans [TripPlan.steps]. */
-    val reachedStepIndices: List<Int>
+    val reachedStepIndices: List<Int>,
+    /** Tronçon de l'itinéraire sur lequel se trouve l'utilisateur, le cas échéant. */
+    val currentLeg: TripCurrentLeg? = null
+)
+
+/**
+ * Un tronçon de l'itinéraire sur lequel l'utilisateur se trouve actuellement.
+ */
+data class TripCurrentLeg(
+    /** Indice de la tranche dans [TripPlan.legPairs]. */
+    val legOrdinal: Int,
+    /** Indice de l'étape de départ du tronçon dans [TripPlan.steps]. */
+    val fromStepIndex: Int,
+    /** Indice de l'étape d'arrivée du tronçon dans [TripPlan.steps] (l'étape immédiatement devant). */
+    val toStepIndex: Int,
+    /** Distance perpendiculaire au tracé en mètres. */
+    val distanceToLegMeters: Double,
+    /** Distance restante à parcourir le long de ce tronçon jusqu'à [toStepIndex]. */
+    val remainingDistanceOnLegMeters: Double
 )
 
 /**
@@ -36,6 +54,66 @@ const val TRIP_REACHED_RADIUS_METERS = 80.0
  */
 const val TRIP_OFF_ROUTE_THRESHOLD_METERS = 120.0
 
+/**
+ * Détecte si la position se trouve sur l'un des tronçons calculés de la tournée.
+ * Rend le tronçon le plus proche si l'écart est inférieur à [maxSnapMeters], ou `null`.
+ */
+fun detectCurrentLeg(
+    plan: TripPlan,
+    latitude: Double,
+    longitude: Double,
+    maxSnapMeters: Double = TRIP_OFF_ROUTE_THRESHOLD_METERS
+): TripCurrentLeg? {
+    val legPairs = plan.legPairs()
+    if (legPairs.isEmpty()) return null
+
+    var bestLeg: TripCurrentLeg? = null
+    var bestDistance = Double.MAX_VALUE
+
+    legPairs.forEachIndexed { ordinal, (fromIndex, toIndex) ->
+        val leg = plan.legBetween(fromIndex, toIndex) ?: return@forEachIndexed
+        val points = leg.points()
+        if (points.size < 2) return@forEachIndexed
+
+        var minSegmentDistance = Double.MAX_VALUE
+        var bestSegmentIndex = -1
+        var bestRatio = 0.0
+
+        for (i in 0 until points.size - 1) {
+            val p1 = points[i]
+            val p2 = points[i + 1]
+            val projection = projectOntoSegment(latitude, longitude, p1[0], p1[1], p2[0], p2[1])
+            if (projection.distanceMeters < minSegmentDistance) {
+                minSegmentDistance = projection.distanceMeters
+                bestSegmentIndex = i
+                bestRatio = projection.ratio
+            }
+        }
+
+        if (minSegmentDistance <= maxSnapMeters && minSegmentDistance < bestDistance) {
+            bestDistance = minSegmentDistance
+            var remainingMeters = 0.0
+            if (bestSegmentIndex >= 0) {
+                val p1 = points[bestSegmentIndex]
+                val p2 = points[bestSegmentIndex + 1]
+                val currentSegmentLength = haversineMeters(p1[0], p1[1], p2[0], p2[1])
+                remainingMeters += currentSegmentLength * (1.0 - bestRatio)
+                for (j in (bestSegmentIndex + 1) until (points.size - 1)) {
+                    remainingMeters += haversineMeters(points[j][0], points[j][1], points[j + 1][0], points[j + 1][1])
+                }
+            }
+            bestLeg = TripCurrentLeg(
+                legOrdinal = ordinal,
+                fromStepIndex = fromIndex,
+                toStepIndex = toIndex,
+                distanceToLegMeters = minSegmentDistance,
+                remainingDistanceOnLegMeters = remainingMeters
+            )
+        }
+    }
+    return bestLeg
+}
+
 fun computeTripFollowStatus(
     plan: TripPlan,
     latitude: Double,
@@ -49,15 +127,26 @@ fun computeTripFollowStatus(
         if (distance <= reachedRadiusMeters) index else null
     }
 
-    // La prochaine étape est la première non relevée dans l'ordre de la tournée -- pas la plus
-    // proche : sauter une étape parce qu'on en frôle une autre casserait l'ordre voulu.
-    val nextIndex = plan.steps.indexOfFirst { it.visitedAtMillis == null }.takeIf { it >= 0 }
-    val distanceToNext = nextIndex?.let {
-        haversineMeters(latitude, longitude, plan.steps[it].latitude, plan.steps[it].longitude)
+    val currentLeg = detectCurrentLeg(plan, latitude, longitude, offRouteThresholdMeters)
+
+    // Si l'utilisateur est déjà sur un tronçon menant à une étape non visitée, on cible cette
+    // étape immédiatement devant lui. Sinon, repli sur la première étape non relevée dans l'ordre.
+    val legTargetIndex = currentLeg?.toStepIndex?.takeIf {
+        it in plan.steps.indices && plan.steps[it].visitedAtMillis == null
+    }
+    val fallbackNextIndex = plan.steps.indexOfFirst { it.visitedAtMillis == null }.takeIf { it >= 0 }
+    val nextIndex = legTargetIndex ?: fallbackNextIndex
+
+    val distanceToNext = if (currentLeg != null && currentLeg.toStepIndex == nextIndex) {
+        currentLeg.remainingDistanceOnLegMeters
+    } else {
+        nextIndex?.let {
+            haversineMeters(latitude, longitude, plan.steps[it].latitude, plan.steps[it].longitude)
+        }
     }
 
-    // Ce qu'il reste : le trajet à vol d'oiseau jusqu'à l'étape suivante, puis les segments
-    // calculés au-delà. On ne prétend pas connaître la route depuis un point hors tracé.
+    // Ce qu'il reste : le parcours le long du tracé jusqu'à l'étape suivante, puis les segments
+    // calculés au-delà.
     val remainingLegs = if (nextIndex == null) {
         emptyList()
     } else {
@@ -80,7 +169,7 @@ fun computeTripFollowStatus(
         legsDuration + (distanceToNext ?: 0.0) / approachSpeedMetersPerSecond(plan, nextIndex) + stops
     }
 
-    val offRoute = distanceToRouteMeters(plan, latitude, longitude)
+    val offRoute = currentLeg?.distanceToLegMeters ?: distanceToRouteMeters(plan, latitude, longitude)
     return TripFollowStatus(
         nextStepIndex = nextIndex,
         distanceToNextMeters = distanceToNext,
@@ -88,7 +177,8 @@ fun computeTripFollowStatus(
         remainingDurationSeconds = remainingDuration,
         offRouteMeters = offRoute,
         isOffRoute = offRoute != null && offRoute > offRouteThresholdMeters,
-        reachedStepIndices = reached
+        reachedStepIndices = reached,
+        currentLeg = currentLeg
     )
 }
 

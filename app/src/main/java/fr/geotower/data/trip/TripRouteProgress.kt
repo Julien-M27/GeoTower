@@ -154,14 +154,14 @@ fun headingAlignedToRoute(
 const val NAV_ROUTE_ALIGN_TOLERANCE_DEGREES = 45.0
 
 /** Projection d'un point sur un segment : à quelle distance, et à quelle fraction du segment. */
-private class SegmentProjection(val distanceMeters: Double, val ratio: Double)
+internal class SegmentProjection(val distanceMeters: Double, val ratio: Double)
 
 /**
  * Projection plane locale centrée sur le point interrogé : à l'échelle d'un segment routier
  * l'erreur est négligeable, et cela évite une trigonométrie sphérique dans une boucle appelée sur
  * des milliers de points à chaque position reçue.
  */
-private fun projectOntoSegment(
+internal fun projectOntoSegment(
     latitude: Double,
     longitude: Double,
     fromLatitude: Double,

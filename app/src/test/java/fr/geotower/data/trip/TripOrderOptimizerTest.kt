@@ -94,6 +94,39 @@ class TripOrderOptimizerTest {
         assertTrue(!outcome.changed)
     }
 
+    @Test
+    fun optimizeRemainingStepsKeepsVisitedStepsAndPlacesTargetFirst() {
+        val steps = listOf(
+            step(48.80, 2.30, label = "step0", visitedAtMillis = 100L),
+            step(48.81, 2.31, label = "step1", visitedAtMillis = 200L),
+            step(48.82, 2.32, label = "step2"),
+            step(48.90, 2.40, label = "step3"),
+            step(48.83, 2.33, label = "step4")
+        )
+        val outcome = TripOrderOptimizer.optimizeRemainingSteps(plan(steps), targetStepIndex = 3)
+        assertTrue(outcome.changed)
+        val resultLabels = outcome.plan.steps.map { it.label }
+        assertEquals("step0", resultLabels[0])
+        assertEquals("step1", resultLabels[1])
+        assertEquals("step3", resultLabels[2])
+        assertEquals(steps.map { it.label }.toSet(), resultLabels.toSet())
+    }
+
+    @Test
+    fun optimizeRemainingStepsWhenNoStepsVisitedRotatesToTarget() {
+        val steps = listOf(
+            step(48.80, 2.30, label = "step0"),
+            step(48.85, 2.35, label = "step1"),
+            step(48.90, 2.40, label = "step2"),
+            step(48.95, 2.45, label = "step3")
+        )
+        val outcome = TripOrderOptimizer.optimizeRemainingSteps(plan(steps), targetStepIndex = 2)
+        assertTrue(outcome.changed)
+        val resultLabels = outcome.plan.steps.map { it.label }
+        assertEquals("step2", resultLabels[0])
+        assertEquals(steps.map { it.label }.toSet(), resultLabels.toSet())
+    }
+
     /** Points régulièrement répartis sur un cercle, donnés dans le désordre. */
     private fun shuffledRing(count: Int, seed: Int): List<TripStep> {
         val ring = List(count) { index ->
