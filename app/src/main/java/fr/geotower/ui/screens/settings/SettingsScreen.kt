@@ -3398,98 +3398,101 @@ fun SectionCartographie(
         safeClick = safeClick
     )
 
-    // Style de la carte 3D (Bâtiments & Relief)
-    Spacer(Modifier.height(sizing.spacing(16.dp)))
     val mappingPrefs = LocalContext.current.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
-    var map3dStyleId by remember {
-        mutableIntStateOf(mappingPrefs.getInt("map_3d_style_id", -1))
-    }
-    val selected3d = if (map3dStyleId != -1) map3dStyleId else if (ign == 1) 1 else 0
 
-    Text(
-        text = stringResource(R.string.appstrings_map_3d_style_title),
-        style = sizing.textStyle(MaterialTheme.typography.labelLarge),
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
-    Spacer(Modifier.height(sizing.spacing(8.dp)))
-    Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp))) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp)),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            SettingsOptionCard(
-                label = stringResource(R.string.appstrings_map_3d_style_liberty),
-                icon = Icons.Default.WbSunny,
-                isSelected = selected3d == 0,
-                onClick = {
-                    safeClick("mapping_3d_style_liberty") {
-                        map3dStyleId = 0
-                        mappingPrefs.edit().putInt("map_3d_style_id", 0).apply()
-                        onIgn(0)
-                    }
-                },
-                modifier = Modifier.weight(1f),
-                shape = shape,
-                border = border,
-                bubbleColor = bubbleColor,
-                useOneUi = useOneUi
-            )
-            SettingsOptionCard(
-                label = stringResource(R.string.appstrings_map_3d_style_dark),
-                icon = Icons.Default.NightsStay,
-                isSelected = selected3d == 1,
-                onClick = {
-                    safeClick("mapping_3d_style_dark") {
-                        map3dStyleId = 1
-                        mappingPrefs.edit().putInt("map_3d_style_id", 1).apply()
-                        onIgn(1)
-                    }
-                },
-                modifier = Modifier.weight(1f),
-                shape = shape,
-                border = border,
-                bubbleColor = bubbleColor,
-                useOneUi = useOneUi
-            )
+    if (AppConfig.supports3DMap.value) {
+        // Style de la carte 3D (Bâtiments & Relief) - masqué si OpenGL ES 3.0 non supporté
+        Spacer(Modifier.height(sizing.spacing(16.dp)))
+        var map3dStyleId by remember {
+            mutableIntStateOf(mappingPrefs.getInt("map_3d_style_id", -1))
         }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp)),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            SettingsOptionCard(
-                label = stringResource(R.string.appstrings_map_3d_style_positron),
-                icon = Icons.Default.Public,
-                isSelected = selected3d == 2,
-                onClick = {
-                    safeClick("mapping_3d_style_positron") {
-                        map3dStyleId = 2
-                        mappingPrefs.edit().putInt("map_3d_style_id", 2).apply()
-                    }
-                },
-                modifier = Modifier.weight(1f),
-                shape = shape,
-                border = border,
-                bubbleColor = bubbleColor,
-                useOneUi = useOneUi
-            )
-            SettingsOptionCard(
-                label = stringResource(R.string.appstrings_map_3d_style_bright),
-                icon = Icons.Default.Layers,
-                isSelected = selected3d == 3,
-                onClick = {
-                    safeClick("mapping_3d_style_bright") {
-                        map3dStyleId = 3
-                        mappingPrefs.edit().putInt("map_3d_style_id", 3).apply()
-                    }
-                },
-                modifier = Modifier.weight(1f),
-                shape = shape,
-                border = border,
-                bubbleColor = bubbleColor,
-                useOneUi = useOneUi
-            )
+        val selected3d = if (map3dStyleId != -1) map3dStyleId else if (ign == 1) 1 else 0
+
+        Text(
+            text = stringResource(R.string.appstrings_map_3d_style_title),
+            style = sizing.textStyle(MaterialTheme.typography.labelLarge),
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(sizing.spacing(8.dp)))
+        Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp))) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp)),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                SettingsOptionCard(
+                    label = stringResource(R.string.appstrings_map_3d_style_liberty),
+                    icon = Icons.Default.WbSunny,
+                    isSelected = selected3d == 0,
+                    onClick = {
+                        safeClick("mapping_3d_style_liberty") {
+                            map3dStyleId = 0
+                            mappingPrefs.edit().putInt("map_3d_style_id", 0).apply()
+                            onIgn(0)
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                    shape = shape,
+                    border = border,
+                    bubbleColor = bubbleColor,
+                    useOneUi = useOneUi
+                )
+                SettingsOptionCard(
+                    label = stringResource(R.string.appstrings_map_3d_style_dark),
+                    icon = Icons.Default.NightsStay,
+                    isSelected = selected3d == 1,
+                    onClick = {
+                        safeClick("mapping_3d_style_dark") {
+                            map3dStyleId = 1
+                            mappingPrefs.edit().putInt("map_3d_style_id", 1).apply()
+                            onIgn(1)
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                    shape = shape,
+                    border = border,
+                    bubbleColor = bubbleColor,
+                    useOneUi = useOneUi
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp)),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                SettingsOptionCard(
+                    label = stringResource(R.string.appstrings_map_3d_style_positron),
+                    icon = Icons.Default.Public,
+                    isSelected = selected3d == 2,
+                    onClick = {
+                        safeClick("mapping_3d_style_positron") {
+                            map3dStyleId = 2
+                            mappingPrefs.edit().putInt("map_3d_style_id", 2).apply()
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                    shape = shape,
+                    border = border,
+                    bubbleColor = bubbleColor,
+                    useOneUi = useOneUi
+                )
+                SettingsOptionCard(
+                    label = stringResource(R.string.appstrings_map_3d_style_bright),
+                    icon = Icons.Default.Layers,
+                    isSelected = selected3d == 3,
+                    onClick = {
+                        safeClick("mapping_3d_style_bright") {
+                            map3dStyleId = 3
+                            mappingPrefs.edit().putInt("map_3d_style_id", 3).apply()
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                    shape = shape,
+                    border = border,
+                    bubbleColor = bubbleColor,
+                    useOneUi = useOneUi
+                )
+            }
         }
     }
 

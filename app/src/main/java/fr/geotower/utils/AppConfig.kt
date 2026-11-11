@@ -563,6 +563,7 @@ object AppConfig {
 
     // --- Capteurs matériels ---
     var hasCompass = mutableStateOf(true) // Vrai par défaut, vérifié au lancement
+    var supports3DMap = mutableStateOf(true) // Déterminé au démarrage selon le support OpenGL ES 3.0
 
     // --- AFFICHAGE DES SPEEDTESTS
     var siteShowSpeedtest = mutableStateOf(true)

@@ -1888,8 +1888,12 @@ fun MapScreen(
     val canUseCompassPage = AppConfig.hasCompass.value &&
         featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.COMPASS)
     val canUseMapLocation = featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.MAP_LOCATION)
+    val is3DSupported = AppConfig.supports3DMap.value
     var is3DMode by rememberSaveable { mutableStateOf(false) }
-    val canUseLayerSelector = is3DMode || listOf(0, 1, 3, 4).any(::isMapProviderEnabled)
+    if (!is3DSupported && is3DMode) {
+        is3DMode = false
+    }
+    val canUseLayerSelector = (is3DSupported && is3DMode) || listOf(0, 1, 3, 4).any(::isMapProviderEnabled)
 
     LaunchedEffect(Unit) {
         AppConfig.loadMapDisplayPreferences(prefs)
@@ -3150,7 +3154,8 @@ fun MapScreen(
     var isTrackingActive by rememberSaveable { mutableStateOf(false) }
 
     val toggle3DMode: () -> Unit = {
-        if (!is3DMode) {
+        if (is3DSupported) {
+            if (!is3DMode) {
             val center = mapViewRef?.mapCenter ?: GeoPoint(currentLat, map3dLon)
             map3dLat = center.latitude
             map3dLon = center.longitude
@@ -3173,6 +3178,7 @@ fun MapScreen(
                 map.invalidate()
                 map.loadVisibleAntennas(viewModel)
             }
+        }
         }
     }
 
@@ -7683,29 +7689,31 @@ fun MapScreen(
             }
 
             // --- Bouton circulaire de bascule 2D / 3D ---
-            Surface(
-                onClick = { safeClick { toggle3DMode() } },
-                shape = CircleShape,
-                color = if (is3DMode) MaterialTheme.colorScheme.primaryContainer.copy(alpha = AppConfig.floatingUiAlpha) else MaterialTheme.colorScheme.surface.copy(alpha = AppConfig.floatingUiAlpha),
-                shadowElevation = AppConfig.floatingUiShadowElevation(6.dp),
-                border = BorderStroke(
-                    width = if (is3DMode) 2.dp else 1.dp,
-                    color = if (is3DMode) MaterialTheme.colorScheme.primary else AppConfig.floatingUiBorderColor()
-                ),
-                modifier = Modifier.size(mapControlButtonDiameter)
-            ) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
+            if (is3DSupported) {
+                Surface(
+                    onClick = { safeClick { toggle3DMode() } },
+                    shape = CircleShape,
+                    color = if (is3DMode) MaterialTheme.colorScheme.primaryContainer.copy(alpha = AppConfig.floatingUiAlpha) else MaterialTheme.colorScheme.surface.copy(alpha = AppConfig.floatingUiAlpha),
+                    shadowElevation = AppConfig.floatingUiShadowElevation(6.dp),
+                    border = BorderStroke(
+                        width = if (is3DMode) 2.dp else 1.dp,
+                        color = if (is3DMode) MaterialTheme.colorScheme.primary else AppConfig.floatingUiBorderColor()
+                    ),
+                    modifier = Modifier.size(mapControlButtonDiameter)
                 ) {
-                    Text(
-                        text = if (is3DMode) stringResource(R.string.appstrings_map_mode_2d) else stringResource(R.string.appstrings_map_mode_3d),
-                        style = MaterialTheme.typography.labelLarge.copy(
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
-                        ),
-                        color = if (is3DMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                    )
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (is3DMode) stringResource(R.string.appstrings_map_mode_2d) else stringResource(R.string.appstrings_map_mode_3d),
+                            style = MaterialTheme.typography.labelLarge.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            ),
+                            color = if (is3DMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                        )
+                    }
                 }
             }
 

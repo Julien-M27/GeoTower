@@ -46,10 +46,14 @@ class GeoTowerApp : Application() {
         osmdroidConfig.osmdroidTileCache = java.io.File(osmdroidBasePath, "tiles")
         osmdroidConfig.expirationExtendedDuration = 30L * 24 * 3600 * 1000L
         osmdroidConfig.expirationOverrideDuration = 30L * 24 * 3600 * 1000L
-        try {
-            org.maplibre.android.MapLibre.getInstance(applicationContext)
-        } catch (e: Exception) {
-            fr.geotower.utils.AppLogger.w("GeoTowerApp", "MapLibre init error", e)
+        val hasGlEs3 = fr.geotower.utils.DeviceProfile.supportsOpenGlEs3(applicationContext)
+        fr.geotower.utils.AppConfig.supports3DMap.value = hasGlEs3
+        if (hasGlEs3) {
+            try {
+                org.maplibre.android.MapLibre.getInstance(applicationContext)
+            } catch (e: Exception) {
+                fr.geotower.utils.AppLogger.w("GeoTowerApp", "MapLibre init error", e)
+            }
         }
         RemoteFeatureFlags.loadCached(applicationContext)
         // Origine de l'installation : doit précéder AppUpdateState, qui s'en sert pour ne jamais

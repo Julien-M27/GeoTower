@@ -870,6 +870,7 @@ class MainActivity : ComponentActivity() {
         if (magneticSensor == null && rotationSensor == null) {
             AppConfig.hasCompass.value = false
         }
+        AppConfig.supports3DMap.value = fr.geotower.utils.DeviceProfile.supportsOpenGlEs3(this)
 
         setContent {
             val themeMode by AppConfig.themeMode
