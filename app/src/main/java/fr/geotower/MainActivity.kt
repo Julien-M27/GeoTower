@@ -998,7 +998,11 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 val bottomNavTabs = remember(rootTabsList) { rootTabsList.toSet() }
-                val isRootTab = isBottomNavActive && currentRoute in bottomNavTabs
+                val isMapSubFlow = (currentRoute == "map" || currentRoute?.startsWith("map") == true) && (
+                    !navBackStackEntry?.arguments?.getString("tripId").isNullOrBlank() ||
+                    !navBackStackEntry?.arguments?.getString("photoDraftId").isNullOrBlank()
+                )
+                val isRootTab = isBottomNavActive && currentRoute in bottomNavTabs && !isMapSubFlow
                 val isMapRoute = currentRoute == "map" || currentRoute?.startsWith("map") == true
                 val isSwipeBetweenTabsEnabled = isRootTab && !isMapRoute
                 val bottomNavStartRoute = if (destinationApresSplash in bottomNavTabs) destinationApresSplash else "map"

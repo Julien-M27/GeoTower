@@ -3504,6 +3504,7 @@
     <string name="appstrings_release_v2118_summary_full_twenty_operators_web_api_and_watch_sync">Vollständige Unterstützung und direkte Synchronisierung aller 20 Mobilfunkbetreiber (Festland und Übersee) über Web-API und Bluetooth auf Smartwatches (Wear OS und Garmin)</string>
     <string name="appstrings_release_v2119_summary_changes_map_and_live_tracking_improvements">Interaktive Karte der ANFR-Änderungen (neue Antennen, Upgrades und Stilllegungen), spezielle Filter und Verbesserungen der Live-Benachrichtigung</string>
     <string name="appstrings_release_v2120_summary_map_3d_mode_and_trip_planner_optimizations">Neuer immersiver 3D-Kartenmodus (MapLibre), anpassbare Stile und erweiterte Optimierungen für Tourverfolgung und Routenführung</string>
+    <string name="appstrings_release_v2121_summary_compatibility_and_map_interface_optimizations">Erweiterte Hardware-Kompatibilität (OpenGL ES 2.0) sowie verbesserte Kartennavigation und Abstände der Steuerelemente</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Netzwerkanfragen-Protokoll</string>

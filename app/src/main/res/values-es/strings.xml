@@ -3504,6 +3504,7 @@
     <string name="appstrings_release_v2118_summary_full_twenty_operators_web_api_and_watch_sync">Compatibilidad total y sincronización directa de los 20 operadores de telecomunicaciones (Metrópoli y Ultramar) mediante API Web y Bluetooth en relojes inteligentes (Wear OS y Garmin)</string>
     <string name="appstrings_release_v2119_summary_changes_map_and_live_tracking_improvements">Mapa interactivo de cambios de la ANFR (nuevas antenas, mejoras y bajas), filtros dedicados y mejoras en el seguimiento en directo</string>
     <string name="appstrings_release_v2120_summary_map_3d_mode_and_trip_planner_optimizations">Nuevo modo de mapa 3D inmersivo (MapLibre), estilos personalizables y optimizaciones avanzadas para el seguimiento de rutas e itinerarios</string>
+    <string name="appstrings_release_v2121_summary_compatibility_and_map_interface_optimizations">Compatibilidad de hardware ampliada (OpenGL ES 2.0) y mejoras de navegación y espaciado en el mapa</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registro de solicitudes de red</string>

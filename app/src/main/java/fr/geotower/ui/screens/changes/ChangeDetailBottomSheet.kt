@@ -282,47 +282,91 @@ fun ChangeDetailBottomSheet(
  */
 data class GroupedChangeItem(
     val code: String,
+    val category: String,
     val op: String?,
     val ops: List<String>?,
     val wasStatus: String?,
     val nowStatus: String?,
     val systems: List<String>,
     val movedMeters: Double?,
-    val rawCount: Int
+    val rawCount: Int,
+    val distinctNowStatuses: List<String> = emptyList(),
+    val distinctWasStatuses: List<String> = emptyList()
 )
 
+private fun isActivationStatus(status: String?): Boolean {
+    if (status == null) return false
+    val s = status.lowercase()
+    return s.contains("service") || s.contains("activ") || s.contains("opérat") || s.contains("operat") || s.contains("opǹrat")
+}
+
+private fun isDeactivationStatus(status: String?): Boolean {
+    if (status == null) return false
+    val s = status.lowercase()
+    return s.contains("arrêt") || s.contains("arret") || s.contains("hors service") ||
+        s.contains("supprim") || s.contains("désactiv") || s.contains("desactiv")
+}
+
+private fun detectChangeCategory(item: ChangeDetailItem): String {
+    val isAct = (item.code == "STATUS_CHANGED" || item.code == "ACTIVATION") && isActivationStatus(item.nowStatus)
+    val isDeact = (item.code == "STATUS_CHANGED" || item.code == "EXTINCTION") && isDeactivationStatus(item.nowStatus)
+    return when {
+        item.code == "SITE_ADDED" -> "SITE_ADDED"
+        item.code == "SITE_REMOVED" -> "SITE_REMOVED"
+        isAct -> "ACTIVATION"
+        isDeact -> "DEACTIVATION"
+        item.code == "SYSTEM_ADDED" -> "SYSTEM_ADDED"
+        item.code == "SYSTEM_REMOVED" -> "SYSTEM_REMOVED"
+        item.code == "OPERATOR_ADDED" -> "OPERATOR_ADDED"
+        item.code == "OPERATOR_REMOVED" -> "OPERATOR_REMOVED"
+        item.code == "MOVED" -> "MOVED|${item.movedMeters ?: 0.0}"
+        else -> "${item.code}|${item.wasStatus.orEmpty()}|${item.nowStatus.orEmpty()}"
+    }
+}
+
 /**
- * Regroupe les évolutions qui partagent le même code, le même opérateur et la même transition de statut.
+ * Regroupe les évolutions qui partagent la même catégorie d'action et le même opérateur sur le site.
  */
 fun groupChanges(changes: List<ChangeDetailItem>): List<GroupedChangeItem> {
     val map = linkedMapOf<String, MutableList<ChangeDetailItem>>()
     changes.forEach { item ->
-        val key = "${item.code}|${item.op.orEmpty()}|${item.wasStatus.orEmpty()}|${item.nowStatus.orEmpty()}|${item.movedMeters ?: 0.0}"
+        val cat = detectChangeCategory(item)
+        val opKey = item.op?.trim()?.uppercase() ?: (item.ops?.sorted()?.joinToString(",") ?: "")
+        val key = "$cat|$opKey"
         map.getOrPut(key) { mutableListOf() }.add(item)
     }
 
     return map.values.map { list ->
         val first = list.first()
+        val cat = detectChangeCategory(first)
         val distinctSystems = mutableListOf<String>()
+        val distinctNowStatuses = mutableListOf<String>()
+        val distinctWasStatuses = mutableListOf<String>()
+
         list.forEach { item ->
             item.system?.trim()?.takeIf { it.isNotBlank() }?.let { if (!distinctSystems.contains(it)) distinctSystems.add(it) }
             item.systems?.forEach { s ->
                 val trimmed = s.trim()
                 if (trimmed.isNotBlank() && !distinctSystems.contains(trimmed)) distinctSystems.add(trimmed)
             }
+            item.nowStatus?.trim()?.takeIf { it.isNotBlank() }?.let { if (!distinctNowStatuses.contains(it)) distinctNowStatuses.add(it) }
+            item.wasStatus?.trim()?.takeIf { it.isNotBlank() }?.let { if (!distinctWasStatuses.contains(it)) distinctWasStatuses.add(it) }
         }
 
         val sortedSystems = sortSystemsByConfig(distinctSystems)
 
         GroupedChangeItem(
             code = first.code,
+            category = cat,
             op = first.op,
             ops = first.ops,
             wasStatus = first.wasStatus,
             nowStatus = first.nowStatus,
             systems = sortedSystems,
             movedMeters = first.movedMeters,
-            rawCount = list.size
+            rawCount = list.size,
+            distinctNowStatuses = distinctNowStatuses,
+            distinctWasStatuses = distinctWasStatuses
         )
     }
 }
@@ -399,21 +443,26 @@ private fun ChangeItemCard(change: GroupedChangeItem) {
     val opName = formatOpName(change.op)
     val opsNames = change.ops?.map { formatOpName(it) }?.joinToString(", ")
 
-    val isActivation = change.code == "STATUS_CHANGED" && (
-        change.nowStatus?.contains("service", ignoreCase = true) == true ||
-        change.nowStatus?.contains("activ", ignoreCase = true) == true ||
-        change.nowStatus?.contains("opérat", ignoreCase = true) == true ||
-        change.nowStatus?.contains("operat", ignoreCase = true) == true ||
-        change.nowStatus?.contains("opǸrat", ignoreCase = true) == true
+    val isActivation = change.category == "ACTIVATION" || (
+        change.code == "STATUS_CHANGED" && isActivationStatus(change.nowStatus)
     )
-    val isDeactivation = change.code == "STATUS_CHANGED" && (
-        change.nowStatus?.contains("arrêt", ignoreCase = true) == true ||
-        change.nowStatus?.contains("arret", ignoreCase = true) == true ||
-        change.nowStatus?.contains("hors service", ignoreCase = true) == true ||
-        change.nowStatus?.contains("supprim", ignoreCase = true) == true ||
-        change.nowStatus?.contains("désactiv", ignoreCase = true) == true ||
-        change.nowStatus?.contains("desactiv", ignoreCase = true) == true
+    val isDeactivation = change.category == "DEACTIVATION" || (
+        change.code == "STATUS_CHANGED" && isDeactivationStatus(change.nowStatus)
     )
+
+    val statusTransitionText = remember(change) {
+        val wasText = if (change.distinctWasStatuses.isNotEmpty()) {
+            change.distinctWasStatuses.joinToString(" / ")
+        } else {
+            change.wasStatus ?: "Projet approuvé"
+        }
+        val nowText = if (change.distinctNowStatuses.isNotEmpty()) {
+            change.distinctNowStatuses.joinToString(" / ")
+        } else {
+            change.nowStatus ?: "En service"
+        }
+        "$wasText ➔ $nowText"
+    }
 
     val (title, subtitle) = when {
         change.code == "SITE_ADDED" -> Pair(
@@ -421,16 +470,16 @@ private fun ChangeItemCard(change: GroupedChangeItem) {
             opsNames ?: (if (opName.isNotBlank()) opName else "Tous opérateurs")
         )
         isActivation -> Pair(
-            "Activation",
-            "${change.wasStatus ?: "Projet approuvé"} ➔ ${change.nowStatus}${if (opName.isNotBlank()) " • $opName" else ""}"
+            if (change.systems.size > 1) "Activations (${change.systems.size})" else "Activation",
+            "$statusTransitionText${if (opName.isNotBlank()) " • $opName" else ""}"
         )
         isDeactivation -> Pair(
-            "Mise hors service",
-            "${change.wasStatus ?: "?"} ➔ ${change.nowStatus}${if (opName.isNotBlank()) " • $opName" else ""}"
+            if (change.systems.size > 1) "Mises hors service (${change.systems.size})" else "Mise hors service",
+            "$statusTransitionText${if (opName.isNotBlank()) " • $opName" else ""}"
         )
         change.code == "STATUS_CHANGED" -> Pair(
             "Changement de statut",
-            "${change.wasStatus ?: "?"} ➔ ${change.nowStatus ?: "En service"}${if (opName.isNotBlank()) " • $opName" else ""}"
+            "$statusTransitionText${if (opName.isNotBlank()) " • $opName" else ""}"
         )
         change.code == "SYSTEM_ADDED" -> Pair(
             if (change.systems.size > 1) "Nouvelles fréquences (${change.systems.size})" else "Ajout de fréquence",
@@ -525,7 +574,7 @@ private fun ChangeItemCard(change: GroupedChangeItem) {
                     text = when {
                         isActivation -> if (change.systems.size > 1) "Fréquences activées :" else "Fréquence activée :"
                         change.code == "SYSTEM_ADDED" -> if (change.systems.size > 1) "Fréquences ajoutées :" else "Fréquence ajoutée :"
-                        change.code == "SYSTEM_REMOVED" -> if (change.systems.size > 1) "Fréquences retirées :" else "Fréquence retirée :"
+                        change.code == "SYSTEM_REMOVED" || isDeactivation -> if (change.systems.size > 1) "Fréquences retirées :" else "Fréquence retirée :"
                         else -> if (change.systems.size > 1) "Fréquences concernées :" else "Fréquence concernée :"
                     },
                     style = sizing.textStyle(MaterialTheme.typography.labelSmall),

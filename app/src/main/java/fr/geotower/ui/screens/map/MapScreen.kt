@@ -6649,11 +6649,12 @@ fun MapScreen(
         val trackingDrawerHeight = (trackingButtonHeight * trackingRowCount.toFloat()) +
             (trackingButtonSpacing * (trackingRowCount - 1).toFloat())
         val isBottomNavActive = AppConfig.isBottomNavActive()
+        val isBottomNavBarVisible = isBottomNavActive && !isPlannerMode && !isSharedPhotoSelectionMode
         val systemNavBars = WindowInsets.navigationBars.asPaddingValues()
         val rawBottomNavPadding = systemNavBars.calculateBottomPadding()
 
         val mapBottomControlsBasePadding = when {
-            isBottomNavActive && uiStyle.useOneUi -> {
+            isBottomNavBarVisible && uiStyle.useOneUi -> {
                 val oneUiBottomInset = if (rawBottomNavPadding > 24.dp) {
                     (rawBottomNavPadding * 0.4f).coerceAtMost(16.dp)
                 } else {
@@ -6661,7 +6662,7 @@ fun MapScreen(
                 }
                 sizing.component(58.dp) + sizing.spacing(28.dp) + oneUiBottomInset
             }
-            isBottomNavActive -> {
+            isBottomNavBarVisible -> {
                 val standardBottomInset = if (rawBottomNavPadding > 24.dp) {
                     (rawBottomNavPadding * 0.4f).coerceAtMost(16.dp)
                 } else {
@@ -6671,7 +6672,7 @@ fun MapScreen(
             }
             else -> sizing.spacing(32.dp)
         }
-        val applyNavBarsPadding = !isBottomNavActive
+        val applyNavBarsPadding = !isBottomNavBarVisible
 
         val zoomBottomPadding = mapBottomControlsBasePadding +
             if (showLocationBtn && canUseMapLocation) {
@@ -7846,7 +7847,7 @@ fun MapScreen(
         }
 
         val mapBottomSliderPadding = when {
-            isBottomNavActive && uiStyle.useOneUi -> {
+            isBottomNavBarVisible && uiStyle.useOneUi -> {
                 val oneUiBottomInset = if (rawBottomNavPadding > 24.dp) {
                     (rawBottomNavPadding * 0.4f).coerceAtMost(16.dp)
                 } else {
@@ -7854,7 +7855,7 @@ fun MapScreen(
                 }
                 sizing.component(58.dp) + sizing.spacing(24.dp) + oneUiBottomInset
             }
-            isBottomNavActive -> {
+            isBottomNavBarVisible -> {
                 val standardBottomInset = if (rawBottomNavPadding > 24.dp) {
                     (rawBottomNavPadding * 0.4f).coerceAtMost(16.dp)
                 } else {

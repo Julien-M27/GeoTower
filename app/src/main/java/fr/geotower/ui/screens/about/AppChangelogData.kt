@@ -27,10 +27,16 @@ data class ChangelogMilestone(
 object AppChangelogRepository {
     val milestones: List<ChangelogMilestone> = listOf(
         ChangelogMilestone(
-            versionName = "2.1.20",
-            releaseDate = "2026-11-11",
+            versionName = "2.1.21",
+            releaseDate = "2026-11-12",
             isCurrent = true,
             badge = MilestoneBadge.CURRENT,
+            summary = "Compatibilité matérielle étendue (OpenGL ES 2.0) et ajustements de navigation et d'ergonomie sur la carte",
+            itemResIds = listOf(R.string.appstrings_release_v2121_summary_compatibility_and_map_interface_optimizations)
+        ),
+        ChangelogMilestone(
+            versionName = "2.1.20",
+            releaseDate = "2026-11-11",
             summary = "Mode Carte 3D immersive (MapLibre), styles dédiés et optimisations du suivi de tournée",
             itemResIds = listOf(R.string.appstrings_release_v2120_summary_map_3d_mode_and_trip_planner_optimizations)
         ),
