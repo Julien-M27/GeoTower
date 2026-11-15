@@ -837,6 +837,24 @@ private fun isMeasureChainClosable(vertices: List<MeasureVertex>, linkedToPrev: 
  * puis le trait de fermeture si la boucle est fermée. Un sommet « ma position » encore inconnu
  * (GPS pas prêt) fait simplement disparaître les traits qui le touchent.
  */
+private fun formatMeasureDistance(dist: Double): String {
+    val isMi = AppConfig.distanceUnit.intValue == 1
+    return if (isMi) {
+        val distMiles = dist / 1609.34
+        if (distMiles < 0.1) {
+            "${(dist * 3.28084).toInt()} ft"
+        } else {
+            String.format(java.util.Locale.US, "%.2f mi", distMiles)
+        }
+    } else {
+        if (dist >= 1000) {
+            String.format(java.util.Locale.US, "%.3f km", dist / 1000)
+        } else {
+            "${dist.toInt()} m"
+        }
+    }
+}
+
 private fun measureSegments(
     vertices: List<MeasureVertex>,
     linkedToPrev: List<Boolean>,
@@ -2506,6 +2524,146 @@ fun MapScreen(
     val searchBoundaryOverlay = remember { FolderOverlay() }
     // ✅ LE CALQUE MACRO POUR LA VUE DÉZOOMÉE
     val macroOverlay = remember { FolderOverlay() }
+    val fhLinksOverlay = remember { FolderOverlay() }
+    val fhUnclusteredOverlay = remember { FolderOverlay() }
+    val fhLinks by viewModel.fhLinks.collectAsState()
+    val fhLinkedSiteIds = remember(fhLinks, AppConfig.showTechnoFH.value, AppConfig.showFhLinks.value) {
+        if (!AppConfig.showTechnoFH.value || !AppConfig.showFhLinks.value || fhLinks.isEmpty()) {
+            emptySet<String>()
+        } else {
+            buildSet<String> {
+                fhLinks.forEach { link ->
+                    add(link.idAnfrA)
+                    add(link.idAnfrB)
+                }
+            }
+        }
+    }
+    var selectedFhLink by remember { mutableStateOf<fr.geotower.data.models.FhLinkItem?>(null) }
+
+    selectedFhLink?.let { link ->
+        val opLabel = OperatorColors.keyFor(link.operatorLabel)
+            ?.let { OperatorColors.specForKey(it)?.label }
+            ?: link.operatorLabel?.takeIf { it.isNotBlank() && !it.startsWith("adm_") && !it.startsWith("op_") }
+            ?: "Opérateur inconnu"
+        val distText = if (link.distanceM >= 1000) {
+            String.format(java.util.Locale.getDefault(), "%.2f km", link.distanceM / 1000.0)
+        } else {
+            "${link.distanceM} m"
+        }
+        AlertDialog(
+            onDismissRequest = { selectedFhLink = null },
+            title = { Text("Liaison FH • $opLabel") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Distance : $distText")
+                    Text("Azimut (A → B) : ${kotlin.math.round(link.azimutAb).toInt()}°")
+                    Text("Site A : ${link.idAnfrA}")
+                    Text("Site B : ${link.idAnfrB}")
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { selectedFhLink = null }) {
+                    Text("Fermer")
+                }
+            },
+            dismissButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    TextButton(
+                        onClick = {
+                            if (is3DMode) {
+                                map3dLat = link.latA
+                                map3dLon = link.lonA
+                                map3dRecenterTrigger++
+                            } else {
+                                mapViewRef?.controller?.animateTo(GeoPoint(link.latA, link.lonA))
+                            }
+                            selectedFhLink = null
+                        }
+                    ) {
+                        Text("Voir A")
+                    }
+                    TextButton(
+                        onClick = {
+                            if (is3DMode) {
+                                map3dLat = link.latB
+                                map3dLon = link.lonB
+                                map3dRecenterTrigger++
+                            } else {
+                                mapViewRef?.controller?.animateTo(GeoPoint(link.latB, link.lonB))
+                            }
+                            selectedFhLink = null
+                        }
+                    ) {
+                        Text("Voir B")
+                    }
+                }
+            }
+        )
+    }
+
+    LaunchedEffect(mapViewRef, AppConfig.showTechnoFH.value, AppConfig.showFhLinks.value) {
+        val map = mapViewRef ?: return@LaunchedEffect
+        val bbox = map.boundingBox
+        viewModel.refreshFhLinks(
+            zoom = map.zoomLevelDouble,
+            latNorth = bbox.latNorth,
+            lonEast = bbox.lonEast,
+            latSouth = bbox.latSouth,
+            lonWest = bbox.lonWest
+        )
+    }
+
+    LaunchedEffect(
+        mapViewRef,
+        fhLinks,
+        AppConfig.showTechnoFH.value,
+        AppConfig.showFhLinks.value,
+        AppConfig.selectedOperatorKeys.value,
+        safePrimaryColor
+    ) {
+        val map = mapViewRef ?: return@LaunchedEffect
+        if (!AppConfig.showTechnoFH.value || !AppConfig.showFhLinks.value || fhLinks.isEmpty()) {
+            fhLinksOverlay.items.clear()
+            map.invalidate()
+            return@LaunchedEffect
+        }
+        val activeOps = AppConfig.selectedOperatorKeys.value
+        val density = context.resources.displayMetrics.density
+        val polylines = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            fhLinks.mapNotNull { link ->
+                val opKeys = OperatorColors.keysFor(link.operatorLabel)
+                val visibleKey = if (activeOps.isEmpty()) {
+                    opKeys.firstOrNull()
+                } else {
+                    if (opKeys.isNotEmpty() && opKeys.none { it in activeOps }) return@mapNotNull null
+                    opKeys.firstOrNull { it in activeOps }
+                }
+                val baseColor = visibleKey?.let { OperatorColors.colorIntForKey(it, fallback = android.graphics.Color.GRAY) }
+                    ?: OperatorColors.colorInt(link.operatorLabel, fallback = android.graphics.Color.GRAY)
+                Polyline(map).apply {
+                    setPoints(
+                        listOf(
+                            GeoPoint(link.latA, link.lonA),
+                            GeoPoint(link.latB, link.lonB),
+                        ),
+                    )
+                    isGeodesic = true
+                    outlinePaint.color = androidx.core.graphics.ColorUtils.setAlphaComponent(baseColor, 210)
+                    outlinePaint.strokeWidth = 2.5f * density
+                    outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
+                    infoWindow = null
+                    setOnClickListener { _, _, _ ->
+                        selectedFhLink = link
+                        true
+                    }
+                }
+            }
+        }
+        fhLinksOverlay.items.clear()
+        fhLinksOverlay.items.addAll(polylines)
+        map.invalidate()
+    }
     val signalQuestCoverageOverlay = remember { SignalQuestCoverageOverlay(context) }
     var selectedCoveragePoint by remember { mutableStateOf<SignalQuestCoveragePoint?>(null) }
     signalQuestCoverageOverlay.onPointClick = { selectedCoveragePoint = it }
@@ -3889,7 +4047,7 @@ fun MapScreen(
         AppConfig.showSitesInService.value, AppConfig.showSitesOutOfService.value, AppConfig.hideUndergroundSites.value, AppConfig.showOnlyZbSites.value,
         AppConfig.showProjectSites.value, sitesHs, currentCityPolygons,
         isTimeSliderVisible, timeSliderThreshold, adminAreaStatsAntennas, hiddenSites,
-        currentZoom, clusterStrength
+        currentZoom, clusterStrength, fhLinkedSiteIds
     ) {
         val computed = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
             val selectedOperators = AppConfig.selectedOperatorKeys.value
@@ -3971,12 +4129,17 @@ fun MapScreen(
                 // les dates) : on n'efface pas la carte, le slider reste sans effet ici.
                 val finalVisible = if (datedTotal == 0) base else visible
                 val effectiveZoom = mapViewRef?.zoomLevelDouble ?: currentZoom
-                val displayAntennas = if (effectiveZoom < 14.0 && !keepAzimuthsWhenZoomedOut && finalVisible.size > 200) {
+                val (fhLinkedAntennas, clusterableAntennas) = if (fhLinkedSiteIds.isNotEmpty()) {
+                    finalVisible.partition { it.idAnfr in fhLinkedSiteIds }
+                } else {
+                    emptyList<LocalisationEntity>() to finalVisible
+                }
+                val displayAntennas = if (effectiveZoom < 14.0 && !keepAzimuthsWhenZoomedOut && clusterableAntennas.size > 200) {
                     val aggregationZoom = MapClusterStrengthProfile.aggregationZoom(
                         mapZoom = effectiveZoom,
                         strength = clusterStrength
                     )
-                    val clusters = viewModel.clusterDetailedAntennas(finalVisible, aggregationZoom)
+                    val clusters = viewModel.clusterDetailedAntennas(clusterableAntennas, aggregationZoom)
                     val clusterIsZb = if (AppConfig.showOnlyZbSites.value) 1 else 0
                     clusters.map { cluster ->
                         LocalisationEntity(
@@ -3990,7 +4153,7 @@ fun MapScreen(
                             isZb = clusterIsZb,
                             hasActive = 1
                         )
-                    }
+                    } + fhLinkedAntennas
                 } else {
                     finalVisible
                 }
@@ -4060,24 +4223,6 @@ fun MapScreen(
         val myLoc = myCurrentLoc ?: locationOverlayRef?.myLocation
         val measurePointIcon = createMeasurePointIcon(highlight = false)
         val measureLoopAnchorIcon = createMeasurePointIcon(highlight = true)
-
-        fun formatMeasureDistance(dist: Double): String {
-            val isMi = AppConfig.distanceUnit.intValue == 1
-            return if (isMi) {
-                val distMiles = dist / 1609.34
-                if (distMiles < 0.1) {
-                    "${(dist * 3.28084).toInt()} ft"
-                } else {
-                    String.format(java.util.Locale.US, "%.2f mi", distMiles)
-                }
-            } else {
-                if (dist >= 1000) {
-                    String.format(java.util.Locale.US, "%.3f km", dist / 1000)
-                } else {
-                    "${dist.toInt()} m"
-                }
-            }
-        }
 
         // route = itinéraire calculé pour ce trait (mode « par la route / par les chemins ») ; null
         // ⇒ trait direct, à vol d'oiseau, et distance à vol d'oiseau.
@@ -4565,6 +4710,7 @@ fun MapScreen(
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                     if (!mapViewUsable.get() || mapViewRef !== map) return@withContext
                     macroOverlay.items.clear()
+                    fhUnclusteredOverlay.items.clear()
                     markersOverlay.items.clear()
                     markersOverlay.invalidate()
                     map.invalidate()
@@ -4746,11 +4892,19 @@ fun MapScreen(
                         }
                     }
                 }
-                val directMarkers = buildAntennaMarkers(directAntennas)
+                val (fhDirectAntennas, otherDirectAntennas) = if (fhLinkedSiteIds.isNotEmpty()) {
+                    directAntennas.partition { it.idAnfr in fhLinkedSiteIds }
+                } else {
+                    emptyList<LocalisationEntity>() to directAntennas
+                }
+                val fhDirectMarkers = buildAntennaMarkers(fhDirectAntennas)
+                val directMarkers = buildAntennaMarkers(otherDirectAntennas)
                 currentCoroutineContext().ensureActive()
                 ensureMapNotDisposed()
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                     if (!mapViewUsable.get() || mapViewRef !== map) return@withContext
+                    fhUnclusteredOverlay.items.clear()
+                    fhUnclusteredOverlay.items.addAll(fhDirectMarkers)
                     markersOverlay.items.clear()
                     markersOverlay.items.addAll(directMarkers)
                     markersOverlay.invalidate()
@@ -4765,7 +4919,9 @@ fun MapScreen(
                 val groupedSites = antennasList.groupBy { it.physicalSiteKey() }.values.take(PowerProfile.mapMarkerCap)
 
                 // ✅ RETOUR À map : 1 seul marqueur définitif par pylône
-                val newMarkers = groupedSites.mapNotNull { siteAntennas ->
+                val clusteredMarkers = ArrayList<org.osmdroid.views.overlay.Marker>(groupedSites.size)
+                val fhUnclusteredMarkers = ArrayList<org.osmdroid.views.overlay.Marker>()
+                groupedSites.forEach { siteAntennas ->
                     val filteredSiteAntennas = siteAntennas.mapNotNull { antenna ->
                         val activeOps = visibleOperatorKeysForAntenna(
                             antenna = antenna,
@@ -4781,7 +4937,7 @@ fun MapScreen(
                         }
                         if (notHiddenOps.isEmpty()) null else visibleAntennaForMap(antenna, notHiddenOps)
                     }
-                    if (filteredSiteAntennas.isEmpty()) return@mapNotNull null
+                    if (filteredSiteAntennas.isEmpty()) return@forEach
 
                     val mainAntenna = filteredSiteAntennas.first()
                     val isHs = filteredSiteAntennas.any { antenna ->
@@ -4790,7 +4946,7 @@ fun MapScreen(
 
                     // Le marqueur UNIQUE (L'antenne)
                     ensureMapNotDisposed()
-                    AntennaMarker(
+                    val marker = AntennaMarker(
                         map,
                         filteredSiteAntennas,
                         safePrimaryColor,
@@ -4857,6 +5013,11 @@ fun MapScreen(
                             true
                         }
                     } // Fin du apply (retourne 1 seul marqueur)
+                    if (fhLinkedSiteIds.isNotEmpty() && siteAntennas.any { it.idAnfr in fhLinkedSiteIds }) {
+                        fhUnclusteredMarkers.add(marker)
+                    } else {
+                        clusteredMarkers.add(marker)
+                    }
                 }
 
                 currentCoroutineContext().ensureActive()
@@ -4864,8 +5025,10 @@ fun MapScreen(
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                     if (!mapViewUsable.get() || mapViewRef !== map) return@withContext
                     macroOverlay.items.clear()
+                    fhUnclusteredOverlay.items.clear()
+                    fhUnclusteredOverlay.items.addAll(fhUnclusteredMarkers)
                     markersOverlay.items.clear()
-                    markersOverlay.items.addAll(newMarkers)
+                    markersOverlay.items.addAll(clusteredMarkers)
                     markersOverlay.invalidate()
                     map.invalidate()
                 }
@@ -4878,6 +5041,7 @@ fun MapScreen(
     LaunchedEffect(
         mapViewRef,
         filteredAntennas,
+        fhLinkedSiteIds,
         hiddenSites,
         sitesHs, // ✅ AJOUT ICI
         isMeasuringMode,
@@ -5557,7 +5721,9 @@ fun MapScreen(
                     overlays.add(macroOverlay) // <-- Calque macro au fond
                     overlays.add(signalQuestCoverageOverlay)
                     overlays.add(radioOverlay)
+                    overlays.add(fhLinksOverlay)
                     overlays.add(markersOverlay) // <-- Calque micro au milieu
+                    overlays.add(fhUnclusteredOverlay) // <-- Antennes liées par FH non clusterisées
                     overlays.add(locationOverlay) // <-- Curseur devant
 
                     // Ajouté en dernier : les calques reçoivent les gestes dans l'ordre inverse du
@@ -5786,6 +5952,7 @@ fun MapScreen(
                 clusterStrength = clusterStrength,
                 satelliteMarkerContrast = satelliteMarkerContrast || is3dDark,
                 radioMarkers = radioMarkers,
+                fhLinks = fhLinks,
                 recenterTrigger = map3dRecenterTrigger,
                 styleUri = current3dStyleUri,
                 tripPlan = plannerPlan,
@@ -5794,15 +5961,94 @@ fun MapScreen(
                 tripProgress = tripProgress,
                 tripMode = tripMode,
                 navCameraLocked = navCameraLocked,
+                measureSegments = if (isMeasuringMode && measuredVertices.size >= 2) {
+                    val myLoc = myCurrentLoc ?: locationOverlayRef?.myLocation
+                    val profile = measureRouteProfile()
+                    val routeOpt = AppConfig.routeOptimization()
+                    measureSegments(measuredVertices, measuredLinkedToPrev, measuredLoopClosed, myLoc).map { seg ->
+                        val route = measureRouteAlignedOnSegment(
+                            seg,
+                            profile
+                                ?.let { p -> measureRoutes[measureRouteCacheKey(seg, p, routeOpt)] }
+                                ?.let { it as? MeasureRoute.Ready }
+                        )
+                        val pts: List<GeoPoint>
+                        val distMeters: Double
+                        if (route != null && route.points.size >= 2) {
+                            pts = buildList {
+                                add(seg.start)
+                                addAll(route.points)
+                                add(seg.end)
+                            }
+                            distMeters = route.distanceMeters
+                        } else {
+                            pts = listOf(seg.start, seg.end)
+                            distMeters = seg.start.distanceToAsDouble(seg.end)
+                        }
+                        val mid = pts[pts.size / 2]
+                        Measure3DSegment(
+                            toIndex = seg.toIndex,
+                            points = pts.map { it.latitude to it.longitude },
+                            label = formatMeasureDistance(distMeters),
+                            labelLat = mid.latitude,
+                            labelLon = mid.longitude
+                        )
+                    }
+                } else {
+                    emptyList()
+                },
+                measurePoints = if (isMeasuringMode) {
+                    val myLoc = myCurrentLoc ?: locationOverlayRef?.myLocation
+                    val anchorReady = !measuredLoopClosed && isMeasureLoopClosable()
+                    measuredVertices.mapIndexedNotNull { index, vertex ->
+                        val geo = when (vertex) {
+                            is MeasureVertex.Fixed -> vertex.point
+                            MeasureVertex.CurrentLocation -> myLoc
+                        } ?: return@mapIndexedNotNull null
+                        Measure3DPoint(
+                            index = index,
+                            latitude = geo.latitude,
+                            longitude = geo.longitude,
+                            isAnchor = index == 0 && anchorReady
+                        )
+                    }
+                } else {
+                    emptyList()
+                },
+                onMeasurePointClick = { index ->
+                    if (index == 0 && !measuredLoopClosed && isMeasureLoopClosable()) {
+                        toggleMeasureLoop()
+                    } else {
+                        removeMeasureVertex(index, AppConfig.measureReconnectOnDelete.value)
+                    }
+                    mapViewRef?.let { refreshMeasureLayers(it) }
+                },
+                onMeasureSegmentClick = { toIndex ->
+                    if (toIndex >= 0) deleteMeasureSegment(toIndex) else measuredLoopClosed = false
+                    mapViewRef?.let { refreshMeasureLayers(it) }
+                },
                 onStepClick = { stepIndex ->
                     if (tripMode != TRIP_MODE_VIEW) {
                         plannerStepMenuIndex = stepIndex
                     }
                 },
+                onFhLinkClick = { link ->
+                    selectedFhLink = link
+                },
                 onMapClick = { lat, lon ->
                     if (plannerPlan != null && tripMode == TRIP_MODE_EDIT) {
                         addTripStep(lat, lon, "", TripStep.KIND_MANUAL)
                         mapViewRef?.let { refreshTripLayers(it) }
+                    } else if (isMeasuringMode) {
+                        val myLoc = myCurrentLoc ?: locationOverlayRef?.myLocation
+                        val tappedOnMyLocation = myLoc != null &&
+                            GeoPoint(lat, lon).distanceToAsDouble(myLoc) <= 25.0
+                        if (tappedOnMyLocation) {
+                            addMeasureVertex(MeasureVertex.CurrentLocation)
+                        } else {
+                            addMeasureVertex(MeasureVertex.Fixed(GeoPoint(lat, lon)))
+                        }
+                        mapViewRef?.let { refreshMeasureLayers(it) }
                     }
                 },
                 onUserInteraction = {
@@ -5838,6 +6084,9 @@ fun MapScreen(
                             supportId = site.idAnfr
                         )
                         mapViewRef?.let { refreshTripLayers(it) }
+                    } else if (isMeasuringMode) {
+                        addMeasureVertex(MeasureVertex.Fixed(GeoPoint(site.latitude, site.longitude)))
+                        mapViewRef?.let { refreshMeasureLayers(it) }
                     } else {
                         mapViewRef?.let { map ->
                             openSupportDetailFromMap(map, site)
@@ -8465,6 +8714,11 @@ fun MapScreen(
                 onAzimuthsConeChange = {
                     AppConfig.showAzimuthsCone.value = it
                     prefs.edit().putBoolean(AppConfig.PREF_SHOW_AZIMUTH_CONES, it).apply()
+                },
+                showFhLinks = AppConfig.showFhLinks.value,
+                onFhLinksChange = {
+                    AppConfig.showFhLinks.value = it
+                    prefs.edit().putBoolean("show_fh_links", it).apply()
                 },
                 showZoom = showZoomBtns,
                 onZoomChange = {

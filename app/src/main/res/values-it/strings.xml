@@ -242,6 +242,8 @@
     <string name="appstrings_site_network_ids_source">Fonte: eNB Analytics</string>
     <string name="appstrings_site_network_ids_about_action">Informazioni su eNB Analytics</string>
     <string name="appstrings_site_network_ids_about">eNB Analytics è un progetto indipendente e volontario di analisi automatizzata delle reti 4G e 5G. I suoi collaboratori registrano le celle incontrate durante i loro spostamenti tramite l\'applicazione Android del progetto, e i rilevamenti vengono confrontati con i dati dell\'ANFR.\n\nIl progetto pubblica mappe 4G e 5G per operatore, strumenti di ricerca delle antenne e analisi delle zone non coperte e delle aree TAC. Copre la Francia (compresi i territori d\'oltremare), Monaco, Spagna, Portogallo, Lussemburgo e Svizzera.\n\nProgetto indipendente, senza legami con gli operatori coperti. GeoTower ridistribuisce i suoi identificativi eNB e gNB con la sua autorizzazione.</string>
+    <string name="appstrings_site_network_ids_rnc_about_action">Informazioni su RNC Mobile</string>
+    <string name="appstrings_site_network_ids_rnc_about">RNC Mobile è un progetto comunitario e indipendente dedicato al monitoraggio della rete Free Mobile. Grazie ai rilevamenti condivisi dai collaboratori tramite l\'applicazione Android, raccoglie identificativi di rete (eNB, gNB, RNC), frequenze e posizioni delle antenne.\n\nGran parte degli identificativi Free Mobile presenti nel database eNB/gNB proviene dai dati raccolti dalla comunità RNC Mobile.</string>
     <string name="enb_database_download_action">Scarica gli identificativi</string>
     <string name="enb_database_row_count">Identificativi: %1$s</string>
     <string name="enb_database_operator_counts_title">Identificativi per operatore</string>
@@ -1730,10 +1732,11 @@
     <string name="appstrings_version_live_db_server_label">Server</string>
     <string name="appstrings_version_live_db_unavailable">Il server non ha comunicato i dettagli dei dati online.</string>
     <string name="appstrings_version_enb_card_title">File sorgente eNB / gNB</string>
-    <string name="appstrings_version_enb_installed_desc">Database installato (fonte: eNB-Analytics)</string>
-    <string name="appstrings_version_enb_server_desc">Database del server (fonte: eNB-Analytics)</string>
+    <string name="appstrings_version_enb_installed_desc">Database installato (fonti: eNB-Analytics, RNC Mobile)</string>
+    <string name="appstrings_version_enb_server_desc">Database del server (fonti: eNB-Analytics, RNC Mobile)</string>
     <string name="appstrings_version_enb_unavailable">Versioni dei file eNB non disponibili</string>
     <string name="appstrings_version_enb_partner_label">Fornitore di file</string>
+    <string name="appstrings_version_enb_partner_free_label">Fonte eNB Free Mobile</string>
     <string name="appstrings_operator_orange">Orange</string>
     <string name="appstrings_operator_sfr">SFR</string>
     <string name="appstrings_operator_bouygues">Bouygues Telecom</string>
@@ -3505,6 +3508,7 @@
     <string name="appstrings_release_v2119_summary_changes_map_and_live_tracking_improvements">Mappa interattiva delle modifiche ANFR (nuove antenne, aggiornamenti e disattivazioni), filtri dedicati e miglioramenti al rilevamento in tempo reale</string>
     <string name="appstrings_release_v2120_summary_map_3d_mode_and_trip_planner_optimizations">Nuova modalità mappa 3D immersiva (MapLibre), stili personalizzabili e ottimizzazioni avanzate per il tracciamento dei percorsi e itinerari</string>
     <string name="appstrings_release_v2121_summary_compatibility_and_map_interface_optimizations">Compatibilità hardware estesa (OpenGL ES 2.0) e miglioramenti alla navigazione e alla spaziatura sulla mappa</string>
+    <string name="appstrings_release_v2122_summary_fh_links_and_rnc_mobile_attribution">Visualizzazione dei collegamenti a microonde (FH) su mappe 2D/3D e attribuzione RNC Mobile per gli ID di Free Mobile</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registro richieste di rete</string>

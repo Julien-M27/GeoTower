@@ -1,9 +1,11 @@
 user_version=8
 
 # schema
+index ix_fh_link_bbox :: CREATE INDEX ix_fh_link_bbox ON fh_link (min_lat, max_lat, min_lon, max_lon)
 table antenne :: CREATE TABLE `antenne` (`aer_id` TEXT NOT NULL, `id_anfr` TEXT NOT NULL, `id_support` TEXT, `tae_id` INTEGER, `azimut` INTEGER, `hauteur_bas` REAL, `is_fh` INTEGER NOT NULL, PRIMARY KEY(`aer_id`))
 table dept_stat_current :: CREATE TABLE dept_stat_current (dept_code TEXT NOT NULL, dept_name TEXT, region_code TEXT, area_km2 REAL, population INTEGER, population_year TEXT, supports INTEGER NOT NULL, supports_active INTEGER NOT NULL, stations INTEGER NOT NULL, stations_active INTEGER NOT NULL, antennas INTEGER NOT NULL, antennas_active INTEGER NOT NULL, antennas_fh INTEGER NOT NULL, stations_per_support REAL, antennas_per_station REAL, supports_per_km2 REAL, stations_per_km2 REAL, antennas_per_km2 REAL, supports_per_1k_hab REAL, stations_per_1k_hab REAL, antennas_per_1k_hab REAL, hab_per_support REAL, hab_per_station REAL, hab_per_antenna REAL, PRIMARY KEY (dept_code))
 table dept_stat_operator_tech :: CREATE TABLE dept_stat_operator_tech (dept_code TEXT NOT NULL, operator_name TEXT NOT NULL, tech TEXT NOT NULL, supports INTEGER NOT NULL, supports_active INTEGER NOT NULL, stations INTEGER NOT NULL, stations_active INTEGER NOT NULL, antennas INTEGER NOT NULL, antennas_active INTEGER NOT NULL, PRIMARY KEY (dept_code, operator_name, tech))
+table fh_link :: CREATE TABLE fh_link (id_anfr_a TEXT NOT NULL, lat_a REAL NOT NULL, lon_a REAL NOT NULL, id_anfr_b TEXT NOT NULL, lat_b REAL NOT NULL, lon_b REAL NOT NULL, min_lat REAL NOT NULL, max_lat REAL NOT NULL, min_lon REAL NOT NULL, max_lon REAL NOT NULL, operateur_id INTEGER, adm_id INTEGER, operator_label TEXT, azimut_ab REAL NOT NULL, distance_m INTEGER NOT NULL, PRIMARY KEY (id_anfr_a, id_anfr_b, operator_label))
 table localisation :: CREATE TABLE `localisation` (`id_anfr` TEXT NOT NULL, `operateur_id` INTEGER, `latitude` REAL NOT NULL, `longitude` REAL NOT NULL, `azimuts` TEXT, `code_insee` TEXT, `azimuts_fh` TEXT, `tech_mask` INTEGER NOT NULL, `band_mask` INTEGER NOT NULL, `arcep_nidt` TEXT, `is_zb` INTEGER NOT NULL, PRIMARY KEY(`id_anfr`))
 table metadata :: CREATE TABLE `metadata` (`version` TEXT NOT NULL, `schema_version` INTEGER NOT NULL, `country_code` TEXT NOT NULL, `country_name` TEXT, `source` TEXT NOT NULL, `date_maj_anfr` TEXT, `zip_version` TEXT, PRIMARY KEY(`version`))
 table radio_stat_current :: CREATE TABLE radio_stat_current (operator_name TEXT NOT NULL, category TEXT NOT NULL, item_key TEXT NOT NULL, label TEXT, total_count INTEGER NOT NULL, active_count INTEGER NOT NULL, PRIMARY KEY (operator_name, category, item_key))
@@ -69,6 +71,8 @@ dept_code=971|operator_name=ALL|tech=4G|supports=1|supports_active=1|stations=1|
 dept_code=971|operator_name=ALL|tech=ALL|supports=1|supports_active=1|stations=1|stations_active=1|antennas=1|antennas_active=1
 dept_code=971|operator_name=ORANGE|tech=4G|supports=1|supports_active=1|stations=1|stations_active=1|antennas=1|antennas_active=1
 dept_code=971|operator_name=ORANGE|tech=ALL|supports=1|supports_active=1|stations=1|stations_active=1|antennas=1|antennas_active=1
+
+# table fh_link (0 lignes)
 
 # table localisation (12 lignes)
 id_anfr=0000000001|operateur_id=2|latitude=48.85|longitude=2.35|azimuts=120|code_insee=75056|azimuts_fh=<null>|tech_mask=4|band_mask=32|arcep_nidt=NIDT1|is_zb=0

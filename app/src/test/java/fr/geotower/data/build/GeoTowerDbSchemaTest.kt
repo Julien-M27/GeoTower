@@ -88,8 +88,8 @@ class GeoTowerDbSchemaTest {
 
     @Test
     fun schemaContainsExpectedStatementCount() {
-        // 14 tables metier/reference + source_versions + 2 tables de stats + 2 tables de stats departementales.
-        assertEquals(18, GeoTowerDbSchema.CREATE_TABLE_STATEMENTS.size)
+        // 15 tables metier/reference (dont fh_link) + source_versions + 2 tables de stats + 2 tables de stats departementales.
+        assertEquals(19, GeoTowerDbSchema.CREATE_TABLE_STATEMENTS.size)
         assertTrue(
             GeoTowerDbSchema.CREATE_TABLE_STATEMENTS.any { it.contains("source_versions") }
         )

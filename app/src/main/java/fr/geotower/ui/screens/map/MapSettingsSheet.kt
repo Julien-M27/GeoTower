@@ -157,6 +157,7 @@ fun MapFiltersControls(
     var show4G by AppConfig.showTechno4G
     var show5G by AppConfig.showTechno5G
     var showFH by AppConfig.showTechnoFH
+    var showFhLinks by AppConfig.showFhLinks
     var mobileTechnologyOnly by AppConfig.mobileTechnologyOnly
 
     // Variables Fréquences
@@ -296,6 +297,12 @@ fun MapFiltersControls(
                 }
             }
 
+            if (showFH) {
+                Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
+                SelectableButton("Liaisons FH (grands traits)", showFhLinks, Modifier.fillMaxWidth()) {
+                    showFhLinks = it; prefs.edit().putBoolean("show_fh_links", it).apply()
+                }
+            }
             Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
 
             Text(

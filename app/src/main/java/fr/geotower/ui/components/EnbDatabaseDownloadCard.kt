@@ -436,6 +436,7 @@ fun EnbDatabaseDownloadCard(
                 dialogShape = shape,
                 modifier = Modifier.fillMaxWidth(),
                 label = stringResource(R.string.enb_database_source_attribution),
+                includeRncMobile = true,
                 horizontalArrangement = Arrangement.Center,
                 textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = sizing.text(11.sp))
             )

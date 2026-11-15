@@ -1,6 +1,9 @@
 package fr.geotower.data.api
 
 import fr.geotower.data.models.LiveDbStatusDto
+import fr.geotower.data.models.LiveFhLinksResponseDto
+import fr.geotower.data.models.LiveRadioMarkerResponseDto
+import fr.geotower.data.models.LiveRadioMarkersResponseDto
 import fr.geotower.data.models.LiveSiteResponseDto
 import fr.geotower.data.models.LiveSitesListResponseDto
 import fr.geotower.data.models.LiveDepartmentOperatorStatsResponseDto
@@ -40,6 +43,15 @@ interface LiveSitesApiService {
         @Query("active_only") activeOnly: Boolean? = null
     ): Response<LiveSitesListResponseDto>
 
+    @GET("api/v2/live/fr/fh-links/bbox")
+    suspend fun getFhLinksInBox(
+        @Query("north") north: Double,
+        @Query("south") south: Double,
+        @Query("east") east: Double,
+        @Query("west") west: Double,
+        @Query("limit") limit: Int
+    ): Response<LiveFhLinksResponseDto>
+
     @GET("api/v2/live/fr/sites/{siteId}")
     suspend fun getSite(
         @Path("siteId") siteId: String
@@ -62,6 +74,36 @@ interface LiveSitesApiService {
     suspend fun getDepartmentOperatorTechStats(
         @Path("deptCode") deptCode: String
     ): Response<LiveDepartmentOperatorStatsResponseDto>
+
+    @GET("api/v2/live/fr/radio/bbox")
+    suspend fun getRadioMarkersInBox(
+        @Query("zoom") zoom: Double,
+        @Query("north") north: Double,
+        @Query("south") south: Double,
+        @Query("east") east: Double,
+        @Query("west") west: Double,
+        @Query("service_mask") serviceMask: Int,
+        @Query("category_mask") categoryMask: Int
+    ): Response<LiveRadioMarkersResponseDto>
+
+    @GET("api/v2/live/fr/radio/support/{supportId}")
+    suspend fun getRadioMarkersForSupport(
+        @Path("supportId") supportId: String,
+        @Query("limit") limit: Int
+    ): Response<LiveRadioMarkersResponseDto>
+
+    @GET("api/v2/live/fr/radio/sites/{stationId}/{supportId}")
+    suspend fun getRadioMarkerForSite(
+        @Path("stationId") stationId: String,
+        @Path("supportId") supportId: String
+    ): Response<LiveRadioMarkerResponseDto>
+
+    @GET("api/v2/live/fr/radio/search")
+    suspend fun searchRadioSites(
+        @Query("q") query: String,
+        @Query("limit") limit: Int,
+        @Query("exact_id") exactId: Boolean = false
+    ): Response<LiveRadioMarkersResponseDto>
 }
 
 object LiveSitesClient {

@@ -2605,6 +2605,8 @@ fun MapSettingsSheet(
     showAzimuths: Boolean, onAzimuthsChange: (Boolean) -> Unit,
     keepAzimuthsWhenZoomedOut: Boolean, onKeepAzimuthsWhenZoomedOutChange: (Boolean) -> Unit,
     showAzimuthsCone: Boolean, onAzimuthsConeChange: (Boolean) -> Unit,
+    showFhLinks: Boolean = AppConfig.showFhLinks.value,
+    onFhLinksChange: (Boolean) -> Unit = { AppConfig.showFhLinks.value = it },
     showZoom: Boolean, onZoomChange: (Boolean) -> Unit,
     showToolbox: Boolean, onToolboxChange: (Boolean) -> Unit,
     showCompass: Boolean, onCompassChange: (Boolean) -> Unit,
@@ -2723,6 +2725,7 @@ fun MapSettingsSheet(
                     SimpleSwitchCard(stringResource(R.string.appstrings_map_location_option), showMapLocation = showLocation, onLocationChange = onLocationChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
                     SimpleSwitchCard(stringResource(R.string.appstrings_map_location_marker_option), showMapLocation = showLocationMarker, onLocationChange = onLocationMarkerChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
                     ConfigurableSwitchCard(stringResource(R.string.appstrings_map_azimuths_option), showAnyAzimuths, ::setAzimuthsVisible, { showAzimuthSettings = true }, shape, border, bubbleColor, useOneUi)
+                    SimpleSwitchCard("Liaisons FH", showMapLocation = showFhLinks, onLocationChange = onFhLinksChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
                     SimpleSwitchCard(stringResource(R.string.appstrings_map_zoom_option), showMapLocation = showZoom, onLocationChange = onZoomChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
                     SimpleSwitchCard(stringResource(R.string.appstrings_map_toolbox_option), showMapLocation = showToolbox, onLocationChange = onToolboxChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
                     if (AppConfig.hasCompass.value) {

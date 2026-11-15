@@ -376,6 +376,7 @@ object AppConfig {
     var showTechno4G = mutableStateOf(true)
     var showTechno5G = mutableStateOf(true)
     var showTechnoFH = mutableStateOf(true)
+    var showFhLinks = mutableStateOf(true)
     var mobileTechnologyOnly = mutableStateOf(MobileTechnologyOnly.NONE)
 
     // --- FILTRES : FRÉQUENCES ---
@@ -619,6 +620,7 @@ object AppConfig {
         showTechno4G.value = MapDisplayPrefs.showTechno4G.read(prefs)
         showTechno5G.value = MapDisplayPrefs.showTechno5G.read(prefs)
         showTechnoFH.value = MapDisplayPrefs.showTechnoFh.read(prefs)
+        showFhLinks.value = prefs.getBoolean("show_fh_links", true)
         mobileTechnologyOnly.value = MobileTechnologyOnly.fromPreferenceValue(
             MapDisplayPrefs.mobileTechnologyOnly.read(prefs)
         )

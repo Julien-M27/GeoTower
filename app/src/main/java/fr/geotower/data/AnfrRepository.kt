@@ -26,14 +26,17 @@ import fr.geotower.data.models.CoverageSiteLocationEntity
 import fr.geotower.data.models.DbCluster
 import fr.geotower.data.models.FaisceauxEntity
 import fr.geotower.data.models.FavoriteScopeSiteRow
+import fr.geotower.data.models.FhLinkItem
 import fr.geotower.data.models.FrequencyDetailsCodec
 import fr.geotower.data.models.LocalisationEntity
+import fr.geotower.data.models.toFhLinkItem
 import fr.geotower.data.models.LiveSiteResponseDto
 import fr.geotower.data.models.PhysiqueEntity
 import fr.geotower.data.models.RadioFilterMasks
 import fr.geotower.data.models.RefTypeAntenneDbEntity
 import fr.geotower.data.models.TechniqueEntity
 import fr.geotower.data.models.isDeclaredActive
+import fr.geotower.data.models.toSiteNetworkIds
 import fr.geotower.data.build.OfficialSources
 import fr.geotower.data.build.RawSourceDownloader
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -1448,6 +1451,22 @@ class AnfrRepository(
         }
     }
 
+    /**
+     * Identifiants réseau eNB/gNB servis par l'API Live pour la fiche d'un site, utilisés en
+     * repli lorsque la base locale `geotower_fr_enb.db` n'est pas installée.
+     */
+    suspend fun getLiveNetworkIds(idAnfr: String): EnbRepository.SiteNetworkIds? {
+        if (!RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.ENB_DATABASE)) {
+            return null
+        }
+        if (!shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_SITE_DETAIL)) {
+            return null
+        }
+        val site = getLiveSite(idAnfr) ?: return null
+        if (isLiveSiteHidden(site)) return null
+        return site.networkIds?.toSiteNetworkIds()
+    }
+
     /** Antennes brutes d'un site (couverture théorique). FH inclus : le moteur filtre `is_fh`. */
     suspend fun getAntennesForCoverage(idAnfr: String): List<AntenneDbEntity> {
         if (isLocalAnfrIdHidden(idAnfr)) return emptyList()
@@ -1897,6 +1916,93 @@ class AnfrRepository(
                     arrayOf<Any>(normalizedCode)
                 )
             )
+        }
+    }
+
+    /**
+     * Retourne les liaisons FH precalculees intersectant l'emprise carte donnee,
+     * depuis l'API Live ou la table locale `fh_link` (selon la source active).
+     * Retourne une liste vide si le serveur ou une ancienne base ne porte pas encore `fh_link`.
+     */
+    suspend fun getFhLinksInBox(
+        latNorth: Double,
+        lonEast: Double,
+        latSouth: Double,
+        lonWest: Double,
+        selectedOperatorKeys: Set<String>? = null,
+        limit: Int = 1500
+    ): List<FhLinkItem> {
+        val links = if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_BBOX)) {
+            try {
+                val response = LiveSitesClient.api.getFhLinksInBox(
+                    north = latNorth,
+                    south = latSouth,
+                    east = lonEast,
+                    west = lonWest,
+                    limit = limit
+                )
+                if (!response.isSuccessful) {
+                    emptyList()
+                } else {
+                    response.body()?.links?.mapNotNull { it.toFhLinkItem() }.orEmpty()
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                AppLogger.w(TAG_DB, "Live fh-links bbox request failed", e)
+                emptyList()
+            }
+        } else {
+            val bounds = mapQueryBounds(latNorth, lonEast, latSouth, lonWest)
+            queryLocalDatabase(emptyList()) {
+                val hasTable = countRaw(
+                    SimpleSQLiteQuery(
+                        "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'fh_link'"
+                    )
+                ) > 0
+                if (!hasTable) {
+                    emptyList()
+                } else {
+                    bounds.longitudeRanges.flatMap { range ->
+                        getFhLinksRaw(
+                            SimpleSQLiteQuery(
+                                """
+                                SELECT id_anfr_a, lat_a, lon_a, id_anfr_b, lat_b, lon_b,
+                                       operateur_id, adm_id, operator_label, azimut_ab, distance_m
+                                FROM fh_link
+                                WHERE max_lat >= ?
+                                  AND min_lat <= ?
+                                  AND max_lon >= ?
+                                  AND min_lon <= ?
+                                ORDER BY distance_m ASC
+                                LIMIT ?
+                                """.trimIndent(),
+                                arrayOf<Any>(bounds.minLat, bounds.maxLat, range.min, range.max, limit)
+                            )
+                        ).map { row ->
+                            FhLinkItem(
+                                idAnfrA = row.id_anfr_a,
+                                latA = row.lat_a,
+                                lonA = row.lon_a,
+                                idAnfrB = row.id_anfr_b,
+                                latB = row.lat_b,
+                                lonB = row.lon_b,
+                                operateurId = row.operateur_id,
+                                admId = row.adm_id,
+                                operatorLabel = row.operator_label,
+                                azimutAb = row.azimut_ab,
+                                distanceM = row.distance_m
+                            )
+                        }
+                    }.distinctBy { "${it.idAnfrA}|${it.idAnfrB}|${it.operatorLabel}" }
+                }
+            }
+        }
+
+        val activeOps = selectedOperatorKeys?.takeIf { it.isNotEmpty() } ?: return links
+        return links.filter { link ->
+            val keys = fr.geotower.utils.OperatorColors.keysFor(link.operatorLabel)
+            keys.isEmpty() || keys.any { it in activeOps }
         }
     }
 

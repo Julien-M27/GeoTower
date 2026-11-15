@@ -405,14 +405,21 @@ object GeoTowerDbBuilder {
 
         report(BuildPhase.READING_SUPPORTS, source = SOURCE_SUP_STATION, total = sourceCounts.stations)
         // 2/ SUP_STATION : dates + exploitant.
+        val fhStationAdm = HashMap<String, Int>()
+        val fhAerIds = HashSet<String>()
+        val fhAzimuthsAll = HashMap<String, MutableSet<Double>>()
+        val fhCoordsAll = HashMap<String, Pair<Double, Double>>()
         var stationRows = 0L
         for (row in sources.stations) {
             val currentRow = ++stationRows
             supSink.station(row)
             val idAnfr = AnfrParsing.normalizeIdAnfr(row.get("sta_nm_anfr"))
+            val admId = AnfrParsing.intOrNone(row.get("adm_id"))
+            if (idAnfr.isNotEmpty() && admId != null) {
+                fhStationAdm[idAnfr] = admId
+            }
             val stationIndex = stations.indexOf(idAnfr)
             if (stationIndex == -1) continue
-            val admId = AnfrParsing.intOrNone(row.get("adm_id"))
             stations.setAdmId(stationIndex, admId)
             stations.setDates(
                 stationIndex,
@@ -461,11 +468,14 @@ object GeoTowerDbBuilder {
             val currentRow = ++emetteurRows
             supSink.emetteur(row)
             val idAnfr = AnfrParsing.normalizeIdAnfr(row.get("sta_nm_anfr"))
+            val aerId = AnfrParsing.cleanText(row.get("aer_id")).ifEmpty { null }
+            val systeme = AnfrParsing.cleanText(row.get("emr_lb_systeme")).ifEmpty { "Inconnu" }
+            if (aerId != null && systeme.uppercase().contains("FH")) {
+                fhAerIds.add(aerId)
+            }
             if (stations.indexOf(idAnfr) == -1) continue
             val emrId = AnfrParsing.cleanText(row.get("emr_id"))
             if (emrId.isEmpty()) continue
-            val aerId = AnfrParsing.cleanText(row.get("aer_id")).ifEmpty { null }
-            val systeme = AnfrParsing.cleanText(row.get("emr_lb_systeme")).ifEmpty { "Inconnu" }
             systemeIds.getId(systeme)
             emetteurInserter.add(listOf(idAnfr, emrId, aerId, systeme))
             if (currentRow % EMIT_EVERY == 0L) {
@@ -535,12 +545,15 @@ object GeoTowerDbBuilder {
             val currentRow = ++antenneRows
             supSink.antenne(row)
             val idAnfr = AnfrParsing.normalizeIdAnfr(row.get("sta_nm_anfr"))
-            if (stations.indexOf(idAnfr) == -1) continue
             val aerId = AnfrParsing.cleanText(row.get("aer_id"))
+            val azimut = AnfrParsing.intOrNone(row.get("aer_nb_azimut"))
+            if (idAnfr.isNotEmpty() && aerId.isNotEmpty() && azimut != null && aerId in fhAerIds) {
+                fhAzimuthsAll.getOrPut(idAnfr) { HashSet() }.add(azimut.toDouble())
+            }
+            if (stations.indexOf(idAnfr) == -1) continue
             if (aerId.isEmpty()) continue
             val supId = AnfrParsing.cleanText(row.get("sup_id")).ifEmpty { null }
             val taeId = AnfrParsing.intOrNone(row.get("tae_id"))
-            val azimut = AnfrParsing.intOrNone(row.get("aer_nb_azimut"))
             val hauteurBas = AnfrParsing.floatOrNone(row.get("aer_nb_alt_bas"))
             val typeTexte = if (taeId != null) {
                 references.typeAntenne[taeId.toString()] ?: "Type inconnu ($taeId)"
@@ -585,7 +598,29 @@ object GeoTowerDbBuilder {
             for (row in sources.supports) {
                 val currentRow = ++supportRows
                 if (supSink !== SupRowSink.None) supSink.support(row)
-                val stationIndex = stations.indexOfRaw(row.get("sta_nm_anfr"))
+                val normalizedId = AnfrParsing.normalizeIdAnfr(row.get("sta_nm_anfr"))
+                val stationIndex = stations.indexOf(normalizedId)
+                if (normalizedId in fhAzimuthsAll && normalizedId !in fhCoordsAll) {
+                    if (stationIndex != -1) {
+                        fhCoordsAll[normalizedId] = stations.latitude(stationIndex) to stations.longitude(stationIndex)
+                    } else {
+                        val latE6 = RadioParsing.dmsToE6(
+                            row.get("cor_nb_dg_lat"),
+                            row.get("cor_nb_mn_lat"),
+                            row.get("cor_nb_sc_lat"),
+                            row.get("cor_cd_ns_lat"),
+                        )
+                        val lonE6 = RadioParsing.dmsToE6(
+                            row.get("cor_nb_dg_lon"),
+                            row.get("cor_nb_mn_lon"),
+                            row.get("cor_nb_sc_lon"),
+                            row.get("cor_cd_ew_lon"),
+                        )
+                        if (latE6 != null && lonE6 != null) {
+                            fhCoordsAll[normalizedId] = (latE6 / 1_000_000.0) to (lonE6 / 1_000_000.0)
+                        }
+                    }
+                }
                 if (stationIndex == -1) continue
                 val idAnfr = stations.id(stationIndex)
                 val supId = AnfrParsing.cleanText(row.get("sup_id"))
@@ -659,6 +694,19 @@ object GeoTowerDbBuilder {
         }
         stationInserter.flush()
         val stationCount = stations.size()
+        // 9bis/ Liaisons FH precalculees (tous supports ANFR, mobiles et non-mobiles), avant de vider `stations`.
+        populateFhLinks(
+            db = db,
+            stations = stations,
+            references = references,
+            fhAzimuthsAll = fhAzimuthsAll,
+            fhStationAdm = fhStationAdm,
+            fhCoordsAll = fhCoordsAll,
+        )
+        fhAerIds.clear()
+        fhAzimuthsAll.clear()
+        fhStationAdm.clear()
+        fhCoordsAll.clear()
         stations.clear()
 
         val arcepInserter = BatchInserter(db, "INSERT OR REPLACE INTO stg_arcep VALUES (?, ?, ?, ?)")
@@ -1115,5 +1163,85 @@ object GeoTowerDbBuilder {
         }
         flushStation()
         inserter.flush()
+    }
+
+    private fun populateFhLinks(
+        db: SqlDatabase,
+        stations: StationAccumulator,
+        references: AnfrReferences,
+        fhAzimuthsAll: Map<String, Set<Double>>,
+        fhStationAdm: Map<String, Int>,
+        fhCoordsAll: Map<String, Pair<Double, Double>>,
+    ) {
+        if (fhAzimuthsAll.isEmpty()) return
+        val fhSites = ArrayList<FhLinkMatcher.FhSite>(fhAzimuthsAll.size)
+        val metaBySite = HashMap<String, Triple<Int?, Int?, String?>>(fhAzimuthsAll.size)
+
+        for ((idAnfr, azSet) in fhAzimuthsAll) {
+            if (azSet.isEmpty()) continue
+            val coords = fhCoordsAll[idAnfr] ?: continue
+            val stIdx = stations.indexOf(idAnfr)
+            val opId = if (stIdx != -1) stations.operatorId(stIdx) else null
+            val admId = (if (stIdx != -1) stations.admId(stIdx) else null) ?: fhStationAdm[idAnfr]
+            val groupKey = when {
+                admId != null -> "adm_$admId"
+                opId != null -> "op_$opId"
+                else -> continue
+            }
+            val opLabel = if (stIdx != -1) {
+                stations.operatorLabel(stIdx).ifBlank { admId?.let { references.exploitant[it.toString()] } }
+            } else {
+                admId?.let { references.exploitant[it.toString()] }
+            }
+            metaBySite[idAnfr] = Triple(opId, admId, opLabel)
+            fhSites.add(
+                FhLinkMatcher.FhSite(
+                    idAnfr = idAnfr,
+                    lat = coords.first,
+                    lon = coords.second,
+                    groupKey = groupKey,
+                    azimuths = azSet.sorted(),
+                ),
+            )
+        }
+
+        val links = FhLinkMatcher.match(fhSites).links
+        if (links.isEmpty()) {
+            db.execSql(GeoTowerDbSchema.CREATE_FH_LINK_INDEX)
+            return
+        }
+
+        val inserter = BatchInserter(
+            db,
+            "INSERT OR REPLACE INTO fh_link (id_anfr_a, lat_a, lon_a, id_anfr_b, lat_b, lon_b, min_lat, max_lat, min_lon, max_lon, operateur_id, adm_id, operator_label, azimut_ab, distance_m) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        for (link in links) {
+            val metaA = metaBySite[link.idAnfrA]
+            val metaB = metaBySite[link.idAnfrB]
+            val opId = metaA?.first ?: metaB?.first
+            val admId = metaA?.second ?: metaB?.second
+            val opLabel = metaA?.third ?: metaB?.third ?: link.groupKey
+            inserter.add(
+                listOf(
+                    link.idAnfrA,
+                    link.latA,
+                    link.lonA,
+                    link.idAnfrB,
+                    link.latB,
+                    link.lonB,
+                    link.minLat,
+                    link.maxLat,
+                    link.minLon,
+                    link.maxLon,
+                    opId,
+                    admId,
+                    opLabel,
+                    kotlin.math.round(link.bearingABDeg * 100.0) / 100.0,
+                    kotlin.math.round(link.distanceKm * 1000.0).toInt(),
+                ),
+            )
+        }
+        inserter.flush()
+        db.execSql(GeoTowerDbSchema.CREATE_FH_LINK_INDEX)
     }
 }

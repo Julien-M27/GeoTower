@@ -27,10 +27,16 @@ data class ChangelogMilestone(
 object AppChangelogRepository {
     val milestones: List<ChangelogMilestone> = listOf(
         ChangelogMilestone(
-            versionName = "2.1.21",
-            releaseDate = "2026-11-12",
+            versionName = "2.1.22",
+            releaseDate = "2026-11-15",
             isCurrent = true,
             badge = MilestoneBadge.CURRENT,
+            summary = "Affichage des liaisons FH (2D/3D) sur la carte et attribution RNC Mobile pour les identifiants Free Mobile",
+            itemResIds = listOf(R.string.appstrings_release_v2122_summary_fh_links_and_rnc_mobile_attribution)
+        ),
+        ChangelogMilestone(
+            versionName = "2.1.21",
+            releaseDate = "2026-11-12",
             summary = "Compatibilité matérielle étendue (OpenGL ES 2.0) et ajustements de navigation et d'ergonomie sur la carte",
             itemResIds = listOf(R.string.appstrings_release_v2121_summary_compatibility_and_map_interface_optimizations)
         ),

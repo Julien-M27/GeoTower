@@ -47,8 +47,12 @@ object GeoTowerDbSchema {
         // pas : superficie et population viennent d'un referentiel en ligne. Une base generee
         // sur l'appareil a donc ces deux tables vides, et l'app doit le supporter.
         "CREATE TABLE IF NOT EXISTS dept_stat_current (dept_code TEXT NOT NULL, dept_name TEXT, region_code TEXT, area_km2 REAL, population INTEGER, population_year TEXT, supports INTEGER NOT NULL, supports_active INTEGER NOT NULL, stations INTEGER NOT NULL, stations_active INTEGER NOT NULL, antennas INTEGER NOT NULL, antennas_active INTEGER NOT NULL, antennas_fh INTEGER NOT NULL, stations_per_support REAL, antennas_per_station REAL, supports_per_km2 REAL, stations_per_km2 REAL, antennas_per_km2 REAL, supports_per_1k_hab REAL, stations_per_1k_hab REAL, antennas_per_1k_hab REAL, hab_per_support REAL, hab_per_station REAL, hab_per_antenna REAL, PRIMARY KEY (dept_code))",
-        "CREATE TABLE IF NOT EXISTS dept_stat_operator_tech (dept_code TEXT NOT NULL, operator_name TEXT NOT NULL, tech TEXT NOT NULL, supports INTEGER NOT NULL, supports_active INTEGER NOT NULL, stations INTEGER NOT NULL, stations_active INTEGER NOT NULL, antennas INTEGER NOT NULL, antennas_active INTEGER NOT NULL, PRIMARY KEY (dept_code, operator_name, tech))"
+        "CREATE TABLE IF NOT EXISTS dept_stat_operator_tech (dept_code TEXT NOT NULL, operator_name TEXT NOT NULL, tech TEXT NOT NULL, supports INTEGER NOT NULL, supports_active INTEGER NOT NULL, stations INTEGER NOT NULL, stations_active INTEGER NOT NULL, antennas INTEGER NOT NULL, antennas_active INTEGER NOT NULL, PRIMARY KEY (dept_code, operator_name, tech))",
+        "CREATE TABLE IF NOT EXISTS fh_link (id_anfr_a TEXT NOT NULL, lat_a REAL NOT NULL, lon_a REAL NOT NULL, id_anfr_b TEXT NOT NULL, lat_b REAL NOT NULL, lon_b REAL NOT NULL, min_lat REAL NOT NULL, max_lat REAL NOT NULL, min_lon REAL NOT NULL, max_lon REAL NOT NULL, operateur_id INTEGER, adm_id INTEGER, operator_label TEXT, azimut_ab REAL NOT NULL, distance_m INTEGER NOT NULL, PRIMARY KEY (id_anfr_a, id_anfr_b, operator_label))"
     )
+
+    const val CREATE_FH_LINK_INDEX =
+        "CREATE INDEX IF NOT EXISTS ix_fh_link_bbox ON fh_link (min_lat, max_lat, min_lon, max_lon)"
 
     /** Table technique de Room portant l'identity_hash. */
     const val CREATE_ROOM_MASTER_TABLE =

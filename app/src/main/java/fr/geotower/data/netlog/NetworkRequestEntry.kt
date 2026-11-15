@@ -53,6 +53,7 @@ data class NetworkRequestEntry(
                 normalizedPath.contains("/api/v2/live/fr/sites/bbox") -> "Zone carte (Live)"
                 normalizedPath.contains("/api/v2/live/fr/sites/") -> "Détail site (Live)"
                 normalizedPath.contains("/api/v2/live/fr/stats") -> "Statistiques (Live)"
+                normalizedPath.contains("/api/v2/live/fr/radio") -> "Données radio annexes (Live)"
                 normalizedPath.contains("/api/v2/live/") -> "Données en direct (Live)"
                 normalizedPath.contains("/api/v2/signalquest/") -> "SignalQuest"
                 normalizedPath.contains("/api/v2/app/latest") -> "Vérification mise à jour"

@@ -1982,4 +1982,24 @@ interface GeoTowerDao {
 
     @RawQuery
     suspend fun getDepartmentOperatorTechStatsRaw(query: SupportSQLiteQuery): List<DepartmentOperatorTechRow>
+
+    @RawQuery
+    suspend fun countRaw(query: SupportSQLiteQuery): Int
+
+    @RawQuery
+    suspend fun getFhLinksRaw(query: SupportSQLiteQuery): List<FhLinkDbRow>
 }
+
+data class FhLinkDbRow(
+    val id_anfr_a: String,
+    val lat_a: Double,
+    val lon_a: Double,
+    val id_anfr_b: String,
+    val lat_b: Double,
+    val lon_b: Double,
+    val operateur_id: Int?,
+    val adm_id: Int?,
+    val operator_label: String?,
+    val azimut_ab: Double,
+    val distance_m: Int,
+)

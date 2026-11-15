@@ -1,7 +1,11 @@
 package fr.geotower.data
 
+import com.google.gson.Gson
+import fr.geotower.data.models.LiveSiteResponseDto
+import fr.geotower.data.models.toSiteNetworkIds
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -45,5 +49,32 @@ class EnbRepositoryTest {
         assertEquals("20810", EnbRepository.plmnForOperator("SFR"))
         assertEquals(null, EnbRepository.plmnForOperator("AUTRE"))
         assertEquals(null, EnbRepository.plmnForOperator(null))
+    }
+
+    @Test
+    fun liveSiteNetworkIdsDeserializationAndMapping() {
+        val json = """
+            {
+              "country_code": "FR",
+              "network_ids": {
+                "lte": [123456, 234567],
+                "nr": [789012],
+                "is_estimated": true
+              }
+            }
+        """.trimIndent()
+        val dto = Gson().fromJson(json, LiveSiteResponseDto::class.java)
+        val mapped = dto.networkIds?.toSiteNetworkIds()
+        assertEquals(
+            EnbRepository.SiteNetworkIds(
+                lte = listOf(123456L, 234567L),
+                nr = listOf(789012L),
+                isEstimated = true
+            ),
+            mapped
+        )
+
+        val withoutNetworkIds = Gson().fromJson("""{"country_code":"FR"}""", LiveSiteResponseDto::class.java)
+        assertNull(withoutNetworkIds.networkIds)
     }
 }

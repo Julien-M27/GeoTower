@@ -609,7 +609,7 @@ fun NearEmittersScreen(
                     NearbySearchField.Gps
                 ) ||
                 (searchSpec.field == NearbySearchField.All && searchValue.length >= 2) ||
-                (searchValue.length >= 2 && radioRepository.isInstalled())
+                (searchValue.length >= 2 && radioRepository.isAvailable())
             )
 
         // On ne lance le scan distant que si ce n'est pas un opérateur ET qu'il y a au moins 3 caractères
@@ -729,7 +729,7 @@ fun NearEmittersScreen(
                     }
 
                     // --- 3. RECHERCHE DANS LA BASE ANNEXE (RADIO) ---
-                    val radioSites = if (radioRepository.isInstalled() && (
+                    val radioSites = if (radioRepository.isAvailable() && (
                         searchSpec.field in setOf(NearbySearchField.AnfrId, NearbySearchField.SupportId, NearbySearchField.Operator, NearbySearchField.All) ||
                         searchValue.length >= 2
                     )) {

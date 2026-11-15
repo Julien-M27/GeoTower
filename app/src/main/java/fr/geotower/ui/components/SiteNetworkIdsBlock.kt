@@ -53,7 +53,8 @@ fun SiteNetworkIdsBlock(
     cardBgColor: Color,
     blockShape: Shape,
     /** Station d'où vient le bloc : sans elle, une copie ne saurait pas quelle fiche rouvrir. */
-    stationId: String? = null
+    stationId: String? = null,
+    operator: String? = null
 ) {
     if (identifiers.isEmpty) return
 
@@ -121,9 +122,11 @@ fun SiteNetworkIdsBlock(
 
             // Attribution du partenaire : cette donnee n'est pas de l'ANFR, elle merite d'etre
             // creditee la ou elle est lue, et pas seulement dans les reglages.
+            // Pour Free Mobile, une grande partie des eNB provient de RNC Mobile.
             Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
             EnbSourceAttribution(
                 dialogShape = blockShape,
+                includeRncMobile = EnbRepository.plmnForOperator(operator) == "20815",
                 modifier = Modifier.fillMaxWidth()
             )
         }

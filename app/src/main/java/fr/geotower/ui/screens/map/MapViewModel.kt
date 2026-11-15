@@ -115,6 +115,9 @@ class MapViewModel(
     private val _radioMarkers = MutableStateFlow<List<RadioMapMarker>>(SharedMapAntennaCacheHolder.getRadioMarkers())
     val radioMarkers = _radioMarkers.asStateFlow()
 
+    private val _fhLinks = MutableStateFlow<List<fr.geotower.data.models.FhLinkItem>>(emptyList())
+    val fhLinks = _fhLinks.asStateFlow()
+
     private val _signalQuestCoveragePoints = MutableStateFlow<List<SignalQuestCoveragePoint>>(emptyList())
     val signalQuestCoveragePoints = _signalQuestCoveragePoints.asStateFlow()
 
@@ -320,6 +323,28 @@ class MapViewModel(
                 val hasHiddenSites = repository.hasHiddenSites()
                 val isTimeSliderActive = AppConfig.timeSliderActive.value
 
+                val loadedFhLinks = if (zoom >= 11.0 && AppConfig.showTechnoFH.value && AppConfig.showFhLinks.value) {
+                    repository.getFhLinksInBox(
+                        latNorth = latNorth,
+                        lonEast = lonEast,
+                        latSouth = latSouth,
+                        lonWest = lonWest,
+                        selectedOperatorKeys = AppConfig.selectedOperatorKeys.value
+                    )
+                } else {
+                    emptyList()
+                }
+                val fhLinkedSiteIds = if (loadedFhLinks.isNotEmpty()) {
+                    buildSet<String> {
+                        loadedFhLinks.forEach { link ->
+                            add(link.idAnfrA)
+                            add(link.idAnfrB)
+                        }
+                    }
+                } else {
+                    emptySet<String>()
+                }
+
                 // Les clusters pré-agrégés ne peuvent pas soustraire les masquages locaux,
                 // les filtres d'opérateur ou de statut. Dès qu'un filtre est actif, on charge
                 // les lignes détaillées afin que la carte reste cohérente avec tous les autres écrans.
@@ -357,7 +382,21 @@ class MapViewModel(
                             hasActive = 1
                         )
                     }
-                    _antennas.value = filterClustersToAdminArea(fakeAntennas)
+                    val fhDirectAntennas = if (fhLinkedSiteIds.isNotEmpty()) {
+                        filterDetailedToAdminArea(
+                            repository.getAntennasByIdsInBox(
+                                fhLinkedSiteIds.toList(),
+                                latNorth,
+                                lonEast,
+                                latSouth,
+                                lonWest,
+                                detailBackedBandMask = 0
+                            )
+                        )
+                    } else {
+                        emptyList()
+                    }
+                    _antennas.value = filterClustersToAdminArea(fakeAntennas) + fhDirectAntennas
                 } else {
                     // Si on a zoomé, on charge les vraies antennes détaillées de la zone
                     val detailBackedBandMask = if (zoom < 14.0) 0 else frequencyFilter.detailBackedBandMaskForEnrichment()
@@ -436,13 +475,18 @@ class MapViewModel(
                             antenna.copy(operateur = visibleOps.joinToString(", "))
                         }
 
-                        if (filteredAntennas.size > 200) {
+                        val (fhDirectAntennas, clusterableAntennas) = if (fhLinkedSiteIds.isNotEmpty()) {
+                            filteredAntennas.partition { it.idAnfr in fhLinkedSiteIds }
+                        } else {
+                            emptyList<LocalisationEntity>() to filteredAntennas
+                        }
+                        if (clusterableAntennas.size > 200) {
                             // En dézoom avec filtres actifs, agréger en arrière-plan pour éviter de figer le thread UI avec des milliers de marqueurs
                             val aggregationZoom = MapClusterStrengthProfile.aggregationZoom(
                                 mapZoom = zoom,
                                 strength = AppConfig.mapClusterStrength.intValue
                             )
-                            val clusters = repository.clusterDetailedAntennas(filteredAntennas, aggregationZoom)
+                            val clusters = repository.clusterDetailedAntennas(clusterableAntennas, aggregationZoom)
                             val clusterIsZb = if (showOnlyZbSites) 1 else 0
                             val fakeAntennas = clusters.map { cluster ->
                                 LocalisationEntity(
@@ -457,7 +501,7 @@ class MapViewModel(
                                     hasActive = 1
                                 )
                             }
-                            _antennas.value = fakeAntennas
+                            _antennas.value = fakeAntennas + fhDirectAntennas
                         } else {
                             _antennas.value = filteredAntennas
                         }
@@ -466,6 +510,7 @@ class MapViewModel(
                     }
                 }
                 _radioMarkers.value = loadRadioMarkers(radioMarkerQueryZoom, latNorth, lonEast, latSouth, lonWest)
+                _fhLinks.value = loadedFhLinks
                 SharedMapAntennaCacheHolder.put(
                     context = radioRepository.appContext,
                     antennas = _antennas.value,
@@ -480,6 +525,7 @@ class MapViewModel(
                 AppLogger.w(TAG, "Map markers request failed", e)
                 _antennas.value = emptyList()
                 _radioMarkers.value = emptyList()
+                _fhLinks.value = emptyList()
             } finally {
                 if (searchJob === thisJob) {
                     _isLoading.value = false
@@ -490,6 +536,35 @@ class MapViewModel(
 
     fun clusterDetailedAntennas(sites: List<LocalisationEntity>, zoom: Double): List<DbCluster> {
         return repository.clusterDetailedAntennas(sites, zoom)
+    }
+
+    fun refreshFhLinks(
+        zoom: Double,
+        latNorth: Double,
+        lonEast: Double,
+        latSouth: Double,
+        lonWest: Double
+    ) {
+        if (zoom < 11.0 || !AppConfig.showTechnoFH.value || !AppConfig.showFhLinks.value) {
+            _fhLinks.value = emptyList()
+            return
+        }
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            _fhLinks.value = try {
+                repository.getFhLinksInBox(
+                    latNorth = latNorth,
+                    lonEast = lonEast,
+                    latSouth = latSouth,
+                    lonWest = lonWest,
+                    selectedOperatorKeys = AppConfig.selectedOperatorKeys.value
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                AppLogger.w(TAG, "FH links refresh failed", e)
+                emptyList()
+            }
+        }
     }
 
     /**
@@ -1008,7 +1083,7 @@ class MapViewModel(
     }
 
     suspend fun searchRadioSiteById(query: String): RadioMapMarker? {
-        if (!radioRepository.isInstalled()) return null
+        if (!radioRepository.isAvailable()) return null
         return try {
             radioRepository.searchSiteById(query)
         } catch (e: CancellationException) {
@@ -1037,7 +1112,7 @@ class MapViewModel(
     }
 
     suspend fun searchRadioSiteSuggestions(query: String, limit: Int): List<RadioMapMarker> {
-        if (limit <= 0 || !radioRepository.isInstalled()) return emptyList()
+        if (limit <= 0 || !radioRepository.isAvailable()) return emptyList()
         return try {
             radioRepository.searchSites(query, limit)
         } catch (e: CancellationException) {

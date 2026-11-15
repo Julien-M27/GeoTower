@@ -19,6 +19,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -35,6 +36,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import fr.geotower.data.db.AppDatabase
 import fr.geotower.data.hidden.HiddenSitesStore
+import fr.geotower.data.models.FhLinkItem
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.RadioMapMarker
 import fr.geotower.data.models.SiteHsEntity
@@ -78,6 +80,16 @@ import kotlin.math.roundToInt
 private const val ANTENNAS_SOURCE_ID = "geotower-antennas-source"
 private const val ANTENNAS_LAYER_ID = "geotower-antennas-layer"
 private const val CLUSTERS_LAYER_ID = "geotower-clusters-layer"
+private const val FH_LINKS_SOURCE_ID = "geotower-fh-links-source"
+private const val FH_LINKS_LAYER_ID = "geotower-fh-links-layer"
+private const val MEASURE_LINES_SOURCE_ID = "geotower-measure-lines-source"
+private const val MEASURE_LINES_LAYER_ID = "geotower-measure-lines-layer"
+private const val MEASURE_POINTS_SOURCE_ID = "geotower-measure-points-source"
+private const val MEASURE_POINTS_LAYER_ID = "geotower-measure-points-layer"
+private const val MEASURE_LABELS_SOURCE_ID = "geotower-measure-labels-source"
+private const val MEASURE_LABELS_LAYER_ID = "geotower-measure-labels-layer"
+private const val MEASURE_POINT_ICON_ID = "geotower-measure-point-icon"
+private const val MEASURE_ANCHOR_ICON_ID = "geotower-measure-anchor-icon"
 private const val USER_LOCATION_SOURCE_ID = "geotower-user-location-source"
 private const val USER_ARROW_LAYER_ID = "geotower-user-arrow-layer"
 private const val USER_ARROW_ICON_ID = "geotower-user-arrow-icon"
@@ -902,6 +914,9 @@ fun Map3DView(
     clusterStrength: Int = AppConfig.DEFAULT_MAP_CLUSTER_STRENGTH,
     satelliteMarkerContrast: Boolean = false,
     radioMarkers: List<RadioMapMarker> = emptyList(),
+    fhLinks: List<FhLinkItem> = emptyList(),
+    measureSegments: List<Measure3DSegment> = emptyList(),
+    measurePoints: List<Measure3DPoint> = emptyList(),
     recenterTrigger: Long = 0L,
     styleUri: String = "https://tiles.openfreemap.org/styles/liberty",
     tripPlan: TripPlan? = null,
@@ -911,6 +926,9 @@ fun Map3DView(
     tripMode: String = TRIP_MODE_VIEW,
     navCameraLocked: Boolean = false,
     onStepClick: ((Int) -> Unit)? = null,
+    onFhLinkClick: ((FhLinkItem) -> Unit)? = null,
+    onMeasurePointClick: ((Int) -> Unit)? = null,
+    onMeasureSegmentClick: ((Int) -> Unit)? = null,
     onMapClick: ((lat: Double, lon: Double) -> Unit)? = null,
     onUserInteraction: (() -> Unit)? = null,
     onCameraChange: (lat: Double, lon: Double, zoom: Double, bearing: Float) -> Unit,
@@ -1097,6 +1115,19 @@ fun Map3DView(
         }
         style.addLayer(userArrowLayer)
 
+        // 2b. Liaisons FH (sous les pylônes 3D)
+        val fhLinksSource = GeoJsonSource(FH_LINKS_SOURCE_ID)
+        style.addSource(fhLinksSource)
+        val fhLinksLayer = LineLayer(FH_LINKS_LAYER_ID, FH_LINKS_SOURCE_ID).apply {
+            setProperties(
+                PropertyFactory.lineColor(Expression.get("color")),
+                PropertyFactory.lineWidth(2.4f),
+                PropertyFactory.lineOpacity(0.82f),
+                PropertyFactory.lineCap(Property.LINE_CAP_ROUND)
+            )
+        }
+        style.addLayer(fhLinksLayer)
+
         // 3. Source et couches de symboles pour les antennes (pylônes) et clusters
         val antennasSource = GeoJsonSource(ANTENNAS_SOURCE_ID)
         style.addSource(antennasSource)
@@ -1149,6 +1180,41 @@ fun Map3DView(
             )
         }
         style.addLayer(clustersLayer)
+
+        // 4. Couches de l'outil de mesure (lignes, sommets, pastilles de distance)
+        style.addSource(GeoJsonSource(MEASURE_LINES_SOURCE_ID))
+        style.addLayer(
+            LineLayer(MEASURE_LINES_LAYER_ID, MEASURE_LINES_SOURCE_ID).apply {
+                setProperties(
+                    PropertyFactory.lineColor("#3B5998"),
+                    PropertyFactory.lineWidth(4.0f),
+                    PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
+                    PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND)
+                )
+            }
+        )
+        style.addImage(MEASURE_POINT_ICON_ID, createMeasure3DPointBitmap(context, highlight = false))
+        style.addImage(MEASURE_ANCHOR_ICON_ID, createMeasure3DPointBitmap(context, highlight = true))
+        style.addSource(GeoJsonSource(MEASURE_POINTS_SOURCE_ID))
+        style.addLayer(
+            SymbolLayer(MEASURE_POINTS_LAYER_ID, MEASURE_POINTS_SOURCE_ID).apply {
+                setProperties(
+                    PropertyFactory.iconImage(Expression.get("iconId")),
+                    PropertyFactory.iconAllowOverlap(true),
+                    PropertyFactory.iconIgnorePlacement(true)
+                )
+            }
+        )
+        style.addSource(GeoJsonSource(MEASURE_LABELS_SOURCE_ID))
+        style.addLayer(
+            SymbolLayer(MEASURE_LABELS_LAYER_ID, MEASURE_LABELS_SOURCE_ID).apply {
+                setProperties(
+                    PropertyFactory.iconImage(Expression.get("iconId")),
+                    PropertyFactory.iconAllowOverlap(true),
+                    PropertyFactory.iconIgnorePlacement(true)
+                )
+            }
+        )
 
         isStyleLoaded = true
         AppLogger.d("Map3DView", "3D Map style ($styleUri) loaded")
@@ -1604,6 +1670,94 @@ fun Map3DView(
         source?.setGeoJson(collection)
     }
 
+    val currentFhLinks by rememberUpdatedState(fhLinks)
+    val currentOnFhLinkClick by rememberUpdatedState(onFhLinkClick)
+
+    LaunchedEffect(
+        isStyleLoaded,
+        fhLinks,
+        AppConfig.showTechnoFH.value,
+        AppConfig.showFhLinks.value,
+        AppConfig.selectedOperatorKeys.value
+    ) {
+        val map = mapLibreMapInstance ?: return@LaunchedEffect
+        val style = map.style ?: return@LaunchedEffect
+        if (!isStyleLoaded) return@LaunchedEffect
+        val source = style.getSourceAs<GeoJsonSource>(FH_LINKS_SOURCE_ID) ?: return@LaunchedEffect
+        if (!AppConfig.showTechnoFH.value || !AppConfig.showFhLinks.value || fhLinks.isEmpty()) {
+            source.setGeoJson(FeatureCollection.fromFeatures(emptyArray()))
+            return@LaunchedEffect
+        }
+        val activeOps = AppConfig.selectedOperatorKeys.value
+        val collection = withContext(Dispatchers.Default) {
+            val features = ArrayList<Feature>(fhLinks.size)
+            fhLinks.forEachIndexed { index, link ->
+                val opKeys = OperatorColors.keysFor(link.operatorLabel)
+                val visibleKey = if (activeOps.isEmpty()) {
+                    opKeys.firstOrNull()
+                } else {
+                    if (opKeys.isNotEmpty() && opKeys.none { it in activeOps }) return@forEachIndexed
+                    opKeys.firstOrNull { it in activeOps }
+                }
+                val colorHex = visibleKey?.let { OperatorColors.specForKey(it)?.colorHex }
+                    ?: OperatorColors.colorHex(link.operatorLabel, fallback = OperatorColors.UNKNOWN_HEX)
+                val line = LineString.fromLngLats(
+                    listOf(
+                        Point.fromLngLat(link.lonA, link.latA),
+                        Point.fromLngLat(link.lonB, link.latB)
+                    )
+                )
+                features.add(
+                    Feature.fromGeometry(line).apply {
+                        addStringProperty("color", colorHex)
+                        addNumberProperty("linkIndex", index)
+                    }
+                )
+            }
+            FeatureCollection.fromFeatures(features)
+        }
+        source.setGeoJson(collection)
+    }
+
+    val currentOnMapClick by rememberUpdatedState(onMapClick)
+    val currentOnSiteClick by rememberUpdatedState(onSiteClick)
+    val currentOnMeasurePointClick by rememberUpdatedState(onMeasurePointClick)
+    val currentOnMeasureSegmentClick by rememberUpdatedState(onMeasureSegmentClick)
+
+    LaunchedEffect(isStyleLoaded, measureSegments, measurePoints) {
+        val map = mapLibreMapInstance ?: return@LaunchedEffect
+        val style = map.style ?: return@LaunchedEffect
+        if (!isStyleLoaded) return@LaunchedEffect
+
+        val lineFeatures = measureSegments.mapNotNull { seg ->
+            if (seg.points.size < 2) return@mapNotNull null
+            val line = LineString.fromLngLats(seg.points.map { (lat, lon) -> Point.fromLngLat(lon, lat) })
+            Feature.fromGeometry(line)
+        }
+        style.getSourceAs<GeoJsonSource>(MEASURE_LINES_SOURCE_ID)
+            ?.setGeoJson(FeatureCollection.fromFeatures(lineFeatures))
+
+        val pointFeatures = measurePoints.map { pt ->
+            Feature.fromGeometry(Point.fromLngLat(pt.longitude, pt.latitude)).apply {
+                addStringProperty("iconId", if (pt.isAnchor) MEASURE_ANCHOR_ICON_ID else MEASURE_POINT_ICON_ID)
+                addNumberProperty("pointIndex", pt.index)
+            }
+        }
+        style.getSourceAs<GeoJsonSource>(MEASURE_POINTS_SOURCE_ID)
+            ?.setGeoJson(FeatureCollection.fromFeatures(pointFeatures))
+
+        val labelFeatures = measureSegments.mapIndexed { idx, seg ->
+            val iconId = "geotower-measure-label-$idx"
+            style.addImage(iconId, createMeasure3DLabelBitmap(context, seg.label))
+            Feature.fromGeometry(Point.fromLngLat(seg.labelLon, seg.labelLat)).apply {
+                addStringProperty("iconId", iconId)
+                addNumberProperty("toIndex", seg.toIndex)
+            }
+        }
+        style.getSourceAs<GeoJsonSource>(MEASURE_LABELS_SOURCE_ID)
+            ?.setGeoJson(FeatureCollection.fromFeatures(labelFeatures))
+    }
+
     Box(modifier = modifier.fillMaxSize()) {
         AndroidView(
             modifier = Modifier.fillMaxSize(),
@@ -1636,7 +1790,25 @@ fun Map3DView(
                                 screenPoint.y + touchSlop
                             )
 
-                            // 1. Clic sur une pastille d'étape de trajet
+                            // 0. Clic sur un sommet ou une pastille de distance de l'outil de mesure
+                            val renderedMeasurePoints = map.queryRenderedFeatures(rect, MEASURE_POINTS_LAYER_ID)
+                            if (renderedMeasurePoints.isNotEmpty()) {
+                                val pointIndex = renderedMeasurePoints[0].getNumberProperty("pointIndex")?.toInt()
+                                if (pointIndex != null && currentOnMeasurePointClick != null) {
+                                    currentOnMeasurePointClick?.invoke(pointIndex)
+                                    return@addOnMapClickListener true
+                                }
+                            }
+                            val renderedMeasureLabels = map.queryRenderedFeatures(rect, MEASURE_LABELS_LAYER_ID)
+                            if (renderedMeasureLabels.isNotEmpty()) {
+                                val toIndex = renderedMeasureLabels[0].getNumberProperty("toIndex")?.toInt()
+                                if (toIndex != null && currentOnMeasureSegmentClick != null) {
+                                    currentOnMeasureSegmentClick?.invoke(toIndex)
+                                    return@addOnMapClickListener true
+                                }
+                            }
+
+                            // 1. Clic sur une étape de trajet
                             val renderedSteps = map.queryRenderedFeatures(rect, TRIP_STEPS_LAYER_ID)
                             if (renderedSteps.isNotEmpty()) {
                                 val stepIndex = renderedSteps[0].getNumberProperty("stepIndex")?.toInt()
@@ -1671,15 +1843,26 @@ fun Map3DView(
                                     val idAnfr = feat.getStringProperty("idAnfr")
                                     val match = sitesMap[idAnfr] ?: antennas.find { it.idAnfr == idAnfr }
                                     if (match != null) {
-                                        onSiteClick(match)
+                                        currentOnSiteClick(match)
                                         return@addOnMapClickListener true
                                     }
                                 }
                             }
 
+                            // 2b. Clic sur une liaison FH
+                            val renderedFhLinks = map.queryRenderedFeatures(rect, FH_LINKS_LAYER_ID)
+                            if (renderedFhLinks.isNotEmpty()) {
+                                val linkIndex = renderedFhLinks[0].getNumberProperty("linkIndex")?.toInt()
+                                val clickedLink = linkIndex?.let { currentFhLinks.getOrNull(it) }
+                                if (clickedLink != null && currentOnFhLinkClick != null) {
+                                    currentOnFhLinkClick?.invoke(clickedLink)
+                                    return@addOnMapClickListener true
+                                }
+                            }
+
                             // 3. Clic sur la carte libre (ex: ajout d'étape manuelle en édition)
-                            if (onMapClick != null) {
-                                onMapClick(latLng.latitude, latLng.longitude)
+                            if (currentOnMapClick != null) {
+                                currentOnMapClick?.invoke(latLng.latitude, latLng.longitude)
                                 return@addOnMapClickListener true
                             }
 
@@ -1787,4 +1970,79 @@ fun Map3DView(
             }
         }
     }
+}
+
+data class Measure3DSegment(
+    val toIndex: Int,
+    val points: List<Pair<Double, Double>>,
+    val label: String,
+    val labelLat: Double,
+    val labelLon: Double
+)
+
+data class Measure3DPoint(
+    val index: Int,
+    val latitude: Double,
+    val longitude: Double,
+    val isAnchor: Boolean
+)
+
+private fun createMeasure3DPointBitmap(context: android.content.Context, highlight: Boolean): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val visibleDiameter = (if (highlight) 24f else 15f) * density
+    val touchDiameter = (if (highlight) 44f else 34f) * density
+    val sizePx = touchDiameter.toInt().coerceAtLeast(24)
+    val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val center = sizePx / 2f
+    val ringWidth = visibleDiameter / 6f
+    val radius = visibleDiameter / 2f - ringWidth
+    val fillPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.parseColor("#3B5998")
+        style = android.graphics.Paint.Style.FILL
+    }
+    val ringPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.WHITE
+        style = android.graphics.Paint.Style.STROKE
+        strokeWidth = ringWidth
+    }
+    canvas.drawCircle(center, center, radius, fillPaint)
+    if (highlight) {
+        val holePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.WHITE
+            style = android.graphics.Paint.Style.FILL
+        }
+        canvas.drawCircle(center, center, radius * 0.42f, holePaint)
+    }
+    canvas.drawCircle(center, center, radius, ringPaint)
+    return bitmap
+}
+
+private fun createMeasure3DLabelBitmap(context: android.content.Context, text: String): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.WHITE
+        textSize = 13f * density
+        textAlign = android.graphics.Paint.Align.CENTER
+        typeface = android.graphics.Typeface.DEFAULT_BOLD
+    }
+    val textWidth = paint.measureText(text)
+    val padX = (14f * density).toInt()
+    val width = (textWidth + padX * 2).toInt().coerceAtLeast((56f * density).toInt())
+    val height = (26f * density).toInt().coerceAtLeast(36)
+    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val rectPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.parseColor("#3B5998")
+        style = android.graphics.Paint.Style.FILL
+    }
+    val radius = 10f * density
+    canvas.drawRoundRect(0f, 0f, width.toFloat(), height.toFloat(), radius, radius, rectPaint)
+    canvas.drawText(
+        text,
+        width / 2f,
+        height / 2f - (paint.ascent() + paint.descent()) / 2f,
+        paint
+    )
+    return bitmap
 }

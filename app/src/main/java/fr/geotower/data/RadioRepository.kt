@@ -4,6 +4,9 @@ import android.content.Context
 import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
 import android.util.Base64
+import fr.geotower.data.api.LiveDatabaseStatus
+import fr.geotower.data.api.LiveSitesClient
+import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.db.RadioDatabaseValidator
 import fr.geotower.data.models.RadioMapCategoryMasks
 import fr.geotower.data.models.RadioMapMarker
@@ -43,7 +46,14 @@ class RadioRepository(private val context: Context) {
         serviceMask: Int = RadioServiceMasks.ALL,
         categoryMask: Int = RadioMapCategoryMasks.ALL
     ): List<RadioMapMarker> = withContext(Dispatchers.IO) {
-        if (serviceMask == 0 || categoryMask == 0 || !databaseFile().isFile) return@withContext emptyList()
+        if (serviceMask == 0 || categoryMask == 0) return@withContext emptyList()
+        if (!databaseFile().isFile) {
+            return@withContext if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_BBOX)) {
+                fetchLiveVisibleMarkers(zoom, latNorth, lonEast, latSouth, lonWest, serviceMask, categoryMask)
+            } else {
+                emptyList()
+            }
+        }
 
         try {
             val bounds = queryBounds(latNorth, lonEast, latSouth, lonWest)
@@ -72,9 +82,20 @@ class RadioRepository(private val context: Context) {
         return databaseFile().isFile
     }
 
+    fun isAvailable(): Boolean {
+        return isInstalled() || shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR)
+    }
+
     suspend fun getMarkersForSupport(supportId: String, limit: Int = MAX_SUPPORT_MARKERS): List<RadioMapMarker> = withContext(Dispatchers.IO) {
         val candidates = supportIdCandidates(supportId)
-        if (candidates.isEmpty() || !databaseFile().isFile) return@withContext emptyList()
+        if (candidates.isEmpty()) return@withContext emptyList()
+        if (!databaseFile().isFile) {
+            return@withContext if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_SITE_DETAIL)) {
+                fetchLiveMarkersForSupport(supportId, limit)
+            } else {
+                emptyList()
+            }
+        }
 
         try {
             openDatabase().use { db ->
@@ -122,8 +143,15 @@ class RadioRepository(private val context: Context) {
     suspend fun getMarkerForSite(stationId: String, supportId: String): RadioMapMarker? = withContext(Dispatchers.IO) {
         val stationCandidates = supportIdCandidates(stationId)
         val supportCandidates = supportIdCandidates(supportId)
-        if (stationCandidates.isEmpty() || supportCandidates.isEmpty() || !databaseFile().isFile) {
+        if (stationCandidates.isEmpty() || supportCandidates.isEmpty()) {
             return@withContext null
+        }
+        if (!databaseFile().isFile) {
+            return@withContext if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_SITE_DETAIL)) {
+                fetchLiveMarkerForSite(stationId, supportId)
+            } else {
+                null
+            }
         }
 
         try {
@@ -172,7 +200,14 @@ class RadioRepository(private val context: Context) {
 
     suspend fun searchSites(query: String, limit: Int = 20): List<RadioMapMarker> = withContext(Dispatchers.IO) {
         val trimmed = query.trim().removePrefix("#").trim()
-        if (trimmed.length < 2 || !databaseFile().isFile) return@withContext emptyList()
+        if (trimmed.length < 2) return@withContext emptyList()
+        if (!databaseFile().isFile) {
+            return@withContext if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR)) {
+                fetchLiveSearchSites(trimmed, limit, exactId = false)
+            } else {
+                emptyList()
+            }
+        }
 
         try {
             openDatabase().use { db ->
@@ -245,7 +280,14 @@ class RadioRepository(private val context: Context) {
 
     suspend fun searchSiteById(query: String): RadioMapMarker? = withContext(Dispatchers.IO) {
         val trimmed = query.trim().removePrefix("#").trim()
-        if (trimmed.isBlank() || !databaseFile().isFile) return@withContext null
+        if (trimmed.isBlank()) return@withContext null
+        if (!databaseFile().isFile) {
+            return@withContext if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR)) {
+                fetchLiveSearchSites(trimmed, limit = 1, exactId = true).firstOrNull()
+            } else {
+                null
+            }
+        }
 
         try {
             openDatabase().use { db ->
@@ -649,6 +691,93 @@ class RadioRepository(private val context: Context) {
 
     private fun Long.coerceToInt(): Int {
         return coerceIn(Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong()).toInt()
+    }
+
+    private fun shouldUseLiveApiFallback(featureId: String): Boolean {
+        if (!RemoteFeatureFlags.isFeatureEnabled(featureId)) return false
+        return LiveDatabaseStatus.isInUse(context)
+    }
+
+    private suspend fun fetchLiveVisibleMarkers(
+        zoom: Double,
+        latNorth: Double,
+        lonEast: Double,
+        latSouth: Double,
+        lonWest: Double,
+        serviceMask: Int,
+        categoryMask: Int
+    ): List<RadioMapMarker> {
+        return try {
+            val south = sanitizeLatitude(latSouth, -90.0)
+            val north = sanitizeLatitude(latNorth, 90.0)
+            val west = normalizeLongitude(sanitizeLongitude(lonWest, -180.0))
+            val east = normalizeLongitude(sanitizeLongitude(lonEast, 180.0))
+            val response = LiveSitesClient.api.getRadioMarkersInBox(
+                zoom = zoom,
+                north = maxOf(south, north),
+                south = minOf(south, north),
+                east = east,
+                west = west,
+                serviceMask = serviceMask,
+                categoryMask = categoryMask
+            )
+            if (!response.isSuccessful) return emptyList()
+            response.body()?.markers.orEmpty().mapNotNull { it.toRadioMapMarker() }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLogger.w(TAG, "Live radio bbox request failed", e)
+            emptyList()
+        }
+    }
+
+    private suspend fun fetchLiveMarkersForSupport(supportId: String, limit: Int): List<RadioMapMarker> {
+        return try {
+            val response = LiveSitesClient.api.getRadioMarkersForSupport(
+                supportId = supportId.trim().removePrefix("#"),
+                limit = limit.coerceAtLeast(1)
+            )
+            if (!response.isSuccessful) return emptyList()
+            response.body()?.markers.orEmpty().mapNotNull { it.toRadioMapMarker() }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLogger.w(TAG, "Live radio support request failed for supportId=$supportId", e)
+            emptyList()
+        }
+    }
+
+    private suspend fun fetchLiveMarkerForSite(stationId: String, supportId: String): RadioMapMarker? {
+        return try {
+            val response = LiveSitesClient.api.getRadioMarkerForSite(
+                stationId = stationId.trim().removePrefix("#"),
+                supportId = supportId.trim().removePrefix("#")
+            )
+            if (!response.isSuccessful) return null
+            response.body()?.marker?.toRadioMapMarker()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLogger.w(TAG, "Live radio site request failed for stationId=$stationId supportId=$supportId", e)
+            null
+        }
+    }
+
+    private suspend fun fetchLiveSearchSites(query: String, limit: Int, exactId: Boolean): List<RadioMapMarker> {
+        return try {
+            val response = LiveSitesClient.api.searchRadioSites(
+                query = query,
+                limit = limit.coerceAtLeast(1),
+                exactId = exactId
+            )
+            if (!response.isSuccessful) return emptyList()
+            response.body()?.markers.orEmpty().mapNotNull { it.toRadioMapMarker() }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLogger.w(TAG, "Live radio search failed for query=$query", e)
+            emptyList()
+        }
     }
 
     private fun openDatabase(): SQLiteDatabase {

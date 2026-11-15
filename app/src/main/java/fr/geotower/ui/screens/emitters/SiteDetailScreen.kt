@@ -1034,16 +1034,22 @@ fun SiteDetailScreen(
     val txtWhichMap = stringResource(R.string.appstrings_which_map)
     val txtIdSupportCopy = stringResource(R.string.appstrings_id_support_copy)
 
-    // Identifiants réseau : lecture locale d'une base optionnelle, hors du chemin bloquant du site.
-    // Le bloc ne s'affiche pas si elle est absente ou si le pylône n'a aucun eNB/gNB rattaché.
-    LaunchedEffect(physique?.idSupport, antenna?.operateur, antenna?.latitude, antenna?.longitude, showNetworkIds) {
+    // Identifiants réseau : lecture locale de la base optionnelle, avec repli sur l'API Live si absente.
+    // Le bloc ne s'affiche pas si aucun eNB/gNB n'est rattaché au pylône.
+    LaunchedEffect(antenna?.idAnfr, physique?.idSupport, antenna?.operateur, antenna?.latitude, antenna?.longitude, showNetworkIds) {
         networkIds = if (showNetworkIds) {
-            fr.geotower.data.EnbRepository(context).getIdentifiersForSupport(
+            val localIds = fr.geotower.data.EnbRepository(context).getIdentifiersForSupport(
                 idSupport = physique?.idSupport,
                 operator = antenna?.operateur,
                 latitude = antenna?.latitude,
                 longitude = antenna?.longitude
             )
+            if (!localIds.isEmpty) {
+                localIds
+            } else {
+                antenna?.idAnfr?.let { repository.getLiveNetworkIds(it) }
+                    ?: fr.geotower.data.EnbRepository.SiteNetworkIds()
+            }
         } else {
             fr.geotower.data.EnbRepository.SiteNetworkIds()
         }
@@ -1853,7 +1859,8 @@ fun SiteDetailScreen(
                                     identifiers = networkIds,
                                     cardBgColor = cardBgColor,
                                     blockShape = blockShape,
-                                    stationId = antennaId.toString()
+                                    stationId = antennaId.toString(),
+                                    operator = info.operateur
                                 )
                             }
                         }

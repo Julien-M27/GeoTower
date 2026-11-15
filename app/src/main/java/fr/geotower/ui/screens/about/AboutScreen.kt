@@ -1669,6 +1669,9 @@ private fun EnbDatabaseVersionsCard(
                     Triple(stringResource(R.string.appstrings_operator_free), "20815", "Free")
                 )
 
+                val partnerLabel = stringResource(R.string.appstrings_version_enb_partner_label)
+                val freePartnerLabel = stringResource(R.string.appstrings_version_enb_partner_free_label)
+
                 val enbRows = buildList {
                     for ((label, plmn, name) in canonicalOperators) {
                         val dateInfo = operatorDates.firstOrNull { it.plmn == plmn }
@@ -1694,22 +1697,33 @@ private fun EnbDatabaseVersionsCard(
                         add(op.operator to formattedDate)
                     }
 
-                    // Partenaire source
-                    add(stringResource(R.string.appstrings_version_enb_partner_label) to "eNB-Analytics")
+                    // Partenaires sources
+                    add(partnerLabel to "eNB-Analytics")
+                    add(freePartnerLabel to "RNC Mobile")
                 }
 
-                val partnerLabel = stringResource(R.string.appstrings_version_enb_partner_label)
                 enbRows.forEachIndexed { index, row ->
-                    val isPartnerRow = row.first == partnerLabel
-                    val onClick = if (isPartnerRow) {
-                        {
-                            try {
-                                uriHandler.openUri(ENB_ANALYTICS_URL)
-                            } catch (e: Exception) {
-                                AppLogger.w(TAG_ABOUT, "Failed to open eNB-Analytics URL", e)
+                    val onClick: (() -> Unit)? = when (row.first) {
+                        partnerLabel -> {
+                            {
+                                try {
+                                    uriHandler.openUri(ENB_ANALYTICS_URL)
+                                } catch (e: Exception) {
+                                    AppLogger.w(TAG_ABOUT, "Failed to open eNB-Analytics URL", e)
+                                }
                             }
                         }
-                    } else null
+                        freePartnerLabel -> {
+                            {
+                                try {
+                                    uriHandler.openUri(RNC_MOBILE_URL)
+                                } catch (e: Exception) {
+                                    AppLogger.w(TAG_ABOUT, "Failed to open RNC Mobile URL", e)
+                                }
+                            }
+                        }
+                        else -> null
+                    }
 
                     VersionLine(row.first, row.second, onClick = onClick)
                     if (index < enbRows.lastIndex) {
@@ -1728,6 +1742,8 @@ private const val GEOTOWER_GITHUB_URL =
     "https://github.com/Julien-M27/GeoTower"
 private const val ENB_ANALYTICS_URL =
     "https://enb-analytics.fr/"
+private const val RNC_MOBILE_URL =
+    "https://rncmobile.net/"
 
 private fun openPlayStore(context: Context, uriHandler: UriHandler) {
     AppDistribution.openPlayStore(context, uriHandler)
