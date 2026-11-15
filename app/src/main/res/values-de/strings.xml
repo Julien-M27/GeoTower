@@ -3509,6 +3509,7 @@
     <string name="appstrings_release_v2120_summary_map_3d_mode_and_trip_planner_optimizations">Neuer immersiver 3D-Kartenmodus (MapLibre), anpassbare Stile und erweiterte Optimierungen für Tourverfolgung und Routenführung</string>
     <string name="appstrings_release_v2121_summary_compatibility_and_map_interface_optimizations">Erweiterte Hardware-Kompatibilität (OpenGL ES 2.0) sowie verbesserte Kartennavigation und Abstände der Steuerelemente</string>
     <string name="appstrings_release_v2122_summary_fh_links_and_rnc_mobile_attribution">Anzeige von Richtfunkverbindungen (FH) auf 2D-/3D-Karten und Quellenangabe für RNC Mobile bei Free Mobile</string>
+    <string name="appstrings_release_v2123_summary_map_crash_fix_and_stability">Absturz beim Öffnen der Karte in der Release-Version behoben und Stabilität der Richtfunk-Darstellung (FH) verbessert</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Netzwerkanfragen-Protokoll</string>

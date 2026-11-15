@@ -2630,7 +2630,7 @@ fun MapScreen(
         }
         val activeOps = AppConfig.selectedOperatorKeys.value
         val density = context.resources.displayMetrics.density
-        val polylines = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+        val preparedLinks = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
             fhLinks.mapNotNull { link ->
                 val opKeys = OperatorColors.keysFor(link.operatorLabel)
                 val visibleKey = if (activeOps.isEmpty()) {
@@ -2641,22 +2641,25 @@ fun MapScreen(
                 }
                 val baseColor = visibleKey?.let { OperatorColors.colorIntForKey(it, fallback = android.graphics.Color.GRAY) }
                     ?: OperatorColors.colorInt(link.operatorLabel, fallback = android.graphics.Color.GRAY)
-                Polyline(map).apply {
-                    setPoints(
-                        listOf(
-                            GeoPoint(link.latA, link.lonA),
-                            GeoPoint(link.latB, link.lonB),
-                        ),
-                    )
-                    isGeodesic = true
-                    outlinePaint.color = androidx.core.graphics.ColorUtils.setAlphaComponent(baseColor, 210)
-                    outlinePaint.strokeWidth = 2.5f * density
-                    outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
-                    infoWindow = null
-                    setOnClickListener { _, _, _ ->
-                        selectedFhLink = link
-                        true
-                    }
+                link to androidx.core.graphics.ColorUtils.setAlphaComponent(baseColor, 210)
+            }
+        }
+        val polylines = preparedLinks.map { (link, lineColor) ->
+            Polyline(map).apply {
+                setPoints(
+                    listOf(
+                        GeoPoint(link.latA, link.lonA),
+                        GeoPoint(link.latB, link.lonB),
+                    ),
+                )
+                isGeodesic = true
+                outlinePaint.color = lineColor
+                outlinePaint.strokeWidth = 2.5f * density
+                outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
+                infoWindow = null
+                setOnClickListener { _, _, _ ->
+                    selectedFhLink = link
+                    true
                 }
             }
         }
@@ -5539,7 +5542,7 @@ fun MapScreen(
         }
     }
 
-    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize()) {
         val rawPrimaryColor = MaterialTheme.colorScheme.primary.toArgb()
         val isColorTooLight = ColorUtils.calculateLuminance(rawPrimaryColor) > 0.85
 
@@ -6726,6 +6729,7 @@ fun MapScreen(
             }
         }
 
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         // ✅ 1. OUVRE LA CONDITION ICI POUR PROTÉGER TA VRAIE INTERFACE
         val isLandscapeLayout = maxWidth > maxHeight ||
             configuration.screenWidthDp > configuration.screenHeightDp
@@ -8511,6 +8515,7 @@ fun MapScreen(
             }
         }
 
+        }
     }
 
 

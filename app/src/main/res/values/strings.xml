@@ -3532,6 +3532,7 @@
     <string name="appstrings_release_v2120_summary_map_3d_mode_and_trip_planner_optimizations">New immersive 3D map mode (MapLibre), customizable styles, and advanced optimizations for trip following and routing</string>
     <string name="appstrings_release_v2121_summary_compatibility_and_map_interface_optimizations">Extended hardware compatibility (OpenGL ES 2.0) and improved map navigation and bottom control spacing</string>
     <string name="appstrings_release_v2122_summary_fh_links_and_rnc_mobile_attribution">Microwave link (FH) visualization on 2D/3D maps and RNC Mobile attribution for Free Mobile network IDs</string>
+    <string name="appstrings_release_v2123_summary_map_crash_fix_and_stability">Fixed a crash when opening the map in release builds and improved microwave link (FH) rendering stability</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Network requests log</string>

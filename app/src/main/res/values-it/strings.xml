@@ -3509,6 +3509,7 @@
     <string name="appstrings_release_v2120_summary_map_3d_mode_and_trip_planner_optimizations">Nuova modalità mappa 3D immersiva (MapLibre), stili personalizzabili e ottimizzazioni avanzate per il tracciamento dei percorsi e itinerari</string>
     <string name="appstrings_release_v2121_summary_compatibility_and_map_interface_optimizations">Compatibilità hardware estesa (OpenGL ES 2.0) e miglioramenti alla navigazione e alla spaziatura sulla mappa</string>
     <string name="appstrings_release_v2122_summary_fh_links_and_rnc_mobile_attribution">Visualizzazione dei collegamenti a microonde (FH) su mappe 2D/3D e attribuzione RNC Mobile per gli ID di Free Mobile</string>
+    <string name="appstrings_release_v2123_summary_map_crash_fix_and_stability">Risolto un arresto anomalo all\'apertura della mappa nella versione Release e migliorata la stabilità della visualizzazione dei collegamenti FH</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registro richieste di rete</string>
