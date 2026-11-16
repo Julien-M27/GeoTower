@@ -32,6 +32,7 @@ data class AboutSourceGroup(
 
 // Pages de présentation des jeux de données ANFR / ARCEP (les URLs de téléchargement, elles, sont
 // résolues à l'exécution par fr.geotower.data.build.OfficialSources).
+private const val DATAGOUV_WEEKLY_DATA_URL = "https://www.data.gouv.fr/datasets/donnees-sur-les-reseaux-mobiles/"
 private const val ANFR_WEEKLY_DATA_URL = "https://data.anfr.fr/explore/dataset/observatoire_2g_3g_4g/"
 private const val ANFR_MONTHLY_DATA_URL = "https://www.data.gouv.fr/datasets/donnees-sur-les-installations-radioelectriques-de-plus-de-5-watts-1/"
 private const val ARCEP_QUARTERLY_DATA_URL = "https://data.arcep.fr/mobile/sites/"
@@ -60,6 +61,10 @@ fun aboutSourceGroups(): List<AboutSourceGroup> {
                 links = listOf(
                     AboutSourceLink(
                         label = weeklyLabel,
+                        host = "www.data.gouv.fr",
+                        url = DATAGOUV_WEEKLY_DATA_URL
+                    ),
+                    AboutSourceLink(
                         host = "data.anfr.fr",
                         url = ANFR_WEEKLY_DATA_URL
                     ),

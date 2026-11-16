@@ -3510,6 +3510,7 @@
     <string name="appstrings_release_v2121_summary_compatibility_and_map_interface_optimizations">Compatibilidade de hardware alargada (OpenGL ES 2.0) e melhorias na navegação e no espaçamento do mapa</string>
     <string name="appstrings_release_v2122_summary_fh_links_and_rnc_mobile_attribution">Visualização de ligações por feixes hertzianos (FH) nos mapas 2D/3D e atribuição RNC Mobile para os IDs da Free Mobile</string>
     <string name="appstrings_release_v2123_summary_map_crash_fix_and_stability">Correção de uma falha ao abrir o mapa na versão Release e melhoria da estabilidade na exibição das ligações FH</string>
+    <string name="appstrings_release_v2124_summary_datagouv_weekly_source_link">Adicionada a ligação data.gouv.fr para os dados semanais no ecrã Acerca</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registo de pedidos de rede</string>
