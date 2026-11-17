@@ -13,6 +13,7 @@ import fr.geotower.data.models.FavoriteScopeSiteRow
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.OutageGeocodeSiteRow
 import fr.geotower.data.models.PhysiqueEntity
+import fr.geotower.data.models.RefOperateurDbEntity
 import fr.geotower.data.models.RefTypeAntenneDbEntity
 import fr.geotower.data.models.SiteSupportInfoRow
 import fr.geotower.data.models.TechniqueEntity
@@ -197,6 +198,9 @@ interface GeoTowerDao {
         maxLon: Double
     ): List<LocalisationEntity>
 
+    @Query("SELECT id, libelle FROM ref_operateur")
+    suspend fun getAllOperators(): List<RefOperateurDbEntity>
+
     @Query("""
         SELECT
             l.id_anfr,
@@ -226,14 +230,14 @@ interface GeoTowerDao {
         LEFT JOIN ref_statut st ON t.statut_id = st.id
         WHERE l.latitude BETWEEN :minLat AND :maxLat
         AND l.longitude BETWEEN :minLon AND :maxLon
-        AND UPPER(TRIM(o.libelle)) IN (:operatorNames)
+        AND l.operateur_id IN (:operatorIds)
     """)
     suspend fun getLocalisationsInBoxForOperators(
         minLat: Double,
         maxLat: Double,
         minLon: Double,
         maxLon: Double,
-        operatorNames: List<String>
+        operatorIds: List<Int>
     ): List<LocalisationEntity>
 
     @Query("""
@@ -259,14 +263,14 @@ interface GeoTowerDao {
         LEFT JOIN ref_statut st ON t.statut_id = st.id
         WHERE l.latitude BETWEEN :minLat AND :maxLat
         AND l.longitude BETWEEN :minLon AND :maxLon
-        AND UPPER(TRIM(o.libelle)) IN (:operatorNames)
+        AND l.operateur_id IN (:operatorIds)
     """)
     suspend fun getLocalisationsInBoxFastForOperators(
         minLat: Double,
         maxLat: Double,
         minLon: Double,
         maxLon: Double,
-        operatorNames: List<String>
+        operatorIds: List<Int>
     ): List<LocalisationEntity>
 
     /**
@@ -571,7 +575,7 @@ interface GeoTowerDao {
             OR (:detailBackedBandMask != 0 AND (l.tech_mask & 8) != 0)
             OR (:includeFh = 1 AND ((l.band_mask & 16384) != 0 OR COALESCE(l.azimuts_fh, '') != ''))
         )
-        AND UPPER(TRIM(o.libelle)) IN (:operatorNames)
+        AND l.operateur_id IN (:operatorIds)
     """)
     suspend fun getLocalisationsInBoxForRadioFilterForOperators(
         minLat: Double,
@@ -581,7 +585,7 @@ interface GeoTowerDao {
         selectedBandMask: Int,
         detailBackedBandMask: Int,
         includeFh: Boolean,
-        operatorNames: List<String>
+        operatorIds: List<Int>
     ): List<LocalisationEntity>
 
     @Query("""
@@ -612,7 +616,7 @@ interface GeoTowerDao {
             OR (:detailBackedBandMask != 0 AND (l.tech_mask & 8) != 0)
             OR (:includeFh = 1 AND ((l.band_mask & 16384) != 0 OR COALESCE(l.azimuts_fh, '') != ''))
         )
-        AND UPPER(TRIM(o.libelle)) IN (:operatorNames)
+        AND l.operateur_id IN (:operatorIds)
     """)
     suspend fun getLocalisationsInBoxForRadioFilterFastForOperators(
         minLat: Double,
@@ -622,7 +626,7 @@ interface GeoTowerDao {
         selectedBandMask: Int,
         detailBackedBandMask: Int,
         includeFh: Boolean,
-        operatorNames: List<String>
+        operatorIds: List<Int>
     ): List<LocalisationEntity>
 
     @Query("""

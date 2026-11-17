@@ -3513,6 +3513,7 @@
     <string name="appstrings_release_v2124_summary_datagouv_weekly_source_link">Quellenlink zu data.gouv.fr für die wöchentlichen Mobilfunkdaten im Info-Bildschirm hinzugefügt</string>
     <string name="appstrings_release_v2125_summary_fh_map_site_comparator_and_map_scale">Eigene Richtfunk-Karte (FH), direkter Standort-Vergleich und dynamischer Kartenmaßstab</string>
     <string name="appstrings_release_v2126_summary_fh_map_local_priority_and_viewport_opt">Priorität für die lokale Datenbank auf der Richtfunk-Karte (FH) und optimiertes Nachladen beim Verschieben</string>
+    <string name="appstrings_release_v2127_summary_overseas_operator_filtering_fix">Verbesserte Netzbetreiber-Filterung auf der Karte für Überseegebiete und kombinierte Bezeichnungen</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Netzwerkanfragen-Protokoll</string>

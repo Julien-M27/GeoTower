@@ -946,11 +946,14 @@ class AnfrRepository(
         detailBackedBandMask: Int = 0,
         selectedOperatorKeys: Set<String>? = null
     ): List<LocalisationEntity> {
-        val operatorNames = selectedOperatorKeys?.takeIf { it.isNotEmpty() }?.let { normalizeOperatorKeys(it) }
+        val selectedKeys = selectedOperatorKeys?.let(::normalizedSelectedOperatorKeys)
+        if (selectedKeys != null && selectedKeys.isEmpty()) {
+            return emptyList()
+        }
         if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_BBOX)) {
             val liveSites = hideHiddenSites(getLiveSitesInBox(latNorth, lonEast, latSouth, lonWest))
-            return if (operatorNames != null && operatorNames.isNotEmpty()) {
-                liveSites.filter { site -> site.operateur?.trim()?.uppercase(Locale.ROOT) in operatorNames }
+            return if (selectedKeys != null) {
+                liveSites.filter { site -> matchesSelectedOperatorKeys(site.operateur, selectedKeys) }
             } else {
                 liveSites
             }
@@ -959,16 +962,23 @@ class AnfrRepository(
         val hideUnderground = AppConfig.hideUndergroundSites.value
         val bounds = mapQueryBounds(latNorth, lonEast, latSouth, lonWest)
         val localisations = queryLocalDatabase(emptyList()) {
+            val operatorIds = if (selectedKeys != null) {
+                resolveMatchingOperatorIds(selectedKeys).also { ids ->
+                    if (ids.isEmpty()) return@queryLocalDatabase emptyList()
+                }
+            } else {
+                null
+            }
             bounds.longitudeRanges
                 .flatMap { range ->
-                    if (operatorNames != null && operatorNames.isNotEmpty()) {
+                    if (operatorIds != null) {
                         if (hideUnderground) {
                             getLocalisationsInBoxForOperators(
                                 minLat = bounds.minLat,
                                 maxLat = bounds.maxLat,
                                 minLon = range.min,
                                 maxLon = range.max,
-                                operatorNames = operatorNames
+                                operatorIds = operatorIds
                             )
                         } else {
                             getLocalisationsInBoxFastForOperators(
@@ -976,7 +986,7 @@ class AnfrRepository(
                                 maxLat = bounds.maxLat,
                                 minLon = range.min,
                                 maxLon = range.max,
-                                operatorNames = operatorNames
+                                operatorIds = operatorIds
                             )
                         }
                     } else {
@@ -1156,7 +1166,6 @@ class AnfrRepository(
         detailBackedBandMask: Int = frequencyFilter.detailBackedBandMaskForEnrichment(),
         selectedOperatorKeys: Set<String>? = null
     ): List<LocalisationEntity> {
-        val operatorNames = selectedOperatorKeys?.takeIf { it.isNotEmpty() }?.let { normalizeOperatorKeys(it) }
         if (frequencyFilter.isFullyEnabled) {
             return getAntennasInBox(
                 latNorth = latNorth,
@@ -1168,10 +1177,15 @@ class AnfrRepository(
             )
         }
 
+        val selectedKeys = selectedOperatorKeys?.let(::normalizedSelectedOperatorKeys)
+        if (selectedKeys != null && selectedKeys.isEmpty()) {
+            return emptyList()
+        }
+
         if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_BBOX)) {
             val liveSites = getLiveSitesInBox(latNorth, lonEast, latSouth, lonWest)
-            val filteredLive = if (operatorNames != null && operatorNames.isNotEmpty()) {
-                liveSites.filter { site -> site.operateur?.trim()?.uppercase(Locale.ROOT) in operatorNames }
+            val filteredLive = if (selectedKeys != null) {
+                liveSites.filter { site -> matchesSelectedOperatorKeys(site.operateur, selectedKeys) }
             } else {
                 liveSites
             }
@@ -1191,9 +1205,16 @@ class AnfrRepository(
         val hideUnderground = AppConfig.hideUndergroundSites.value
         val bounds = mapQueryBounds(latNorth, lonEast, latSouth, lonWest)
         val localisations = queryLocalDatabase(emptyList()) {
+            val operatorIds = if (selectedKeys != null) {
+                resolveMatchingOperatorIds(selectedKeys).also { ids ->
+                    if (ids.isEmpty()) return@queryLocalDatabase emptyList()
+                }
+            } else {
+                null
+            }
             bounds.longitudeRanges
                 .flatMap { range ->
-                    if (operatorNames != null && operatorNames.isNotEmpty()) {
+                    if (operatorIds != null) {
                         if (hideUnderground) {
                             getLocalisationsInBoxForRadioFilterForOperators(
                                 minLat = bounds.minLat,
@@ -1203,7 +1224,7 @@ class AnfrRepository(
                                 selectedBandMask = selectedBandMask,
                                 detailBackedBandMask = detailBackedBandMask,
                                 includeFh = includeFh,
-                                operatorNames = operatorNames
+                                operatorIds = operatorIds
                             )
                         } else {
                             getLocalisationsInBoxForRadioFilterFastForOperators(
@@ -1214,7 +1235,7 @@ class AnfrRepository(
                                 selectedBandMask = selectedBandMask,
                                 detailBackedBandMask = detailBackedBandMask,
                                 includeFh = includeFh,
-                                operatorNames = operatorNames
+                                operatorIds = operatorIds
                             )
                         }
                     } else {
@@ -1713,6 +1734,25 @@ class AnfrRepository(
                 }
             }
         }
+    }
+
+    private fun normalizedSelectedOperatorKeys(keys: Set<String>): Set<String> {
+        return keys
+            .mapNotNull { key ->
+                OperatorColors.specForKey(key)?.key
+                    ?: key.trim().uppercase(Locale.ROOT).takeIf(String::isNotBlank)
+            }
+            .toSet()
+    }
+
+    private fun matchesSelectedOperatorKeys(rawOperator: String?, selectedKeys: Set<String>): Boolean {
+        return OperatorColors.keysFor(rawOperator).any { it in selectedKeys }
+    }
+
+    private suspend fun GeoTowerDao.resolveMatchingOperatorIds(selectedKeys: Set<String>): List<Int> {
+        return getAllOperators()
+            .filter { op -> matchesSelectedOperatorKeys(op.libelle, selectedKeys) }
+            .map { it.id }
     }
 
     fun normalizeOperatorKeys(keysOrNames: Collection<String>): List<String> {

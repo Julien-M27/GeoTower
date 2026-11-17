@@ -3515,6 +3515,7 @@
     <string name="appstrings_release_v2124_summary_datagouv_weekly_source_link">Ajout du lien data.gouv.fr pour les données hebdomadaires dans l\'écran À propos</string>
     <string name="appstrings_release_v2125_summary_fh_map_site_comparator_and_map_scale">Nouvelle carte des faisceaux hertziens (FH), comparateur de sites côte à côte et échelle dynamique sur la carte</string>
     <string name="appstrings_release_v2126_summary_fh_map_local_priority_and_viewport_opt">Priorité à la base locale pour la carte des faisceaux FH et optimisation du rechargement lors des déplacements</string>
+    <string name="appstrings_release_v2127_summary_overseas_operator_filtering_fix">Filtrage par opérateur amélioré sur la carte pour les opérateurs d\'Outre-mer et les libellés combinés</string>
 
     <!-- Journal des requêtes réseau -->
     <string name="network_log_title">Journal des requêtes réseau</string>

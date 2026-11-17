@@ -3513,6 +3513,7 @@
     <string name="appstrings_release_v2124_summary_datagouv_weekly_source_link">Aggiunto il link data.gouv.fr per i dati settimanali nella schermata Informazioni</string>
     <string name="appstrings_release_v2125_summary_fh_map_site_comparator_and_map_scale">Mappa dedicata ai collegamenti a microonde (FH), comparatore di siti fianco a fianco e scala dinamica sulla mappa</string>
     <string name="appstrings_release_v2126_summary_fh_map_local_priority_and_viewport_opt">Priorità al database locale per la mappa dei collegamenti FH e ottimizzazione del ricaricamento durante gli spostamenti</string>
+    <string name="appstrings_release_v2127_summary_overseas_operator_filtering_fix">Filtraggio per operatore migliorato sulla mappa per i territori d\'oltremare e le etichette combinate</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registro richieste di rete</string>
