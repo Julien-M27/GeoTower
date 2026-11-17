@@ -153,6 +153,7 @@ fun MoreScreen(navController: NavController) {
     val showNearby by AppConfig.moreShowNearby
     val showMap by AppConfig.moreShowMap
     val showTrips by AppConfig.moreShowTrips
+    val showFhMap by AppConfig.moreShowFhMap
     val showStats by AppConfig.moreShowStats
     val reorderEnabled = AppConfig.moreLongPressReorder.value
 
@@ -219,6 +220,21 @@ fun MoreScreen(navController: NavController) {
                         HomeAboutLink(fillWidth = false) {
                             navController.navigate("about")
                         }
+                    })
+                }
+            }
+            "fh_map" -> {
+                if (showFhMap) {
+                    entries.add(MoreMenuEntry(pageId) {
+                        MenuButton(
+                            text = "Carte des faisceaux FH",
+                            icon = Icons.Default.Timeline,
+                            color = buttonBgColor,
+                            contentColor = MaterialTheme.colorScheme.onSurface,
+                            useOneUi = uiStyle.useOneUi,
+                            fillWidth = true,
+                            onClick = { navController.navigate(FH_MAP_ROUTE) { launchSingleTop = true } }
+                        )
                     })
                 }
             }
@@ -378,16 +394,6 @@ fun MoreScreen(navController: NavController) {
                                 }
                             }
                         }
-
-                        MenuButton(
-                            text = "Carte des faisceaux FH",
-                            icon = Icons.Default.Timeline,
-                            color = buttonBgColor,
-                            contentColor = MaterialTheme.colorScheme.onSurface,
-                            useOneUi = uiStyle.useOneUi,
-                            fillWidth = true,
-                            onClick = { navController.navigate(FH_MAP_ROUTE) { launchSingleTop = true } }
-                        )
                     }
 
                     Spacer(modifier = Modifier.weight(1f))

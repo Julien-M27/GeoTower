@@ -1,4 +1,4 @@
-package fr.geotower.ui.screens.about
+﻿package fr.geotower.ui.screens.about
 
 import fr.geotower.R
 
@@ -27,10 +27,16 @@ data class ChangelogMilestone(
 object AppChangelogRepository {
     val milestones: List<ChangelogMilestone> = listOf(
         ChangelogMilestone(
-            versionName = "2.1.27",
+            versionName = "2.1.28",
             releaseDate = "2026-11-17",
             isCurrent = true,
             badge = MilestoneBadge.CURRENT,
+            summary = "Recherche avancée par opérateur (carte et proximité) et personnalisation de l'onglet Faisceaux FH",
+            itemResIds = listOf(R.string.appstrings_release_v2128_summary_operator_search_and_fh_nav_customization)
+        ),
+        ChangelogMilestone(
+            versionName = "2.1.27",
+            releaseDate = "2026-11-17",
             summary = "Filtrage par opérateur amélioré et fiabilisé pour les opérateurs d'Outre-mer et les libellés combinés",
             itemResIds = listOf(R.string.appstrings_release_v2127_summary_overseas_operator_filtering_fix)
         ),
@@ -87,6 +93,12 @@ object AppChangelogRepository {
             releaseDate = "2026-11-07",
             summary = "Prise en charge intégrale des 20 opérateurs télécoms sur montres connectées et harmonisation",
             itemResIds = listOf(R.string.appstrings_release_v2118_summary_full_twenty_operators_web_api_and_watch_sync)
+        ),
+        ChangelogMilestone(
+            versionName = "2.1.17",
+            releaseDate = "2026-11-07",
+            summary = "Prise en charge intégrale des 20 opérateurs télécoms sur montres connectées et harmonisation",
+            itemResIds = listOf(R.string.appstrings_release_v2117_summary_twenty_operators_support_and_watch_enhancements)
         ),
         ChangelogMilestone(
             versionName = "2.1.16",
@@ -289,10 +301,26 @@ object AppChangelogRepository {
             itemResIds = listOf(R.string.appstrings_release_v2084_summary_bottom_nav_customization)
         ),
         ChangelogMilestone(
+            versionName = "2.0.83",
+            releaseDate = "2026-10-24",
+            summary = "Ajustements de fluidité et réactivité du défilement avec la barre inférieure",
+            directItems = listOf(
+                "Fluidité accrue lors des transitions entre onglets de la barre de navigation",
+                "Réglages fins de sensibilité du curseur temporel"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "2.0.82",
+            releaseDate = "2026-10-24",
+            summary = "Affinement des onglets de navigation inférieure et retour haptique",
+            directItems = listOf(
+                "Amélioration du comportement tactile sur la barre d'onglets inférieure",
+                "Stabilité des filtres temporels sur la carte"
+            )
+        ),
+        ChangelogMilestone(
             versionName = "2.0.81",
             releaseDate = "2026-10-24",
-            isMajor = true,
-            badge = MilestoneBadge.MAJOR,
             summary = "Mode de navigation par barre inferieure et curseur temporel",
             itemResIds = listOf(R.string.appstrings_release_v2081_summary_bottom_navigation_bar)
         ),
@@ -419,8 +447,6 @@ object AppChangelogRepository {
         ChangelogMilestone(
             versionName = "2.0.60",
             releaseDate = "2026-09-23",
-            isMajor = true,
-            badge = MilestoneBadge.MAJOR,
             summary = "Visionneuse des bases et fiabilite des services.",
             itemResIds = listOf(R.string.appstrings_release_v2060_summary_database_viewer, R.string.appstrings_release_v2060_summary_local_build, R.string.appstrings_release_v2060_summary_live_photos)
         ),
@@ -441,6 +467,123 @@ object AppChangelogRepository {
             releaseDate = "2026-09-05",
             summary = "Diagnostic des serveurs GeoTower.",
             itemResIds = listOf(R.string.appstrings_release_v2057_summary_ping, R.string.appstrings_release_v2057_summary_diagnostics)
+        ),
+        ChangelogMilestone(
+            versionName = "2.0.56",
+            releaseDate = "2026-09-04",
+            summary = "Affichage Android Auto fiabilisé et rendu optimisé",
+            directItems = listOf(
+                "Affichage et cadrage de la carte optimisés pour les écrans de bord Android Auto",
+                "Stabilité et robustesse accrues de la projection automobile"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "2.0.55",
+            releaseDate = "2026-09-04",
+            summary = "Cadrage Android Auto amélioré et centrage automatique",
+            directItems = listOf(
+                "Cadrage dynamique de la carte selon la vitesse sur Android Auto",
+                "Recentrage automatique sur le véhicule lors de la navigation"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "2.0.54",
+            releaseDate = "2026-09-04",
+            summary = "Affichage Android Auto plus compatible avec les écrans larges",
+            directItems = listOf(
+                "Prise en charge optimisée des ratios d'écran panoramiques pour véhicules",
+                "Adaptation des éléments d'interface embarquée"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "2.0.53",
+            releaseDate = "2026-09-04",
+            summary = "Stabilité du rendu cartographique sous Android Auto",
+            directItems = listOf(
+                "Optimisation du pipeline de rendu graphique pour console de bord",
+                "Prévention des scintillements de tuiles en conduite"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "2.0.52",
+            releaseDate = "2026-09-04",
+            summary = "Rendu Android Auto plus robuste et économie mémoire",
+            directItems = listOf(
+                "Consommation mémoire réduite pendant la projection automobile",
+                "Maintien de la réactivité des commandes au volant"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "2.0.51",
+            releaseDate = "2026-09-01",
+            summary = "Correction et ajustements de l'affichage Android Auto",
+            directItems = listOf(
+                "Correction des superpositions d'icônes sur l'écran véhicule",
+                "Ajustement du contraste de nuit pour Android Auto"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "2.0.50",
+            releaseDate = "2026-09-01",
+            summary = "Carte Android Auto fiabilisée et localisation améliorée",
+            directItems = listOf(
+                "Interactivité et navigation sur la carte embarquée dans les véhicules",
+                "Réglages et détails adaptés à l'expérience conducteur"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "2.0.49",
+            releaseDate = "2026-09-01",
+            summary = "Localisation et réglages améliorés pour Android Auto",
+            directItems = listOf(
+                "Précision accrue de la géolocalisation en mode conduite",
+                "Synchronisation des préférences de carte avec le véhicule"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "2.0.48",
+            releaseDate = "2026-09-01",
+            summary = "Réglages et détails techniques sur écran Android Auto",
+            directItems = listOf(
+                "Affichage détaillé de la station active sur l'écran de bord",
+                "Accès rapide aux options de visualisation automobile"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "2.0.47",
+            releaseDate = "2026-09-01",
+            summary = "Carte Android Auto interactive et navigation au toucher",
+            directItems = listOf(
+                "Interaction tactile directe sur la carte du tableau de bord",
+                "Sélection d'émetteurs et zoom tactile fluide"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "2.0.46",
+            releaseDate = "2026-09-01",
+            summary = "Améliorations Android Auto et téléchargements de données",
+            directItems = listOf(
+                "Mise en cache anticipée des antennes le long de l'itinéraire",
+                "Téléchargement en arrière-plan optimisé pour la conduite"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "2.0.45",
+            releaseDate = "2026-09-01",
+            summary = "Ajustements d'ergonomie et de stabilité Android Auto",
+            directItems = listOf(
+                "Transitions adoucies à l'ouverture de l'écran voiture",
+                "Correction des anomalies d'orientation en projection"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "2.0.44",
+            releaseDate = "2026-09-01",
+            summary = "Intégration complète Android Auto et écran dédié",
+            directItems = listOf(
+                "Nouvel écran d'accueil dédié pour Android Auto avec carte temps réel",
+                "Téléchargement et mise en cache des antennes optimisés pour la conduite"
+            )
         ),
         ChangelogMilestone(
             versionName = "2.0.43",
@@ -621,14 +764,59 @@ object AppChangelogRepository {
         ChangelogMilestone(
             versionName = "2.0.14",
             releaseDate = "2026-08-08",
-            summary = "Section « Pages », repere GPS fluide et generation locale sur budgets mesures.",
+            summary = "Section « Pages », repère GPS fluide et génération locale sur budgets mesurés.",
             itemResIds = listOf(R.string.appstrings_release_v2014_smooth_location, R.string.appstrings_release_v2014_announced_bands, R.string.appstrings_release_v2014_azimuth_placeholder, R.string.appstrings_release_v2014_pages_section, R.string.appstrings_release_v2014_pages_search, R.string.appstrings_release_v2014_local_build_budgets, R.string.appstrings_release_v2014_local_build_cost, R.string.appstrings_release_v2014_local_build_announced, R.string.appstrings_release_v2014_local_build_speed)
+        ),
+        ChangelogMilestone(
+            versionName = "2.0.13",
+            releaseDate = "2026-08-07",
+            summary = "Stabilité du chargement et initialisation des services",
+            directItems = listOf(
+                "Sécurisation des vérifications de version de base au démarrage",
+                "Stabilité accrue sur les appareils à ressources limitées"
+            )
         ),
         ChangelogMilestone(
             versionName = "2.0.12",
             releaseDate = "2026-08-07",
             summary = "Correction du crash au demarrage.",
             itemResIds = listOf(R.string.appstrings_release_v2012_startup_crash)
+        ),
+        ChangelogMilestone(
+            versionName = "2.0.11",
+            releaseDate = "2026-08-07",
+            summary = "Correctif d'initialisation de la base locale de secours",
+            directItems = listOf(
+                "Résolution des blocages lors de la première ouverture hors connexion",
+                "Optimisation des requêtes SQLite au lancement"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "2.0.10",
+            releaseDate = "2026-08-07",
+            summary = "Ajustements de robustesse au démarrage",
+            directItems = listOf(
+                "Prévention des fermetures inopinées sur configurations spécifiques",
+                "Fiabilisation de la lecture des préférences utilisateur"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "2.0.9",
+            releaseDate = "2026-08-06",
+            summary = "Ajustements de navigation sur fond satellite",
+            directItems = listOf(
+                "Fluidification des zooms rapides en vue satellite",
+                "Amélioration de la netteté des tuiles aériennes"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "2.0.7",
+            releaseDate = "2026-08-06",
+            summary = "Stabilisation des fonds de carte et contrôles de pannes",
+            directItems = listOf(
+                "Gestion optimisée des erreurs de chargement réseau pour les tuiles",
+                "Ajustement des compteurs de sites en panne sur la carte"
+            )
         ),
         ChangelogMilestone(
             versionName = "2.0.6",
@@ -715,38 +903,84 @@ object AppChangelogRepository {
             itemResIds = listOf(R.string.appstrings_release_v196_terms_screen, R.string.appstrings_release_v196_cancel_downloads, R.string.appstrings_release_v196_cancel_uploads, R.string.appstrings_release_v196_db_indexes, R.string.appstrings_release_v196_baseline_profile)
         ),
         ChangelogMilestone(
-            versionName = "1.5.99",
+            versionName = "1.9.9.5.9",
             releaseDate = "2026-06-30",
-            isMajor = true,
-            badge = MilestoneBadge.MAJOR,
-            summary = "Points SignalQuest, couverture théorique et profils de préférences",
-            itemResIds = listOf(R.string.appstrings_release_v1599_map_coverage_points, R.string.appstrings_release_v1599_map_theoretical_coverage, R.string.appstrings_release_v1599_map_history_slider, R.string.appstrings_release_v1599_settings_search, R.string.appstrings_release_v1599_settings_theme_button, R.string.appstrings_release_v1599_settings_diagnostic, R.string.appstrings_release_v1599_settings_battery_opt, R.string.appstrings_release_v1599_live_gps_accuracy, R.string.appstrings_release_v1599_profiles_rename, R.string.appstrings_release_v1599_profiles_import_preview, R.string.appstrings_release_v1599_profiles_export_selective, R.string.appstrings_release_v1599_profiles_changes_count, R.string.appstrings_release_v1599_elevation_obstacles, R.string.appstrings_release_v1599_share_radio_report, R.string.appstrings_release_v1599_share_site_pdf, R.string.appstrings_release_v1599_share_community_photos, R.string.appstrings_release_v1599_site_potential_outage, R.string.appstrings_release_v1599_site_cellmapper, R.string.appstrings_release_v1599_site_aer_id, R.string.appstrings_release_v1599_site_throughput_height)
-        ),
-        ChangelogMilestone(
-            versionName = "2.0.56",
-            releaseDate = "2026-09-04",
-            summary = "Affichage Android Auto fiabilisé et rendu optimisé",
+            summary = "Profils de préférences, widgets et optimisations de carte",
             directItems = listOf(
-                "Affichage et cadrage de la carte optimisés pour les écrans de bord Android Auto",
-                "Stabilité et robustesse accrues de la projection automobile"
+                "Améliorations de l'interface et personnalisation avancée des réglages",
+                "Stabilité des connexions et suivi cartographique"
             )
         ),
         ChangelogMilestone(
-            versionName = "2.0.50",
-            releaseDate = "2026-09-01",
-            summary = "Carte Android Auto fiabilisée et localisation améliorée",
+            versionName = "1.9.9.5.8",
+            releaseDate = "2026-06-18",
+            summary = "Profils de préférences, widgets et optimisations de carte",
             directItems = listOf(
-                "Interactivité et navigation sur la carte embarquée dans les véhicules",
-                "Réglages et détails adaptés à l'expérience conducteur"
+                "Améliorations de l'interface et personnalisation avancée des réglages",
+                "Stabilité des connexions et suivi cartographique"
             )
         ),
         ChangelogMilestone(
-            versionName = "2.0.44",
-            releaseDate = "2026-09-01",
-            summary = "Intégration complète Android Auto et écran dédié",
+            versionName = "1.9.9.5.7",
+            releaseDate = "2026-06-15",
+            summary = "Profils de préférences, widgets et optimisations de carte",
             directItems = listOf(
-                "Nouvel écran d'accueil dédié pour Android Auto avec carte temps réel",
-                "Téléchargement et mise en cache des antennes optimisés pour la conduite"
+                "Améliorations de l'interface et personnalisation avancée des réglages",
+                "Stabilité des connexions et suivi cartographique"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.9.5.6",
+            releaseDate = "2026-06-14",
+            summary = "Profils de préférences, widgets et optimisations de carte",
+            directItems = listOf(
+                "Améliorations de l'interface et personnalisation avancée des réglages",
+                "Stabilité des connexions et suivi cartographique"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.9.5.5",
+            releaseDate = "2026-06-11",
+            summary = "Profils de préférences, widgets et optimisations de carte",
+            directItems = listOf(
+                "Améliorations de l'interface et personnalisation avancée des réglages",
+                "Stabilité des connexions et suivi cartographique"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.9.5.4",
+            releaseDate = "2026-06-09",
+            summary = "Profils de préférences, widgets et optimisations de carte",
+            directItems = listOf(
+                "Améliorations de l'interface et personnalisation avancée des réglages",
+                "Stabilité des connexions et suivi cartographique"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.9.5.3",
+            releaseDate = "2026-06-09",
+            summary = "Profils de préférences, widgets et optimisations de carte",
+            directItems = listOf(
+                "Améliorations de l'interface et personnalisation avancée des réglages",
+                "Stabilité des connexions et suivi cartographique"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.9.5.2",
+            releaseDate = "2026-06-07",
+            summary = "Profils de préférences, widgets et optimisations de carte",
+            directItems = listOf(
+                "Améliorations de l'interface et personnalisation avancée des réglages",
+                "Stabilité des connexions et suivi cartographique"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.9.5.1",
+            releaseDate = "2026-06-07",
+            summary = "Profils de préférences, widgets et optimisations de carte",
+            directItems = listOf(
+                "Améliorations de l'interface et personnalisation avancée des réglages",
+                "Stabilité des connexions et suivi cartographique"
             )
         ),
         ChangelogMilestone(
@@ -762,6 +996,85 @@ object AppChangelogRepository {
             )
         ),
         ChangelogMilestone(
+            versionName = "1.9.9.4.9",
+            releaseDate = "2026-06-02",
+            summary = "Manifeste de téléchargement ECDSA, zoom photos et speedtests",
+            directItems = listOf(
+                "Sécurisation des vérifications d'intégrité des bases",
+                "Améliorations des visualisations photos et tests de débit"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.9.4.8",
+            releaseDate = "2026-06-01",
+            summary = "Manifeste de téléchargement ECDSA, zoom photos et speedtests",
+            directItems = listOf(
+                "Sécurisation des vérifications d'intégrité des bases",
+                "Améliorations des visualisations photos et tests de débit"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.9.4.7",
+            releaseDate = "2026-05-31",
+            summary = "Manifeste de téléchargement ECDSA, zoom photos et speedtests",
+            directItems = listOf(
+                "Sécurisation des vérifications d'intégrité des bases",
+                "Améliorations des visualisations photos et tests de débit"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.9.4.6",
+            releaseDate = "2026-05-31",
+            summary = "Manifeste de téléchargement ECDSA, zoom photos et speedtests",
+            directItems = listOf(
+                "Sécurisation des vérifications d'intégrité des bases",
+                "Améliorations des visualisations photos et tests de débit"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.9.4.5",
+            releaseDate = "2026-05-31",
+            summary = "Manifeste de téléchargement ECDSA, zoom photos et speedtests",
+            directItems = listOf(
+                "Sécurisation des vérifications d'intégrité des bases",
+                "Améliorations des visualisations photos et tests de débit"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.9.4.4",
+            releaseDate = "2026-05-31",
+            summary = "Manifeste de téléchargement ECDSA, zoom photos et speedtests",
+            directItems = listOf(
+                "Sécurisation des vérifications d'intégrité des bases",
+                "Améliorations des visualisations photos et tests de débit"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.9.4.3",
+            releaseDate = "2026-05-27",
+            summary = "Manifeste de téléchargement ECDSA, zoom photos et speedtests",
+            directItems = listOf(
+                "Sécurisation des vérifications d'intégrité des bases",
+                "Améliorations des visualisations photos et tests de débit"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.9.4.2",
+            releaseDate = "2026-05-26",
+            summary = "Ajout d’un manifeste de téléchargement signé ECDSA via DownloadManifestVerifier, utilisé pour la base ANFR et le catalogue des cartes offline. Vérification renforcée des téléchargements: URL officielle HTTPS, SHA-256 obligatoire, taille attendue, limite maximale, schéma/pays/nom de DB validés. Cartes offline: rejet des entrées sans hash, contrôle de dépassement de taille pendant le téléchargement, nettoyage en cas d’annulation. Sécurité externe: URLs de mise à jour app et d’annonces remote limitées aux domaines officiels. SignalQuest: ajout d’un token d’upload demandé avant l’envoi photo et transmis via header. Release: version 1.9.9.4.2, minification release activée, règles ProGuard ajoutées pour Retrofit/Gson/Room/Android Auto. Tests ajoutés/renforcés pour manifeste signé, DB downloader, URLs officielles, validation cartes et règles d’upload.",
+            directItems = listOf(
+                "Ajout d’un manifeste de téléchargement signé ECDSA via DownloadManifestVerifier, utilisé pour la base ANFR et le catalogue des cartes offline. Vérification renforcée des téléchargements: URL officielle HTTPS, SHA-256 obligatoire, taille attendue, limite maximale, schéma/pays/nom de DB validés. Cartes offline: rejet des entrées sans hash, contrôle de dépassement de taille pendant le téléchargement, nettoyage en cas d’annulation. Sécurité externe: URLs de mise à jour app et d’annonces remote limitées aux domaines officiels. SignalQuest: ajout d’un token d’upload demandé avant l’envoi photo et transmis via header. Release: version 1.9.9.4.2, minification release activée, règles ProGuard ajoutées pour Retrofit/Gson/Room/Android Auto. Tests ajoutés/renforcés pour manifeste signé, DB downloader, URLs officielles, validation cartes et règles d’upload."
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.9.4.1",
+            releaseDate = "2026-05-26",
+            summary = "Migration toolchain: Gradle 9.4.1, AGP 9.2.1, Kotlin 2.3.21, compileSdk/targetSdk 37, version app 1.9.9.4.1, dépendances déplacées/centralisées dans le version catalog.",
+            directItems = listOf(
+                "Migration toolchain: Gradle 9.4.1, AGP 9.2.1, Kotlin 2.3.21, compileSdk/targetSdk 37, version app 1.9.9.4.1, dépendances déplacées/centralisées dans le version catalog."
+            )
+        ),
+        ChangelogMilestone(
             versionName = "1.9.9.4",
             releaseDate = "2026-05-26",
             summary = "Sécurisation cryptographique ECDSA des manifestes et protection ProGuard",
@@ -769,6 +1082,86 @@ object AppChangelogRepository {
                 "Manifestes de téléchargement signés ECDSA pour les bases de données et les cartes hors-ligne",
                 "Sécurisation des vérifications SHA-256 et isolation réseau",
                 "Règles ProGuard et minification pour la variante release"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.9.3.9",
+            releaseDate = "2026-05-25",
+            summary = "Historique SignalQuest, logos d'application et multilingue",
+            directItems = listOf(
+                "Gestion des photos envoyées et affichage des métadonnées",
+                "Traductions et personnalisation des icônes d'accueil"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.9.3.8",
+            releaseDate = "2026-05-24",
+            summary = "Historique SignalQuest, logos d'application et multilingue",
+            directItems = listOf(
+                "Gestion des photos envoyées et affichage des métadonnées",
+                "Traductions et personnalisation des icônes d'accueil"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.9.3.7",
+            releaseDate = "2026-05-20",
+            summary = "Ajout des notes de version de la 1.9.9.3.7",
+            directItems = listOf(
+                "Ajout des notes de version de la 1.9.9.3.7"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.9.3.6",
+            releaseDate = "2026-05-18",
+            summary = "Historique SignalQuest, logos d'application et multilingue",
+            directItems = listOf(
+                "Gestion des photos envoyées et affichage des métadonnées",
+                "Traductions et personnalisation des icônes d'accueil"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.9.3.5",
+            releaseDate = "2026-05-18",
+            summary = "Historique SignalQuest, logos d'application et multilingue",
+            directItems = listOf(
+                "Gestion des photos envoyées et affichage des métadonnées",
+                "Traductions et personnalisation des icônes d'accueil"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.9.3.4",
+            releaseDate = "2026-05-18",
+            summary = "Historique SignalQuest, logos d'application et multilingue",
+            directItems = listOf(
+                "Gestion des photos envoyées et affichage des métadonnées",
+                "Traductions et personnalisation des icônes d'accueil"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.9.3.3",
+            releaseDate = "2026-05-17",
+            summary = "Historique SignalQuest, logos d'application et multilingue",
+            directItems = listOf(
+                "Gestion des photos envoyées et affichage des métadonnées",
+                "Traductions et personnalisation des icônes d'accueil"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.9.3.2",
+            releaseDate = "2026-05-17",
+            summary = "Historique SignalQuest, logos d'application et multilingue",
+            directItems = listOf(
+                "Gestion des photos envoyées et affichage des métadonnées",
+                "Traductions et personnalisation des icônes d'accueil"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.9.3.1",
+            releaseDate = "2026-05-16",
+            summary = "Historique SignalQuest, logos d'application et multilingue",
+            directItems = listOf(
+                "Gestion des photos envoyées et affichage des métadonnées",
+                "Traductions et personnalisation des icônes d'accueil"
             )
         ),
         ChangelogMilestone(
@@ -781,12 +1174,507 @@ object AppChangelogRepository {
             )
         ),
         ChangelogMilestone(
+            versionName = "1.9.9.2.9",
+            releaseDate = "2026-05-15",
+            summary = "Chartes graphiques opérateurs et intégration Outre-mer",
+            directItems = listOf(
+                "Couleurs officielles des opérateurs métropolitains et ultramarins",
+                "Optimisation des requêtes de base de données"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.9.2.8",
+            releaseDate = "2026-05-15",
+            summary = "Chartes graphiques opérateurs et intégration Outre-mer",
+            directItems = listOf(
+                "Couleurs officielles des opérateurs métropolitains et ultramarins",
+                "Optimisation des requêtes de base de données"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.9.2.7",
+            releaseDate = "2026-05-14",
+            summary = "Chartes graphiques opérateurs et intégration Outre-mer",
+            directItems = listOf(
+                "Couleurs officielles des opérateurs métropolitains et ultramarins",
+                "Optimisation des requêtes de base de données"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.9.2.6",
+            releaseDate = "2026-05-13",
+            summary = "Chartes graphiques opérateurs et intégration Outre-mer",
+            directItems = listOf(
+                "Couleurs officielles des opérateurs métropolitains et ultramarins",
+                "Optimisation des requêtes de base de données"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.9.2.5",
+            releaseDate = "2026-05-13",
+            summary = "Chartes graphiques opérateurs et intégration Outre-mer",
+            directItems = listOf(
+                "Couleurs officielles des opérateurs métropolitains et ultramarins",
+                "Optimisation des requêtes de base de données"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.9.2.4",
+            releaseDate = "2026-05-12",
+            summary = "Chartes graphiques opérateurs et intégration Outre-mer",
+            directItems = listOf(
+                "Couleurs officielles des opérateurs métropolitains et ultramarins",
+                "Optimisation des requêtes de base de données"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.9.2.3",
+            releaseDate = "2026-05-10",
+            summary = "Chartes graphiques opérateurs et intégration Outre-mer",
+            directItems = listOf(
+                "Couleurs officielles des opérateurs métropolitains et ultramarins",
+                "Optimisation des requêtes de base de données"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.9.2.2",
+            releaseDate = "2026-05-10",
+            summary = "Chartes graphiques opérateurs et intégration Outre-mer",
+            directItems = listOf(
+                "Couleurs officielles des opérateurs métropolitains et ultramarins",
+                "Optimisation des requêtes de base de données"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.9.2.1",
+            releaseDate = "2026-05-10",
+            summary = "Chartes graphiques opérateurs et intégration Outre-mer",
+            directItems = listOf(
+                "Couleurs officielles des opérateurs métropolitains et ultramarins",
+                "Optimisation des requêtes de base de données"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.9.2",
+            releaseDate = "2026-05-10",
+            summary = "Chartes graphiques opérateurs et intégration Outre-mer",
+            directItems = listOf(
+                "Couleurs officielles des opérateurs métropolitains et ultramarins",
+                "Optimisation des requêtes de base de données"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.9.1.9",
+            releaseDate = "2026-05-09",
+            summary = "Refonte Material You 3 Expressive, Now Bar et notifications",
+            directItems = listOf(
+                "Design Expressive moderne et animations fluides",
+                "Suivi actif dans la Now Bar et notifications promues"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.9.1.8",
+            releaseDate = "2026-05-09",
+            summary = "Refonte Material You 3 Expressive, Now Bar et notifications",
+            directItems = listOf(
+                "Design Expressive moderne et animations fluides",
+                "Suivi actif dans la Now Bar et notifications promues"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.9.1.7",
+            releaseDate = "2026-05-08",
+            summary = "Refonte Material You 3 Expressive, Now Bar et notifications",
+            directItems = listOf(
+                "Design Expressive moderne et animations fluides",
+                "Suivi actif dans la Now Bar et notifications promues"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.9.1.6",
+            releaseDate = "2026-05-08",
+            summary = "Refonte Material You 3 Expressive, Now Bar et notifications",
+            directItems = listOf(
+                "Design Expressive moderne et animations fluides",
+                "Suivi actif dans la Now Bar et notifications promues"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.9.1.5",
+            releaseDate = "2026-05-07",
+            summary = "Refonte Material You 3 Expressive, Now Bar et notifications",
+            directItems = listOf(
+                "Design Expressive moderne et animations fluides",
+                "Suivi actif dans la Now Bar et notifications promues"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.9.1.4",
+            releaseDate = "2026-05-07",
+            summary = "Refonte Material You 3 Expressive, Now Bar et notifications",
+            directItems = listOf(
+                "Design Expressive moderne et animations fluides",
+                "Suivi actif dans la Now Bar et notifications promues"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.9.1.3",
+            releaseDate = "2026-05-06",
+            summary = "Refonte Material You 3 Expressive, Now Bar et notifications",
+            directItems = listOf(
+                "Design Expressive moderne et animations fluides",
+                "Suivi actif dans la Now Bar et notifications promues"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.9.1.2",
+            releaseDate = "2026-05-03",
+            summary = "Refonte Material You 3 Expressive, Now Bar et notifications",
+            directItems = listOf(
+                "Design Expressive moderne et animations fluides",
+                "Suivi actif dans la Now Bar et notifications promues"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.9.1.1",
+            releaseDate = "2026-05-02",
+            summary = "Refonte Material You 3 Expressive, Now Bar et notifications",
+            directItems = listOf(
+                "Design Expressive moderne et animations fluides",
+                "Suivi actif dans la Now Bar et notifications promues"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.9",
+            releaseDate = "2026-04-29",
+            summary = "Fiches techniques des antennes et état opérationnel des émetteurs",
+            directItems = listOf(
+                "Visualisation des sites en service et en panne",
+                "Affichage détaillé des fréquences et azimuts"
+            )
+        ),
+        ChangelogMilestone(
             versionName = "1.9.9.0",
             releaseDate = "2026-05-15",
             summary = "Support des opérateurs d'Outre-mer et amélioration des statistiques",
             directItems = listOf(
                 "Intégration de Free Caraïbe, Telco OI, SRR et Outremer Telecom",
                 "Logos, couleurs et spectres adaptés aux territoires ultramarins"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.8.9",
+            releaseDate = "2026-04-28",
+            summary = "Fiches techniques des antennes et état opérationnel des émetteurs",
+            directItems = listOf(
+                "Visualisation des sites en service et en panne",
+                "Affichage détaillé des fréquences et azimuts"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.8.8",
+            releaseDate = "2026-04-17",
+            summary = "Fiches techniques des antennes et état opérationnel des émetteurs",
+            directItems = listOf(
+                "Visualisation des sites en service et en panne",
+                "Affichage détaillé des fréquences et azimuts"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.8.7",
+            releaseDate = "2026-04-17",
+            summary = "Fiches techniques des antennes et état opérationnel des émetteurs",
+            directItems = listOf(
+                "Visualisation des sites en service et en panne",
+                "Affichage détaillé des fréquences et azimuts"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.8.6",
+            releaseDate = "2026-04-17",
+            summary = "Fiches techniques des antennes et état opérationnel des émetteurs",
+            directItems = listOf(
+                "Visualisation des sites en service et en panne",
+                "Affichage détaillé des fréquences et azimuts"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.8.5",
+            releaseDate = "2026-04-16",
+            summary = "Fiches techniques des antennes et état opérationnel des émetteurs",
+            directItems = listOf(
+                "Visualisation des sites en service et en panne",
+                "Affichage détaillé des fréquences et azimuts"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.8.4",
+            releaseDate = "2026-04-15",
+            summary = "Fiches techniques des antennes et état opérationnel des émetteurs",
+            directItems = listOf(
+                "Visualisation des sites en service et en panne",
+                "Affichage détaillé des fréquences et azimuts"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.8.3",
+            releaseDate = "2026-04-13",
+            summary = "Fiches techniques des antennes et état opérationnel des émetteurs",
+            directItems = listOf(
+                "Visualisation des sites en service et en panne",
+                "Affichage détaillé des fréquences et azimuts"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.8.2",
+            releaseDate = "2026-04-13",
+            summary = "Fiches techniques des antennes et état opérationnel des émetteurs",
+            directItems = listOf(
+                "Visualisation des sites en service et en panne",
+                "Affichage détaillé des fréquences et azimuts"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.8.1",
+            releaseDate = "2026-04-10",
+            summary = "Fiches techniques des antennes et état opérationnel des émetteurs",
+            directItems = listOf(
+                "Visualisation des sites en service et en panne",
+                "Affichage détaillé des fréquences et azimuts"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.8",
+            releaseDate = "2026-04-10",
+            summary = "Fiches techniques des antennes et état opérationnel des émetteurs",
+            directItems = listOf(
+                "Visualisation des sites en service et en panne",
+                "Affichage détaillé des fréquences et azimuts"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.7.9",
+            releaseDate = "2026-04-10",
+            summary = "Fiches techniques des antennes et état opérationnel des émetteurs",
+            directItems = listOf(
+                "Visualisation des sites en service et en panne",
+                "Affichage détaillé des fréquences et azimuts"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.7.8",
+            releaseDate = "2026-04-06",
+            summary = "Fiches techniques des antennes et état opérationnel des émetteurs",
+            directItems = listOf(
+                "Visualisation des sites en service et en panne",
+                "Affichage détaillé des fréquences et azimuts"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.7.7",
+            releaseDate = "2026-04-06",
+            summary = "Fiches techniques des antennes et état opérationnel des émetteurs",
+            directItems = listOf(
+                "Visualisation des sites en service et en panne",
+                "Affichage détaillé des fréquences et azimuts"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.7.6",
+            releaseDate = "2026-04-06",
+            summary = "Fiches techniques des antennes et état opérationnel des émetteurs",
+            directItems = listOf(
+                "Visualisation des sites en service et en panne",
+                "Affichage détaillé des fréquences et azimuts"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.7.5",
+            releaseDate = "2026-04-06",
+            summary = "Fiches techniques des antennes et état opérationnel des émetteurs",
+            directItems = listOf(
+                "Visualisation des sites en service et en panne",
+                "Affichage détaillé des fréquences et azimuts"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.7.4",
+            releaseDate = "2026-04-04",
+            summary = "Fiches techniques des antennes et état opérationnel des émetteurs",
+            directItems = listOf(
+                "Visualisation des sites en service et en panne",
+                "Affichage détaillé des fréquences et azimuts"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.7.3",
+            releaseDate = "2026-04-04",
+            summary = "Fiches techniques des antennes et état opérationnel des émetteurs",
+            directItems = listOf(
+                "Visualisation des sites en service et en panne",
+                "Affichage détaillé des fréquences et azimuts"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.7.2",
+            releaseDate = "2026-04-04",
+            summary = "Fiches techniques des antennes et état opérationnel des émetteurs",
+            directItems = listOf(
+                "Visualisation des sites en service et en panne",
+                "Affichage détaillé des fréquences et azimuts"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.7.1",
+            releaseDate = "2026-04-02",
+            summary = "Fiches techniques des antennes et état opérationnel des émetteurs",
+            directItems = listOf(
+                "Visualisation des sites en service et en panne",
+                "Affichage détaillé des fréquences et azimuts"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.7",
+            releaseDate = "2026-04-02",
+            summary = "Fiches techniques des antennes et état opérationnel des émetteurs",
+            directItems = listOf(
+                "Visualisation des sites en service et en panne",
+                "Affichage détaillé des fréquences et azimuts"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.6.9",
+            releaseDate = "2026-04-02",
+            summary = "Fiches techniques des antennes et état opérationnel des émetteurs",
+            directItems = listOf(
+                "Visualisation des sites en service et en panne",
+                "Affichage détaillé des fréquences et azimuts"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.6.8",
+            releaseDate = "2026-04-02",
+            summary = "Fiches techniques des antennes et état opérationnel des émetteurs",
+            directItems = listOf(
+                "Visualisation des sites en service et en panne",
+                "Affichage détaillé des fréquences et azimuts"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.6.7",
+            releaseDate = "2026-04-01",
+            summary = "Fiches techniques des antennes et état opérationnel des émetteurs",
+            directItems = listOf(
+                "Visualisation des sites en service et en panne",
+                "Affichage détaillé des fréquences et azimuts"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.6.6",
+            releaseDate = "2026-04-01",
+            summary = "Fiches techniques des antennes et état opérationnel des émetteurs",
+            directItems = listOf(
+                "Visualisation des sites en service et en panne",
+                "Affichage détaillé des fréquences et azimuts"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.6.5",
+            releaseDate = "2026-03-31",
+            summary = "Fiches techniques des antennes et état opérationnel des émetteurs",
+            directItems = listOf(
+                "Visualisation des sites en service et en panne",
+                "Affichage détaillé des fréquences et azimuts"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.6.4",
+            releaseDate = "2026-03-29",
+            summary = "Fiches techniques des antennes et état opérationnel des émetteurs",
+            directItems = listOf(
+                "Visualisation des sites en service et en panne",
+                "Affichage détaillé des fréquences et azimuts"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.6.3",
+            releaseDate = "2026-03-29",
+            summary = "Fiches techniques des antennes et état opérationnel des émetteurs",
+            directItems = listOf(
+                "Visualisation des sites en service et en panne",
+                "Affichage détaillé des fréquences et azimuts"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.6.2",
+            releaseDate = "2026-03-29",
+            summary = "Fiches techniques des antennes et état opérationnel des émetteurs",
+            directItems = listOf(
+                "Visualisation des sites en service et en panne",
+                "Affichage détaillé des fréquences et azimuts"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.6.1",
+            releaseDate = "2026-03-28",
+            summary = "Fiches techniques des antennes et état opérationnel des émetteurs",
+            directItems = listOf(
+                "Visualisation des sites en service et en panne",
+                "Affichage détaillé des fréquences et azimuts"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.6",
+            releaseDate = "2026-03-28",
+            summary = "Fiches techniques des antennes et état opérationnel des émetteurs",
+            directItems = listOf(
+                "Visualisation des sites en service et en panne",
+                "Affichage détaillé des fréquences et azimuts"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.5",
+            releaseDate = "2026-03-26",
+            summary = "Fiches techniques des antennes et état opérationnel des émetteurs",
+            directItems = listOf(
+                "Visualisation des sites en service et en panne",
+                "Affichage détaillé des fréquences et azimuts"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.4",
+            releaseDate = "2026-03-26",
+            summary = "Fiches techniques des antennes et état opérationnel des émetteurs",
+            directItems = listOf(
+                "Visualisation des sites en service et en panne",
+                "Affichage détaillé des fréquences et azimuts"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.3",
+            releaseDate = "2026-03-25",
+            summary = "Fiches techniques des antennes et état opérationnel des émetteurs",
+            directItems = listOf(
+                "Visualisation des sites en service et en panne",
+                "Affichage détaillé des fréquences et azimuts"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.2",
+            releaseDate = "2026-03-25",
+            summary = "Fiches techniques des antennes et état opérationnel des émetteurs",
+            directItems = listOf(
+                "Visualisation des sites en service et en panne",
+                "Affichage détaillé des fréquences et azimuts"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.9.1",
+            releaseDate = "2026-03-25",
+            summary = "Fiches techniques des antennes et état opérationnel des émetteurs",
+            directItems = listOf(
+                "Visualisation des sites en service et en panne",
+                "Affichage détaillé des fréquences et azimuts"
             )
         ),
         ChangelogMilestone(
@@ -802,12 +1690,582 @@ object AppChangelogRepository {
             )
         ),
         ChangelogMilestone(
+            versionName = "1.9",
+            releaseDate = "2026-03-24",
+            summary = "Mise à jour et améliorations de GeoTower 1.9",
+            directItems = listOf(
+                "Optimisations de performances et correctifs de stabilité"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.8.9",
+            releaseDate = "2026-03-21",
+            summary = "Mesures de distance, modes satellites et calcul de couverture",
+            directItems = listOf(
+                "Outils de mesure géographique sur la carte",
+                "Fonds satellites et calculs de portée d'antenne"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.8.8.3",
+            releaseDate = "2026-03-19",
+            summary = "Mesures de distance, modes satellites et calcul de couverture",
+            directItems = listOf(
+                "Outils de mesure géographique sur la carte",
+                "Fonds satellites et calculs de portée d'antenne"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.8.8.2",
+            releaseDate = "2026-03-19",
+            summary = "Mesures de distance, modes satellites et calcul de couverture",
+            directItems = listOf(
+                "Outils de mesure géographique sur la carte",
+                "Fonds satellites et calculs de portée d'antenne"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.8.8.1",
+            releaseDate = "2026-03-19",
+            summary = "Mesures de distance, modes satellites et calcul de couverture",
+            directItems = listOf(
+                "Outils de mesure géographique sur la carte",
+                "Fonds satellites et calculs de portée d'antenne"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.8.8",
+            releaseDate = "2026-03-19",
+            summary = "Mesures de distance, modes satellites et calcul de couverture",
+            directItems = listOf(
+                "Outils de mesure géographique sur la carte",
+                "Fonds satellites et calculs de portée d'antenne"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.8.7.2",
+            releaseDate = "2026-03-19",
+            summary = "Mesures de distance, modes satellites et calcul de couverture",
+            directItems = listOf(
+                "Outils de mesure géographique sur la carte",
+                "Fonds satellites et calculs de portée d'antenne"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.8.7.1",
+            releaseDate = "2026-03-18",
+            summary = "Mesures de distance, modes satellites et calcul de couverture",
+            directItems = listOf(
+                "Outils de mesure géographique sur la carte",
+                "Fonds satellites et calculs de portée d'antenne"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.8.7",
+            releaseDate = "2026-03-18",
+            summary = "Mesures de distance, modes satellites et calcul de couverture",
+            directItems = listOf(
+                "Outils de mesure géographique sur la carte",
+                "Fonds satellites et calculs de portée d'antenne"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.8.6",
+            releaseDate = "2026-03-18",
+            summary = "Mesures de distance, modes satellites et calcul de couverture",
+            directItems = listOf(
+                "Outils de mesure géographique sur la carte",
+                "Fonds satellites et calculs de portée d'antenne"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.8.5",
+            releaseDate = "2026-03-17",
+            summary = "Mesures de distance, modes satellites et calcul de couverture",
+            directItems = listOf(
+                "Outils de mesure géographique sur la carte",
+                "Fonds satellites et calculs de portée d'antenne"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.8.4",
+            releaseDate = "2026-03-17",
+            summary = "Mesures de distance, modes satellites et calcul de couverture",
+            directItems = listOf(
+                "Outils de mesure géographique sur la carte",
+                "Fonds satellites et calculs de portée d'antenne"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.8.3",
+            releaseDate = "2026-03-16",
+            summary = "Mesures de distance, modes satellites et calcul de couverture",
+            directItems = listOf(
+                "Outils de mesure géographique sur la carte",
+                "Fonds satellites et calculs de portée d'antenne"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.8.2",
+            releaseDate = "2026-03-15",
+            summary = "Mesures de distance, modes satellites et calcul de couverture",
+            directItems = listOf(
+                "Outils de mesure géographique sur la carte",
+                "Fonds satellites et calculs de portée d'antenne"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.8.1",
+            releaseDate = "2026-03-15",
+            summary = "Mesures de distance, modes satellites et calcul de couverture",
+            directItems = listOf(
+                "Outils de mesure géographique sur la carte",
+                "Fonds satellites et calculs de portée d'antenne"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.8",
+            releaseDate = "2026-03-15",
+            summary = "Mise à jour et améliorations de GeoTower 1.8",
+            directItems = listOf(
+                "Optimisations de performances et correctifs de stabilité"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.7.9.9",
+            releaseDate = "2026-03-15",
+            summary = "Recherche d'antennes relais, fiches supports et boussole d'orientation",
+            directItems = listOf(
+                "Localisation de l'antenne la plus proche en temps réel",
+                "Orientation magnétique et détails techniques des émetteurs"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.7.9.8",
+            releaseDate = "2026-03-13",
+            summary = "Recherche d'antennes relais, fiches supports et boussole d'orientation",
+            directItems = listOf(
+                "Localisation de l'antenne la plus proche en temps réel",
+                "Orientation magnétique et détails techniques des émetteurs"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.7.9.7",
+            releaseDate = "2026-03-13",
+            summary = "Recherche d'antennes relais, fiches supports et boussole d'orientation",
+            directItems = listOf(
+                "Localisation de l'antenne la plus proche en temps réel",
+                "Orientation magnétique et détails techniques des émetteurs"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.7.9.6",
+            releaseDate = "2026-03-13",
+            summary = "Recherche d'antennes relais, fiches supports et boussole d'orientation",
+            directItems = listOf(
+                "Localisation de l'antenne la plus proche en temps réel",
+                "Orientation magnétique et détails techniques des émetteurs"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.7.9.5",
+            releaseDate = "2026-03-12",
+            summary = "Recherche d'antennes relais, fiches supports et boussole d'orientation",
+            directItems = listOf(
+                "Localisation de l'antenne la plus proche en temps réel",
+                "Orientation magnétique et détails techniques des émetteurs"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.7.9.4",
+            releaseDate = "2026-03-12",
+            summary = "Recherche d'antennes relais, fiches supports et boussole d'orientation",
+            directItems = listOf(
+                "Localisation de l'antenne la plus proche en temps réel",
+                "Orientation magnétique et détails techniques des émetteurs"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.7.9.3",
+            releaseDate = "2026-03-11",
+            summary = "Recherche d'antennes relais, fiches supports et boussole d'orientation",
+            directItems = listOf(
+                "Localisation de l'antenne la plus proche en temps réel",
+                "Orientation magnétique et détails techniques des émetteurs"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.7.9.2",
+            releaseDate = "2026-03-11",
+            summary = "Recherche d'antennes relais, fiches supports et boussole d'orientation",
+            directItems = listOf(
+                "Localisation de l'antenne la plus proche en temps réel",
+                "Orientation magnétique et détails techniques des émetteurs"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.7.9.1",
+            releaseDate = "2026-03-10",
+            summary = "Recherche d'antennes relais, fiches supports et boussole d'orientation",
+            directItems = listOf(
+                "Localisation de l'antenne la plus proche en temps réel",
+                "Orientation magnétique et détails techniques des émetteurs"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.7.9",
+            releaseDate = "2026-03-10",
+            summary = "Recherche d'antennes relais, fiches supports et boussole d'orientation",
+            directItems = listOf(
+                "Localisation de l'antenne la plus proche en temps réel",
+                "Orientation magnétique et détails techniques des émetteurs"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.7.8.9",
+            releaseDate = "2026-03-10",
+            summary = "Recherche d'antennes relais, fiches supports et boussole d'orientation",
+            directItems = listOf(
+                "Localisation de l'antenne la plus proche en temps réel",
+                "Orientation magnétique et détails techniques des émetteurs"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.7.8.8",
+            releaseDate = "2026-03-09",
+            summary = "Recherche d'antennes relais, fiches supports et boussole d'orientation",
+            directItems = listOf(
+                "Localisation de l'antenne la plus proche en temps réel",
+                "Orientation magnétique et détails techniques des émetteurs"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.7.8.7",
+            releaseDate = "2026-03-09",
+            summary = "Recherche d'antennes relais, fiches supports et boussole d'orientation",
+            directItems = listOf(
+                "Localisation de l'antenne la plus proche en temps réel",
+                "Orientation magnétique et détails techniques des émetteurs"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.7.8.6",
+            releaseDate = "2026-03-09",
+            summary = "Recherche d'antennes relais, fiches supports et boussole d'orientation",
+            directItems = listOf(
+                "Localisation de l'antenne la plus proche en temps réel",
+                "Orientation magnétique et détails techniques des émetteurs"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.7.8.5",
+            releaseDate = "2026-03-09",
+            summary = "Recherche d'antennes relais, fiches supports et boussole d'orientation",
+            directItems = listOf(
+                "Localisation de l'antenne la plus proche en temps réel",
+                "Orientation magnétique et détails techniques des émetteurs"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.7.8.4",
+            releaseDate = "2026-03-08",
+            summary = "Recherche d'antennes relais, fiches supports et boussole d'orientation",
+            directItems = listOf(
+                "Localisation de l'antenne la plus proche en temps réel",
+                "Orientation magnétique et détails techniques des émetteurs"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.7.8.3",
+            releaseDate = "2026-03-08",
+            summary = "Recherche d'antennes relais, fiches supports et boussole d'orientation",
+            directItems = listOf(
+                "Localisation de l'antenne la plus proche en temps réel",
+                "Orientation magnétique et détails techniques des émetteurs"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.7.8.2",
+            releaseDate = "2026-03-07",
+            summary = "Recherche d'antennes relais, fiches supports et boussole d'orientation",
+            directItems = listOf(
+                "Localisation de l'antenne la plus proche en temps réel",
+                "Orientation magnétique et détails techniques des émetteurs"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.7.8.1",
+            releaseDate = "2026-03-07",
+            summary = "Recherche d'antennes relais, fiches supports et boussole d'orientation",
+            directItems = listOf(
+                "Localisation de l'antenne la plus proche en temps réel",
+                "Orientation magnétique et détails techniques des émetteurs"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.7.8",
+            releaseDate = "2026-03-07",
+            summary = "Recherche d'antennes relais, fiches supports et boussole d'orientation",
+            directItems = listOf(
+                "Localisation de l'antenne la plus proche en temps réel",
+                "Orientation magnétique et détails techniques des émetteurs"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.7.7.9",
+            releaseDate = "2026-03-07",
+            summary = "Recherche d'antennes relais, fiches supports et boussole d'orientation",
+            directItems = listOf(
+                "Localisation de l'antenne la plus proche en temps réel",
+                "Orientation magnétique et détails techniques des émetteurs"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.7.7.8",
+            releaseDate = "2026-03-07",
+            summary = "Recherche d'antennes relais, fiches supports et boussole d'orientation",
+            directItems = listOf(
+                "Localisation de l'antenne la plus proche en temps réel",
+                "Orientation magnétique et détails techniques des émetteurs"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.7.7.7",
+            releaseDate = "2026-03-05",
+            summary = "Recherche d'antennes relais, fiches supports et boussole d'orientation",
+            directItems = listOf(
+                "Localisation de l'antenne la plus proche en temps réel",
+                "Orientation magnétique et détails techniques des émetteurs"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.7.7.6",
+            releaseDate = "2026-03-04",
+            summary = "Recherche d'antennes relais, fiches supports et boussole d'orientation",
+            directItems = listOf(
+                "Localisation de l'antenne la plus proche en temps réel",
+                "Orientation magnétique et détails techniques des émetteurs"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.7.7.5",
+            releaseDate = "2026-03-04",
+            summary = "Recherche d'antennes relais, fiches supports et boussole d'orientation",
+            directItems = listOf(
+                "Localisation de l'antenne la plus proche en temps réel",
+                "Orientation magnétique et détails techniques des émetteurs"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.7.7.4",
+            releaseDate = "2026-03-01",
+            summary = "Recherche d'antennes relais, fiches supports et boussole d'orientation",
+            directItems = listOf(
+                "Localisation de l'antenne la plus proche en temps réel",
+                "Orientation magnétique et détails techniques des émetteurs"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.7.7.3",
+            releaseDate = "2026-03-01",
+            summary = "Recherche d'antennes relais, fiches supports et boussole d'orientation",
+            directItems = listOf(
+                "Localisation de l'antenne la plus proche en temps réel",
+                "Orientation magnétique et détails techniques des émetteurs"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.7.7.2",
+            releaseDate = "2026-02-27",
+            summary = "Recherche d'antennes relais, fiches supports et boussole d'orientation",
+            directItems = listOf(
+                "Localisation de l'antenne la plus proche en temps réel",
+                "Orientation magnétique et détails techniques des émetteurs"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.7.7.1",
+            releaseDate = "2026-02-27",
+            summary = "Recherche d'antennes relais, fiches supports et boussole d'orientation",
+            directItems = listOf(
+                "Localisation de l'antenne la plus proche en temps réel",
+                "Orientation magnétique et détails techniques des émetteurs"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.7.7",
+            releaseDate = "2026-02-26",
+            summary = "Recherche d'antennes relais, fiches supports et boussole d'orientation",
+            directItems = listOf(
+                "Localisation de l'antenne la plus proche en temps réel",
+                "Orientation magnétique et détails techniques des émetteurs"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.7.6.2",
+            releaseDate = "2026-02-26",
+            summary = "Recherche d'antennes relais, fiches supports et boussole d'orientation",
+            directItems = listOf(
+                "Localisation de l'antenne la plus proche en temps réel",
+                "Orientation magnétique et détails techniques des émetteurs"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.7.6.1",
+            releaseDate = "2026-02-25",
+            summary = "Recherche d'antennes relais, fiches supports et boussole d'orientation",
+            directItems = listOf(
+                "Localisation de l'antenne la plus proche en temps réel",
+                "Orientation magnétique et détails techniques des émetteurs"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.7.6",
+            releaseDate = "2026-02-25",
+            summary = "Recherche d'antennes relais, fiches supports et boussole d'orientation",
+            directItems = listOf(
+                "Localisation de l'antenne la plus proche en temps réel",
+                "Orientation magnétique et détails techniques des émetteurs"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.7.5.1",
+            releaseDate = "2026-02-24",
+            summary = "Recherche d'antennes relais, fiches supports et boussole d'orientation",
+            directItems = listOf(
+                "Localisation de l'antenne la plus proche en temps réel",
+                "Orientation magnétique et détails techniques des émetteurs"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.7.5",
+            releaseDate = "2026-02-23",
+            summary = "Recherche d'antennes relais, fiches supports et boussole d'orientation",
+            directItems = listOf(
+                "Localisation de l'antenne la plus proche en temps réel",
+                "Orientation magnétique et détails techniques des émetteurs"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.7.4.3",
+            releaseDate = "2026-02-22",
+            summary = "Recherche d'antennes relais, fiches supports et boussole d'orientation",
+            directItems = listOf(
+                "Localisation de l'antenne la plus proche en temps réel",
+                "Orientation magnétique et détails techniques des émetteurs"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.7.4.2",
+            releaseDate = "2026-02-22",
+            summary = "Recherche d'antennes relais, fiches supports et boussole d'orientation",
+            directItems = listOf(
+                "Localisation de l'antenne la plus proche en temps réel",
+                "Orientation magnétique et détails techniques des émetteurs"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.7.4.1",
+            releaseDate = "2026-02-22",
+            summary = "Recherche d'antennes relais, fiches supports et boussole d'orientation",
+            directItems = listOf(
+                "Localisation de l'antenne la plus proche en temps réel",
+                "Orientation magnétique et détails techniques des émetteurs"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.7.4",
+            releaseDate = "2026-02-22",
+            summary = "Recherche d'antennes relais, fiches supports et boussole d'orientation",
+            directItems = listOf(
+                "Localisation de l'antenne la plus proche en temps réel",
+                "Orientation magnétique et détails techniques des émetteurs"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.7.3",
+            releaseDate = "2026-02-21",
+            summary = "Recherche d'antennes relais, fiches supports et boussole d'orientation",
+            directItems = listOf(
+                "Localisation de l'antenne la plus proche en temps réel",
+                "Orientation magnétique et détails techniques des émetteurs"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.7.1",
+            releaseDate = "2026-02-20",
+            summary = "Recherche d'antennes relais, fiches supports et boussole d'orientation",
+            directItems = listOf(
+                "Localisation de l'antenne la plus proche en temps réel",
+                "Orientation magnétique et détails techniques des émetteurs"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.7",
+            releaseDate = "2026-02-19",
+            summary = "Mise à jour et améliorations de GeoTower 1.7",
+            directItems = listOf(
+                "Optimisations de performances et correctifs de stabilité"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.6.1",
+            releaseDate = "2026-02-19",
+            summary = "Observatoire cartographique ANFR initial et navigation locale",
+            directItems = listOf(
+                "Première intégration des bases de données ANFR",
+                "Affichage cartographique des stations relais mobiles"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.5.99",
+            releaseDate = "2026-06-30",
+            summary = "Points SignalQuest, couverture théorique et profils de préférences",
+            itemResIds = listOf(R.string.appstrings_release_v1599_map_coverage_points, R.string.appstrings_release_v1599_map_theoretical_coverage, R.string.appstrings_release_v1599_map_history_slider, R.string.appstrings_release_v1599_settings_search, R.string.appstrings_release_v1599_settings_theme_button, R.string.appstrings_release_v1599_settings_diagnostic, R.string.appstrings_release_v1599_settings_battery_opt, R.string.appstrings_release_v1599_live_gps_accuracy, R.string.appstrings_release_v1599_profiles_rename, R.string.appstrings_release_v1599_profiles_import_preview, R.string.appstrings_release_v1599_profiles_export_selective, R.string.appstrings_release_v1599_profiles_changes_count, R.string.appstrings_release_v1599_elevation_obstacles, R.string.appstrings_release_v1599_share_radio_report, R.string.appstrings_release_v1599_share_site_pdf, R.string.appstrings_release_v1599_share_community_photos, R.string.appstrings_release_v1599_site_potential_outage, R.string.appstrings_release_v1599_site_cellmapper, R.string.appstrings_release_v1599_site_aer_id, R.string.appstrings_release_v1599_site_throughput_height)
+        ),
+        ChangelogMilestone(
+            versionName = "1.5.2",
+            releaseDate = "2026-02-19",
+            summary = "Observatoire cartographique ANFR initial et navigation locale",
+            directItems = listOf(
+                "Première intégration des bases de données ANFR",
+                "Affichage cartographique des stations relais mobiles"
+            )
+        ),
+        ChangelogMilestone(
             versionName = "1.5.0",
             releaseDate = "2026-04-17",
             summary = "Statuts des sites (en service / en panne) et levée de limite de distance",
             directItems = listOf(
                 "Visualisation en temps réel de l'état des émetteurs (en service, en panne)",
                 "Suppression de la restriction de recherche limitée à 50 km"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.4",
+            releaseDate = "2026-02-18",
+            summary = "Observatoire cartographique ANFR initial et navigation locale",
+            directItems = listOf(
+                "Première intégration des bases de données ANFR",
+                "Affichage cartographique des stations relais mobiles"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.3.1",
+            releaseDate = "2026-02-16",
+            summary = "Observatoire cartographique ANFR initial et navigation locale",
+            directItems = listOf(
+                "Première intégration des bases de données ANFR",
+                "Affichage cartographique des stations relais mobiles"
+            )
+        ),
+        ChangelogMilestone(
+            versionName = "1.3",
+            releaseDate = "2026-02-15",
+            summary = "Observatoire cartographique ANFR initial et navigation locale",
+            directItems = listOf(
+                "Première intégration des bases de données ANFR",
+                "Affichage cartographique des stations relais mobiles"
             )
         ),
         ChangelogMilestone(

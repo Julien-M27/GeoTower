@@ -996,6 +996,51 @@ interface GeoTowerDao {
             ) THEN 1 ELSE 0 END AS has_underground_support
         FROM localisation l
         LEFT JOIN ref_operateur o ON l.operateur_id = o.id
+        WHERE l.operateur_id IN (:operatorIds)
+        ORDER BY (
+            (l.latitude - :lat) * (l.latitude - :lat) +
+            (CASE
+                WHEN ABS(l.longitude - :lon) > 180 THEN 360 - ABS(l.longitude - :lon)
+                ELSE ABS(l.longitude - :lon)
+            END) *
+            (CASE
+                WHEN ABS(l.longitude - :lon) > 180 THEN 360 - ABS(l.longitude - :lon)
+                ELSE ABS(l.longitude - :lon)
+            END)
+        ) ASC
+        LIMIT :limit
+    """)
+    suspend fun getNearestForOperators(
+        lat: Double,
+        lon: Double,
+        operatorIds: List<Int>,
+        limit: Int
+    ): List<LocalisationEntity>
+
+    @Query("""
+        SELECT
+            l.id_anfr,
+            COALESCE(o.libelle, 'Inconnu') AS operateur,
+            l.latitude,
+            l.longitude,
+            l.azimuts,
+            l.code_insee,
+            l.azimuts_fh,
+            l.tech_mask,
+            l.band_mask,
+            l.arcep_nidt,
+            l.is_zb,
+            NULL AS statut,
+            0 AS has_active,
+            CASE WHEN EXISTS (
+                SELECT 1
+                FROM support underground_support
+                LEFT JOIN ref_nature underground_nature ON underground_support.nat_id = underground_nature.nat_id
+                WHERE underground_support.id_anfr = l.id_anfr
+                AND underground_nature.libelle = 'Intérieur sous-terrain'
+            ) THEN 1 ELSE 0 END AS has_underground_support
+        FROM localisation l
+        LEFT JOIN ref_operateur o ON l.operateur_id = o.id
         WHERE l.is_zb = 1
         ORDER BY (
             (l.latitude - :lat) * (l.latitude - :lat) +

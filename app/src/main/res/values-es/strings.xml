@@ -3514,6 +3514,7 @@
     <string name="appstrings_release_v2125_summary_fh_map_site_comparator_and_map_scale">Mapa dedicado de enlaces de microondas (FH), comparador de sitios lado a lado y escala dinámica en el mapa</string>
     <string name="appstrings_release_v2126_summary_fh_map_local_priority_and_viewport_opt">Prioridad a la base local para el mapa de enlaces FH y optimización de la recarga al desplazarse</string>
     <string name="appstrings_release_v2127_summary_overseas_operator_filtering_fix">Mejora del filtrado por operador en el mapa para territorios de ultramar y etiquetas combinadas</string>
+    <string name="appstrings_release_v2128_summary_operator_search_and_fh_nav_customization">Búsqueda avanzada por operador (mapa y cercanía) y personalización de la pestaña Enlaces FH en la navegación</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registro de solicitudes de red</string>
@@ -3560,6 +3561,7 @@
     <string name="bottom_nav_nearby">Cercanas</string>
     <string name="bottom_nav_map">Mapa</string>
     <string name="bottom_nav_trips">Rutas</string>
+    <string name="bottom_nav_fh_map">Enlaces FH</string>
     <string name="bottom_nav_stats">Estadísticas</string>
     <string name="bottom_nav_more">Más</string>
     <string name="settings_nav_mode_title">Modo de navegación</string>

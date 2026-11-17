@@ -3514,6 +3514,7 @@
     <string name="appstrings_release_v2125_summary_fh_map_site_comparator_and_map_scale">Dedicated microwave links (FH) map, side-by-side site comparator, and dynamic map scale bar</string>
     <string name="appstrings_release_v2126_summary_fh_map_local_priority_and_viewport_opt">Local database priority for the microwave links (FH) map and viewport-based reload optimization</string>
     <string name="appstrings_release_v2127_summary_overseas_operator_filtering_fix">Improved operator filtering on the map for Overseas territories and combined operator labels</string>
+    <string name="appstrings_release_v2128_summary_operator_search_and_fh_nav_customization">Enhanced operator search (map and nearby) and customizable Microwave Links (FH) navigation tab</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Network requests log</string>
@@ -3560,6 +3561,7 @@
     <string name="bottom_nav_nearby">Nearby</string>
     <string name="bottom_nav_map">Map</string>
     <string name="bottom_nav_trips">Trips</string>
+    <string name="bottom_nav_fh_map">FH Links</string>
     <string name="bottom_nav_stats">Statistics</string>
     <string name="bottom_nav_more">More</string>
     <string name="settings_nav_mode_title">Navigation mode</string>

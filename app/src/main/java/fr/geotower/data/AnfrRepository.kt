@@ -1325,6 +1325,38 @@ class AnfrRepository(
             .take(safeLimit)
     }
 
+    suspend fun getNearestByOperatorKeys(
+        lat: Double,
+        lon: Double,
+        operatorKeys: Set<String>,
+        limit: Int,
+        detailBackedBandMask: Int = 0
+    ): List<LocalisationEntity> {
+        val selectedKeys = normalizedSelectedOperatorKeys(operatorKeys)
+        if (selectedKeys.isEmpty()) return emptyList()
+
+        val safeLimit = limit.coerceAtLeast(1)
+        val candidateLimit = (safeLimit.toLong() * 8L).coerceAtMost(5000L).toInt()
+        if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_NEARBY)) {
+            return hideHiddenSites(getLiveNearest(lat, lon, candidateLimit, zbOnly = false))
+                .filter { matchesSelectedOperatorKeys(it.operateur, selectedKeys) }
+                .take(safeLimit)
+        }
+
+        val localisations = queryLocalDatabase(emptyList()) {
+            val operatorIds = resolveMatchingOperatorIds(selectedKeys)
+            if (operatorIds.isEmpty()) return@queryLocalDatabase emptyList()
+            getNearestForOperators(
+                lat = lat,
+                lon = lon,
+                operatorIds = operatorIds,
+                limit = candidateLimit
+            )
+        }
+        return hideHiddenSites(enrichRadioBandMasksFromDetails(localisations, detailBackedBandMask))
+            .take(safeLimit)
+    }
+
     suspend fun getNearest(
         lat: Double,
         lon: Double,

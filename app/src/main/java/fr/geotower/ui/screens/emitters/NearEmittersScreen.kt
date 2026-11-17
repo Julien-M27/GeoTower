@@ -38,6 +38,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -112,7 +113,11 @@ import fr.geotower.ui.screens.map.FreqRow
 import fr.geotower.ui.screens.map.ProjectFilterColor
 import fr.geotower.ui.screens.map.SectionTitle
 import fr.geotower.ui.screens.map.SelectableButton
+import fr.geotower.ui.screens.map.extractExplicitOperatorQuery
+import fr.geotower.ui.screens.map.parseOperatorSearchKeys
+import fr.geotower.ui.screens.map.suggestOperatorsForExplicitQuery
 import fr.geotower.ui.screens.settings.NearbySettingsSheet
+import fr.geotower.utils.OperatorColorSpec
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AnfrDisplayText
 import fr.geotower.utils.AppConfig
@@ -398,7 +403,8 @@ fun NearEmittersScreen(
     val showOnlyOutOfServiceSites = showSitesOutOfService && !showSitesInService
     val searchedOperatorKey = remember(searchQuery) {
         if (currentSearchSpec.field == NearbySearchField.Operator) {
-            OperatorColors.keyFor(currentSearchSpec.value)
+            parseOperatorSearchKeys("op:${currentSearchSpec.value}").singleOrNull()
+                ?: OperatorColors.keyFor(currentSearchSpec.value)
         } else {
             null
         }
@@ -592,14 +598,15 @@ fun NearEmittersScreen(
         // On affiche immédiatement ce qu'on a trouvé localement pour éviter un écran vide
 
         // B. RECHERCHE DISTANTE INTELLIGENTE
-        // On vérifie si c'est juste le nom d'un opérateur (auquel cas on ne déclenche pas le GPS)
+        // On vérifie si c'est juste un filtre sur la zone courante (techno/type) ou une recherche globale (dont op:)
+        val hasOperatorSearch = searchSpec.field == NearbySearchField.Operator && searchValue.isNotBlank()
         val fieldSearchesCurrentArea = searchSpec.field in setOf(
-            NearbySearchField.Operator,
             NearbySearchField.Technology,
             NearbySearchField.SupportType
         )
         val shouldSearchRemote = !fieldSearchesCurrentArea && (
-            searchSpec.latitude != null ||
+            hasOperatorSearch ||
+                searchSpec.latitude != null ||
                 searchSpec.field in setOf(
                     NearbySearchField.AnfrId,
                     NearbySearchField.SupportId,
@@ -705,6 +712,23 @@ fun NearEmittersScreen(
                     }
 
                     // Si on a trouvé des coordonnées, on récupère le bloc d'antennes autour
+                    if (hasOperatorSearch) {
+                        val matchedOperatorKeys = parseOperatorSearchKeys("op:$searchValue").toSet()
+                        if (matchedOperatorKeys.isNotEmpty()) {
+                            val refLat = referenceLocation?.latitude ?: 46.603354
+                            val refLon = referenceLocation?.longitude ?: 1.888334
+                            globalAntennas.addAll(
+                                repository.getNearestByOperatorKeys(
+                                    lat = refLat,
+                                    lon = refLon,
+                                    operatorKeys = matchedOperatorKeys,
+                                    limit = nearbySearchLimit,
+                                    detailBackedBandMask = detailBackedBandMask
+                                )
+                            )
+                        }
+                    }
+
                     if (fieldSearchesCurrentArea && referenceLocation != null) {
                         globalAntennas.addAll(
                             repository.getNearest(
@@ -919,7 +943,24 @@ fun NearEmittersScreen(
                                     )
                                 )
 
-                                if (showSearchSuggestions) {
+                                val explicitOperatorSuggestions = remember(searchQuery) {
+                                    if (extractExplicitOperatorQuery(searchQuery) != null) {
+                                        suggestOperatorsForExplicitQuery(searchQuery)
+                                    } else {
+                                        emptyList()
+                                    }
+                                }
+                                if (explicitOperatorSuggestions.isNotEmpty()) {
+                                    NearbyOperatorSuggestionsRow(
+                                        operators = explicitOperatorSuggestions,
+                                        useOneUi = useOneUi,
+                                        onOperatorClick = { spec ->
+                                            searchQuery = "op:${spec.label}"
+                                            maxItemsToShow = 100
+                                            focusManager.clearFocus()
+                                        }
+                                    )
+                                } else if (showSearchSuggestions) {
                                     NearbyQuickSearchSuggestions(
                                         useOneUi = useOneUi,
                                         onSuggestionClick = { suggestion ->
@@ -1329,6 +1370,7 @@ private fun NearbyQuickSearchSuggestions(
     var showSearchHelp by remember { mutableStateOf(false) }
     val suggestions = listOf(
         NearbySearchSuggestion(stringResource(R.string.appstrings_nearby_search_suggestion_city), "ville:"),
+        NearbySearchSuggestion(stringResource(R.string.map_search_suggestion_operator), "op:"),
         NearbySearchSuggestion("Orange", "op:Orange"),
         NearbySearchSuggestion("SFR", "op:SFR"),
         NearbySearchSuggestion("Bouygues", "op:Bouygues"),
@@ -1382,6 +1424,47 @@ private fun NearbyQuickSearchSuggestions(
             ) {
                 Text(
                     text = suggestion.label,
+                    style = sizing.textStyle(MaterialTheme.typography.labelMedium),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun NearbyOperatorSuggestionsRow(
+    operators: List<OperatorColorSpec>,
+    useOneUi: Boolean,
+    onOperatorClick: (OperatorColorSpec) -> Unit
+) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(start = sizing.spacing(16.dp), top = sizing.spacing(8.dp), end = sizing.spacing(16.dp)),
+        horizontalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp)),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        operators.forEach { spec ->
+            OutlinedButton(
+                onClick = { onOperatorClick(spec) },
+                shape = if (useOneUi) RoundedCornerShape(50) else RoundedCornerShape(sizing.component(16.dp)),
+                contentPadding = PaddingValues(horizontal = sizing.spacing(12.dp), vertical = sizing.spacing(6.dp)),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = MaterialTheme.colorScheme.onSurface
+                )
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(sizing.component(10.dp))
+                        .background(Color(spec.colorArgb), CircleShape)
+                )
+                Spacer(modifier = Modifier.width(sizing.spacing(6.dp)))
+                Text(
+                    text = spec.label,
                     style = sizing.textStyle(MaterialTheme.typography.labelMedium),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -2014,7 +2097,7 @@ private fun siteMatchesSearch(site: UiSite, spec: NearbySearchSpec): Boolean {
 
     return when (spec.field) {
         NearbySearchField.All -> nearbyTextMatches(site.searchText, needle, compactNeedle)
-        NearbySearchField.Operator -> containsNeedle(site.operators)
+        NearbySearchField.Operator -> nearbySiteMatchesOperatorQuery(site.operators, spec.value)
         NearbySearchField.Technology -> containsNeedle(site.technologies + site.technicalText)
         NearbySearchField.SupportType -> containsNeedle(site.supportTypes + site.supportText)
         NearbySearchField.SupportId -> containsNeedle(site.supportIds + site.idSupport + site.anfrIds + site.id.toString())
@@ -2030,6 +2113,28 @@ private fun siteMatchesSearch(site: UiSite, spec: NearbySearchSpec): Boolean {
                 String.format(Locale.US, "%.6f,%.6f", site.latitude, site.longitude)
             )
         )
+    }
+}
+
+internal fun nearbySiteMatchesOperatorQuery(siteOperators: List<String>, rawOperatorValue: String): Boolean {
+    val cleanValue = rawOperatorValue.trim()
+    if (cleanValue.isBlank()) return true
+
+    val matchedKeys = parseOperatorSearchKeys("op:$cleanValue").toSet()
+    if (matchedKeys.isNotEmpty() && siteOperators.any { op ->
+            op in matchedKeys || OperatorColors.keysFor(op).any { it in matchedKeys }
+        }
+    ) {
+        return true
+    }
+
+    val needle = normalizeNearbySearch(cleanValue)
+    val compactNeedle = normalizeNearbySearchCompact(cleanValue)
+    if (needle.isBlank()) return true
+
+    return siteOperators.any { op ->
+        val candidates = listOf(op) + OperatorColors.searchLabelsFor(op)
+        candidates.any { candidate -> nearbyTextMatches(candidate, needle, compactNeedle) }
     }
 }
 

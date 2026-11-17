@@ -48,6 +48,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Timeline
 import androidx.compose.material.icons.filled.VerticalAlignTop
 import androidx.compose.material.icons.filled.ViewColumn
 import androidx.compose.material.icons.filled.WifiTethering
@@ -1336,6 +1337,7 @@ fun MoreSettingsSheet(
     var showNearby by remember { mutableStateOf(AppConfig.moreShowNearby.value) }
     var showMap by remember { mutableStateOf(AppConfig.moreShowMap.value) }
     var showTrips by remember { mutableStateOf(AppConfig.moreShowTrips.value) }
+    var showFhMap by remember { mutableStateOf(AppConfig.moreShowFhMap.value) }
     var showStats by remember { mutableStateOf(AppConfig.moreShowStats.value) }
     var longPressReorder by remember { mutableStateOf(AppConfig.moreLongPressReorder.value) }
 
@@ -1496,6 +1498,14 @@ fun MoreSettingsSheet(
                                     },
                                     shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight
                                 )
+                                "fh_map" -> DraggableSwitchCard(
+                                    "Carte des faisceaux FH", showFhMap,
+                                    {
+                                        showFhMap = it
+                                        AppConfig.setMoreShowFhMap(prefs, it)
+                                    },
+                                    shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight
+                                )
                                 "stats" -> DraggableSwitchCard(
                                     stringResource(R.string.bottom_nav_stats), showStats,
                                     {
@@ -1559,6 +1569,7 @@ fun MoreSettingsSheet(
                     showNearby = true
                     showMap = true
                     showTrips = true
+                    showFhMap = true
                     showStats = true
                     longPressReorder = true
                     showQuitButton = true
@@ -1569,6 +1580,7 @@ fun MoreSettingsSheet(
                     AppConfig.setMoreShowNearby(prefs, true)
                     AppConfig.setMoreShowMap(prefs, true)
                     AppConfig.setMoreShowTrips(prefs, true)
+                    AppConfig.setMoreShowFhMap(prefs, true)
                     AppConfig.setMoreShowStats(prefs, true)
                     AppConfig.setMoreLongPressReorder(prefs, true)
                     AppConfig.setHomeHelpPosition(prefs, AppConfig.DEFAULT_HOME_HELP_POSITION)
@@ -1809,6 +1821,7 @@ private fun getBottomNavTabInfo(id: String): BottomNavTabInfo = when (id) {
     "nearby" -> BottomNavTabInfo("nearby", R.string.bottom_nav_nearby, Icons.Default.MyLocation)
     "map" -> BottomNavTabInfo("map", R.string.bottom_nav_map, Icons.Default.Map)
     "trips" -> BottomNavTabInfo("trips", R.string.bottom_nav_trips, Icons.Default.Route)
+    "fh_map" -> BottomNavTabInfo("fh_map", R.string.bottom_nav_fh_map, Icons.Default.Timeline)
     "compass" -> BottomNavTabInfo("compass", R.string.nav_compass, Icons.Default.Explore)
     "stats" -> BottomNavTabInfo("stats", R.string.bottom_nav_stats, Icons.Default.BarChart)
     "settings" -> BottomNavTabInfo("settings", R.string.nav_settings, Icons.Default.Settings)

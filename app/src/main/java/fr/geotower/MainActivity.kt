@@ -1006,7 +1006,7 @@ class MainActivity : ComponentActivity() {
                     !navBackStackEntry?.arguments?.getString("photoDraftId").isNullOrBlank()
                 )
                 val isRootTab = isBottomNavActive && currentRoute in bottomNavTabs && !isMapSubFlow
-                val isMapRoute = currentRoute == "map" || currentRoute?.startsWith("map") == true
+                val isMapRoute = currentRoute == "map" || currentRoute?.startsWith("map") == true || currentRoute == "fh_map"
                 val isSwipeBetweenTabsEnabled = isRootTab && !isMapRoute
                 val bottomNavStartRoute = if (destinationApresSplash in bottomNavTabs) destinationApresSplash else "map"
                 val resolvedPopUpRoute = if (bottomNavStartRoute == "map") "map" else bottomNavStartRoute

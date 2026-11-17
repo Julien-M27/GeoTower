@@ -17,10 +17,12 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -648,12 +650,40 @@ fun FhMapScreen(
             }
 
             // Boutons flottants de contrôle de la carte (Zoom en HAUT, Localisation en BAS) identiques à la carte principale
+            val uiStyle = LocalGeoTowerUiStyle.current
+            val isBottomNavActive = AppConfig.isBottomNavActive()
+            val systemNavBars = WindowInsets.navigationBars.asPaddingValues()
+            val rawBottomNavPadding = systemNavBars.calculateBottomPadding()
+            val bottomControlsPadding = when {
+                isBottomNavActive && uiStyle.useOneUi -> {
+                    val oneUiBottomInset = if (rawBottomNavPadding > 24.dp) {
+                        (rawBottomNavPadding * 0.4f).coerceAtMost(16.dp)
+                    } else {
+                        (rawBottomNavPadding * 0.15f).coerceAtMost(4.dp)
+                    }
+                    sizing.component(58.dp) + sizing.spacing(28.dp) + oneUiBottomInset
+                }
+                isBottomNavActive -> {
+                    val standardBottomInset = if (rawBottomNavPadding > 24.dp) {
+                        (rawBottomNavPadding * 0.4f).coerceAtMost(16.dp)
+                    } else {
+                        (rawBottomNavPadding * 0.15f).coerceAtMost(3.dp)
+                    }
+                    sizing.component(64.dp) + standardBottomInset + sizing.spacing(12.dp)
+                }
+                else -> sizing.spacing(16.dp)
+            }
+            val bottomNavModifier = if (!isBottomNavActive) Modifier.navigationBarsPadding() else Modifier
+
             val mapControlButtonDiameter = sizing.component(52.dp)
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .navigationBarsPadding()
-                    .padding(end = sizing.spacing(16.dp), bottom = sizing.spacing(24.dp)),
+                    .then(bottomNavModifier)
+                    .padding(
+                        end = sizing.spacing(16.dp),
+                        bottom = if (isBottomNavActive) bottomControlsPadding else sizing.spacing(24.dp)
+                    ),
                 horizontalAlignment = Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))
             ) {
@@ -785,8 +815,8 @@ fun FhMapScreen(
                 showAttribution = showAttribution,
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .navigationBarsPadding()
-                    .padding(start = sizing.spacing(16.dp), bottom = sizing.spacing(16.dp))
+                    .then(bottomNavModifier)
+                    .padding(start = sizing.spacing(16.dp), bottom = bottomControlsPadding)
             )
 
             // Fiche du trait FH sélectionné
@@ -804,10 +834,11 @@ fun FhMapScreen(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
+                        .then(bottomNavModifier)
                         .padding(
                             start = sizing.spacing(12.dp),
                             end = sizing.spacing(72.dp),
-                            bottom = sizing.spacing(24.dp)
+                            bottom = if (isBottomNavActive) bottomControlsPadding else sizing.spacing(24.dp)
                         ),
                     shape = RoundedCornerShape(20.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),

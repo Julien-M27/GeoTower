@@ -58,6 +58,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -1099,10 +1100,6 @@ internal fun extractOperatorKeys(value: String?): List<String> {
     return OperatorColors.keysFor(value)
 }
 
-private val operatorSearchSplitRegex = Regex("\\s*(?:[,;/\\u2022]|\\bet\\b|\\+|&|\\|)\\s*", RegexOption.IGNORE_CASE)
-private val operatorSearchCombiningMarksRegex = Regex("\\p{Mn}+")
-private val operatorSearchNonWordRegex = Regex("[^A-Z0-9]+")
-private val operatorSearchRepeatedSpacesRegex = Regex("\\s+")
 // Tailles de reference (a 100 %) des controles flottants de la carte.
 private val MapControlButtonDiameter = 54.dp
 private val MapSearchBarHeight = 54.dp
@@ -1114,76 +1111,6 @@ private val mapControlButtonDiameter: Dp
 
 private val mapSearchBarHeight: Dp
     @Composable get() = LocalGeoTowerUiSizing.current.component(MapSearchBarHeight)
-
-private fun normalizeOperatorSearchToken(value: String): String {
-    return Normalizer.normalize(value, Normalizer.Form.NFD)
-        .replace(operatorSearchCombiningMarksRegex, "")
-        .uppercase(Locale.ROOT)
-        .replace(operatorSearchNonWordRegex, " ")
-        .trim()
-        .replace(operatorSearchRepeatedSpacesRegex, " ")
-}
-
-/**
- * Alias d'opérateurs normalisés une seule fois (indépendants de la requête de recherche) :
- * évite de tout re-normaliser à chaque frappe dans la recherche « op: … ».
- */
-private val operatorSearchAliasCandidates: List<Pair<String, String>> by lazy {
-    OperatorColors.all
-        .flatMap { spec ->
-            (listOf(spec.key, spec.label) + spec.aliases).map { rawAlias ->
-                spec.key to normalizeOperatorSearchToken(rawAlias)
-            }
-        }
-        .filter { (_, alias) -> alias.isNotBlank() }
-        .distinct()
-        .sortedByDescending { (_, alias) -> alias.length }
-}
-
-private fun parseOperatorSearchKeys(query: String): List<String> {
-    val trimmed = query.trim()
-    val splitIndex = trimmed.indexOf(':')
-    if (splitIndex <= 0) return emptyList()
-
-    val prefix = normalizeOperatorSearchToken(trimmed.substring(0, splitIndex)).replace(" ", "")
-    if (prefix !in setOf("OP", "OPERATEUR", "OPERATOR", "O")) return emptyList()
-
-    val cleanQuery = trimmed.substring(splitIndex + 1).trim()
-    if (cleanQuery.isBlank()) return emptyList()
-
-    val separatedTokens = cleanQuery
-        .split(operatorSearchSplitRegex)
-        .map { it.trim() }
-        .filter { it.isNotEmpty() }
-    val separatedKeys = separatedTokens.map { OperatorColors.keyFor(it) }
-    if (separatedKeys.size > 1 && separatedKeys.all { it != null }) {
-        return separatedKeys.filterNotNull().distinct()
-    }
-
-    val normalizedQuery = normalizeOperatorSearchToken(cleanQuery)
-    if (normalizedQuery.isBlank()) return emptyList()
-
-    val candidates = operatorSearchAliasCandidates
-
-    var reducedQuery = " $normalizedQuery "
-    val matches = mutableListOf<Pair<Int, String>>()
-
-    candidates.forEach { (key, alias) ->
-        val pattern = Regex("(?<![A-Z0-9])${Regex.escape(alias)}(?![A-Z0-9])")
-        pattern.find(reducedQuery)?.let { match ->
-            matches += match.range.first to key
-            reducedQuery = reducedQuery.replaceRange(match.range, " ".repeat(match.value.length))
-        }
-    }
-
-    val leftover = reducedQuery.replace(operatorSearchNonWordRegex, "")
-    if (matches.isEmpty() || leftover.isNotEmpty()) return emptyList()
-
-    return matches
-        .sortedBy { it.first }
-        .map { it.second }
-        .distinct()
-}
 
 /** Nombre de suggestions ouvertes sous la barre de recherche. */
 private const val MAP_SEARCH_SUGGESTION_COUNT = 3
@@ -1230,25 +1157,6 @@ private sealed interface MapSearchSuggestion {
 }
 
 /**
- * Opérateurs dont un alias commence par la saisie, sans exiger le préfixe `op:`.
- *
- * [exactOnly] ne garde que la correspondance pleine : c'est ce qui décide si l'opérateur passe
- * devant les communes. Taper « orange » vise sans doute l'opérateur ; « ora » peut encore être le
- * début d'une commune, l'opérateur attend alors son tour.
- */
-private fun matchOperatorSuggestions(query: String, exactOnly: Boolean): List<OperatorColorSpec> {
-    val normalizedQuery = normalizeOperatorSearchToken(query)
-    if (normalizedQuery.length < 2) return emptyList()
-
-    return OperatorColors.all.filter { spec ->
-        (listOf(spec.key, spec.label) + spec.aliases).any { rawAlias ->
-            val alias = normalizeOperatorSearchToken(rawAlias)
-            if (exactOnly) alias == normalizedQuery else alias.startsWith(normalizedQuery)
-        }
-    }
-}
-
-/**
  * Suggestions d'une saisie, dans l'ordre où [performSearch] les résoudrait à la validation : appuyer
  * sur une ligne doit donner exactement ce que la touche Entrée aurait donné, en levant juste
  * l'ambiguïté (quelle commune, quelle station) que la validation aurait tranchée toute seule.
@@ -1262,12 +1170,9 @@ private suspend fun buildMapSearchSuggestions(
 ): List<MapSearchSuggestion> {
     // Recherche explicite « op: … » : la barre filtre alors la carte au lieu de la déplacer, il n'y
     // a rien d'autre à proposer.
-    val explicitOperatorKeys = parseOperatorSearchKeys(query)
-    if (explicitOperatorKeys.isNotEmpty()) {
-        return explicitOperatorKeys
-            .mapNotNull(OperatorColors::specForKey)
+    if (extractExplicitOperatorQuery(query) != null) {
+        return suggestOperatorsForExplicitQuery(query)
             .map(MapSearchSuggestion::Operator)
-            .take(MAP_SEARCH_SUGGESTION_COUNT)
     }
 
     if (query.trim().startsWith("#")) {
@@ -3295,7 +3200,8 @@ fun MapScreen(
     )
     LaunchedEffect(searchQuery, isSearchActive, canUseMapSearch, searchSuggestionMinLength) {
         val cleanQuery = searchQuery.trim()
-        if (!isSearchActive || !canUseMapSearch || cleanQuery.length < searchSuggestionMinLength) {
+        val hasExplicitOperatorPrefix = extractExplicitOperatorQuery(cleanQuery) != null
+        if (!isSearchActive || !canUseMapSearch || (!hasExplicitOperatorPrefix && cleanQuery.length < searchSuggestionMinLength)) {
             searchSuggestions = emptyList()
             return@LaunchedEffect
         }
@@ -7867,9 +7773,15 @@ fun MapScreen(
                             enter = fadeIn() + expandVertically(expandFrom = Alignment.Top),
                             exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top)
                         ) {
+                            val compactSuggestions = if (extractExplicitOperatorQuery(searchQuery) != null) {
+                                searchSuggestions
+                            } else {
+                                searchSuggestions.take(MAP_SEARCH_SUGGESTION_COMPACT_COUNT)
+                            }
                             MapSearchSuggestionList(
-                                suggestions = searchSuggestions.take(MAP_SEARCH_SUGGESTION_COMPACT_COUNT),
+                                suggestions = compactSuggestions,
                                 onSelect = { suggestion -> safeClick { applySearchSuggestion(suggestion) } },
+                                maxHeight = 140.dp,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(start = sizing.spacing(16.dp), top = sizing.spacing(8.dp))
@@ -9237,7 +9149,8 @@ private fun MapSearchBar(
 private fun MapSearchSuggestionList(
     suggestions: List<MapSearchSuggestion>,
     onSelect: (MapSearchSuggestion) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    maxHeight: Dp = 280.dp
 ) {
     val sizing = LocalGeoTowerUiSizing.current
     Surface(
@@ -9247,7 +9160,12 @@ private fun MapSearchSuggestionList(
         shadowElevation = sizing.component(3.dp + 5.dp * AppConfig.floatingUiOpacityProgress),
         border = BorderStroke(1.dp, AppConfig.floatingUiBorderColor())
     ) {
-        Column(modifier = Modifier.padding(vertical = sizing.spacing(6.dp))) {
+        Column(
+            modifier = Modifier
+                .heightIn(max = sizing.component(maxHeight))
+                .verticalScroll(rememberScrollState())
+                .padding(vertical = sizing.spacing(6.dp))
+        ) {
             suggestions.forEachIndexed { index, suggestion ->
                 if (index > 0) {
                     HorizontalDivider(

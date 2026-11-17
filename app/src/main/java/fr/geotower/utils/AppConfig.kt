@@ -173,6 +173,7 @@ object AppConfig {
         "nearby",
         "map",
         "trips",
+        "fh_map",
         "compass",
         "stats",
         "settings",
@@ -182,8 +183,8 @@ object AppConfig {
 
     // Menu « Plus » pour le mode barre inférieure
     const val PREF_MORE_ORDER = "more_order"
-    const val DEFAULT_MORE_ORDER = "nearby,map,trips,compass,stats,settings,logo,about"
-    val moreOrder = mutableStateOf<List<String>>(listOf("compass", "settings", "logo", "about"))
+    const val DEFAULT_MORE_ORDER = "nearby,map,trips,fh_map,compass,stats,settings,logo,about"
+    val moreOrder = mutableStateOf<List<String>>(listOf("fh_map", "compass", "settings", "logo", "about"))
 
     const val PREF_MORE_SHOW_LOGO = "more_show_logo"
     const val PREF_MORE_SHOW_ABOUT = "more_show_about"
@@ -192,6 +193,7 @@ object AppConfig {
     const val PREF_MORE_SHOW_NEARBY = "more_show_nearby"
     const val PREF_MORE_SHOW_MAP = "more_show_map"
     const val PREF_MORE_SHOW_TRIPS = "more_show_trips"
+    const val PREF_MORE_SHOW_FH_MAP = "more_show_fh_map"
     const val PREF_MORE_SHOW_STATS = "more_show_stats"
     const val PREF_MORE_LONG_PRESS_REORDER = "more_long_press_reorder"
 
@@ -202,6 +204,7 @@ object AppConfig {
     val moreShowNearby = mutableStateOf(true)
     val moreShowMap = mutableStateOf(true)
     val moreShowTrips = mutableStateOf(true)
+    val moreShowFhMap = mutableStateOf(true)
     val moreShowStats = mutableStateOf(true)
     val moreLongPressReorder = mutableStateOf(true)
 
@@ -209,6 +212,7 @@ object AppConfig {
         "nearby",
         "map",
         "trips",
+        "fh_map",
         "compass",
         "stats",
         "settings",
@@ -1036,6 +1040,11 @@ object AppConfig {
         prefs.edit().putBoolean(PREF_MORE_SHOW_TRIPS, enabled).apply()
     }
 
+    fun setMoreShowFhMap(prefs: SharedPreferences, enabled: Boolean) {
+        moreShowFhMap.value = enabled
+        prefs.edit().putBoolean(PREF_MORE_SHOW_FH_MAP, enabled).apply()
+    }
+
     fun setMoreShowStats(prefs: SharedPreferences, enabled: Boolean) {
         moreShowStats.value = enabled
         prefs.edit().putBoolean(PREF_MORE_SHOW_STATS, enabled).apply()
@@ -1178,6 +1187,7 @@ object AppConfig {
         moreShowNearby.value = prefs.getBoolean(PREF_MORE_SHOW_NEARBY, true)
         moreShowMap.value = prefs.getBoolean(PREF_MORE_SHOW_MAP, true)
         moreShowTrips.value = prefs.getBoolean(PREF_MORE_SHOW_TRIPS, true)
+        moreShowFhMap.value = prefs.getBoolean(PREF_MORE_SHOW_FH_MAP, true)
         moreShowStats.value = prefs.getBoolean(PREF_MORE_SHOW_STATS, true)
         moreLongPressReorder.value = prefs.getBoolean(PREF_MORE_LONG_PRESS_REORDER, true)
 

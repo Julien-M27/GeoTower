@@ -43,6 +43,7 @@ import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Timeline
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
@@ -95,6 +96,7 @@ enum class BottomNavTab(
     NEARBY("nearby", "emitters", R.string.bottom_nav_nearby, Icons.Default.MyLocation),
     MAP("map", "map", R.string.bottom_nav_map, Icons.Default.Map),
     TRIPS("trips", "trips", R.string.bottom_nav_trips, Icons.Default.Route),
+    FH_MAP("fh_map", "fh_map", R.string.bottom_nav_fh_map, Icons.Default.Timeline),
     COMPASS("compass", "compass", R.string.nav_compass, Icons.Default.Explore),
     STATS("stats", "stats", R.string.bottom_nav_stats, Icons.Default.BarChart),
     SETTINGS("settings", "settings", R.string.nav_settings, Icons.Default.Settings),
