@@ -166,6 +166,7 @@ fun FhMapScreen(
     var hasFhTable by remember { mutableStateOf(true) }
     var refreshTrigger by remember { mutableIntStateOf(0) }
     var viewportVersion by remember { mutableIntStateOf(0) }
+    val lastFetchedViewport = remember { doubleArrayOf(Double.NaN, Double.NaN, Double.NaN, Double.NaN, Double.NaN) }
 
     fun updateExcludedOperators(next: Set<String>) {
         excludedOperatorIds = next
@@ -196,12 +197,17 @@ fun FhMapScreen(
         isLoading = true
         val map = mapViewRef
         val bbox = map?.boundingBox
+        val north = bbox?.latNorth ?: 51.5
+        val east = bbox?.lonEast ?: 9.8
+        val south = bbox?.latSouth ?: 41.0
+        val west = bbox?.lonWest ?: -5.5
+        val zoom = map?.zoomLevelDouble ?: 6.0
         val result = withContext(Dispatchers.IO) {
             repository.getAllFhLinksForMap(
-                latNorth = bbox?.latNorth ?: 51.5,
-                lonEast = bbox?.lonEast ?: 9.8,
-                latSouth = bbox?.latSouth ?: 41.0,
-                lonWest = bbox?.lonWest ?: -5.5
+                latNorth = north,
+                lonEast = east,
+                latSouth = south,
+                lonWest = west
             )
         }
         val prepared = withContext(Dispatchers.Default) {
@@ -210,6 +216,11 @@ fun FhMapScreen(
         val buckets = withContext(Dispatchers.Default) {
             FhOperatorResolver.buildBuckets(prepared)
         }
+        lastFetchedViewport[0] = north
+        lastFetchedViewport[1] = east
+        lastFetchedViewport[2] = south
+        lastFetchedViewport[3] = west
+        lastFetchedViewport[4] = zoom
         preparedLinks = prepared
         operatorBuckets = buckets
         isViewportScoped = result.isViewportScoped
@@ -222,13 +233,18 @@ fun FhMapScreen(
         delay(350L)
         val map = mapViewRef ?: return@LaunchedEffect
         val bbox = map.boundingBox
+        val north = bbox.latNorth
+        val east = bbox.lonEast
+        val south = bbox.latSouth
+        val west = bbox.lonWest
+        val zoom = map.zoomLevelDouble
         isLoading = true
         val result = withContext(Dispatchers.IO) {
             repository.getAllFhLinksForMap(
-                latNorth = bbox.latNorth,
-                lonEast = bbox.lonEast,
-                latSouth = bbox.latSouth,
-                lonWest = bbox.lonWest
+                latNorth = north,
+                lonEast = east,
+                latSouth = south,
+                lonWest = west
             )
         }
         val prepared = withContext(Dispatchers.Default) {
@@ -237,6 +253,11 @@ fun FhMapScreen(
         val buckets = withContext(Dispatchers.Default) {
             FhOperatorResolver.buildBuckets(prepared)
         }
+        lastFetchedViewport[0] = north
+        lastFetchedViewport[1] = east
+        lastFetchedViewport[2] = south
+        lastFetchedViewport[3] = west
+        lastFetchedViewport[4] = zoom
         preparedLinks = prepared
         operatorBuckets = buckets
         isLoading = false
@@ -331,6 +352,31 @@ fun FhMapScreen(
                         controller.setZoom(initialZoom)
                         controller.setCenter(GeoPoint(initialLat, initialLon))
 
+                        fun notifyViewportChangedIfNeeded() {
+                            if (!isViewportScoped) return
+                            val bbox = boundingBox ?: return
+                            val prevN = lastFetchedViewport[0]
+                            val prevE = lastFetchedViewport[1]
+                            val prevS = lastFetchedViewport[2]
+                            val prevW = lastFetchedViewport[3]
+                            val prevZ = lastFetchedViewport[4]
+                            if (prevN.isNaN()) {
+                                viewportVersion++
+                                return
+                            }
+                            val latSpan = kotlin.math.abs(prevN - prevS).coerceAtLeast(1e-4)
+                            val lonSpan = kotlin.math.abs(prevE - prevW).coerceAtLeast(1e-4)
+                            val movedEnough =
+                                kotlin.math.abs(bbox.latNorth - prevN) > latSpan * 0.03 ||
+                                kotlin.math.abs(bbox.latSouth - prevS) > latSpan * 0.03 ||
+                                kotlin.math.abs(bbox.lonEast - prevE) > lonSpan * 0.03 ||
+                                kotlin.math.abs(bbox.lonWest - prevW) > lonSpan * 0.03 ||
+                                kotlin.math.abs(zoomLevelDouble - prevZ) > 0.15
+                            if (movedEnough) {
+                                viewportVersion++
+                            }
+                        }
+
                         addMapListener(object : MapListener {
                             override fun onScroll(event: ScrollEvent?): Boolean {
                                 mapCenter?.let {
@@ -340,9 +386,7 @@ fun FhMapScreen(
                                         scaleLatState.doubleValue = it.latitude
                                     }
                                 }
-                                if (isViewportScoped) {
-                                    viewportVersion++
-                                }
+                                notifyViewportChangedIfNeeded()
                                 return false
                             }
 
@@ -352,9 +396,7 @@ fun FhMapScreen(
                                 if (kotlin.math.abs(z - scaleZoomState.doubleValue) >= 0.05) {
                                     scaleZoomState.doubleValue = z
                                 }
-                                if (isViewportScoped) {
-                                    viewportVersion++
-                                }
+                                notifyViewportChangedIfNeeded()
                                 return false
                             }
                         })

@@ -2014,8 +2014,8 @@ class AnfrRepository(
 
     /**
      * Charge toutes les liaisons FH pour la carte dédiée aux faisceaux hertziens.
-     * En mode base locale, lit l'intégralité de la table `fh_link` sans plafond de zoom ni limite
-     * arbitraire à 1500. En mode Live API, interroge l'emprise courante avec un plafond étendu.
+     * Priorise la base de données locale si elle est présente et contient `fh_link` (lecture
+     * intégrale sans plafond de zoom ni limite à 1500), sinon bascule sur l'API en ligne.
      */
     suspend fun getAllFhLinksForMap(
         latNorth: Double,
@@ -2024,41 +2024,14 @@ class AnfrRepository(
         lonWest: Double,
         liveLimit: Int = 10_000
     ): FhLinksLoadResult {
-        if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_BBOX)) {
-            val links = try {
-                val response = LiveSitesClient.api.getFhLinksInBox(
-                    north = latNorth,
-                    south = latSouth,
-                    east = lonEast,
-                    west = lonWest,
-                    limit = liveLimit
-                )
-                if (!response.isSuccessful) {
-                    emptyList()
-                } else {
-                    response.body()?.links?.mapNotNull { it.toFhLinkItem() }.orEmpty()
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                AppLogger.w(TAG_DB, "Live fh-links full map request failed", e)
-                emptyList()
-            }
-            return FhLinksLoadResult(
-                links = links,
-                isViewportScoped = true,
-                hasFhTable = true
-            )
-        }
-
-        var hasTable = false
-        val links = queryLocalDatabase(emptyList()) {
-            hasTable = countRaw(
+        var hasLocalTable = false
+        val localLinks = queryLocalDatabase(emptyList()) {
+            hasLocalTable = countRaw(
                 SimpleSQLiteQuery(
                     "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'fh_link'"
                 )
             ) > 0
-            if (!hasTable) {
+            if (!hasLocalTable) {
                 emptyList()
             } else {
                 getFhLinksRaw(
@@ -2086,10 +2059,45 @@ class AnfrRepository(
                 }
             }
         }
+        if (hasLocalTable && localLinks.isNotEmpty()) {
+            return FhLinksLoadResult(
+                links = localLinks,
+                isViewportScoped = false,
+                hasFhTable = true
+            )
+        }
+
+        if (RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.LIVE_API_FR_BBOX)) {
+            val liveLinks = try {
+                val response = LiveSitesClient.api.getFhLinksInBox(
+                    north = latNorth,
+                    south = latSouth,
+                    east = lonEast,
+                    west = lonWest,
+                    limit = liveLimit
+                )
+                if (!response.isSuccessful) {
+                    emptyList()
+                } else {
+                    response.body()?.links?.mapNotNull { it.toFhLinkItem() }.orEmpty()
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                AppLogger.w(TAG_DB, "Live fh-links full map request failed", e)
+                emptyList()
+            }
+            return FhLinksLoadResult(
+                links = liveLinks,
+                isViewportScoped = true,
+                hasFhTable = true
+            )
+        }
+
         return FhLinksLoadResult(
-            links = links,
+            links = localLinks,
             isViewportScoped = false,
-            hasFhTable = hasTable
+            hasFhTable = hasLocalTable
         )
     }
 

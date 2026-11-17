@@ -27,10 +27,16 @@ data class ChangelogMilestone(
 object AppChangelogRepository {
     val milestones: List<ChangelogMilestone> = listOf(
         ChangelogMilestone(
-            versionName = "2.1.25",
+            versionName = "2.1.26",
             releaseDate = "2026-11-17",
             isCurrent = true,
             badge = MilestoneBadge.CURRENT,
+            summary = "Priorité à la base locale pour la carte des faisceaux FH et optimisation du rechargement au déplacement",
+            itemResIds = listOf(R.string.appstrings_release_v2126_summary_fh_map_local_priority_and_viewport_opt)
+        ),
+        ChangelogMilestone(
+            versionName = "2.1.25",
+            releaseDate = "2026-11-17",
             summary = "Carte dédiée aux faisceaux hertziens (FH), comparateur de sites côte à côte et échelle sur la carte",
             itemResIds = listOf(R.string.appstrings_release_v2125_summary_fh_map_site_comparator_and_map_scale)
         ),
