@@ -43,6 +43,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.CompareArrows
 import androidx.compose.material.icons.automirrored.filled.Launch
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Home
@@ -1936,6 +1937,17 @@ fun SiteDetailScreen(
                                         Icon(Icons.Default.Speed, contentDescription = null, modifier = Modifier.size(sizing.component(24.dp)))
                                         Spacer(modifier = Modifier.width(sizing.spacing(12.dp)))
                                         Text(stringResource(R.string.appstrings_throughput_calculator_button), fontWeight = FontWeight.Bold, fontSize = sizing.text(16.sp))
+                                    }
+                                }
+                                OutlinedButton(
+                                    onClick = { safeClick { navController.navigate("site_comparator?siteA=${info.idAnfr}") } },
+                                    modifier = Modifier.fillMaxWidth().height(sizing.component(56.dp)),
+                                    shape = buttonShape
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.AutoMirrored.Filled.CompareArrows, contentDescription = null, modifier = Modifier.size(sizing.component(24.dp)))
+                                        Spacer(modifier = Modifier.width(sizing.spacing(12.dp)))
+                                        Text(stringResource(R.string.site_comparator_button), fontWeight = FontWeight.Bold, fontSize = sizing.text(16.sp))
                                     }
                                 }
                             }

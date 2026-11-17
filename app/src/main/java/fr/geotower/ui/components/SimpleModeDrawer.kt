@@ -28,7 +28,9 @@ import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.NewReleases
 import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Timeline
 import fr.geotower.ui.screens.changes.CHANGES_MAP_ROUTE
+import fr.geotower.ui.screens.fh.FH_MAP_ROUTE
 import androidx.compose.material.icons.filled.SystemUpdateAlt
 import androidx.compose.material.icons.filled.ToggleOff
 import androidx.compose.material3.DrawerState
@@ -312,6 +314,24 @@ private fun SimpleModeDrawerContent(
                                         onCloseDrawer()
                                         if (!isChanges) {
                                             navController.navigate(CHANGES_MAP_ROUTE) { launchSingleTop = true }
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                            )
+                        })
+
+                        list.add(SimpleDrawerButtonEntry("fh_map") {
+                            val isFhMap = currentRoute?.startsWith(FH_MAP_ROUTE) == true
+                            NavigationDrawerItem(
+                                icon = { Icon(Icons.Default.Timeline, contentDescription = null) },
+                                label = { Text("Carte des faisceaux FH") },
+                                selected = isFhMap,
+                                onClick = {
+                                    safeClick {
+                                        onCloseDrawer()
+                                        if (!isFhMap) {
+                                            navController.navigate(FH_MAP_ROUTE) { launchSingleTop = true }
                                         }
                                     }
                                 },

@@ -3511,6 +3511,7 @@
     <string name="appstrings_release_v2122_summary_fh_links_and_rnc_mobile_attribution">Visualizzazione dei collegamenti a microonde (FH) su mappe 2D/3D e attribuzione RNC Mobile per gli ID di Free Mobile</string>
     <string name="appstrings_release_v2123_summary_map_crash_fix_and_stability">Risolto un arresto anomalo all\'apertura della mappa nella versione Release e migliorata la stabilità della visualizzazione dei collegamenti FH</string>
     <string name="appstrings_release_v2124_summary_datagouv_weekly_source_link">Aggiunto il link data.gouv.fr per i dati settimanali nella schermata Informazioni</string>
+    <string name="appstrings_release_v2125_summary_fh_map_site_comparator_and_map_scale">Mappa dedicata ai collegamenti a microonde (FH), comparatore di siti fianco a fianco e scala dinamica sulla mappa</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registro richieste di rete</string>
@@ -3617,4 +3618,41 @@
     <string name="pref_order_page_map">Mappa e anteprima</string>
     <string name="pref_order_page_search">Ricerca e vicinanza</string>
     <string name="pref_order_page_live">Monitoraggio rete e Live</string>
+    <string name="site_comparator_button">Confronta con un altro sito</string>
+    <string name="site_comparator_title">Confronto siti</string>
+    <string name="site_comparator_swap">Scambia siti A e B</string>
+    <string name="site_comparator_pick_site">Scegli sito %1$s</string>
+    <string name="site_comparator_empty_title">Confronta due siti affiancati</string>
+    <string name="site_comparator_empty_desc">Seleziona due siti ANFR per confrontare supporto, bande, azimut, ponti radio e throughput teorico stimato.</string>
+    <string name="site_comparator_pick_second_title">Seleziona sito %1$s</string>
+    <string name="site_comparator_pick_second_desc">Scegli un secondo sito nelle vicinanze o tramite ricerca per iniziare il confronto.</string>
+    <string name="site_comparator_choose">Scegli</string>
+    <string name="site_comparator_open_a">Apri sito A</string>
+    <string name="site_comparator_open_b">Apri sito B</string>
+    <string name="site_comparator_section_distance">Distanza e orientamento</string>
+    <string name="site_comparator_distance_label">Distanza A ↔ B</string>
+    <string name="site_comparator_bearing_label">Azimut A → B</string>
+    <string name="site_comparator_section_support">Supporto e stato</string>
+    <string name="site_comparator_status">Stato</string>
+    <string name="site_comparator_height">Altezza max</string>
+    <string name="site_comparator_support_nature">Tipo di supporto</string>
+    <string name="site_comparator_support_owner">Proprietario</string>
+    <string name="site_comparator_section_radio">Tecnologie e frequenze</string>
+    <string name="site_comparator_technologies">Tecnologie</string>
+    <string name="site_comparator_bands_common">Bande comuni</string>
+    <string name="site_comparator_bands_only">Solo sul sito %1$s</string>
+    <string name="site_comparator_section_throughput">Throughput teorico stimato</string>
+    <string name="site_comparator_throughput_note">Stima in profilo Standard (4G+5G) in base alle bande dichiarate ANFR.</string>
+    <string name="site_comparator_section_azimuth_fh">Azimut e ponti radio</string>
+    <string name="site_comparator_azimuths">Azimut settori</string>
+    <string name="site_comparator_fh_links">Ponti radio FH</string>
+    <string name="site_comparator_yes">Sì</string>
+    <string name="site_comparator_no">No</string>
+    <string name="site_comparator_section_dates">Date ANFR</string>
+    <string name="site_comparator_date_implantation">Installazione</string>
+    <string name="site_comparator_date_service">Attivazione</string>
+    <string name="site_comparator_date_modif">Ultima modifica</string>
+    <string name="site_comparator_picker_title">Scegli un sito</string>
+    <string name="site_comparator_search_hint">ID ANFR, comune o indirizzo…</string>
+    <string name="site_comparator_no_results">Nessun sito trovato.</string>
 </resources>

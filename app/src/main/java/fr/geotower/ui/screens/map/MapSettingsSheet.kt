@@ -27,6 +27,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -76,7 +77,8 @@ private const val PREF_OPERATOR_FILTER_OVERSEAS_EXPANDED = "map_operator_filter_
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun MapSettingsSheet(
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onOpenFhMap: (() -> Unit)? = null
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     val sizing = LocalGeoTowerUiStyle.current.sizing
@@ -98,7 +100,8 @@ fun MapSettingsSheet(
                 .padding(horizontal = sizing.spacing(24.dp))
                 .settingsPopupFadingEdge(scrollState)
                 .verticalScroll(scrollState)
-                .padding(bottom = sizing.spacing(64.dp))
+                .padding(bottom = sizing.spacing(64.dp)),
+            onOpenFhMap = onOpenFhMap
         )
     }
 }
@@ -112,7 +115,8 @@ fun MapSettingsSheet(
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun MapFiltersControls(
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onOpenFhMap: (() -> Unit)? = null
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -301,6 +305,15 @@ fun MapFiltersControls(
                 Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
                 SelectableButton("Liaisons FH (grands traits)", showFhLinks, Modifier.fillMaxWidth()) {
                     showFhLinks = it; prefs.edit().putBoolean("show_fh_links", it).apply()
+                }
+            }
+            if (onOpenFhMap != null) {
+                Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
+                OutlinedButton(
+                    onClick = onOpenFhMap,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Ouvrir la carte dédiée FH")
                 }
             }
             Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))

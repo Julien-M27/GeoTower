@@ -26,6 +26,8 @@ import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Timeline
+import fr.geotower.ui.screens.fh.FH_MAP_ROUTE
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -376,6 +378,16 @@ fun MoreScreen(navController: NavController) {
                                 }
                             }
                         }
+
+                        MenuButton(
+                            text = "Carte des faisceaux FH",
+                            icon = Icons.Default.Timeline,
+                            color = buttonBgColor,
+                            contentColor = MaterialTheme.colorScheme.onSurface,
+                            useOneUi = uiStyle.useOneUi,
+                            fillWidth = true,
+                            onClick = { navController.navigate(FH_MAP_ROUTE) { launchSingleTop = true } }
+                        )
                     }
 
                     Spacer(modifier = Modifier.weight(1f))

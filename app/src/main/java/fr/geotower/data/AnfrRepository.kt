@@ -2006,6 +2006,93 @@ class AnfrRepository(
         }
     }
 
+    data class FhLinksLoadResult(
+        val links: List<FhLinkItem>,
+        val isViewportScoped: Boolean,
+        val hasFhTable: Boolean
+    )
+
+    /**
+     * Charge toutes les liaisons FH pour la carte dédiée aux faisceaux hertziens.
+     * En mode base locale, lit l'intégralité de la table `fh_link` sans plafond de zoom ni limite
+     * arbitraire à 1500. En mode Live API, interroge l'emprise courante avec un plafond étendu.
+     */
+    suspend fun getAllFhLinksForMap(
+        latNorth: Double,
+        lonEast: Double,
+        latSouth: Double,
+        lonWest: Double,
+        liveLimit: Int = 10_000
+    ): FhLinksLoadResult {
+        if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_BBOX)) {
+            val links = try {
+                val response = LiveSitesClient.api.getFhLinksInBox(
+                    north = latNorth,
+                    south = latSouth,
+                    east = lonEast,
+                    west = lonWest,
+                    limit = liveLimit
+                )
+                if (!response.isSuccessful) {
+                    emptyList()
+                } else {
+                    response.body()?.links?.mapNotNull { it.toFhLinkItem() }.orEmpty()
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                AppLogger.w(TAG_DB, "Live fh-links full map request failed", e)
+                emptyList()
+            }
+            return FhLinksLoadResult(
+                links = links,
+                isViewportScoped = true,
+                hasFhTable = true
+            )
+        }
+
+        var hasTable = false
+        val links = queryLocalDatabase(emptyList()) {
+            hasTable = countRaw(
+                SimpleSQLiteQuery(
+                    "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'fh_link'"
+                )
+            ) > 0
+            if (!hasTable) {
+                emptyList()
+            } else {
+                getFhLinksRaw(
+                    SimpleSQLiteQuery(
+                        """
+                        SELECT id_anfr_a, lat_a, lon_a, id_anfr_b, lat_b, lon_b,
+                               operateur_id, adm_id, operator_label, azimut_ab, distance_m
+                        FROM fh_link
+                        """.trimIndent()
+                    )
+                ).map { row ->
+                    FhLinkItem(
+                        idAnfrA = row.id_anfr_a,
+                        latA = row.lat_a,
+                        lonA = row.lon_a,
+                        idAnfrB = row.id_anfr_b,
+                        latB = row.lat_b,
+                        lonB = row.lon_b,
+                        operateurId = row.operateur_id,
+                        admId = row.adm_id,
+                        operatorLabel = row.operator_label,
+                        azimutAb = row.azimut_ab,
+                        distanceM = row.distance_m
+                    )
+                }
+            }
+        }
+        return FhLinksLoadResult(
+            links = links,
+            isViewportScoped = false,
+            hasFhTable = hasTable
+        )
+    }
+
     /**
      * Département d'un point, deviné par les stations les plus proches — la base ne porte aucun
      * contour administratif, seules les antennes situent le terrain.

@@ -4073,6 +4073,41 @@ fun ElevationProfileSettingsSheet(
     }
 }
 
+/** Feuille de réglages de la page Comparateur de sites : aides au défilement. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SiteComparatorSettingsSheet(
+    onDismiss: () -> Unit,
+    sheetState: SheetState,
+    useOneUi: Boolean
+) {
+    val sizing = LocalGeoTowerUiSizing.current
+    val context = LocalContext.current
+    val themeMode by AppConfig.themeMode
+    val isOledMode by AppConfig.isOledMode
+    val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
+    val bg = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
+
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = bg) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(start = sizing.spacing(24.dp), end = sizing.spacing(24.dp), bottom = sizing.spacing(48.dp)),
+            verticalArrangement = Arrangement.spacedBy(sizing.spacing(16.dp))
+        ) {
+            Text(
+                stringResource(R.string.site_comparator_title),
+                style = sizing.textStyle(MaterialTheme.typography.titleLarge),
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center
+            )
+            val scrollAidPrefs = remember(context) {
+                context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
+            }
+            ScrollAidSwitchRows(PageScrollPrefs.SITE_COMPARATOR, scrollAidPrefs, useOneUi)
+        }
+    }
+}
+
 /** Slider stylé OneUI (rail épais + pastilles + pouce cerclé) quand OneUI est actif, sinon Slider standard. */
 @Composable
 private fun OneUiDefaultSlider(

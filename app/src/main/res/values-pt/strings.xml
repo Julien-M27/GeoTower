@@ -3511,6 +3511,7 @@
     <string name="appstrings_release_v2122_summary_fh_links_and_rnc_mobile_attribution">Visualização de ligações por feixes hertzianos (FH) nos mapas 2D/3D e atribuição RNC Mobile para os IDs da Free Mobile</string>
     <string name="appstrings_release_v2123_summary_map_crash_fix_and_stability">Correção de uma falha ao abrir o mapa na versão Release e melhoria da estabilidade na exibição das ligações FH</string>
     <string name="appstrings_release_v2124_summary_datagouv_weekly_source_link">Adicionada a ligação data.gouv.fr para os dados semanais no ecrã Acerca</string>
+    <string name="appstrings_release_v2125_summary_fh_map_site_comparator_and_map_scale">Mapa dedicado de feixes hertzianos (FH), comparador de locais lado a lado e escala dinâmica no mapa</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registo de pedidos de rede</string>
@@ -3617,4 +3618,41 @@
     <string name="pref_order_page_map">Mapa e prévia</string>
     <string name="pref_order_page_search">Busca e proximidade</string>
     <string name="pref_order_page_live">Monitoramento de rede e Ao vivo</string>
+    <string name="site_comparator_button">Comparar com outro site</string>
+    <string name="site_comparator_title">Comparador de sites</string>
+    <string name="site_comparator_swap">Trocar sites A e B</string>
+    <string name="site_comparator_pick_site">Escolher site %1$s</string>
+    <string name="site_comparator_empty_title">Comparar dois sites lado a lado</string>
+    <string name="site_comparator_empty_desc">Selecione dois sites ANFR para comparar suporte, bandas, azimutes, ligações FH e débito teórico estimado.</string>
+    <string name="site_comparator_pick_second_title">Selecionar site %1$s</string>
+    <string name="site_comparator_pick_second_desc">Escolha um segundo site nas proximidades ou por pesquisa para iniciar a comparação.</string>
+    <string name="site_comparator_choose">Escolher</string>
+    <string name="site_comparator_open_a">Abrir site A</string>
+    <string name="site_comparator_open_b">Abrir site B</string>
+    <string name="site_comparator_section_distance">Distância e orientação</string>
+    <string name="site_comparator_distance_label">Distância A ↔ B</string>
+    <string name="site_comparator_bearing_label">Azimute A → B</string>
+    <string name="site_comparator_section_support">Suporte e estado</string>
+    <string name="site_comparator_status">Estado</string>
+    <string name="site_comparator_height">Altura máx.</string>
+    <string name="site_comparator_support_nature">Tipo de suporte</string>
+    <string name="site_comparator_support_owner">Proprietário</string>
+    <string name="site_comparator_section_radio">Tecnologias e frequências</string>
+    <string name="site_comparator_technologies">Tecnologias</string>
+    <string name="site_comparator_bands_common">Bandas comuns</string>
+    <string name="site_comparator_bands_only">Apenas no site %1$s</string>
+    <string name="site_comparator_section_throughput">Débito teórico estimado</string>
+    <string name="site_comparator_throughput_note">Estimativa em perfil Padrão (4G+5G) com base nas bandas declaradas ANFR.</string>
+    <string name="site_comparator_section_azimuth_fh">Azimutes e feixes hertzianos</string>
+    <string name="site_comparator_azimuths">Azimutes dos setores</string>
+    <string name="site_comparator_fh_links">Ligações FH</string>
+    <string name="site_comparator_yes">Sim</string>
+    <string name="site_comparator_no">Não</string>
+    <string name="site_comparator_section_dates">Datas ANFR</string>
+    <string name="site_comparator_date_implantation">Implantação</string>
+    <string name="site_comparator_date_service">Entrada em serviço</string>
+    <string name="site_comparator_date_modif">Última modificação</string>
+    <string name="site_comparator_picker_title">Escolher um site</string>
+    <string name="site_comparator_search_hint">ID ANFR, município ou morada…</string>
+    <string name="site_comparator_no_results">Nenhum site encontrado.</string>
 </resources>

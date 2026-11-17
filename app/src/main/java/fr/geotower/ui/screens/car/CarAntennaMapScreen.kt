@@ -162,11 +162,12 @@ class CarAntennaMapScreen(
 
         val items = ItemList.Builder()
         shownSites.forEachIndexed { index, site ->
+            // Le marqueur appartient au Place : l'hôte le rend sur la carte et dans la liste.
+            // Une image d'opérateurs séparée n'est pas autorisée sur une Row de PlaceListMapTemplate.
             val place = Place.Builder(CarLocation.create(site.latitude, site.longitude))
                 .setMarker(antennaPlaceMarker(site, index))
                 .build()
             val row = Row.Builder()
-                .setImage(carOperatorGridIcon(carContext, site.operators), Row.IMAGE_TYPE_LARGE)
                 .setTitle(site.title)
                 .addText(distanceLineWithSpan(site))
                 .addText(carSiteDescriptionLine(site))

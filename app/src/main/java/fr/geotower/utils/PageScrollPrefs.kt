@@ -31,6 +31,7 @@ object PageScrollPrefs {
     const val COVERAGE = "coverage"
     const val ELEVATION_PROFILE = "elevation_profile"
     const val THROUGHPUT_CALCULATOR = "throughput_calculator"
+    const val SITE_COMPARATOR = "site_comparator"
     const val SETTINGS = "settings"
     const val ABOUT = "about"
     const val HELP = "help"

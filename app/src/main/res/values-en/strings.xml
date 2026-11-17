@@ -3511,6 +3511,7 @@
     <string name="appstrings_release_v2122_summary_fh_links_and_rnc_mobile_attribution">Microwave link (FH) visualization on 2D/3D maps and RNC Mobile attribution for Free Mobile network IDs</string>
     <string name="appstrings_release_v2123_summary_map_crash_fix_and_stability">Fixed a crash when opening the map in release builds and improved microwave link (FH) rendering stability</string>
     <string name="appstrings_release_v2124_summary_datagouv_weekly_source_link">Added the data.gouv.fr source link for weekly mobile network datasets in the About screen</string>
+    <string name="appstrings_release_v2125_summary_fh_map_site_comparator_and_map_scale">Dedicated microwave links (FH) map, side-by-side site comparator, and dynamic map scale bar</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Network requests log</string>
@@ -3617,4 +3618,41 @@
     <string name="pref_order_page_map">Map &amp; preview</string>
     <string name="pref_order_page_search">Search &amp; Nearby</string>
     <string name="pref_order_page_live">Network monitoring &amp; Live</string>
+    <string name="site_comparator_button">Compare with another site</string>
+    <string name="site_comparator_title">Site comparator</string>
+    <string name="site_comparator_swap">Swap sites A and B</string>
+    <string name="site_comparator_pick_site">Select site %1$s</string>
+    <string name="site_comparator_empty_title">Compare two sites side by side</string>
+    <string name="site_comparator_empty_desc">Select two ANFR sites to compare their support, bands, azimuths, microwave links and estimated throughput.</string>
+    <string name="site_comparator_pick_second_title">Select site %1$s</string>
+    <string name="site_comparator_pick_second_desc">Choose a second site nearby or via search to start comparing.</string>
+    <string name="site_comparator_choose">Choose</string>
+    <string name="site_comparator_open_a">Open site A</string>
+    <string name="site_comparator_open_b">Open site B</string>
+    <string name="site_comparator_section_distance">Distance &amp; orientation</string>
+    <string name="site_comparator_distance_label">Distance A ↔ B</string>
+    <string name="site_comparator_bearing_label">Azimuth A → B</string>
+    <string name="site_comparator_section_support">Support &amp; status</string>
+    <string name="site_comparator_status">Status</string>
+    <string name="site_comparator_height">Max height</string>
+    <string name="site_comparator_support_nature">Support type</string>
+    <string name="site_comparator_support_owner">Owner</string>
+    <string name="site_comparator_section_radio">Technologies &amp; frequencies</string>
+    <string name="site_comparator_technologies">Technologies</string>
+    <string name="site_comparator_bands_common">Common bands</string>
+    <string name="site_comparator_bands_only">Only on site %1$s</string>
+    <string name="site_comparator_section_throughput">Estimated theoretical throughput</string>
+    <string name="site_comparator_throughput_note">Standard profile estimate (4G+5G) based on declared ANFR bands.</string>
+    <string name="site_comparator_section_azimuth_fh">Azimuths &amp; microwave links</string>
+    <string name="site_comparator_azimuths">Sector azimuths</string>
+    <string name="site_comparator_fh_links">Microwave links</string>
+    <string name="site_comparator_yes">Yes</string>
+    <string name="site_comparator_no">No</string>
+    <string name="site_comparator_section_dates">ANFR dates</string>
+    <string name="site_comparator_date_implantation">Implantation</string>
+    <string name="site_comparator_date_service">In service</string>
+    <string name="site_comparator_date_modif">Last modified</string>
+    <string name="site_comparator_picker_title">Choose a site</string>
+    <string name="site_comparator_search_hint">ANFR ID, city or address…</string>
+    <string name="site_comparator_no_results">No matching sites found.</string>
 </resources>

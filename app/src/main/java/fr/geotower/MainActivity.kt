@@ -116,6 +116,7 @@ import fr.geotower.ui.screens.emitters.SiteDetailToolWrapperScreen
 import fr.geotower.ui.screens.emitters.FrequencyReferenceScreen
 import fr.geotower.ui.screens.emitters.FREQUENCY_REFERENCE_ROUTE
 import fr.geotower.ui.screens.emitters.RadioSiteDetailScreen
+import fr.geotower.ui.screens.emitters.SiteComparatorScreen
 import fr.geotower.ui.screens.emitters.ThroughputCalculatorScreen
 import fr.geotower.ui.screens.stats.DEPARTMENT_STATS_ROUTE
 import fr.geotower.ui.screens.stats.DEPARTMENT_STAT_DETAIL_ROUTE
@@ -126,6 +127,8 @@ import fr.geotower.ui.screens.stats.StatisticsScreen
 import fr.geotower.ui.screens.stats.StatisticsWrapperScreen
 import fr.geotower.ui.screens.changes.ChangesMapScreen
 import fr.geotower.ui.screens.changes.CHANGES_MAP_ROUTE
+import fr.geotower.ui.screens.fh.FhMapScreen
+import fr.geotower.ui.screens.fh.FH_MAP_ROUTE
 import fr.geotower.ui.screens.about.AboutScreen
 import fr.geotower.ui.screens.about.ChangelogHistoryScreen
 import fr.geotower.ui.screens.about.PhotoUploadHistoryScreen
@@ -1341,6 +1344,16 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
 
+                            // Carte dédiée aux faisceaux hertziens (FH) et sélection d'opérateurs
+                            composable(FH_MAP_ROUTE) {
+                                Box(modifier = Modifier.padding(bottom = rootBottomPadding)) {
+                                    FhMapScreen(
+                                        navController = navController,
+                                        repository = repository
+                                    )
+                                }
+                            }
+
                             // Statistiques par département (tables dept_stat_* de la base)
                             composable(DEPARTMENT_STATS_ROUTE) {
                                 Box(modifier = Modifier.padding(screenPadding)) {
@@ -1975,6 +1988,24 @@ class MainActivity : ComponentActivity() {
                                     } else {
                                         DisabledFeatureRoute(navController, txtUnavailable)
                                     }
+                                }
+                            }
+                            composable(
+                                route = "site_comparator?siteA={siteA}&siteB={siteB}",
+                                arguments = listOf(
+                                    navArgument("siteA") { type = NavType.StringType; defaultValue = "" },
+                                    navArgument("siteB") { type = NavType.StringType; defaultValue = "" }
+                                )
+                            ) { backStackEntry ->
+                                val siteA = backStackEntry.arguments?.getString("siteA").orEmpty()
+                                val siteB = backStackEntry.arguments?.getString("siteB").orEmpty()
+                                Box(modifier = Modifier.padding(screenPadding)) {
+                                    SiteComparatorScreen(
+                                        navController = navController,
+                                        repository = repository,
+                                        initialSiteAId = siteA.ifBlank { null },
+                                        initialSiteBId = siteB.ifBlank { null }
+                                    )
                                 }
                             }
 

@@ -8675,7 +8675,17 @@ fun MapScreen(
                 }
             }
         }
-        if (showSettingsSheet) { MapSettingsSheet(onDismiss = { showSettingsSheet = false }) }
+        if (showSettingsSheet) {
+            MapSettingsSheet(
+                onDismiss = { showSettingsSheet = false },
+                onOpenFhMap = {
+                    showSettingsSheet = false
+                    navController.navigate(fr.geotower.ui.screens.fh.FH_MAP_ROUTE) {
+                        launchSingleTop = true
+                    }
+                }
+            )
+        }
         if (showActiveFiltersDialog) {
             ActiveMapFiltersDialog(
                 summary = activeMapFilterSummary.orEmpty(),

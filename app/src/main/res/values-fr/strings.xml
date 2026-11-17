@@ -3513,6 +3513,7 @@
     <string name="appstrings_release_v2122_summary_fh_links_and_rnc_mobile_attribution">Affichage des liaisons FH sur la carte (2D et 3D) et attribution RNC Mobile pour les identifiants Free Mobile</string>
     <string name="appstrings_release_v2123_summary_map_crash_fix_and_stability">Correction d\'un crash à l\'ouverture de la carte en version Release et fiabilisation de l\'affichage des liaisons FH</string>
     <string name="appstrings_release_v2124_summary_datagouv_weekly_source_link">Ajout du lien data.gouv.fr pour les données hebdomadaires dans l\'écran À propos</string>
+    <string name="appstrings_release_v2125_summary_fh_map_site_comparator_and_map_scale">Nouvelle carte des faisceaux hertziens (FH), comparateur de sites côte à côte et échelle dynamique sur la carte</string>
 
     <!-- Journal des requêtes réseau -->
     <string name="network_log_title">Journal des requêtes réseau</string>
@@ -3619,4 +3620,41 @@
     <string name="pref_order_page_map">Carte &amp; aperçu</string>
     <string name="pref_order_page_search">Recherche &amp; Proximité</string>
     <string name="pref_order_page_live">Surveillance réseau &amp; Live</string>
+    <string name="site_comparator_button">Comparer avec un autre site</string>
+    <string name="site_comparator_title">Comparateur de sites</string>
+    <string name="site_comparator_swap">Inverser les sites A et B</string>
+    <string name="site_comparator_pick_site">Choisir le site %1$s</string>
+    <string name="site_comparator_empty_title">Comparer deux sites côte à côte</string>
+    <string name="site_comparator_empty_desc">Sélectionnez deux sites ANFR pour comparer leur support, leurs bandes, leurs azimuts, les liaisons FH et le débit théorique estimé.</string>
+    <string name="site_comparator_pick_second_title">Sélectionner le site %1$s</string>
+    <string name="site_comparator_pick_second_desc">Choisissez un second site à proximité ou via la recherche pour lancer la comparaison.</string>
+    <string name="site_comparator_choose">Choisir</string>
+    <string name="site_comparator_open_a">Ouvrir fiche A</string>
+    <string name="site_comparator_open_b">Ouvrir fiche B</string>
+    <string name="site_comparator_section_distance">Distance &amp; orientation</string>
+    <string name="site_comparator_distance_label">Distance A ↔ B</string>
+    <string name="site_comparator_bearing_label">Azimut A → B</string>
+    <string name="site_comparator_section_support">Support &amp; statut</string>
+    <string name="site_comparator_status">Statut</string>
+    <string name="site_comparator_height">Hauteur max</string>
+    <string name="site_comparator_support_nature">Type de support</string>
+    <string name="site_comparator_support_owner">Propriétaire</string>
+    <string name="site_comparator_section_radio">Technologies &amp; fréquences</string>
+    <string name="site_comparator_technologies">Technologies</string>
+    <string name="site_comparator_bands_common">Bandes communes</string>
+    <string name="site_comparator_bands_only">Uniquement sur le site %1$s</string>
+    <string name="site_comparator_section_throughput">Débit théorique estimé</string>
+    <string name="site_comparator_throughput_note">Estimation en profil Standard (4G+5G) selon les bandes déclarées à l\'ANFR.</string>
+    <string name="site_comparator_section_azimuth_fh">Azimuts &amp; faisceaux hertziens</string>
+    <string name="site_comparator_azimuths">Azimuts des secteurs</string>
+    <string name="site_comparator_fh_links">Liaisons FH</string>
+    <string name="site_comparator_yes">Oui</string>
+    <string name="site_comparator_no">Non</string>
+    <string name="site_comparator_section_dates">Dates ANFR</string>
+    <string name="site_comparator_date_implantation">Implantation</string>
+    <string name="site_comparator_date_service">Mise en service</string>
+    <string name="site_comparator_date_modif">Dernière modification</string>
+    <string name="site_comparator_picker_title">Choisir un site</string>
+    <string name="site_comparator_search_hint">ID ANFR, commune ou adresse…</string>
+    <string name="site_comparator_no_results">Aucun site trouvé.</string>
 </resources>

@@ -51,6 +51,7 @@ object PageCustomizationPrefs {
         PageScrollPrefs.COVERAGE,
         PageScrollPrefs.ELEVATION_PROFILE,
         PageScrollPrefs.THROUGHPUT_CALCULATOR,
+        PageScrollPrefs.SITE_COMPARATOR,
         PageScrollPrefs.DEPARTMENT_STATS
     )
 
