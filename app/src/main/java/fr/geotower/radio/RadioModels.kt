@@ -14,17 +14,37 @@ enum class MobileOperator(
     val colorHex: String,
     val aliases: List<String>
 ) {
-    ORANGE("Orange", OperatorColors.ORANGE_HEX, listOf("ORANGE", "ORANGE FRANCE")),
+    ORANGE("Orange", OperatorColors.ORANGE_HEX, listOf("ORANGE", "ORANGE FRANCE", "ORANGE CARAIBE", "ORANGE CARAÏBE")),
     SFR("SFR", OperatorColors.SFR_HEX, listOf("SFR", "SOCIETE FRANCAISE DU RADIOTELEPHONE")),
-    BOUYGUES("Bouygues Telecom", OperatorColors.BOUYGUES_HEX, listOf("BOUYGUES", "BOUYGUES TELECOM")),
-    FREE("Free Mobile", OperatorColors.FREE_HEX, listOf("FREE", "FREE MOBILE"));
+    BOUYGUES("Bouygues Telecom", OperatorColors.BOUYGUES_HEX, listOf("BOUYGUES", "BOUYGUES TELECOM", "BYTEL")),
+    FREE("Free Mobile", OperatorColors.FREE_HEX, listOf("FREE", "FREE MOBILE")),
+    FREE_CARAIBE("Free Caraibe", OperatorColors.FREE_HEX, listOf("FREE CARAIBE", "FREE CARAIBES", "FREE CARAÏBE", "FREE CARAÏBES")),
+    SRR("SRR", OperatorColors.SFR_HEX, listOf("SRR")),
+    DIGICEL("Digicel", "#F4DA95", listOf("DIGICEL", "DIGICEL AFG")),
+    OUTREMER_TELECOM("Outremer Telecom", "#F3A6C8", listOf("OUTREMER TELECOM", "OUTREMER TÉLÉCOM", "OUTREMER", "OMT", "SFR CARAIBE", "SFR CARAÏBE")),
+    UTS_CARAIBE("UTS Caraibe", "#F09B49", listOf("UTS CARAIBE", "UTS CARAÏBE", "UTS CARAIBES", "UTS CARAÏBES")),
+    DAUPHIN_TELECOM("Dauphin Telecom", "#51B2F8", listOf("DAUPHIN TELECOM", "DAUPHIN TÉLÉCOM", "DAUPHIN")),
+    TELCO_OI("Telco OI", "#C45A9E", listOf("TELCO OI", "TELCO", "ONLY")),
+    ZEOP("ZEOP Mobile", "#F9C846", listOf("ZEOP", "ZEOP MOBILE")),
+    MAORE_MOBILE("Maore Mobile", "#2FBF5B", listOf("MAORE MOBILE", "MAORÉ MOBILE", "MAORE")),
+    SPM_TELECOM("SPM Telecom", "#875CEE", listOf("SPM TELECOM", "SPM TÉLÉCOM", "SPM")),
+    GLOBALTEL("Globaltel", "#59C28F", listOf("GLOBALTEL")),
+    OPT_NC("OPT Nouvelle-Calédonie", "#005BAC", listOf("OPT NOUVELLE-CALEDONIE", "OPT NOUVELLE-CALÉDONIE", "OPT NOUVELLE CALEDONIE", "OPT NC", "GOUV NELLE CALEDONIE")),
+    ONATI("ONATi (Vini)", "#00A3E0", listOf("ONATI", "ONATI VINI", "VINI")),
+    PMT_VODAFONE("PMT/Vodafone", "#E60000", listOf("PMT/VODAFONE", "PMT", "VODAFONE")),
+    VITI("Ora (Vini)", "#005B2F", listOf("ORA", "ORA VINI", "VITI", "VITI SAS")),
+    SPT("SPT", "#00806A", listOf("SPT"));
 
     companion object {
         fun fromLabel(raw: String?): MobileOperator? {
             val normalized = raw?.uppercase()?.trim().orEmpty()
-            return entries.firstOrNull { operator ->
-                operator.aliases.any { alias -> normalized.contains(alias) }
-            }
+            if (normalized.isBlank()) return null
+            return entries
+                .asSequence()
+                .flatMap { operator -> operator.aliases.asSequence().map { alias -> operator to alias } }
+                .filter { (_, alias) -> normalized.contains(alias) }
+                .maxByOrNull { (_, alias) -> alias.length }
+                ?.first
         }
     }
 }

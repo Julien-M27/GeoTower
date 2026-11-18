@@ -27,9 +27,12 @@ import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material.CompactChip
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
+import fr.geotower.wear.data.model.DistanceUnit
 import fr.geotower.wear.data.model.TechOrder
 import fr.geotower.wear.data.model.WearOperatorSite
 import fr.geotower.wear.data.model.WearTower
+import fr.geotower.wear.data.model.formatDistance
+import fr.geotower.wear.data.model.formatHeight
 import fr.geotower.wear.presentation.theme.getOperatorColor
 
 /**
@@ -46,6 +49,7 @@ fun OperatorDetailScreen(
     onOpenCompass: () -> Unit,
     onBack: () -> Unit,
     techOrder: TechOrder = TechOrder.DESCENDING,
+    distanceUnit: DistanceUnit = DistanceUnit.METRIC,
     modifier: Modifier = Modifier
 ) {
     val listState = rememberScalingLazyListState()
@@ -125,10 +129,11 @@ fun OperatorDetailScreen(
 
         // Section 4 : Support associé
         item {
+            val distStr = formatDistance(tower.distanceMeters, distanceUnit)
             val supDesc = if (tower.supportHeight != null && tower.supportHeight > 0) {
-                "${tower.supportType} (${tower.supportHeight} m) • ${tower.distanceMeters} m"
+                "${tower.supportType} (${formatHeight(tower.supportHeight, distanceUnit)}) • $distStr"
             } else {
-                "${tower.supportType} • ${tower.distanceMeters} m"
+                "${tower.supportType} • $distStr"
             }
             OperatorDetailCard(
                 title = "Support physique",

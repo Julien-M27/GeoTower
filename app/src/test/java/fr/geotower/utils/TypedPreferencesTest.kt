@@ -145,7 +145,7 @@ class TypedPreferencesTest {
         // mais sa place voulue est AVANT la boussole : un ordre déjà enregistré doit le recevoir là,
         // pas en queue de liste.
         assertEquals(
-            listOf("nearby", "map", "trips", "compass", "stats", "settings", "logo", "about"),
+            listOf("nearby", "map", "trips", "fh_map", "compass", "stats", "settings", "logo", "about"),
             HomePrefs.normalizedPageOrder(prefs)
         )
     }
@@ -160,7 +160,7 @@ class TypedPreferencesTest {
         )
 
         assertEquals(
-            listOf("logo", "nearby", "map", "trips", "compass", "stats", "settings", "about"),
+            listOf("logo", "nearby", "map", "trips", "fh_map", "compass", "stats", "settings", "about"),
             merged
         )
     }

@@ -24,6 +24,12 @@ enum class NetworkLogStatusFilter {
     ERRORS
 }
 
+enum class NetworkLogExportFormat(val extension: String, val mimeType: String) {
+    TEXT("txt", "text/plain"),
+    JSON("json", "application/json"),
+    CSV("csv", "text/csv")
+}
+
 data class NetworkLogStats(
     val totalCount: Long = 0L,
     val errorCount: Long = 0L,
@@ -270,7 +276,7 @@ object NetworkLogStore {
     }
 
     fun exportAsText(context: Context, requests: List<NetworkRequestEntry>? = null): String {
-        val list = requests ?: getRequests(context, limit = 1000)
+        val list = requests ?: getRequests(context, limit = MAX_ENTRIES_SAFETY_CAP)
         val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US)
         val sb = StringBuilder()
         sb.append("=== GeoTower Network Request Log ===\n")
@@ -291,15 +297,91 @@ object NetworkLogStore {
         return sb.toString()
     }
 
-    fun shareLog(context: Context, chooserTitle: String): Boolean {
-        return runCatching {
-            val text = exportAsText(context)
-            if (text.isBlank()) return false
+    fun exportAsJson(context: Context, requests: List<NetworkRequestEntry>? = null): String {
+        val list = requests ?: getRequests(context, limit = MAX_ENTRIES_SAFETY_CAP)
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ", Locale.US)
+        val arr = org.json.JSONArray()
+        for (item in list) {
+            arr.put(
+                org.json.JSONObject().apply {
+                    put("id", item.id)
+                    put("timestamp", item.timestamp)
+                    put("date", dateFormat.format(Date(item.timestamp)))
+                    put("method", item.method)
+                    put("url", item.url)
+                    put("host", item.host)
+                    put("path", item.path)
+                    put("statusCode", item.statusCode)
+                    put("durationMs", item.durationMs)
+                    put("responseSizeBytes", item.responseSizeBytes)
+                    put("feature", item.displayFeature)
+                    put("errorMessage", item.errorMessage)
+                }
+            )
+        }
+        return arr.toString(2)
+    }
 
+    fun exportAsCsv(context: Context, requests: List<NetworkRequestEntry>? = null): String {
+        val list = requests ?: getRequests(context, limit = MAX_ENTRIES_SAFETY_CAP)
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US)
+        fun csvCell(value: String?): String {
+            val v = value.orEmpty()
+            return if (v.contains(',') || v.contains('"') || v.contains('\n') || v.contains('\r')) {
+                "\"" + v.replace("\"", "\"\"") + "\""
+            } else {
+                v
+            }
+        }
+        val sb = StringBuilder()
+        sb.append("id,timestamp,date,method,statusCode,durationMs,responseSizeBytes,feature,host,path,url,errorMessage\n")
+        for (item in list) {
+            sb.append(item.id).append(',')
+            sb.append(item.timestamp).append(',')
+            sb.append(csvCell(dateFormat.format(Date(item.timestamp)))).append(',')
+            sb.append(csvCell(item.method)).append(',')
+            sb.append(item.statusCode).append(',')
+            sb.append(item.durationMs).append(',')
+            sb.append(item.responseSizeBytes).append(',')
+            sb.append(csvCell(item.displayFeature)).append(',')
+            sb.append(csvCell(item.host)).append(',')
+            sb.append(csvCell(item.path)).append(',')
+            sb.append(csvCell(item.url)).append(',')
+            sb.append(csvCell(item.errorMessage)).append('\n')
+        }
+        return sb.toString()
+    }
+
+    fun shareLog(
+        context: Context,
+        chooserTitle: String,
+        format: NetworkLogExportFormat = NetworkLogExportFormat.TEXT,
+        requests: List<NetworkRequestEntry>? = null
+    ): Boolean {
+        return runCatching {
+            val content = when (format) {
+                NetworkLogExportFormat.TEXT -> exportAsText(context, requests)
+                NetworkLogExportFormat.JSON -> exportAsJson(context, requests)
+                NetworkLogExportFormat.CSV -> exportAsCsv(context, requests)
+            }
+            if (content.isBlank()) return false
+
+            val exportDir = File(context.cacheDir, "netlog").apply { mkdirs() }
+            val file = File(exportDir, "geotower_network_log.${format.extension}")
+            file.writeText(content, Charsets.UTF_8)
+            val uri = androidx.core.content.FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                file
+            )
             val sendIntent = Intent(Intent.ACTION_SEND).apply {
-                type = "text/plain"
-                putExtra(Intent.EXTRA_SUBJECT, "geotower_network_log.txt")
-                putExtra(Intent.EXTRA_TEXT, text)
+                type = format.mimeType
+                putExtra(Intent.EXTRA_SUBJECT, file.name)
+                putExtra(Intent.EXTRA_STREAM, uri)
+                if (format == NetworkLogExportFormat.TEXT && content.length <= 64_000) {
+                    putExtra(Intent.EXTRA_TEXT, content)
+                }
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             val chooser = Intent.createChooser(sendIntent, chooserTitle).apply {

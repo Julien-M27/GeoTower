@@ -109,6 +109,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Memory
+import androidx.compose.material.icons.filled.Timeline
+import fr.geotower.ui.screens.fh.FH_MAP_ROUTE
 import androidx.compose.runtime.collectAsState
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -630,6 +632,7 @@ fun MenuButtonsList(
     // arrivée après coup et n'a pas de miroir observable dans AppConfig.
     val showTrips = HomePrefs.showTripsPage.read(prefs) &&
         featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.TRIPS)
+    val showFhMap = HomePrefs.showFhMapPage.read(prefs)
     val showAbout = includeAbout && HomePrefs.showAboutLink.read(prefs) &&
         featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.ABOUT)
 
@@ -698,6 +701,22 @@ fun MenuButtonsList(
                             fillWidth = isGrid,
                             compact = compact,
                             onClick = { navController.navigate("trips") }
+                        )
+                    })
+                }
+            }
+            "fh_map" -> {
+                if (showFhMap) {
+                    buttons.add(HomeMenuEntry(pageId) {
+                        MenuButton(
+                            text = stringResource(R.string.fh_map_title),
+                            icon = Icons.Default.Timeline,
+                            color = buttonBgColor,
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            useOneUi = useOneUi,
+                            fillWidth = isGrid,
+                            compact = compact,
+                            onClick = { navController.navigate(FH_MAP_ROUTE) }
                         )
                     })
                 }

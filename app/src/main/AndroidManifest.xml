@@ -1,19 +1,20 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <!-- Permission de bibliothèque requise par PlaceListMapTemplate pour les apps POI. -->
+    <!-- Permission de bibliothÃ¨que requise par PlaceListMapTemplate pour les apps POI. -->
     <uses-permission android:name="androidx.car.app.MAP_TEMPLATES" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <!-- Utilisée séparément par les widgets et le suivi en arrière-plan, jamais demandée par Android Auto. -->
+    <!-- UtilisÃ©e sÃ©parÃ©ment par les widgets et le suivi en arriÃ¨re-plan, jamais demandÃ©e par Android Auto. -->
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <!-- Generation locale de la base : un service au premier plan garde le process en vie mais
          n'empeche PAS la suspension du CPU ecran eteint. Sans wake lock, un build long est
          interrompu en boucle des que l'utilisateur range son telephone. -->
@@ -48,19 +49,19 @@
 
     <!-- MapLibre requiert OpenGL ES 3.0 dans son manifeste AAR, ce qui fait filtrer par Google Play
          tous les appareils n'ayant qu'OpenGL ES 2.0. On retire cette exigence stricte du manifeste
-         fusionné pour préserver l'accès 2D à tous les anciens appareils, la 3D étant protégée
-         par une vérification dynamique au runtime dans le code Kotlin. -->
+         fusionnÃ© pour prÃ©server l'accÃ¨s 2D Ã  tous les anciens appareils, la 3D Ã©tant protÃ©gÃ©e
+         par une vÃ©rification dynamique au runtime dans le code Kotlin. -->
     <uses-feature
         android:glEsVersion="0x00030000"
         tools:node="remove" />
 
     <queries>
-        <!-- Hôte Android Auto : la visibilité du paquet est nécessaire pour lire sa version dans
+        <!-- HÃ´te Android Auto : la visibilitÃ© du paquet est nÃ©cessaire pour lire sa version dans
              le journal de diagnostic, la liaison seule ne la garantit pas au moment d'onCreate. -->
         <package android:name="com.google.android.projection.gearhead" />
         <package android:name="fr.enb_analytics.enb4g" />
         <package android:name="com.sfrmap.android" />
-        <!-- CellularFR masqué — voir CellularFrApi.ENABLED -->
+        <!-- CellularFR masquÃ© â€” voir CellularFrApi.ENABLED -->
         <package android:name="com.luisbaker.cellularfr" />
         <package android:name="org.rncteam.rncfreemobile" />
         <!-- Garmin Connect Mobile pour la communication BLE avec les montres Connect IQ -->
@@ -86,10 +87,10 @@
             android:name="com.samsung.android.support.ongoing_activity"
             android:value="true" />
 
-        <!-- Doit rester au niveau <application> : AppInfo.create(), premier appel de l'hôte après
-             le bind du CarAppService, lit cette clé dans ApplicationInfo.metaData. Posée sur le
-             <service>, elle atterrit dans ServiceInfo.metaData, invisible d'ici : la poignée de
-             main échoue sur une IllegalArgumentException et l'hôte se déconnecte sans rien
+        <!-- Doit rester au niveau <application> : AppInfo.create(), premier appel de l'hÃ´te aprÃ¨s
+             le bind du CarAppService, lit cette clÃ© dans ApplicationInfo.metaData. PosÃ©e sur le
+             <service>, elle atterrit dans ServiceInfo.metaData, invisible d'ici : la poignÃ©e de
+             main Ã©choue sur une IllegalArgumentException et l'hÃ´te se dÃ©connecte sans rien
              afficher. Couvert par CarAppHandshakeTest. -->
         <meta-data
             android:name="androidx.car.app.minCarApiLevel"
@@ -123,7 +124,7 @@
                 <data android:scheme="geotower" />
             </intent-filter>
 
-            <!-- ✅ AJOUTER : Pour geotower://support/... -->
+            <!-- âœ… AJOUTER : Pour geotower://support/... -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -131,7 +132,7 @@
                 <data android:scheme="geotower" android:host="support" />
             </intent-filter>
 
-            <!-- ✅ AJOUTER : Pour geotower://site/... -->
+            <!-- âœ… AJOUTER : Pour geotower://site/... -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -155,7 +156,7 @@
 
         <!-- Les alias de lanceur (icone au choix de l'utilisateur) vivent dans src/mobile : sur
              Android Automotive OS, le lanceur de la voiture ne doit proposer que CarAppActivity,
-             jamais l'UI telephone — c'est elle qui s'affichait mal placee et trop petite. -->
+             jamais l'UI telephone â€” c'est elle qui s'affichait mal placee et trop petite. -->
 
         <receiver
             android:name=".widget.AntennaWidgetReceiver"
@@ -201,15 +202,15 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/antenna_map_widget_info" />
         </receiver>
-        <!-- Boutons du rappel de trajet. Non exporté : seules les notifications de l'app le
-             déclenchent, via des PendingIntent qu'elle a elle-même construits. -->
+        <!-- Boutons du rappel de trajet. Non exportÃ© : seules les notifications de l'app le
+             dÃ©clenchent, via des PendingIntent qu'elle a elle-mÃªme construits. -->
         <receiver
             android:name=".data.workers.TripReminderActionReceiver"
             android:exported="false" />
 
         <service
             android:name="androidx.work.impl.foreground.SystemForegroundService"
-            android:foregroundServiceType="dataSync"
+            android:foregroundServiceType="dataSync|connectedDevice"
             tools:node="merge" />
 
         <service
@@ -220,9 +221,9 @@
         <service
             android:name=".services.garmin.GarminCompanionService"
             android:exported="false"
-            android:foregroundServiceType="dataSync" />
+            android:foregroundServiceType="connectedDevice" />
 
-        <!-- Service d'écoute Wearable pour répondre aux requêtes de la montre Wear OS -->
+        <!-- Service d'Ã©coute Wearable pour rÃ©pondre aux requÃªtes de la montre Wear OS -->
         <service
             android:name=".services.wear.WearablePhoneListenerService"
             android:exported="true">
@@ -239,9 +240,6 @@
                     android:host="*"
                     android:pathPrefix="/geotower" />
             </intent-filter>
-            <intent-filter>
-                <action android:name="com.google.android.gms.wearable.BIND_LISTENER_INTENT" />
-            </intent-filter>
         </service>
 
         <!-- Android Auto must discover this exported CarAppService; release hosts are restricted in createHostValidator(). -->
@@ -256,7 +254,7 @@
                 <category android:name="androidx.car.app.category.POI" />
             </intent-filter>
         </service>
-        <!-- Récepteur vocal pour l'Assistant Android / Gemini (App Actions / Shortcuts) -->
+        <!-- RÃ©cepteur vocal pour l'Assistant Android / Gemini (App Actions / Shortcuts) -->
         <receiver
             android:name=".assistant.GeminiAntennaReceiver"
             android:permission="android.permission.ACCESS_FINE_LOCATION"

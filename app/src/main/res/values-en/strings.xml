@@ -1,4 +1,4 @@
-<resources>
+﻿<resources>
     <string name="antenna_widget_label">Nearby antennas</string>
     <string name="antenna_map_widget_label">Nearby antenna map</string>
     <string name="common_logo">Logo</string>
@@ -3517,6 +3517,7 @@
     <string name="appstrings_release_v2128_summary_operator_search_and_fh_nav_customization">Enhanced operator search (map and nearby) and customizable Microwave Links (FH) navigation tab</string>
     <string name="appstrings_release_v2129_summary_fh_map_rendering_optimization">Fluidity optimization for the microwave links (FH) map using batched rendering and adaptive zoom detail</string>
     <string name="appstrings_release_v2130_summary_fh_map_world_bounds_and_min_zoom">Minimum zoom and world map bounds enforcement on the microwave links (FH) map</string>
+    <string name="appstrings_release_v2131_summary_fh_filters_export_and_wear_improvements">Distance filters and export on the FH map, compass/IGN alerts, network log pagination, and Wear OS enhancements</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Network requests log</string>
@@ -3661,4 +3662,22 @@
     <string name="site_comparator_picker_title">Choose a site</string>
     <string name="site_comparator_search_hint">ANFR ID, city or address…</string>
     <string name="site_comparator_no_results">No matching sites found.</string>
+    <string name="fh_map_distance_under_5km">&lt; 5 km</string>
+    <string name="fh_map_loading">Loading microwave links...</string>
+    <string name="appstrings_compass_sensor_unavailable">Compass sensor unavailable on this device</string>
+    <string name="fh_map_links_shown_count">%1$s links shown out of %2$s</string>
+    <string name="fh_map_empty_area">No microwave links in this area</string>
+    <string name="fh_map_distance_5_20km">5–20 km</string>
+    <string name="appstrings_compass_calibration_needed">Low compass accuracy: calibrate by moving in a figure-8</string>
+    <string name="fh_map_title">Microwave links map</string>
+    <string name="appstrings_coverage_compute_error">Error computing theoretical coverage</string>
+    <string name="fh_map_distance_all">All lengths</string>
+    <string name="fh_map_export">Export microwave links</string>
+    <string name="appstrings_coverage_share_source">Source: IGN RGE ALTI / BD TOPO · © OpenStreetMap</string>
+    <string name="fh_map_no_table">Microwave links table missing from local database</string>
+    <string name="appstrings_coverage_out_of_ign_area">Area outside IGN elevation coverage (France): terrain data unavailable</string>
+    <string name="fh_map_distance_over_20km">&gt; 20 km</string>
+    <string name="fh_map_filter_operators">Filter microwave operators</string>
+    <string name="fh_map_subtitle_counts">%1$s / %2$s links • %3$d/%4$d operators</string>
+    <string name="network_log_load_more">Load more</string>
 </resources>

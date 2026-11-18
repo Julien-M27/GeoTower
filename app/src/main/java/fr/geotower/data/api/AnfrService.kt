@@ -64,14 +64,8 @@ data class EnbVersionResponseDto(
 )
 
 interface AnfrService {
-    @GET("/api/v2/download/manifest")
-    suspend fun getDownloadManifest(): okhttp3.ResponseBody
-
     @GET("/api/v2/download/version_fr_enb")
     suspend fun getEnbVersion(): Response<EnbVersionResponseDto>
-
-    @GET("/api/v2/maps/catalog")
-    suspend fun getMapsCatalog(): List<OfflineMapDto>
 
     @GET("/api/v2/antennes/hs")
     suspend fun getSitesHsGeoJson(@Query("source") source: String? = null): okhttp3.ResponseBody

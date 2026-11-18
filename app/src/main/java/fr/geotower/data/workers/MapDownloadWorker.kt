@@ -31,6 +31,7 @@ import kotlinx.coroutines.withContext
 import okhttp3.Request
 import java.io.File
 import java.io.FileOutputStream
+import java.util.concurrent.TimeUnit
 
 class MapDownloadWorker(
     context: Context,
@@ -101,8 +102,12 @@ class MapDownloadWorker(
             awaitIfPaused(0, mapFilename, mapDisplayName, progressNotifId)
             if (tempMapFile.exists()) tempMapFile.delete()
 
+            val downloadClient = RetrofitClient.currentClient.newBuilder()
+                .callTimeout(15, TimeUnit.MINUTES)
+                .readTimeout(2, TimeUnit.MINUTES)
+                .build()
             val request = Request.Builder().url(mapUrl).build()
-            val response = RetrofitClient.currentClient.newCall(request).execute()
+            val response = downloadClient.newCall(request).execute()
 
             response.use { safeResponse ->
                 if (!safeResponse.isSuccessful) return@withContext Result.failure()

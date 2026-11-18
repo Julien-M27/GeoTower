@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Tune
@@ -540,19 +541,17 @@ fun ChangesMapScreen(
                     )
                 }
 
-                // Ligne 2 : [Filtres] --- [Nb de changements] --- [Semaine]
+                // Ligne 2 : [Site web] --- [Nb de changements] --- [Semaine]
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     SmallFloatingCircleButton(
-                        icon = Icons.Default.Tune,
-                        desc = "Filtres",
+                        icon = Icons.Default.Public,
+                        desc = "Ouvrir fraetech.github.io",
                         size = 44.dp,
-                        isActive = !filterState.isDefault,
-                        badgeCount = if (!filterState.isDefault) filterState.activeCount else null,
-                        onClick = { showFilterSheet = true }
+                        onClick = { uriHandler.openUri("https://fraetech.github.io/") }
                     )
 
                     val isFiltered = !filterState.isDefault
@@ -654,6 +653,16 @@ fun ChangesMapScreen(
                         }
                     }
                 }
+
+                // Ligne 3 : [Filtres] sous le bouton web
+                SmallFloatingCircleButton(
+                    icon = Icons.Default.Tune,
+                    desc = "Filtres",
+                    size = 44.dp,
+                    isActive = !filterState.isDefault,
+                    badgeCount = if (!filterState.isDefault) filterState.activeCount else null,
+                    onClick = { showFilterSheet = true }
+                )
             }
 
             // Boutons flottants de contrôle de la carte (Zoom en HAUT, Localisation en BAS) identiques à la carte principale

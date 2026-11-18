@@ -1,4 +1,4 @@
-<resources>
+﻿<resources>
     <string name="antenna_map_widget_label">Mapa de antenas cercanas</string>
     <string name="antenna_widget_label">Antenas cercanas</string>
     <string name="common_logo">Logotipo</string>
@@ -3517,6 +3517,7 @@
     <string name="appstrings_release_v2128_summary_operator_search_and_fh_nav_customization">Búsqueda avanzada por operador (mapa y cercanía) y personalización de la pestaña Enlaces FH en la navegación</string>
     <string name="appstrings_release_v2129_summary_fh_map_rendering_optimization">Optimización de la fluidez del mapa de enlaces de microondas (FH) mediante renderizado por lotes y detalle adaptativo al zoom</string>
     <string name="appstrings_release_v2130_summary_fh_map_world_bounds_and_min_zoom">Limitación del zoom mínimo y de los límites geográficos en el mapa de enlaces de microondas (FH)</string>
+    <string name="appstrings_release_v2131_summary_fh_filters_export_and_wear_improvements">Filtros por distancia y exportación en el mapa FH, avisos de brújula/IGN, paginación del registro de red y mejoras en Wear OS</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registro de solicitudes de red</string>
@@ -3661,4 +3662,22 @@
     <string name="site_comparator_picker_title">Elegir un sitio</string>
     <string name="site_comparator_search_hint">ID ANFR, municipio o dirección…</string>
     <string name="site_comparator_no_results">No se encontraron sitios.</string>
+    <string name="fh_map_distance_under_5km">&lt; 5 km</string>
+    <string name="fh_map_loading">Cargando radioenlaces...</string>
+    <string name="appstrings_compass_sensor_unavailable">Sensor de brújula no disponible en este dispositivo</string>
+    <string name="fh_map_links_shown_count">%1$s enlaces mostrados de %2$s</string>
+    <string name="fh_map_empty_area">Sin radioenlaces en esta zona</string>
+    <string name="fh_map_distance_5_20km">5–20 km</string>
+    <string name="appstrings_compass_calibration_needed">Baja precisión de brújula: calibra moviendo en forma de 8</string>
+    <string name="fh_map_title">Mapa de radioenlaces</string>
+    <string name="appstrings_coverage_compute_error">Error al calcular la cobertura teórica</string>
+    <string name="fh_map_distance_all">Todas las distancias</string>
+    <string name="fh_map_export">Exportar radioenlaces</string>
+    <string name="appstrings_coverage_share_source">Fuente: IGN RGE ALTI / BD TOPO · © OpenStreetMap</string>
+    <string name="fh_map_no_table">Falta la tabla de radioenlaces en la base local</string>
+    <string name="appstrings_coverage_out_of_ign_area">Zona fuera de la cobertura altimétrica IGN (Francia): datos de relieve no disponibles</string>
+    <string name="fh_map_distance_over_20km">&gt; 20 km</string>
+    <string name="fh_map_filter_operators">Filtrar operadores de radioenlaces</string>
+    <string name="fh_map_subtitle_counts">%1$s / %2$s enlaces • %3$d/%4$d operadores</string>
+    <string name="network_log_load_more">Cargar más</string>
 </resources>

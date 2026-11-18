@@ -484,7 +484,10 @@ object GarminCompanionManager {
             val effectiveLimit = limit.coerceIn(1, 50)
             val candidateCount = (effectiveLimit * 6).coerceIn(25, 300)
             log("GarminBridge", "Recherche des $candidateCount candidats les plus proches dans Room...")
-            val antennas = repo.getNearest(lat, lon, candidateCount)
+            val rawAntennas = repo.getNearest(lat, lon, candidateCount)
+            val antennas = appContext?.let { ctx ->
+                fr.geotower.data.hidden.HiddenSitesStore.filter(ctx, rawAntennas)
+            } ?: rawAntennas
             log("GarminBridge", "${antennas.size} antenne(s) brute(s) trouvée(s)")
 
             if (antennas.isEmpty()) {
@@ -678,48 +681,6 @@ object GarminCompanionManager {
         // Tri standard opérateurs (Orange, SFR, Bouygues, Free, Autres)
         result.sortBy { (it["id"] as? Int) ?: 99 }
         return result
-    }
-
-    private fun formatBandsString(bandMask: Int, techMask: Int): String {
-        if (bandMask == 0) {
-            val parts = mutableListOf<String>()
-            if (techMask and 8 != 0) parts.add("5G: 3500")
-            if (techMask and 4 != 0) parts.add("4G: 700, 1800, 2100")
-            if (techMask and 2 != 0) parts.add("3G: 900")
-            if (techMask and 1 != 0) parts.add("2G: 900")
-            return if (parts.isNotEmpty()) parts.joinToString(" • ") + " MHz" else "4G: 800, 1800, 2100 MHz"
-        }
-
-        val f5g = mutableListOf<String>()
-        if (bandMask and (1 shl 13) != 0) f5g.add("26G")
-        if (bandMask and (1 shl 12) != 0) f5g.add("3500")
-        if (bandMask and (1 shl 11) != 0) f5g.add("2100")
-        if (bandMask and (1 shl 21) != 0) f5g.add("1400")
-        if (bandMask and (1 shl 10) != 0) f5g.add("700")
-
-        val f4g = mutableListOf<String>()
-        if (bandMask and (1 shl 9) != 0) f4g.add("2600")
-        if (bandMask and (1 shl 8) != 0) f4g.add("2100")
-        if (bandMask and (1 shl 7) != 0) f4g.add("1800")
-        if (bandMask and (1 shl 6) != 0) f4g.add("900")
-        if (bandMask and (1 shl 5) != 0) f4g.add("800")
-        if (bandMask and (1 shl 4) != 0) f4g.add("700")
-
-        val f3g = mutableListOf<String>()
-        if (bandMask and (1 shl 3) != 0) f3g.add("2100")
-        if (bandMask and (1 shl 2) != 0) f3g.add("900")
-
-        val f2g = mutableListOf<String>()
-        if (bandMask and (1 shl 1) != 0) f2g.add("1800")
-        if (bandMask and (1 shl 0) != 0) f2g.add("900")
-
-        val groups = mutableListOf<String>()
-        if (f5g.isNotEmpty()) groups.add("5G: ${f5g.joinToString(", ")}")
-        if (f4g.isNotEmpty()) groups.add("4G: ${f4g.joinToString(", ")}")
-        if (f3g.isNotEmpty()) groups.add("3G: ${f3g.joinToString(", ")}")
-        if (f2g.isNotEmpty()) groups.add("2G: ${f2g.joinToString(", ")}")
-
-        return if (groups.isNotEmpty()) groups.joinToString(" • ") + " MHz" else "4G: 800, 1800, 2100 MHz"
     }
 
     private fun parseAzimuths(raw: String?): List<Int> {

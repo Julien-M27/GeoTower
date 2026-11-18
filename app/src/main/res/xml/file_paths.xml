@@ -9,6 +9,9 @@
     <cache-path name="trip_exports" path="trip_exports/"/>
     <!-- Sauvegarde complète des données (AppBackupManager), même règle que ci-dessus. -->
     <cache-path name="backup_exports" path="backup_exports/"/>
+    <!-- Exports des faisceaux FH (GeoJSON/CSV/GPX) et journaux réseau (TXT/JSON/CSV). -->
+    <cache-path name="fh_exports" path="fh_export/"/>
+    <cache-path name="netlog_exports" path="netlog/"/>
     <!-- Journal de débogage (AppFileLog) : dans filesDir, pour survivre au vidage du cache. -->
     <files-path name="debug_logs" path="logs/"/>
     <!-- Rapports PDF enregistrés dans Téléchargements avant Android 10 (MediaStore ensuite). -->

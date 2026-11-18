@@ -254,7 +254,14 @@ private fun DisabledFeatureRoute(navController: NavHostController, message: Stri
     LaunchedEffect(message) {
         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
         // En mode simplifié il n'y a pas d'accueil : le repli est la carte.
-        val fallback = AppConfig.homeRoute()
+        // Si la route courante est déjà la route de repli (ex. carte désactivée), basculer sur settings pour éviter une boucle.
+        val currentRoute = navController.currentBackStackEntry?.destination?.route
+        val homeFallback = AppConfig.homeRoute()
+        val fallback = if (currentRoute == homeFallback || currentRoute?.startsWith("$homeFallback?") == true) {
+            "settings"
+        } else {
+            homeFallback
+        }
         navController.navigate(fallback) {
             launchSingleTop = true
             popUpTo(fallback) { inclusive = false }
@@ -1335,22 +1342,30 @@ class MainActivity : ComponentActivity() {
                             // Carte des changements et nouveautés ANFR (plein écran / borderless)
                             composable(CHANGES_MAP_ROUTE) {
                                 Box(modifier = Modifier.padding(bottom = rootBottomPadding)) {
-                                    ChangesMapScreen(
-                                        navController = navController,
-                                        onOpenSupportDetail = { supId ->
-                                            navController.navigate("support_detail/$supId")
-                                        }
-                                    )
+                                    if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.MAP)) {
+                                        ChangesMapScreen(
+                                            navController = navController,
+                                            onOpenSupportDetail = { supId ->
+                                                navController.navigate("support_detail/$supId")
+                                            }
+                                        )
+                                    } else {
+                                        DisabledFeatureRoute(navController, txtUnavailable)
+                                    }
                                 }
                             }
 
                             // Carte dédiée aux faisceaux hertziens (FH) et sélection d'opérateurs
                             composable(FH_MAP_ROUTE) {
                                 Box(modifier = Modifier.padding(bottom = rootBottomPadding)) {
-                                    FhMapScreen(
-                                        navController = navController,
-                                        repository = repository
-                                    )
+                                    if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.MAP)) {
+                                        FhMapScreen(
+                                            navController = navController,
+                                            repository = repository
+                                        )
+                                    } else {
+                                        DisabledFeatureRoute(navController, txtUnavailable)
+                                    }
                                 }
                             }
 

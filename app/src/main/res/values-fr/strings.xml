@@ -1,4 +1,4 @@
-<resources>
+﻿<resources>
     <string name="antenna_map_widget_label">Mini-carte des antennes</string>
     <string name="antenna_widget_label">Antennes à proximité</string>
     <string name="common_logo">Logo</string>
@@ -3519,6 +3519,7 @@
     <string name="appstrings_release_v2128_summary_operator_search_and_fh_nav_customization">Recherche avancée par opérateur (carte et proximité) et personnalisation de l\'onglet Faisceaux FH dans la navigation</string>
     <string name="appstrings_release_v2129_summary_fh_map_rendering_optimization">Optimisation de la fluidité de la carte des faisceaux hertziens (FH) par rendu groupé et niveau de détail adaptatif au zoom</string>
     <string name="appstrings_release_v2130_summary_fh_map_world_bounds_and_min_zoom">Limitation du dézoom minimal et des bornes géographiques sur la carte des faisceaux hertziens (FH)</string>
+    <string name="appstrings_release_v2131_summary_fh_filters_export_and_wear_improvements">Filtres par distance et exportation sur la carte des faisceaux FH, alertes boussole/IGN, pagination du journal réseau et améliorations Wear OS</string>
 
     <!-- Journal des requêtes réseau -->
     <string name="network_log_title">Journal des requêtes réseau</string>
@@ -3663,4 +3664,22 @@
     <string name="site_comparator_picker_title">Choisir un site</string>
     <string name="site_comparator_search_hint">ID ANFR, commune ou adresse…</string>
     <string name="site_comparator_no_results">Aucun site trouvé.</string>
+    <string name="fh_map_distance_under_5km">&lt; 5 km</string>
+    <string name="fh_map_loading">Chargement des liaisons FH...</string>
+    <string name="appstrings_compass_sensor_unavailable">Capteur boussole indisponible sur cet appareil</string>
+    <string name="fh_map_links_shown_count">%1$s liaisons affichées sur %2$s</string>
+    <string name="fh_map_empty_area">Aucune liaison FH dans cette zone</string>
+    <string name="fh_map_distance_5_20km">5–20 km</string>
+    <string name="appstrings_compass_calibration_needed">Précision boussole faible : calibrez en effectuant un 8</string>
+    <string name="fh_map_title">Carte des faisceaux FH</string>
+    <string name="appstrings_coverage_compute_error">Erreur lors du calcul de couverture théorique</string>
+    <string name="fh_map_distance_all">Toutes longueurs</string>
+    <string name="fh_map_export">Exporter les faisceaux FH</string>
+    <string name="appstrings_coverage_share_source">Source : IGN RGE ALTI / BD TOPO · © OpenStreetMap</string>
+    <string name="fh_map_no_table">Table FH absente de la base locale</string>
+    <string name="appstrings_coverage_out_of_ign_area">Zone hors couverture altimétrique IGN (France) : relief indisponible</string>
+    <string name="fh_map_distance_over_20km">&gt; 20 km</string>
+    <string name="fh_map_filter_operators">Choisir les opérateurs FH</string>
+    <string name="fh_map_subtitle_counts">%1$s / %2$s traits • %3$d/%4$d opérateurs</string>
+    <string name="network_log_load_more">Charger plus</string>
 </resources>

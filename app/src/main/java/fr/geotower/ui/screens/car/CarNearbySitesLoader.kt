@@ -49,7 +49,8 @@ internal class CarNearbySitesLoader(
             ?: return CarSitesLoadResult.Error(carContext.getString(R.string.car_location_unavailable))
 
         val sites = withContext(Dispatchers.IO) {
-            repository.getNearest100(location.latitude, location.longitude)
+            val rawNearest = repository.getNearest100(location.latitude, location.longitude)
+            fr.geotower.data.hidden.HiddenSitesStore.filter(carContext, rawNearest)
                 .toCarSiteListItems(location)
                 .take(MAX_SITES)
         }

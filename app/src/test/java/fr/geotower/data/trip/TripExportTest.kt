@@ -132,4 +132,18 @@ class TripExportTest {
         assertEquals("trajets-geotower", TripExport.fileStem(listOf(plan(ladder(2)), plan(ladder(2)))))
         assertEquals("trajets-geotower", TripExport.fileStem(listOf(plan(ladder(2)).copy(name = "///"))))
     }
+
+    @Test
+    fun parsesGpxWaypointsAndAutoDetectsFormat() {
+        val original = plan(listOf(step(48.85, 2.35, label = "Site A"), step(48.86, 2.36, label = "Site B")))
+            .copy(name = "Tournée GPX")
+        val gpx = TripExport.buildGpx(listOf(original), nowMillis = 0L)
+
+        val imported = TripExport.parseAny(gpx, nowMillis = 1_234L)
+        assertEquals(1, imported.size)
+        assertEquals("Tournée GPX", imported[0].name)
+        assertEquals(2, imported[0].steps.size)
+        assertEquals("Site A", imported[0].steps[0].label)
+        assertEquals(48.86, imported[0].steps[1].latitude, 0.0001)
+    }
 }

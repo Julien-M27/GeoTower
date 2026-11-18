@@ -1075,6 +1075,7 @@ fun HomeSettingsSheet(
     var showHelpButton by remember { mutableStateOf(prefs.getBoolean("show_home_help", true)) }
     var showAboutLink by remember { mutableStateOf(HomePrefs.showAboutLink.read(prefs)) }
     var showTripsPage by remember { mutableStateOf(HomePrefs.showTripsPage.read(prefs)) }
+    var showFhMapPage by remember { mutableStateOf(HomePrefs.showFhMapPage.read(prefs)) }
     var showQuitButton by remember { mutableStateOf(HomePrefs.showQuitButton.read(prefs)) }
     val longPressReorder by AppConfig.homeLongPressReorder
     // Partagé avec l'accueil, qui déplace aussi ce bouton par appui long : l'un doit voir l'autre.
@@ -1222,6 +1223,14 @@ fun HomeSettingsSheet(
                                 },
                                 shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight
                             )
+                            "fh_map" -> DraggableSwitchCard(
+                                "Carte des faisceaux FH", showFhMapPage,
+                                {
+                                    showFhMapPage = it
+                                    HomePrefs.showFhMapPage.write(prefs.edit(), it).apply()
+                                },
+                                shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight
+                            )
 
                             // --- NOUVEAU : AJOUT DE LA CARTE PARAMÈTRES ---
                             "settings" -> DraggableSwitchCard(stringResource(R.string.appstrings_settings_title), true, {}, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight, hideSwitch = true)
@@ -1282,7 +1291,7 @@ fun HomeSettingsSheet(
 
             Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
             TextButton(onClick = {
-                val defaultHomeOrder = listOf("nearby", "map", "trips", "stats", "settings", "logo", "about")
+                val defaultHomeOrder = listOf("nearby", "map", "trips", "fh_map", "compass", "stats", "settings", "logo", "about")
 
                 onOrderChange(defaultHomeOrder)
                 onNearbyChange(true)
@@ -1294,10 +1303,12 @@ fun HomeSettingsSheet(
                 showLogo = true
                 showHelpButton = true
                 showQuitButton = true
+                showFhMapPage = HomePrefs.showFhMapPage.defaultValue
                 showAboutLink = HomePrefs.showAboutLink.defaultValue
                 AppConfig.setHomeLongPressReorder(prefs, true)
                 AppConfig.setHomeHelpPosition(prefs, AppConfig.DEFAULT_HOME_HELP_POSITION)
                 AppConfig.setHomeShowQuitButton(prefs, true)
+                HomePrefs.showFhMapPage.write(prefs.edit(), HomePrefs.showFhMapPage.defaultValue).apply()
                 HomePrefs.showAboutLink.write(
                     prefs.edit()
                         .putBoolean("show_home_logo", true)

@@ -229,10 +229,22 @@ fun TheoreticalCoverageScreen(
                 coverage = result
                 overlay.setCoverage(result)
                 mapRef?.invalidate()
+                if (result != null && result.terrainValidFraction <= 0.05) {
+                    android.widget.Toast.makeText(
+                        context,
+                        R.string.appstrings_coverage_out_of_ign_area,
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 AppLogger.w("TheoreticalCoverage", "compute failed", e)
+                android.widget.Toast.makeText(
+                    context,
+                    e.localizedMessage ?: context.getString(R.string.appstrings_coverage_compute_error),
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
             } finally {
                 isLoading = false
                 progress = null
@@ -273,7 +285,7 @@ fun TheoreticalCoverageScreen(
                         subtitle = "ANFR ${cov.idAnfr}" + (cov.operator?.let { " · $it" } ?: ""),
                         paramsLine = params,
                         disclaimer = context.getString(R.string.appstrings_coverage_disclaimer_short),
-                        source = "Source : IGN RGE ALTI / BD TOPO · © OpenStreetMap",
+                        source = context.getString(R.string.appstrings_coverage_share_source),
                         mapBitmap = mapBitmap,
                         forceDark = false
                     )

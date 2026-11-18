@@ -184,4 +184,21 @@ class RadioThroughputEngineTest {
         assertFalse(excludedCarrier.reason.isBlank())
         assertFalse(result.warnings.isEmpty())
     }
+
+    @Test
+    fun dssSplitSpectrumAndOutreMerWork() {
+        val systems = listOf(
+            SiteRadioSystem("lte-2100", "s1", MobileOperator.ORANGE, RadioTechnology.LTE_4G, "2100", status = SiteRadioStatus.IN_SERVICE),
+            SiteRadioSystem("nr-2100", "s1", MobileOperator.ORANGE, RadioTechnology.NR_5G, "2100", status = SiteRadioStatus.IN_SERVICE)
+        )
+        val splitProfile = ThroughputProfiles.standard.copy(dssPolicy = DssPolicy.SPLIT_SPECTRUM)
+        val splitResult = RadioThroughputEngine.estimate(systems, splitProfile)
+        assertEquals(2, splitResult.perCarrierResults.count { it.included })
+
+        val srr = MobileOperator.fromLabel("SRR")
+        assertEquals(MobileOperator.SRR, srr)
+        val srrAlloc = SpectrumAllocationsFrMetro.find(srr!!, RadioTechnology.LTE_4G, "1800")
+        assertNotNull(srrAlloc)
+        assertEquals(CountryScope.OUTRE_MER, srrAlloc!!.countryScope)
+    }
 }

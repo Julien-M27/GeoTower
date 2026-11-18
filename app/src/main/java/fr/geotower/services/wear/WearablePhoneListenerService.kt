@@ -115,6 +115,14 @@ class WearablePhoneListenerService : WearableListenerService() {
             maxLon = centerLon + offsetLon
         )
 
+        val hsAnfrIds = runCatching {
+            (applicationContext as? fr.geotower.GeoTowerApp)?.repository?.getSitesHs()
+                ?.map { it.idAnfr.trim().trimStart('0') }
+                ?.filter { it.isNotEmpty() }
+                ?.toSet()
+                .orEmpty()
+        }.getOrDefault(emptySet())
+
         val resultsArray = FloatArray(2)
 
         data class RowWithDistance(
@@ -124,6 +132,11 @@ class WearablePhoneListenerService : WearableListenerService() {
         )
 
         val candidates = rawRows.mapNotNull { row ->
+            val siteKey = "${Math.round(row.latitude * 10000.0)}_${Math.round(row.longitude * 10000.0)}"
+            val opKeys = fr.geotower.data.hidden.HiddenSitesStore.operatorKeysFor(row.operateur)
+            if (fr.geotower.data.hidden.HiddenSitesStore.isHidden(applicationContext, siteKey, opKeys)) {
+                return@mapNotNull null
+            }
             val lat = row.latitude
             val lon = row.longitude
             Location.distanceBetween(centerLat, centerLon, lat, lon, resultsArray)
@@ -200,7 +213,9 @@ class WearablePhoneListenerService : WearableListenerService() {
                     name = opName,
                     technologies = techString,
                     bands = if (bandsString.isNotBlank()) bandsString else "4G / 5G",
-                    azimuths = azSorted
+                    azimuths = azSorted,
+                    techMask = combinedTech,
+                    bandMask = combinedBands
                 )
             }.sortedBy { getOperatorPriority(it.name) }
 
@@ -214,6 +229,7 @@ class WearablePhoneListenerService : WearableListenerService() {
 
             val supportId = group.mapNotNull { it.row.idSupport?.trim() }.firstOrNull { it.isNotBlank() }
                 ?: first.row.idAnfr
+            val hasOutage = group.any { it.row.idAnfr.trim().trimStart('0') in hsAnfrIds }
 
             TowerNearbyItem(
                 id = supportId,
@@ -226,6 +242,7 @@ class WearablePhoneListenerService : WearableListenerService() {
                 longitude = first.row.longitude,
                 supportType = resolvedNature,
                 supportHeight = resolvedHeight,
+                hasOutage = hasOutage,
                 operators = operatorsList
             )
         }.sortedBy { it.distanceMeters }.take(limit)
@@ -243,6 +260,7 @@ class WearablePhoneListenerService : WearableListenerService() {
                 put("longitude", item.longitude)
                 put("supportType", item.supportType)
                 put("supportHeight", item.supportHeight)
+                put("hs", item.hasOutage)
 
                 val opsArr = JSONArray()
                 for (op in item.operators) {
@@ -250,6 +268,8 @@ class WearablePhoneListenerService : WearableListenerService() {
                         put("name", op.name)
                         put("tech", op.technologies)
                         put("bands", op.bands)
+                        put("tm", op.techMask)
+                        put("bm", op.bandMask)
                         put("az", op.azimuths.joinToString(","))
                         val azArr = JSONArray()
                         op.azimuths.forEach { azArr.put(it) }
@@ -268,73 +288,19 @@ class WearablePhoneListenerService : WearableListenerService() {
         }.toString()
     }
 
-    private fun parseTechnologies(techMask: Int): String {
-        val techs = mutableListOf<String>()
-        if (techMask and 1 != 0) techs.add("2G")
-        if (techMask and 2 != 0) techs.add("3G")
-        if (techMask and 4 != 0) techs.add("4G")
-        if (techMask and 8 != 0) techs.add("5G")
-        return if (techs.isEmpty()) "Mobile" else techs.joinToString(", ")
-    }
-
-    private fun formatBandsString(bandMask: Int, techMask: Int): String {
-        if (bandMask == 0) {
-            val parts = mutableListOf<String>()
-            if (techMask and 8 != 0) parts.add("5G: 3500")
-            if (techMask and 4 != 0) parts.add("4G: 700, 1800, 2100")
-            if (techMask and 2 != 0) parts.add("3G: 900")
-            if (techMask and 1 != 0) parts.add("2G: 900")
-            return if (parts.isNotEmpty()) parts.joinToString(" • ") + " MHz" else "4G: 800, 1800, 2100 MHz"
-        }
-
-        val f5g = mutableListOf<String>()
-        if (bandMask and (1 shl 12) != 0) f5g.add("3500")
-        if (bandMask and (1 shl 10) != 0) f5g.add("700")
-        if (bandMask and (1 shl 11) != 0) f5g.add("2100")
-        if (bandMask and (1 shl 21) != 0) f5g.add("1400")
-        if (bandMask and (1 shl 13) != 0) f5g.add("26G")
-
-        val f4g = mutableListOf<String>()
-        if (bandMask and (1 shl 4) != 0) f4g.add("700")
-        if (bandMask and (1 shl 5) != 0) f4g.add("800")
-        if (bandMask and (1 shl 6) != 0) f4g.add("900")
-        if (bandMask and (1 shl 7) != 0) f4g.add("1800")
-        if (bandMask and (1 shl 8) != 0) f4g.add("2100")
-        if (bandMask and (1 shl 9) != 0) f4g.add("2600")
-
-        val f3g = mutableListOf<String>()
-        if (bandMask and (1 shl 2) != 0) f3g.add("900")
-        if (bandMask and (1 shl 3) != 0) f3g.add("2100")
-
-        val f2g = mutableListOf<String>()
-        if (bandMask and (1 shl 0) != 0) f2g.add("900")
-        if (bandMask and (1 shl 1) != 0) f2g.add("1800")
-
-        val groups = mutableListOf<String>()
-        if (f5g.isNotEmpty()) groups.add("5G: ${f5g.joinToString(", ")}")
-        if (f4g.isNotEmpty()) groups.add("4G: ${f4g.joinToString(", ")}")
-        if (f3g.isNotEmpty()) groups.add("3G: ${f3g.joinToString(", ")}")
-        if (f2g.isNotEmpty()) groups.add("2G: ${f2g.joinToString(", ")}")
-
-        return if (groups.isNotEmpty()) groups.joinToString(" • ") + " MHz" else "4G: 800, 1800, 2100 MHz"
-    }
-
     private fun getOperatorPriority(name: String): Int {
-        val upper = name.uppercase(java.util.Locale.ROOT)
-        return when {
-            upper.contains("ORANGE") -> 1
-            upper.contains("SFR") -> 2
-            upper.contains("BOUYGUES") -> 3
-            upper.contains("FREE") -> 4
-            else -> 5
-        }
+        val key = fr.geotower.utils.OperatorColors.keyFor(name)
+        val idx = if (key != null) fr.geotower.utils.OperatorColors.orderedKeys.indexOf(key) else -1
+        return if (idx >= 0) idx + 1 else 99
     }
 
     private data class OperatorNearbyItem(
         val name: String,
         val technologies: String,
         val bands: String,
-        val azimuths: List<Int>
+        val azimuths: List<Int>,
+        val techMask: Int,
+        val bandMask: Int
     )
 
     private data class TowerNearbyItem(
@@ -348,6 +314,7 @@ class WearablePhoneListenerService : WearableListenerService() {
         val longitude: Double,
         val supportType: String,
         val supportHeight: Int?,
+        val hasOutage: Boolean,
         val operators: List<OperatorNearbyItem>
     )
 }

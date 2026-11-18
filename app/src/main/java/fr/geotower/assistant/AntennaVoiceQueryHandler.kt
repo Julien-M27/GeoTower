@@ -99,14 +99,27 @@ class AntennaVoiceQueryHandler(
             if (raw.isNullOrBlank()) return null
             val lower = raw.trim().lowercase()
             return when {
+                lower.contains("free cara") -> "Free Caraibe"
                 lower.contains("free") -> "Free"
                 lower.contains("orange") -> "Orange"
+                lower.contains("sfr cara") -> "Outremer"
                 lower.contains("sfr") -> "SFR"
-                lower.contains("bouygues") -> "Bouygues"
+                lower.contains("bouygues") || lower.contains("bytel") -> "Bouygues"
                 lower.contains("digicel") -> "Digicel"
-                lower.contains("outremer") -> "Outremer"
-                // Si la phrase contient "antenne", "relais", etc. sans nom d'opérateur spécifique,
-                // on renvoie null pour chercher tous les opérateurs confondus.
+                lower.contains("outremer") || lower.contains("omt") -> "Outremer"
+                lower.contains("uts") -> "UTS Caraibe"
+                lower.contains("dauphin") -> "Dauphin"
+                lower.contains("srr") -> "SRR"
+                lower.contains("telco") || lower.contains("only") -> "Telco OI"
+                lower.contains("zeop") -> "ZEOP"
+                lower.contains("maore") || lower.contains("maoré") -> "Maore"
+                lower.contains("spm") -> "SPM"
+                lower.contains("globaltel") -> "Globaltel"
+                lower.contains("opt") || lower.contains("caledon") || lower.contains("calédon") -> "OPT"
+                lower.contains("onati") -> "ONATi"
+                lower.contains("pmt") || lower.contains("vodafone") -> "PMT"
+                lower.contains("viti") || lower.contains("ora") -> "Ora"
+                lower.contains("spt") -> "SPT"
                 else -> null
             }
         }

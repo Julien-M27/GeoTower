@@ -227,7 +227,7 @@ fun MoreScreen(navController: NavController) {
                 if (showFhMap) {
                     entries.add(MoreMenuEntry(pageId) {
                         MenuButton(
-                            text = "Carte des faisceaux FH",
+                            text = stringResource(R.string.fh_map_title),
                             icon = Icons.Default.Timeline,
                             color = buttonBgColor,
                             contentColor = MaterialTheme.colorScheme.onSurface,

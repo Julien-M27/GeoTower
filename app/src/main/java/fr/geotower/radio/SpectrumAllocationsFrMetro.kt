@@ -38,7 +38,39 @@ object SpectrumAllocationsFrMetro {
         SpectrumAllocation(MobileOperator.BOUYGUES, bandLabel = "3500", ratBandNr = "n78", duplexMode = DuplexMode.TDD, tddStartMHz = 3570.0, tddEndMHz = 3640.0, bandwidthMHz = 70.0, validFrom = "2020-11-17", validTo = "2035-11-17", sourceName = "Arcep patrimoine de frequences mobiles", sourceUrl = ARCEP_SPECTRUM_SOURCE, confidence = 95),
         SpectrumAllocation(MobileOperator.FREE, bandLabel = "3500", ratBandNr = "n78", duplexMode = DuplexMode.TDD, tddStartMHz = 3640.0, tddEndMHz = 3710.0, bandwidthMHz = 70.0, validFrom = "2020-11-17", validTo = "2035-11-17", sourceName = "Arcep patrimoine de frequences mobiles", sourceUrl = ARCEP_SPECTRUM_SOURCE, confidence = 95),
         SpectrumAllocation(MobileOperator.ORANGE, bandLabel = "3500", ratBandNr = "n78", duplexMode = DuplexMode.TDD, tddStartMHz = 3710.0, tddEndMHz = 3800.0, bandwidthMHz = 90.0, validFrom = "2020-11-17", validTo = "2035-11-17", sourceName = "Arcep patrimoine de frequences mobiles", sourceUrl = ARCEP_SPECTRUM_SOURCE, confidence = 95)
-    )
+    ) + outremersAllocations()
+
+    private fun outremersAllocations(): List<SpectrumAllocation> {
+        val overseasOperators = listOf(
+            MobileOperator.FREE_CARAIBE,
+            MobileOperator.SRR,
+            MobileOperator.DIGICEL,
+            MobileOperator.OUTREMER_TELECOM,
+            MobileOperator.UTS_CARAIBE,
+            MobileOperator.DAUPHIN_TELECOM,
+            MobileOperator.TELCO_OI,
+            MobileOperator.ZEOP,
+            MobileOperator.MAORE_MOBILE,
+            MobileOperator.SPM_TELECOM,
+            MobileOperator.GLOBALTEL,
+            MobileOperator.OPT_NC,
+            MobileOperator.ONATI,
+            MobileOperator.PMT_VODAFONE,
+            MobileOperator.VITI,
+            MobileOperator.SPT
+        )
+        return overseasOperators.flatMap { operator ->
+            listOf(
+                SpectrumAllocation(operator, CountryScope.OUTRE_MER, bandLabel = "700", ratBandLte = "B28", ratBandNr = "n28", duplexMode = DuplexMode.FDD, bandwidthMHz = 10.0, validFrom = "2016-01-01", validTo = null, sourceName = "Arcep Outre-mer (estimation standard)", sourceUrl = ARCEP_SPECTRUM_SOURCE, confidence = 75),
+                SpectrumAllocation(operator, CountryScope.OUTRE_MER, bandLabel = "800", ratBandLte = "B20", duplexMode = DuplexMode.FDD, bandwidthMHz = 10.0, validFrom = "2016-01-01", validTo = null, sourceName = "Arcep Outre-mer (estimation standard)", sourceUrl = ARCEP_SPECTRUM_SOURCE, confidence = 75),
+                SpectrumAllocation(operator, CountryScope.OUTRE_MER, bandLabel = "900", ratBandLte = "B8", duplexMode = DuplexMode.FDD, bandwidthMHz = 5.0, validFrom = "2016-01-01", validTo = null, sourceName = "Arcep Outre-mer (estimation standard)", sourceUrl = ARCEP_SPECTRUM_SOURCE, confidence = 70),
+                SpectrumAllocation(operator, CountryScope.OUTRE_MER, bandLabel = "1800", ratBandLte = "B3", duplexMode = DuplexMode.FDD, bandwidthMHz = 15.0, validFrom = "2016-01-01", validTo = null, sourceName = "Arcep Outre-mer (estimation standard)", sourceUrl = ARCEP_SPECTRUM_SOURCE, confidence = 75),
+                SpectrumAllocation(operator, CountryScope.OUTRE_MER, bandLabel = "2100", ratBandLte = "B1", ratBandNr = "n1", duplexMode = DuplexMode.FDD, bandwidthMHz = 15.0, validFrom = "2016-01-01", validTo = null, sourceName = "Arcep Outre-mer (estimation standard)", sourceUrl = ARCEP_SPECTRUM_SOURCE, confidence = 75),
+                SpectrumAllocation(operator, CountryScope.OUTRE_MER, bandLabel = "2600", ratBandLte = "B7", duplexMode = DuplexMode.FDD, bandwidthMHz = 15.0, validFrom = "2016-01-01", validTo = null, sourceName = "Arcep Outre-mer (estimation standard)", sourceUrl = ARCEP_SPECTRUM_SOURCE, confidence = 75),
+                SpectrumAllocation(operator, CountryScope.OUTRE_MER, bandLabel = "3500", ratBandNr = "n78", duplexMode = DuplexMode.TDD, bandwidthMHz = 50.0, validFrom = "2022-01-01", validTo = null, sourceName = "Arcep Outre-mer (estimation standard)", sourceUrl = ARCEP_SPECTRUM_SOURCE, confidence = 70)
+            )
+        }
+    }
 
     fun find(operator: MobileOperator, technology: RadioTechnology, bandLabel: String): SpectrumAllocation? {
         val normalizedBand = normalizeBandLabel(bandLabel)

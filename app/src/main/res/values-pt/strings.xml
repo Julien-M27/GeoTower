@@ -1,4 +1,4 @@
-<resources>
+﻿<resources>
     <string name="antenna_map_widget_label">Mapa de antenas próximas</string>
     <string name="antenna_widget_label">Antenas próximas</string>
     <string name="common_logo">Logótipo</string>
@@ -3517,6 +3517,7 @@
     <string name="appstrings_release_v2128_summary_operator_search_and_fh_nav_customization">Pesquisa avançada por operador (mapa e proximidade) e personalização do separador Ligações FH na navegação</string>
     <string name="appstrings_release_v2129_summary_fh_map_rendering_optimization">Otimização da fluidez do mapa de ligações FH através de renderização em lotes e nível de detalhe adaptativo ao zoom</string>
     <string name="appstrings_release_v2130_summary_fh_map_world_bounds_and_min_zoom">Limitação do zoom mínimo e dos limites geográficos no mapa de ligações por feixes hertzianos (FH)</string>
+    <string name="appstrings_release_v2131_summary_fh_filters_export_and_wear_improvements">Filtros por distância e exportação no mapa FH, alertas de bússola/IGN, paginação do registo de rede e melhorias no Wear OS</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registo de pedidos de rede</string>
@@ -3661,4 +3662,22 @@
     <string name="site_comparator_picker_title">Escolher um site</string>
     <string name="site_comparator_search_hint">ID ANFR, município ou morada…</string>
     <string name="site_comparator_no_results">Nenhum site encontrado.</string>
+    <string name="fh_map_distance_under_5km">&lt; 5 km</string>
+    <string name="fh_map_loading">A carregar ligações FH...</string>
+    <string name="appstrings_compass_sensor_unavailable">Sensor de bússola indisponível neste dispositivo</string>
+    <string name="fh_map_links_shown_count">%1$s ligações mostradas de %2$s</string>
+    <string name="fh_map_empty_area">Sem ligações FH nesta zona</string>
+    <string name="fh_map_distance_5_20km">5–20 km</string>
+    <string name="appstrings_compass_calibration_needed">Baixa precisão da bússola: calibre movendo em forma de 8</string>
+    <string name="fh_map_title">Mapa de feixes hertzianos</string>
+    <string name="appstrings_coverage_compute_error">Erro ao calcular a cobertura teórica</string>
+    <string name="fh_map_distance_all">Todas as distâncias</string>
+    <string name="fh_map_export">Exportar ligações FH</string>
+    <string name="appstrings_coverage_share_source">Fonte: IGN RGE ALTI / BD TOPO · © OpenStreetMap</string>
+    <string name="fh_map_no_table">Tabela FH ausente na base de dados local</string>
+    <string name="appstrings_coverage_out_of_ign_area">Área fora da cobertura altimétrica IGN (França): dados de terreno indisponíveis</string>
+    <string name="fh_map_distance_over_20km">&gt; 20 km</string>
+    <string name="fh_map_filter_operators">Escolher operadores FH</string>
+    <string name="fh_map_subtitle_counts">%1$s / %2$s ligações • %3$d/%4$d operadores</string>
+    <string name="network_log_load_more">Carregar mais</string>
 </resources>

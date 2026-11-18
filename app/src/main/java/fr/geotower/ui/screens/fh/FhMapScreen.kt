@@ -38,10 +38,13 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -79,7 +82,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import fr.geotower.R
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -120,6 +126,7 @@ import kotlin.math.roundToInt
 
 const val FH_MAP_ROUTE = "fh_map"
 private const val PREF_FH_EXCLUDED_OPERATORS = "fh_map_excluded_operators"
+private const val CARTE_FH_WEB_URL = "https://julierose23.github.io/Carte-FH/"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -128,6 +135,7 @@ fun FhMapScreen(
     repository: AnfrRepository
 ) {
     val context = LocalContext.current
+    val uriHandler = LocalUriHandler.current
     val sizing = LocalGeoTowerUiStyle.current.sizing
     val scope = rememberCoroutineScope()
     val safeBackNavigation = rememberSafeBackNavigation(navController)
@@ -165,22 +173,24 @@ fun FhMapScreen(
     var showOperatorSheet by remember { mutableStateOf(false) }
 
     var isLoading by remember { mutableStateOf(true) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
     var isViewportScoped by remember { mutableStateOf(false) }
     var hasFhTable by remember { mutableStateOf(true) }
     var refreshTrigger by remember { mutableIntStateOf(0) }
     var viewportVersion by remember { mutableIntStateOf(0) }
     val lastFetchedViewport = remember { doubleArrayOf(Double.NaN, Double.NaN, Double.NaN, Double.NaN, Double.NaN) }
+    var selectedDistanceFilter by remember { mutableStateOf(FhDistanceFilter.ALL) }
+    var showExportDialog by remember { mutableStateOf(false) }
 
     fun updateExcludedOperators(next: Set<String>) {
         excludedOperatorIds = next
         prefs.edit().putStringSet(PREF_FH_EXCLUDED_OPERATORS, next).apply()
     }
 
-    val filteredLinks = remember(preparedLinks, excludedOperatorIds) {
-        if (excludedOperatorIds.isEmpty()) {
-            preparedLinks
-        } else {
-            preparedLinks.filter { it.operatorId !in excludedOperatorIds }
+    val filteredLinks = remember(preparedLinks, excludedOperatorIds, selectedDistanceFilter) {
+        preparedLinks.filter { prepared ->
+            (excludedOperatorIds.isEmpty() || prepared.operatorId !in excludedOperatorIds) &&
+                selectedDistanceFilter.matches(prepared.link.distanceM)
         }
     }
 
@@ -198,37 +208,45 @@ fun FhMapScreen(
 
     LaunchedEffect(refreshTrigger) {
         isLoading = true
-        val map = mapViewRef
-        val bbox = map?.boundingBox
-        val north = bbox?.latNorth ?: 51.5
-        val east = bbox?.lonEast ?: 9.8
-        val south = bbox?.latSouth ?: 41.0
-        val west = bbox?.lonWest ?: -5.5
-        val zoom = map?.zoomLevelDouble ?: 6.0
-        val result = withContext(Dispatchers.IO) {
-            repository.getAllFhLinksForMap(
-                latNorth = north,
-                lonEast = east,
-                latSouth = south,
-                lonWest = west
-            )
+        errorMessage = null
+        try {
+            val map = mapViewRef
+            val bbox = map?.boundingBox
+            val north = bbox?.latNorth ?: 51.5
+            val east = bbox?.lonEast ?: 9.8
+            val south = bbox?.latSouth ?: 41.0
+            val west = bbox?.lonWest ?: -5.5
+            val zoom = map?.zoomLevelDouble ?: 6.0
+            val result = withContext(Dispatchers.IO) {
+                repository.getAllFhLinksForMap(
+                    latNorth = north,
+                    lonEast = east,
+                    latSouth = south,
+                    lonWest = west
+                )
+            }
+            val prepared = withContext(Dispatchers.Default) {
+                FhOperatorResolver.prepare(result.links)
+            }
+            val buckets = withContext(Dispatchers.Default) {
+                FhOperatorResolver.buildBuckets(prepared)
+            }
+            lastFetchedViewport[0] = north
+            lastFetchedViewport[1] = east
+            lastFetchedViewport[2] = south
+            lastFetchedViewport[3] = west
+            lastFetchedViewport[4] = zoom
+            preparedLinks = prepared
+            operatorBuckets = buckets
+            isViewportScoped = result.isViewportScoped
+            hasFhTable = result.hasFhTable
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            errorMessage = e.localizedMessage ?: context.getString(R.string.appstrings_error)
+        } finally {
+            isLoading = false
         }
-        val prepared = withContext(Dispatchers.Default) {
-            FhOperatorResolver.prepare(result.links)
-        }
-        val buckets = withContext(Dispatchers.Default) {
-            FhOperatorResolver.buildBuckets(prepared)
-        }
-        lastFetchedViewport[0] = north
-        lastFetchedViewport[1] = east
-        lastFetchedViewport[2] = south
-        lastFetchedViewport[3] = west
-        lastFetchedViewport[4] = zoom
-        preparedLinks = prepared
-        operatorBuckets = buckets
-        isViewportScoped = result.isViewportScoped
-        hasFhTable = result.hasFhTable
-        isLoading = false
     }
 
     LaunchedEffect(viewportVersion, isViewportScoped) {
@@ -242,28 +260,36 @@ fun FhMapScreen(
         val west = bbox.lonWest
         val zoom = map.zoomLevelDouble
         isLoading = true
-        val result = withContext(Dispatchers.IO) {
-            repository.getAllFhLinksForMap(
-                latNorth = north,
-                lonEast = east,
-                latSouth = south,
-                lonWest = west
-            )
+        errorMessage = null
+        try {
+            val result = withContext(Dispatchers.IO) {
+                repository.getAllFhLinksForMap(
+                    latNorth = north,
+                    lonEast = east,
+                    latSouth = south,
+                    lonWest = west
+                )
+            }
+            val prepared = withContext(Dispatchers.Default) {
+                FhOperatorResolver.prepare(result.links)
+            }
+            val buckets = withContext(Dispatchers.Default) {
+                FhOperatorResolver.buildBuckets(prepared)
+            }
+            lastFetchedViewport[0] = north
+            lastFetchedViewport[1] = east
+            lastFetchedViewport[2] = south
+            lastFetchedViewport[3] = west
+            lastFetchedViewport[4] = zoom
+            preparedLinks = prepared
+            operatorBuckets = buckets
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            errorMessage = e.localizedMessage ?: context.getString(R.string.appstrings_error)
+        } finally {
+            isLoading = false
         }
-        val prepared = withContext(Dispatchers.Default) {
-            FhOperatorResolver.prepare(result.links)
-        }
-        val buckets = withContext(Dispatchers.Default) {
-            FhOperatorResolver.buildBuckets(prepared)
-        }
-        lastFetchedViewport[0] = north
-        lastFetchedViewport[1] = east
-        lastFetchedViewport[2] = south
-        lastFetchedViewport[3] = west
-        lastFetchedViewport[4] = zoom
-        preparedLinks = prepared
-        operatorBuckets = buckets
-        isLoading = false
     }
 
     val mapProvider by AppConfig.mapProvider
@@ -498,45 +524,63 @@ fun FhMapScreen(
                             IconButton(onClick = { safeBackNavigation.navigateBack() }) {
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = "Retour"
+                                    contentDescription = stringResource(R.string.appstrings_back)
                                 )
                             }
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "Carte des faisceaux FH",
+                                    text = stringResource(R.string.fh_map_title),
                                     style = sizing.textStyle(MaterialTheme.typography.titleMedium),
                                     fontWeight = FontWeight.Bold,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 val subtitle = when {
-                                    isLoading -> "Chargement des liaisons FH..."
-                                    !hasFhTable -> "Table FH absente de la base locale"
+                                    isLoading -> stringResource(R.string.fh_map_loading)
+                                    errorMessage != null -> errorMessage!!
+                                    !hasFhTable -> stringResource(R.string.fh_map_no_table)
                                     else -> {
                                         val vis = numberFormat.format(filteredLinks.size)
                                         val tot = numberFormat.format(preparedLinks.size)
-                                        "$vis / $tot traits • $activeOperatorCount/${operatorBuckets.size} opérateurs"
+                                        stringResource(R.string.fh_map_subtitle_counts, vis, tot, activeOperatorCount, operatorBuckets.size)
                                     }
                                 }
                                 Text(
                                     text = subtitle,
                                     style = sizing.textStyle(MaterialTheme.typography.bodySmall),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    color = if (errorMessage != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            IconButton(
+                                onClick = { uriHandler.openUri(CARTE_FH_WEB_URL) }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Public,
+                                    contentDescription = "Ouvrir Carte-FH en ligne"
+                                )
+                            }
+                            IconButton(
+                                onClick = { showExportDialog = true },
+                                enabled = filteredLinks.isNotEmpty()
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Share,
+                                    contentDescription = stringResource(R.string.fh_map_export)
                                 )
                             }
                             IconButton(onClick = { refreshTrigger++ }) {
                                 Icon(
                                     imageVector = Icons.Default.Refresh,
-                                    contentDescription = "Actualiser"
+                                    contentDescription = stringResource(R.string.fh_map_loading)
                                 )
                             }
                             IconButton(onClick = { showOperatorSheet = true }) {
                                 Icon(
                                     imageVector = Icons.Default.Tune,
-                                    contentDescription = "Choisir les opérateurs FH",
-                                    tint = if (excludedOperatorIds.isNotEmpty()) {
+                                    contentDescription = stringResource(R.string.fh_map_filter_operators),
+                                    tint = if (excludedOperatorIds.isNotEmpty() || selectedDistanceFilter != FhDistanceFilter.ALL) {
                                         MaterialTheme.colorScheme.primary
                                     } else {
                                         MaterialTheme.colorScheme.onSurface
@@ -567,7 +611,9 @@ fun FhMapScreen(
                         FilterChip(
                             selected = allSelected,
                             onClick = {
-                                if (!allSelected) {
+                                if (allSelected) {
+                                    updateExcludedOperators(operatorBuckets.map { it.id }.toSet())
+                                } else {
                                     updateExcludedOperators(emptySet())
                                 }
                             },
@@ -617,8 +663,8 @@ fun FhMapScreen(
                 }
             }
 
-            // Message si aucune liaison FH disponible
-            if (!isLoading && preparedLinks.isEmpty()) {
+            // Message si aucune liaison FH disponible ou erreur
+            if (!isLoading && (preparedLinks.isEmpty() || errorMessage != null)) {
                 Card(
                     modifier = Modifier
                         .align(Alignment.Center)
@@ -633,10 +679,10 @@ fun FhMapScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Text(
-                            text = if (!hasFhTable) {
-                                "Aucune table de faisceaux FH dans cette base"
-                            } else {
-                                "Aucune liaison FH dans cette zone"
+                            text = when {
+                                errorMessage != null -> errorMessage!!
+                                !hasFhTable -> stringResource(R.string.fh_map_no_table)
+                                else -> stringResource(R.string.fh_map_empty_area)
                             },
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
@@ -981,15 +1027,34 @@ fun FhMapScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Text(
-                    text = "Choisir les opérateurs FH",
+                    text = stringResource(R.string.fh_map_filter_operators),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "${numberFormat.format(filteredLinks.size)} liaisons affichées sur ${numberFormat.format(preparedLinks.size)}",
+                    text = stringResource(
+                        R.string.fh_map_links_shown_count,
+                        numberFormat.format(filteredLinks.size),
+                        numberFormat.format(preparedLinks.size)
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FhDistanceFilter.entries.forEach { distFilter ->
+                        FilterChip(
+                            selected = selectedDistanceFilter == distFilter,
+                            onClick = { selectedDistanceFilter = distFilter },
+                            label = { Text(stringResource(distFilter.labelRes), maxLines = 1) }
+                        )
+                    }
+                }
 
                 Row(
                     modifier = Modifier
@@ -1101,6 +1166,142 @@ fun FhMapScreen(
                 }
             }
         }
+    }
+
+    if (showExportDialog) {
+        AlertDialog(
+            onDismissRequest = { showExportDialog = false },
+            title = { Text(stringResource(R.string.fh_map_export)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FhExportFormat.entries.forEach { format ->
+                        OutlinedButton(
+                            onClick = {
+                                showExportDialog = false
+                                shareFhLinks(context, filteredLinks, format)
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(format.label)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showExportDialog = false }) {
+                    Text(stringResource(R.string.appstrings_cancel))
+                }
+            }
+        )
+    }
+}
+
+private enum class FhDistanceFilter(val labelRes: Int) {
+    ALL(R.string.fh_map_distance_all),
+    UNDER_5KM(R.string.fh_map_distance_under_5km),
+    BETWEEN_5_20KM(R.string.fh_map_distance_5_20km),
+    OVER_20KM(R.string.fh_map_distance_over_20km);
+
+    fun matches(distanceM: Int): Boolean = when (this) {
+        ALL -> true
+        UNDER_5KM -> distanceM < 5_000
+        BETWEEN_5_20KM -> distanceM in 5_000..20_000
+        OVER_20KM -> distanceM > 20_000
+    }
+}
+
+private enum class FhExportFormat(val label: String, val extension: String, val mimeType: String) {
+    GEOJSON("GeoJSON", "geojson", "application/geo+json"),
+    CSV("CSV", "csv", "text/csv"),
+    GPX("GPX", "gpx", "application/gpx+xml")
+}
+
+private fun shareFhLinks(
+    context: android.content.Context,
+    links: List<FhPreparedLink>,
+    format: FhExportFormat
+) {
+    if (links.isEmpty()) return
+    runCatching {
+        val content = when (format) {
+            FhExportFormat.GEOJSON -> {
+                val features = org.json.JSONArray()
+                links.forEach { item ->
+                    val l = item.link
+                    val coords = org.json.JSONArray().apply {
+                        put(org.json.JSONArray().put(l.lonA).put(l.latA))
+                        put(org.json.JSONArray().put(l.lonB).put(l.latB))
+                    }
+                    features.put(
+                        org.json.JSONObject().apply {
+                            put("type", "Feature")
+                            put("geometry", org.json.JSONObject().apply {
+                                put("type", "LineString")
+                                put("coordinates", coords)
+                            })
+                            put("properties", org.json.JSONObject().apply {
+                                put("operator", item.operatorLabel)
+                                put("idAnfrA", l.idAnfrA)
+                                put("idAnfrB", l.idAnfrB)
+                                put("distanceM", l.distanceM)
+                                put("azimutAb", l.azimutAb)
+                            })
+                        }
+                    )
+                }
+                org.json.JSONObject().apply {
+                    put("type", "FeatureCollection")
+                    put("features", features)
+                }.toString(2)
+            }
+            FhExportFormat.CSV -> {
+                val sb = StringBuilder("operator,id_anfr_a,lat_a,lon_a,id_anfr_b,lat_b,lon_b,distance_m,azimut_ab\n")
+                links.forEach { item ->
+                    val l = item.link
+                    val op = "\"${item.operatorLabel.replace("\"", "\"\"")}\""
+                    sb.append("$op,${l.idAnfrA},${l.latA},${l.lonA},${l.idAnfrB},${l.latB},${l.lonB},${l.distanceM},${l.azimutAb}\n")
+                }
+                sb.toString()
+            }
+            FhExportFormat.GPX -> {
+                val sb = StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<gpx version=\"1.1\" creator=\"GeoTower\" xmlns=\"http://www.topografix.com/GPX/1/1\">\n")
+                links.forEach { item ->
+                    val l = item.link
+                    val name = "${item.operatorLabel} (${l.idAnfrA} - ${l.idAnfrB})"
+                        .replace("&", "&amp;")
+                        .replace("<", "&lt;")
+                        .replace(">", "&gt;")
+                    sb.append("  <trk>\n    <name>$name</name>\n    <trkseg>\n")
+                    sb.append("      <trkpt lat=\"${l.latA}\" lon=\"${l.lonA}\"/>\n")
+                    sb.append("      <trkpt lat=\"${l.latB}\" lon=\"${l.lonB}\"/>\n")
+                    sb.append("    </trkseg>\n  </trk>\n")
+                }
+                sb.append("</gpx>\n")
+                sb.toString()
+            }
+        }
+        val dir = File(context.cacheDir, "fh_export").apply { mkdirs() }
+        val file = File(dir, "geotower_fh_links.${format.extension}")
+        file.writeText(content, Charsets.UTF_8)
+        val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+            type = format.mimeType
+            putExtra(android.content.Intent.EXTRA_SUBJECT, file.name)
+            putExtra(android.content.Intent.EXTRA_STREAM, uri)
+            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(
+            android.content.Intent.createChooser(intent, context.getString(R.string.fh_map_export))
+                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
+    }.onFailure { err ->
+        fr.geotower.utils.AppLogger.w("FhMapScreen", "FH share failed", err)
+        android.widget.Toast.makeText(
+            context,
+            err.localizedMessage ?: context.getString(R.string.appstrings_error),
+            android.widget.Toast.LENGTH_SHORT
+        ).show()
     }
 }
 

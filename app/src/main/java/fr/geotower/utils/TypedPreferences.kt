@@ -515,7 +515,7 @@ object HomePrefs {
     const val STARTUP_PAGE = "startup_page"
     const val DEFAULT_STARTUP_PAGE = "home"
     const val PAGES_ORDER = "pages_order"
-    const val DEFAULT_PAGES_ORDER = "nearby,map,trips,compass,stats,settings"
+    const val DEFAULT_PAGES_ORDER = "nearby,map,trips,fh_map,compass,stats,settings"
     val showNearbyPage = BooleanPreference("show_nearby_page", true)
     val showMapPage = BooleanPreference("show_map_page", true)
     // Éteinte par défaut : la boussole s'ouvre maintenant depuis la boîte à outils de la carte,
@@ -523,6 +523,7 @@ object HomePrefs {
     val showCompassPage = BooleanPreference("show_compass_page", false)
     val showStatsPage = BooleanPreference("show_stats_page", true)
     val showTripsPage = BooleanPreference("show_trips_page", true)
+    val showFhMapPage = BooleanPreference("show_fh_map_page", false)
 
     /**
      * Bouton « Quitter sans notification live » affiché en haut de l'accueil.
@@ -543,6 +544,7 @@ object HomePrefs {
      * liste comme les autres retardataires : un ordre déjà enregistré doit le recevoir là.
      */
     private const val TRIPS_ELEMENT = "trips"
+    private const val FH_MAP_ELEMENT = "fh_map"
     private const val TRIPS_ANCHOR = "compass"
 
     fun startupPage(prefs: SharedPreferences): String {
@@ -564,6 +566,14 @@ object HomePrefs {
                 normalized.add(anchorIndex, TRIPS_ELEMENT)
             } else {
                 normalized.add(TRIPS_ELEMENT)
+            }
+        }
+        if (!normalized.contains(FH_MAP_ELEMENT)) {
+            val anchorIndex = normalized.indexOf(TRIPS_ANCHOR)
+            if (anchorIndex >= 0) {
+                normalized.add(anchorIndex, FH_MAP_ELEMENT)
+            } else {
+                normalized.add(FH_MAP_ELEMENT)
             }
         }
         lateElements.forEach { if (!normalized.contains(it)) normalized.add(it) }

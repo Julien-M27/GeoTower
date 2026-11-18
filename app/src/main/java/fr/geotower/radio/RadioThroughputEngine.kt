@@ -69,18 +69,19 @@ object RadioThroughputEngine {
         }
 
         val dssFiltered = applyDssPolicy(initialResults, profile, excluded, warnings)
-        val includedResults = dssFiltered.filter { it.included }
+        val aggregationFiltered = applyAggregationLimits(dssFiltered, profile, excluded, warnings)
+        val includedResults = aggregationFiltered.filter { it.included }
 
         var confidence = 92
         if (systems.any { it.azimuthDeg == null }) confidence -= 6
-        if (warnings.any { it.contains("exclue", ignoreCase = true) }) confidence -= 8
+        if (excluded.isNotEmpty()) confidence -= 8
         if (systems.any { it.status != SiteRadioStatus.COMMERCIAL_OPEN && it.status != SiteRadioStatus.IN_SERVICE }) confidence -= 6
         confidence = confidence.coerceIn(35, 95)
 
         return ThroughputEngineResult(
             totalDlMbps = includedResults.sumOf { it.dlMbps },
             totalUlMbps = includedResults.sumOf { it.ulMbps },
-            perCarrierResults = dssFiltered,
+            perCarrierResults = aggregationFiltered,
             excludedCarriers = excluded,
             warnings = warnings.distinct(),
             assumptions = assumptions.distinct(),
@@ -122,18 +123,24 @@ object RadioThroughputEngine {
                 overhead = effectiveAssumptions.overheadDl,
                 tddRatio = if (effectiveDuplexMode == DuplexMode.TDD) effectiveAssumptions.tddDlRatio else 1.0
             )
-            ulMbps = calculateNrRateMbps(
-                bandwidthMHz = effectiveBandwidthMHz,
-                scsKHz = effectiveAssumptions.scsKHz,
-                nPrb = nPrb,
-                layers = effectiveAssumptions.ulMimoLayers,
-                modulationOrder = effectiveAssumptions.ulModulationOrder,
-                overhead = effectiveAssumptions.overheadUl,
-                tddRatio = if (effectiveDuplexMode == DuplexMode.TDD) effectiveAssumptions.tddUlRatio else 1.0
-            )
+            ulMbps = if (effectiveDuplexMode == DuplexMode.SDL) {
+                0.0
+            } else {
+                calculateNrRateMbps(
+                    bandwidthMHz = effectiveBandwidthMHz,
+                    scsKHz = effectiveAssumptions.scsKHz,
+                    nPrb = nPrb,
+                    layers = effectiveAssumptions.ulMimoLayers,
+                    modulationOrder = effectiveAssumptions.ulModulationOrder,
+                    overhead = effectiveAssumptions.overheadUl,
+                    tddRatio = if (effectiveDuplexMode == DuplexMode.TDD) effectiveAssumptions.tddUlRatio else 1.0
+                )
+            }
             assumptions += "NR_TS_38_306_PRB_SCS_${effectiveAssumptions.scsKHz}_KHZ"
             if (effectiveDuplexMode == DuplexMode.TDD) {
                 assumptions += "TDD DL ${effectiveAssumptions.tddDlRatio} / UL ${effectiveAssumptions.tddUlRatio}"
+            } else if (effectiveDuplexMode == DuplexMode.SDL) {
+                assumptions += "SDL (Downlink only)"
             }
         } else {
             dlMbps = calculateLteApproxMbps(
@@ -143,13 +150,17 @@ object RadioThroughputEngine {
                 downlink = true,
                 overhead = effectiveAssumptions.overheadDl
             )
-            ulMbps = calculateLteApproxMbps(
-                bandwidthMHz = effectiveBandwidthMHz,
-                modulationOrder = effectiveAssumptions.ulModulationOrder,
-                layers = effectiveAssumptions.ulMimoLayers,
-                downlink = false,
-                overhead = effectiveAssumptions.overheadUl
-            )
+            ulMbps = if (effectiveDuplexMode == DuplexMode.SDL) {
+                0.0
+            } else {
+                calculateLteApproxMbps(
+                    bandwidthMHz = effectiveBandwidthMHz,
+                    modulationOrder = effectiveAssumptions.ulModulationOrder,
+                    layers = effectiveAssumptions.ulMimoLayers,
+                    downlink = false,
+                    overhead = effectiveAssumptions.overheadUl
+                )
+            }
             assumptions += "LTE_APPROX_V1"
         }
 
@@ -248,8 +259,6 @@ object RadioThroughputEngine {
         excluded: MutableList<ExcludedCarrier>,
         warnings: MutableList<String>
     ): List<CarrierThroughputResult> {
-        if (profile.dssPolicy != DssPolicy.DO_NOT_DOUBLE_COUNT) return results
-
         val mutableResults = results.toMutableList()
         results
             .groupBy { "${it.operator}:${it.bandLabel}" }
@@ -260,17 +269,96 @@ object RadioThroughputEngine {
             }
             .values
             .forEach { dssGroup ->
-                val winner = dssGroup.maxBy { it.dlMbps }
-                dssGroup.filter { it.sourceKey != winner.sourceKey }.forEach { loser ->
-                    val reason = ThroughputTextKey.THROUGHPUT_REASON_DSS_SHARED
-                    val index = mutableResults.indexOfFirst { it.sourceKey == loser.sourceKey }
-                    if (index >= 0) {
-                        mutableResults[index] = loser.copy(included = false, excludedReason = reason, warnings = loser.warnings + reason)
+                val bandLabel = dssGroup.first().bandLabel
+                when (profile.dssPolicy) {
+                    DssPolicy.SPLIT_SPECTRUM -> {
+                        val factor = 1.0 / dssGroup.size.coerceAtLeast(1)
+                        dssGroup.forEach { carrier ->
+                            val index = mutableResults.indexOfFirst { it.sourceKey == carrier.sourceKey }
+                            if (index >= 0) {
+                                mutableResults[index] = carrier.copy(
+                                    dlMbps = carrier.dlMbps * factor,
+                                    ulMbps = carrier.ulMbps * factor,
+                                    warnings = carrier.warnings + ThroughputTextKey.THROUGHPUT_REASON_DSS_SHARED
+                                )
+                            }
+                        }
                     }
-                    excluded += ExcludedCarrier(loser.sourceKey, loser.technology, loser.bandLabel, reason)
+                    DssPolicy.DO_NOT_DOUBLE_COUNT, DssPolicy.LTE_PRIORITY, DssPolicy.NR_PRIORITY -> {
+                        val winner = when (profile.dssPolicy) {
+                            DssPolicy.LTE_PRIORITY -> dssGroup.filter { it.technology == RadioTechnology.LTE_4G }.maxByOrNull { it.dlMbps }
+                                ?: dssGroup.maxBy { it.dlMbps }
+                            DssPolicy.NR_PRIORITY -> dssGroup.filter { it.technology == RadioTechnology.NR_5G }.maxByOrNull { it.dlMbps }
+                                ?: dssGroup.maxBy { it.dlMbps }
+                            else -> dssGroup.maxBy { it.dlMbps }
+                        }
+                        dssGroup.filter { it.sourceKey != winner.sourceKey }.forEach { loser ->
+                            val reason = ThroughputTextKey.THROUGHPUT_REASON_DSS_SHARED
+                            val index = mutableResults.indexOfFirst { it.sourceKey == loser.sourceKey }
+                            if (index >= 0) {
+                                mutableResults[index] = loser.copy(included = false, excludedReason = reason, warnings = loser.warnings + reason)
+                            }
+                            excluded += ExcludedCarrier(loser.sourceKey, loser.technology, loser.bandLabel, reason)
+                        }
+                    }
                 }
-                warnings += "${ThroughputTextKey.THROUGHPUT_WARNING_DSS_PREFIX}${winner.bandLabel}${ThroughputTextKey.THROUGHPUT_WARNING_DSS_SUFFIX}"
+                warnings += "${ThroughputTextKey.THROUGHPUT_WARNING_DSS_PREFIX}${bandLabel}${ThroughputTextKey.THROUGHPUT_WARNING_DSS_SUFFIX}"
             }
+
+        return mutableResults
+    }
+
+    private fun applyAggregationLimits(
+        results: List<CarrierThroughputResult>,
+        profile: ThroughputProfile,
+        excluded: MutableList<ExcludedCarrier>,
+        warnings: MutableList<String>
+    ): List<CarrierThroughputResult> {
+        val mutableResults = results.toMutableList()
+
+        fun excludeCarrier(carrier: CarrierThroughputResult, reason: String) {
+            val index = mutableResults.indexOfFirst { it.sourceKey == carrier.sourceKey }
+            if (index >= 0 && mutableResults[index].included) {
+                mutableResults[index] = mutableResults[index].copy(
+                    included = false,
+                    excludedReason = reason,
+                    warnings = mutableResults[index].warnings + reason
+                )
+                excluded += ExcludedCarrier(carrier.sourceKey, carrier.technology, carrier.bandLabel, reason)
+            }
+        }
+
+        if (!profile.endcAllowed) {
+            val activeLte = mutableResults.filter { it.included && it.technology == RadioTechnology.LTE_4G }
+            val activeNr = mutableResults.filter { it.included && it.technology == RadioTechnology.NR_5G }
+            if (activeLte.isNotEmpty() && activeNr.isNotEmpty()) {
+                val lteSum = activeLte.sumOf { it.dlMbps }
+                val nrSum = activeNr.sumOf { it.dlMbps }
+                if (nrSum >= lteSum) {
+                    activeLte.forEach { excludeCarrier(it, ThroughputTextKey.THROUGHPUT_REASON_4G_DISABLED) }
+                } else {
+                    activeNr.forEach { excludeCarrier(it, ThroughputTextKey.THROUGHPUT_REASON_5G_DISABLED) }
+                }
+            }
+        }
+
+        val maxLte = profile.lte.maxCaComponents.coerceAtLeast(0)
+        val activeLte = mutableResults.filter { it.included && it.technology == RadioTechnology.LTE_4G }
+        if (activeLte.size > maxLte) {
+            activeLte.sortedByDescending { it.dlMbps }.drop(maxLte).forEach {
+                excludeCarrier(it, ThroughputTextKey.THROUGHPUT_REASON_BAND_EXCLUDED)
+            }
+            warnings += ThroughputTextKey.THROUGHPUT_WARNING_LTE_AGGREGATION_LIMIT
+        }
+
+        val maxNr = profile.nr.maxCaComponents.coerceAtLeast(0)
+        val activeNr = mutableResults.filter { it.included && it.technology == RadioTechnology.NR_5G }
+        if (activeNr.size > maxNr) {
+            activeNr.sortedByDescending { it.dlMbps }.drop(maxNr).forEach {
+                excludeCarrier(it, ThroughputTextKey.THROUGHPUT_REASON_BAND_EXCLUDED)
+            }
+            warnings += ThroughputTextKey.THROUGHPUT_WARNING_NR_AGGREGATION_LIMIT
+        }
 
         return mutableResults
     }

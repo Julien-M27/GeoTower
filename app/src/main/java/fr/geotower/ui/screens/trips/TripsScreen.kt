@@ -157,10 +157,10 @@ fun TripsScreen(
     ) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
         runCatching {
-            val json = context.contentResolver.openInputStream(uri)?.use { stream ->
+            val rawContent = context.contentResolver.openInputStream(uri)?.use { stream ->
                 stream.readBytes().toString(Charsets.UTF_8)
             } ?: error("fichier illisible")
-            val imported = TripExport.parseJson(json)
+            val imported = TripExport.parseAny(rawContent)
             require(imported.isNotEmpty()) { "aucun trajet valide" }
             TripPlanStore.mergePlans(context, imported)
         }.onSuccess { result ->
@@ -349,7 +349,17 @@ fun TripsScreen(
                         onClick = {
                             showAddTripOptions = false
                             safeClick("import_trip") {
-                                importLauncher.launch(arrayOf(TripExport.JSON_MIME_TYPE, "text/json"))
+                                importLauncher.launch(
+                                    arrayOf(
+                                        TripExport.JSON_MIME_TYPE,
+                                        "text/json",
+                                        TripExport.GPX_MIME_TYPE,
+                                        "application/xml",
+                                        "text/xml",
+                                        "application/octet-stream",
+                                        "text/plain"
+                                    )
+                                )
                             }
                         },
                         modifier = Modifier.fillMaxWidth()

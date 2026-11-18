@@ -27,10 +27,16 @@ data class ChangelogMilestone(
 object AppChangelogRepository {
     val milestones: List<ChangelogMilestone> = listOf(
         ChangelogMilestone(
-            versionName = "2.1.30",
+            versionName = "2.1.31",
             releaseDate = "2026-11-18",
             isCurrent = true,
             badge = MilestoneBadge.CURRENT,
+            summary = "Filtres de distance et export sur la carte FH, alertes boussole/IGN, pagination du journal réseau et améliorations Wear OS",
+            itemResIds = listOf(R.string.appstrings_release_v2131_summary_fh_filters_export_and_wear_improvements)
+        ),
+        ChangelogMilestone(
+            versionName = "2.1.30",
+            releaseDate = "2026-11-18",
             summary = "Limitation du dézoom minimal et des bornes géographiques sur la carte des faisceaux FH",
             itemResIds = listOf(R.string.appstrings_release_v2130_summary_fh_map_world_bounds_and_min_zoom)
         ),

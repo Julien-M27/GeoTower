@@ -214,6 +214,8 @@ fun CompassScreen(
     // --- VARIABLES BOUSSOLE ---
     var continuousAzimuth by remember { mutableFloatStateOf(0f) }
     var displayAzimuth by remember { mutableIntStateOf(0) }
+    var hasCompassSensor by remember { mutableStateOf(true) }
+    var isCompassLowAccuracy by remember { mutableStateOf(false) }
 
     // --- LECTURE DES TRADUCTIONS (Dans le contexte sécurisé) ---
     val txtSearching = stringResource(R.string.appstrings_searching)
@@ -232,28 +234,73 @@ fun CompassScreen(
     val settingsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     // --- GESTION DES CAPTEURS (Boussole) ---
+    val magneticDeclination = remember(latitude, longitude) {
+        if (latitude != 0.0 || longitude != 0.0) {
+            android.hardware.GeomagneticField(
+                latitude.toFloat(),
+                longitude.toFloat(),
+                0f,
+                System.currentTimeMillis()
+            ).declination
+        } else {
+            0f
+        }
+    }
+
     DisposableEffect(screenRotation) {
         val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
 
         @Suppress("DEPRECATION")
         val rotationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
             ?: sensorManager.getDefaultSensor(Sensor.TYPE_ORIENTATION)
+        val accelSensor = if (rotationSensor == null) sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) else null
+        val magSensor = if (rotationSensor == null) sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD) else null
+        val hasFallback = accelSensor != null && magSensor != null
+        hasCompassSensor = rotationSensor != null || hasFallback
+
+        val gravity = FloatArray(3)
+        val geomagnetic = FloatArray(3)
+        var hasGravity = false
+        var hasGeomagnetic = false
+        val rotMatrix = FloatArray(9)
+        val inclMatrix = FloatArray(9)
+        val orientationAngles = FloatArray(3)
 
         var lastIntAzimuth = -1
 
         val listener = object : SensorEventListener {
             override fun onSensorChanged(event: SensorEvent) {
-                var newAzimuth = 0f
-                if (event.sensor.type == Sensor.TYPE_ROTATION_VECTOR) {
-                    newAzimuth = azimuthFromRotationVector(event.values, screenRotation)
-                } else if (isLegacyOrientationSensor(event.sensor)) {
-                    newAzimuth = correctLegacyAzimuthForDisplay(event.values[0], screenRotation)
+                var newAzimuth: Float? = null
+                when {
+                    event.sensor.type == Sensor.TYPE_ROTATION_VECTOR -> {
+                        newAzimuth = azimuthFromRotationVector(event.values, screenRotation)
+                    }
+                    isLegacyOrientationSensor(event.sensor) -> {
+                        newAzimuth = correctLegacyAzimuthForDisplay(event.values[0], screenRotation)
+                    }
+                    event.sensor.type == Sensor.TYPE_ACCELEROMETER -> {
+                        System.arraycopy(event.values, 0, gravity, 0, 3)
+                        hasGravity = true
+                    }
+                    event.sensor.type == Sensor.TYPE_MAGNETIC_FIELD -> {
+                        System.arraycopy(event.values, 0, geomagnetic, 0, 3)
+                        hasGeomagnetic = true
+                    }
                 }
 
-                newAzimuth = (newAzimuth + 360) % 360
+                if (newAzimuth == null && hasFallback && hasGravity && hasGeomagnetic) {
+                    if (SensorManager.getRotationMatrix(rotMatrix, inclMatrix, gravity, geomagnetic)) {
+                        SensorManager.getOrientation(rotMatrix, orientationAngles)
+                        val deg = Math.toDegrees(orientationAngles[0].toDouble()).toFloat()
+                        newAzimuth = correctLegacyAzimuthForDisplay(deg, screenRotation)
+                    }
+                }
+
+                val computedAzimuth = newAzimuth ?: return
+                val trueAzimuth = (computedAzimuth + magneticDeclination + 360f) % 360f
 
                 // Chemin le plus court pour l'animation
-                var delta = newAzimuth - (continuousAzimuth % 360f)
+                var delta = trueAzimuth - (continuousAzimuth % 360f)
                 if (delta < -180f) delta += 360f
                 else if (delta > 180f) delta -= 360f
 
@@ -276,13 +323,32 @@ fun CompassScreen(
                 }
                 lastIntAzimuth = currentIntAzimuth
             }
-            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
+                if (sensor?.type == Sensor.TYPE_MAGNETIC_FIELD || sensor?.type == Sensor.TYPE_ROTATION_VECTOR) {
+                    isCompassLowAccuracy = accuracy == SensorManager.SENSOR_STATUS_UNRELIABLE ||
+                        accuracy == SensorManager.SENSOR_STATUS_ACCURACY_LOW
+                }
+            }
         }
 
         if (rotationSensor != null) {
             sensorManager.registerListener(listener, rotationSensor, PowerProfile.compassSensorDelay)
+        } else if (hasFallback) {
+            sensorManager.registerListener(listener, accelSensor, PowerProfile.compassSensorDelay)
+            sensorManager.registerListener(listener, magSensor, PowerProfile.compassSensorDelay)
         }
         onDispose { sensorManager.unregisterListener(listener) }
+    }
+
+    LaunchedEffect(hasCompassSensor) {
+        if (!hasCompassSensor) {
+            android.widget.Toast.makeText(context, R.string.appstrings_compass_sensor_unavailable, android.widget.Toast.LENGTH_LONG).show()
+        }
+    }
+    LaunchedEffect(isCompassLowAccuracy) {
+        if (isCompassLowAccuracy) {
+            android.widget.Toast.makeText(context, R.string.appstrings_compass_calibration_needed, android.widget.Toast.LENGTH_SHORT).show()
+        }
     }
 
     // --- GESTION DU GPS (Localisation) ---

@@ -79,6 +79,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import fr.geotower.R
+import fr.geotower.data.netlog.NetworkLogExportFormat
 import fr.geotower.data.netlog.NetworkLogStatusFilter
 import fr.geotower.data.netlog.NetworkLogStore
 import fr.geotower.data.netlog.NetworkRequestEntry
@@ -107,10 +108,13 @@ fun NetworkLogScreen(
 
     var requests by remember { mutableStateOf<List<NetworkRequestEntry>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    var isLoadingMore by remember { mutableStateOf(false) }
+    var hasMore by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var selectedFilter by remember { mutableStateOf(NetworkLogStatusFilter.ALL) }
     var selectedRequestForDetail by remember { mutableStateOf<NetworkRequestEntry?>(null) }
     var showClearConfirmation by remember { mutableStateOf(false) }
+    var showExportDialog by remember { mutableStateOf(false) }
 
     val retentionDays = remember { NetworkLogStore.getRetentionDays(context) }
     val retentionLabel = remember(retentionDays) {
@@ -126,19 +130,42 @@ fun NetworkLogScreen(
         }
     }
 
+    val pageSize = 500
+
     fun loadData() {
         scope.launch {
             isLoading = true
             val data = withContext(Dispatchers.IO) {
                 NetworkLogStore.getRequests(
                     context = context,
-                    limit = 500,
+                    limit = pageSize,
+                    offset = 0,
                     searchQuery = searchQuery,
                     statusFilter = selectedFilter
                 )
             }
             requests = data
+            hasMore = data.size >= pageSize
             isLoading = false
+        }
+    }
+
+    fun loadMore() {
+        if (isLoadingMore || !hasMore) return
+        scope.launch {
+            isLoadingMore = true
+            val nextPage = withContext(Dispatchers.IO) {
+                NetworkLogStore.getRequests(
+                    context = context,
+                    limit = pageSize,
+                    offset = requests.size,
+                    searchQuery = searchQuery,
+                    statusFilter = selectedFilter
+                )
+            }
+            requests = (requests + nextPage).distinctBy { it.id }
+            hasMore = nextPage.size >= pageSize
+            isLoadingMore = false
         }
     }
 
@@ -153,15 +180,7 @@ fun NetworkLogScreen(
                 onBack = { safeBack.navigateBack() },
                 actions = {
                     IconButton(
-                        onClick = {
-                            val ok = NetworkLogStore.shareLog(
-                                context,
-                                context.getString(R.string.network_log_share)
-                            )
-                            if (!ok) {
-                                Toast.makeText(context, R.string.network_log_empty, Toast.LENGTH_SHORT).show()
-                            }
-                        },
+                        onClick = { showExportDialog = true },
                         enabled = requests.isNotEmpty()
                     ) {
                         Icon(
@@ -329,9 +348,64 @@ fun NetworkLogScreen(
                             onClick = { selectedRequestForDetail = item }
                         )
                     }
+                    if (hasMore) {
+                        item(key = "load_more") {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = sizing.spacing(8.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                androidx.compose.material3.OutlinedButton(
+                                    onClick = { loadMore() },
+                                    enabled = !isLoadingMore
+                                ) {
+                                    Text(
+                                        if (isLoadingMore) stringResource(R.string.loading_app)
+                                        else stringResource(R.string.network_log_load_more)
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
+    }
+
+    if (showExportDialog) {
+        AlertDialog(
+            onDismissRequest = { showExportDialog = false },
+            title = { Text(stringResource(R.string.network_log_share)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))) {
+                    NetworkLogExportFormat.entries.forEach { format ->
+                        androidx.compose.material3.OutlinedButton(
+                            onClick = {
+                                showExportDialog = false
+                                val ok = NetworkLogStore.shareLog(
+                                    context = context,
+                                    chooserTitle = context.getString(R.string.network_log_share),
+                                    format = format,
+                                    requests = requests
+                                )
+                                if (!ok) {
+                                    Toast.makeText(context, R.string.network_log_empty, Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(format.name)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showExportDialog = false }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            }
+        )
     }
 
     // Dialogue de confirmation de vidage

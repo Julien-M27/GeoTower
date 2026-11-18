@@ -221,8 +221,8 @@ object WearWebApiClient {
                     }
                     val t = opObj.optString("t", "4G / 5G")
                     val rawBands = opObj.optString("bands", "")
-                    val bandMask = opObj.optInt("band_mask", 0)
-                    val techMask = opObj.optInt("tech_mask", 0)
+                    val bandMask = opObj.optInt("band_mask", opObj.optInt("bm", 0))
+                    val techMask = opObj.optInt("tech_mask", opObj.optInt("tm", 0))
                     val formattedBands = if (bandMask != 0 || techMask != 0) {
                         fr.geotower.wear.data.model.BandFormatter.formatBands(bandMask, techMask)
                     } else {
@@ -241,8 +241,8 @@ object WearWebApiClient {
                             technologies = t,
                             bands = formattedBands,
                             azimuths = azimList.ifEmpty { listOf(0, 120, 240) },
-                            rawTechMask = opObj.optInt("tm", 0),
-                            rawBandMask = opObj.optInt("bm", 0)
+                            rawTechMask = techMask,
+                            rawBandMask = bandMask
                         )
                     )
                 }
@@ -275,14 +275,5 @@ object WearWebApiClient {
         if (mask and 4 != 0) techs.add("4G")
         if (mask and 8 != 0) techs.add("5G")
         return if (techs.isEmpty()) "4G / 5G" else techs.joinToString(" / ")
-    }
-
-    private fun parseTechBands(mask: Int): String {
-        val parts = mutableListOf<String>()
-        if (mask and 8 != 0) parts.add("5G: 3500, 2100, 700")
-        if (mask and 4 != 0) parts.add("4G: 700, 800, 1800, 2100, 2600")
-        if (mask and 2 != 0) parts.add("3G: 900, 2100")
-        if (mask and 1 != 0) parts.add("2G: 900, 1800")
-        return if (parts.isEmpty()) "4G: 800, 1800, 2600 • 5G: 3500 MHz" else parts.joinToString(" • ") + " MHz"
     }
 }

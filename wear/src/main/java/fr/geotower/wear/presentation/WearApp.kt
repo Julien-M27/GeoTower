@@ -1,11 +1,13 @@
 package fr.geotower.wear.presentation
 
+import android.content.res.Configuration
 import android.location.Location
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -15,6 +17,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import java.util.Locale
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.wear.compose.material.Scaffold
 import androidx.wear.compose.material.TimeText
@@ -107,8 +112,22 @@ fun WearApp(
             if (filter == null) {
                 towers
             } else {
-                towers.filter { it.operator.uppercase().contains(filter.uppercase()) }
+                towers.filter { tower ->
+                    tower.operator.contains(filter, ignoreCase = true) ||
+                        tower.operators.any { it.operator.contains(filter, ignoreCase = true) }
+                }
             }
+        }
+
+        // Applique la langue choisie sur le contexte Compose/Locale
+        val baseContext = LocalContext.current
+        val systemLocale = remember { Locale.getDefault() }
+        val localizedContext = remember(currentLanguage, baseContext) {
+            val targetLocale = if (currentLanguage.code.isNotBlank()) Locale(currentLanguage.code) else systemLocale
+            Locale.setDefault(targetLocale)
+            val config = Configuration(baseContext.resources.configuration)
+            config.setLocale(targetLocale)
+            baseContext.createConfigurationContext(config)
         }
 
         // Antenne active / cible verrouillée sur le radar
@@ -126,6 +145,10 @@ fun WearApp(
             }
         }
 
+        CompositionLocalProvider(
+            LocalContext provides localizedContext,
+            LocalConfiguration provides localizedContext.resources.configuration
+        ) {
         Scaffold(
             timeText = { TimeText() },
             modifier = modifier.fillMaxSize().background(Color.Black)
@@ -322,7 +345,8 @@ fun WearApp(
                                 onBack = {
                                     currentScreen = WearScreen.SUPPORT_DETAIL
                                 },
-                                techOrder = techOrder
+                                techOrder = techOrder,
+                                distanceUnit = distanceUnit
                             )
                         } else {
                             currentScreen = WearScreen.SUPPORT_DETAIL
@@ -330,6 +354,7 @@ fun WearApp(
                     }
                 }
             }
+        }
         }
     }
 }

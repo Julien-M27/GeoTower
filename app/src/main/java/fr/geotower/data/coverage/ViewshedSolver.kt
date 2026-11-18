@@ -48,8 +48,9 @@ object ViewshedSolver {
                 }
 
                 // (c) Mise à jour de l'angle d'obstruction (avec inflation Fresnel optionnelle).
-                val fresnelInflation = if (params.fresnel && freq != null) {
-                    0.6 * CoverageGeo.fresnelRadiusM(d, (field.maxRadiusM - d).coerceAtLeast(1.0), freq)
+                val dReceiver = (ray.distances.lastOrNull() ?: field.maxRadiusM) - d
+                val fresnelInflation = if (params.fresnel && freq != null && dReceiver > 0.0) {
+                    0.6 * CoverageGeo.fresnelRadiusM(d, dReceiver.coerceAtLeast(1.0), freq)
                 } else {
                     0.0
                 }

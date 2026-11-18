@@ -16,6 +16,10 @@ class AntennaVoiceQueryHandlerTest {
         assertEquals("Orange", AntennaVoiceQueryHandler.cleanOperatorFilter("orange"))
         assertEquals("SFR", AntennaVoiceQueryHandler.cleanOperatorFilter("sfr"))
         assertEquals("Bouygues", AntennaVoiceQueryHandler.cleanOperatorFilter("Bouygues Telecom"))
+        assertEquals("Digicel", AntennaVoiceQueryHandler.cleanOperatorFilter("digicel"))
+        assertEquals("SRR", AntennaVoiceQueryHandler.cleanOperatorFilter("srr réunion"))
+        assertEquals("ZEOP", AntennaVoiceQueryHandler.cleanOperatorFilter("zeop mobile"))
+        assertEquals("OPT", AntennaVoiceQueryHandler.cleanOperatorFilter("opt nc"))
         assertNull(AntennaVoiceQueryHandler.cleanOperatorFilter("antenne la plus proche"))
         assertNull(AntennaVoiceQueryHandler.cleanOperatorFilter("relais 5g"))
     }

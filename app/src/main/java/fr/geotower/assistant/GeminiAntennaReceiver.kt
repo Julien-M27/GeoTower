@@ -10,6 +10,7 @@ import fr.geotower.GeoTowerApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 /**
@@ -18,10 +19,9 @@ import kotlinx.coroutines.launch
  */
 class GeminiAntennaReceiver : BroadcastReceiver() {
 
-    private val receiverScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-
     override fun onReceive(context: Context, intent: Intent?) {
         val pendingResult = goAsync()
+        val receiverScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         val appContext = context.applicationContext as GeoTowerApp
 
         // Récupération souple de l'opérateur (différentes clés selon Assistant / Gemini / BII)
@@ -68,6 +68,7 @@ class GeminiAntennaReceiver : BroadcastReceiver() {
                 )
             } finally {
                 pendingResult.finish()
+                receiverScope.cancel()
             }
         }
     }

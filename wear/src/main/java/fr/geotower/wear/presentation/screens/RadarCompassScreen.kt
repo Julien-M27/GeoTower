@@ -293,9 +293,9 @@ fun RadarCompassScreen(
                         )
                     }
 
-                    // Échelle de portée active (ex: 1 km)
+                    // Échelle de portée active (ex: 1 km ou 0.6 mi)
                     Text(
-                        text = if (maxDist >= 1000f) "${(maxDist / 1000).toInt()} km" else "${maxDist.toInt()} m",
+                        text = formatDistance(maxDist.toInt(), distanceUnit),
                         fontSize = 8.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF30D158)

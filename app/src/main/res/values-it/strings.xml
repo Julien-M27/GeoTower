@@ -1,4 +1,4 @@
-<resources>
+﻿<resources>
     <string name="antenna_map_widget_label">Mappa antenne vicine</string>
     <string name="antenna_widget_label">Antenne vicine</string>
     <string name="common_logo">Logo</string>
@@ -3517,6 +3517,7 @@
     <string name="appstrings_release_v2128_summary_operator_search_and_fh_nav_customization">Ricerca avanzata per operatore (mappa e vicinanze) e personalizzazione della scheda Collegamenti FH nella navigazione</string>
     <string name="appstrings_release_v2129_summary_fh_map_rendering_optimization">Ottimizzazione della fluidità della mappa dei collegamenti FH tramite rendering a lotti e livello di dettaglio adattivo allo zoom</string>
     <string name="appstrings_release_v2130_summary_fh_map_world_bounds_and_min_zoom">Limitazione dello zoom minimo e dei confini geografici sulla mappa dei collegamenti a microonde (FH)</string>
+    <string name="appstrings_release_v2131_summary_fh_filters_export_and_wear_improvements">Filtri per distanza ed esportazione sulla mappa FH, avvisi bussola/IGN, paginazione del registro di rete e miglioramenti Wear OS</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registro richieste di rete</string>
@@ -3661,4 +3662,22 @@
     <string name="site_comparator_picker_title">Scegli un sito</string>
     <string name="site_comparator_search_hint">ID ANFR, comune o indirizzo…</string>
     <string name="site_comparator_no_results">Nessun sito trovato.</string>
+    <string name="fh_map_distance_under_5km">&lt; 5 km</string>
+    <string name="fh_map_loading">Caricamento ponti radio...</string>
+    <string name="appstrings_compass_sensor_unavailable">Sensore bussola non disponibile su questo dispositivo</string>
+    <string name="fh_map_links_shown_count">%1$s tratte mostrate su %2$s</string>
+    <string name="fh_map_empty_area">Nessun ponte radio in questa zona</string>
+    <string name="fh_map_distance_5_20km">5–20 km</string>
+    <string name="appstrings_compass_calibration_needed">Bassa precisione bussola: calibra muovendo a forma di 8</string>
+    <string name="fh_map_title">Mappa ponti radio</string>
+    <string name="appstrings_coverage_compute_error">Errore nel calcolo della copertura teorica</string>
+    <string name="fh_map_distance_all">Tutte le lunghezze</string>
+    <string name="fh_map_export">Esporta ponti radio</string>
+    <string name="appstrings_coverage_share_source">Fonte: IGN RGE ALTI / BD TOPO · © OpenStreetMap</string>
+    <string name="fh_map_no_table">Tabella ponti radio assente nel database locale</string>
+    <string name="appstrings_coverage_out_of_ign_area">Area fuori copertura altimetrica IGN (Francia): dati terreno non disponibili</string>
+    <string name="fh_map_distance_over_20km">&gt; 20 km</string>
+    <string name="fh_map_filter_operators">Scegli operatori ponti radio</string>
+    <string name="fh_map_subtitle_counts">%1$s / %2$s tratte • %3$d/%4$d operatori</string>
+    <string name="network_log_load_more">Carica altri</string>
 </resources>
