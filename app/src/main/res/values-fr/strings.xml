@@ -3518,6 +3518,7 @@
     <string name="appstrings_release_v2127_summary_overseas_operator_filtering_fix">Filtrage par opérateur amélioré sur la carte pour les opérateurs d\'Outre-mer et les libellés combinés</string>
     <string name="appstrings_release_v2128_summary_operator_search_and_fh_nav_customization">Recherche avancée par opérateur (carte et proximité) et personnalisation de l\'onglet Faisceaux FH dans la navigation</string>
     <string name="appstrings_release_v2129_summary_fh_map_rendering_optimization">Optimisation de la fluidité de la carte des faisceaux hertziens (FH) par rendu groupé et niveau de détail adaptatif au zoom</string>
+    <string name="appstrings_release_v2130_summary_fh_map_world_bounds_and_min_zoom">Limitation du dézoom minimal et des bornes géographiques sur la carte des faisceaux hertziens (FH)</string>
 
     <!-- Journal des requêtes réseau -->
     <string name="network_log_title">Journal des requêtes réseau</string>

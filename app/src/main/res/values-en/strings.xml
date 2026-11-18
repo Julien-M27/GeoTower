@@ -3516,6 +3516,7 @@
     <string name="appstrings_release_v2127_summary_overseas_operator_filtering_fix">Improved operator filtering on the map for Overseas territories and combined operator labels</string>
     <string name="appstrings_release_v2128_summary_operator_search_and_fh_nav_customization">Enhanced operator search (map and nearby) and customizable Microwave Links (FH) navigation tab</string>
     <string name="appstrings_release_v2129_summary_fh_map_rendering_optimization">Fluidity optimization for the microwave links (FH) map using batched rendering and adaptive zoom detail</string>
+    <string name="appstrings_release_v2130_summary_fh_map_world_bounds_and_min_zoom">Minimum zoom and world map bounds enforcement on the microwave links (FH) map</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Network requests log</string>

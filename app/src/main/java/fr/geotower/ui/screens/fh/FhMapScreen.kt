@@ -115,6 +115,7 @@ import org.osmdroid.views.MapView
 import java.io.File
 import java.text.NumberFormat
 import java.util.Locale
+import kotlin.math.log2
 import kotlin.math.roundToInt
 
 const val FH_MAP_ROUTE = "fh_map"
@@ -345,8 +346,12 @@ fun FhMapScreen(
                         zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
                         setMultiTouchControls(true)
                         isTilesScaledToDpi = true
-                        setHorizontalMapRepetitionEnabled(false)
-                        setVerticalMapRepetitionEnabled(false)
+                        applyWorldMapBounds()
+                        addOnLayoutChangeListener { view, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
+                            if ((right - left) != (oldRight - oldLeft) || (bottom - top) != (oldBottom - oldTop)) {
+                                (view as? MapView)?.applyWorldMapBounds()
+                            }
+                        }
 
                         val initialLat = if (!savedLat.isNaN()) savedLat else 46.6
                         val initialLon = if (!savedLon.isNaN()) savedLon else 2.4
@@ -1118,4 +1123,24 @@ private fun FhScaleAndAttributionBadge(
         showAttribution = showAttribution,
         modifier = modifier
     )
+}
+
+private const val WEB_MERCATOR_WORLD_TILE_SIZE_PX = 256.0
+
+private fun MapView.applyWorldMapBounds() {
+    if (isHorizontalMapRepetitionEnabled()) setHorizontalMapRepetitionEnabled(false)
+    if (isVerticalMapRepetitionEnabled()) setVerticalMapRepetitionEnabled(false)
+
+    val tileSystem = MapView.getTileSystem()
+    setScrollableAreaLimitLatitude(tileSystem.maxLatitude, tileSystem.minLatitude, 0)
+    setScrollableAreaLimitLongitude(tileSystem.minLongitude, tileSystem.maxLongitude, 0)
+
+    val mapWidthPx = width.takeIf { it > 0 } ?: resources.displayMetrics.widthPixels
+    val mapHeightPx = height.takeIf { it > 0 } ?: resources.displayMetrics.heightPixels
+    val minZoom = log2((maxOf(mapWidthPx, mapHeightPx).toDouble() / WEB_MERCATOR_WORLD_TILE_SIZE_PX).coerceAtLeast(1.0))
+    setMinZoomLevel(minZoom)
+    if (zoomLevelDouble < minZoom) {
+        controller.stopAnimation(false)
+        controller.setZoom(minZoom)
+    }
 }

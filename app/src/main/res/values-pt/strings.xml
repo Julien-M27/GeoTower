@@ -3516,6 +3516,7 @@
     <string name="appstrings_release_v2127_summary_overseas_operator_filtering_fix">Filtragem por operador melhorada no mapa para territórios ultramarinos e etiquetas combinadas</string>
     <string name="appstrings_release_v2128_summary_operator_search_and_fh_nav_customization">Pesquisa avançada por operador (mapa e proximidade) e personalização do separador Ligações FH na navegação</string>
     <string name="appstrings_release_v2129_summary_fh_map_rendering_optimization">Otimização da fluidez do mapa de ligações FH através de renderização em lotes e nível de detalhe adaptativo ao zoom</string>
+    <string name="appstrings_release_v2130_summary_fh_map_world_bounds_and_min_zoom">Limitação do zoom mínimo e dos limites geográficos no mapa de ligações por feixes hertzianos (FH)</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registo de pedidos de rede</string>

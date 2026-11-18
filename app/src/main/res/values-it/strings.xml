@@ -3516,6 +3516,7 @@
     <string name="appstrings_release_v2127_summary_overseas_operator_filtering_fix">Filtraggio per operatore migliorato sulla mappa per i territori d\'oltremare e le etichette combinate</string>
     <string name="appstrings_release_v2128_summary_operator_search_and_fh_nav_customization">Ricerca avanzata per operatore (mappa e vicinanze) e personalizzazione della scheda Collegamenti FH nella navigazione</string>
     <string name="appstrings_release_v2129_summary_fh_map_rendering_optimization">Ottimizzazione della fluidità della mappa dei collegamenti FH tramite rendering a lotti e livello di dettaglio adattivo allo zoom</string>
+    <string name="appstrings_release_v2130_summary_fh_map_world_bounds_and_min_zoom">Limitazione dello zoom minimo e dei confini geografici sulla mappa dei collegamenti a microonde (FH)</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registro richieste di rete</string>
