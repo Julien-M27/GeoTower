@@ -3538,6 +3538,7 @@
     <string name="appstrings_release_v2126_summary_fh_map_local_priority_and_viewport_opt">Local database priority for the microwave links (FH) map and viewport-based reload optimization</string>
     <string name="appstrings_release_v2127_summary_overseas_operator_filtering_fix">Improved operator filtering on the map for Overseas territories and combined operator labels</string>
     <string name="appstrings_release_v2128_summary_operator_search_and_fh_nav_customization">Enhanced operator search (map and nearby) and customizable Microwave Links (FH) navigation tab</string>
+    <string name="appstrings_release_v2129_summary_fh_map_rendering_optimization">Fluidity optimization for the microwave links (FH) map using batched rendering and adaptive zoom detail</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Network requests log</string>

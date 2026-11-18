@@ -3515,6 +3515,7 @@
     <string name="appstrings_release_v2126_summary_fh_map_local_priority_and_viewport_opt">Prioridad a la base local para el mapa de enlaces FH y optimización de la recarga al desplazarse</string>
     <string name="appstrings_release_v2127_summary_overseas_operator_filtering_fix">Mejora del filtrado por operador en el mapa para territorios de ultramar y etiquetas combinadas</string>
     <string name="appstrings_release_v2128_summary_operator_search_and_fh_nav_customization">Búsqueda avanzada por operador (mapa y cercanía) y personalización de la pestaña Enlaces FH en la navegación</string>
+    <string name="appstrings_release_v2129_summary_fh_map_rendering_optimization">Optimización de la fluidez del mapa de enlaces de microondas (FH) mediante renderizado por lotes y detalle adaptativo al zoom</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registro de solicitudes de red</string>

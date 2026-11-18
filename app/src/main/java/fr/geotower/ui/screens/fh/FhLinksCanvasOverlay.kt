@@ -13,11 +13,12 @@ import org.osmdroid.views.Projection
 import org.osmdroid.views.overlay.Overlay
 import kotlin.math.abs
 import kotlin.math.hypot
+import kotlin.math.min
 
 /**
  * Calque haute performance dessinant toutes les liaisons FH filtrées directement sur Canvas.
- * Utilise des coordonnées Mercator précalculées et un rendu groupé par opérateur via
- * `canvas.drawLines` pour conserver 60 fps même avec des dizaines de milliers de traits.
+ * Utilise des coordonnées Mercator précalculées, un LOD adaptatif selon le zoom et un rendu
+ * groupé par opérateur via `canvas.drawLines` par lots pour éviter de saturer le GPU (Adreno).
  */
 class FhLinksCanvasOverlay(
     context: Context,
@@ -38,7 +39,7 @@ class FhLinksCanvasOverlay(
     private var items: List<FhPreparedLink> = emptyList()
     private var colorGroups: List<ColorGroup> = emptyList()
     private var selectedLinkKey: String? = null
-    private var lineBuffer = FloatArray(4096)
+    private var lineBuffer = FloatArray(DRAW_CHUNK_FLOATS)
 
     private val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
@@ -66,7 +67,10 @@ class FhLinksCanvasOverlay(
         colorGroups = if (links.isEmpty()) {
             emptyList()
         } else {
-            links.groupBy { it.colorInt }.map { (color, group) -> ColorGroup(color, group) }
+            links.groupBy { it.colorInt }.map { (color, group) ->
+                // Les liaisons les plus longues en premier pour que le LOD au dézoom conserve la dorsale.
+                ColorGroup(color, group.sortedByDescending { it.link.distanceM })
+            }
         }
     }
 
@@ -122,7 +126,19 @@ class FhLinksCanvasOverlay(
             zoom < 10.0 -> 195
             else -> 220
         }
-        val skipTinyLines = zoom < 9.0
+        val minScreenSpan = when {
+            zoom < 7.0 -> 4.5f
+            zoom < 8.5 -> 2.8f
+            zoom < 10.0 -> 1.5f
+            else -> 0f
+        }
+        val maxTotalLines = when {
+            zoom < 7.0 -> 4_500
+            zoom < 8.5 -> 7_500
+            zoom < 10.0 -> 12_000
+            else -> Int.MAX_VALUE
+        }
+        val totalLinksCount = items.size.coerceAtLeast(1)
         val drawDots = zoom >= 10.5
         val dotRadius = if (zoom >= 13.0) 3.4f * density else 2.4f * density
 
@@ -136,9 +152,20 @@ class FhLinksCanvasOverlay(
         for (g in groups.indices) {
             val group = groups[g]
             val groupLinks = group.links
+            val groupBudget = if (maxTotalLines == Int.MAX_VALUE) {
+                Int.MAX_VALUE
+            } else {
+                ((maxTotalLines.toLong() * groupLinks.size) / totalLinksCount).toInt().coerceAtLeast(150)
+            }
+
+            linePaint.color = ColorUtils.setAlphaComponent(group.colorInt, baseAlpha)
+            dotPaint.color = group.colorInt
+
             var count = 0
+            var drawnInGroup = 0
 
             for (i in groupLinks.indices) {
+                if (drawnInGroup >= groupBudget) break
                 val item = groupLinks[i]
                 if (item.maxLat < viewMinLat || item.minLat > viewMaxLat ||
                     item.maxLon < viewMinLon || item.minLon > viewMaxLon
@@ -161,32 +188,24 @@ class FhLinksCanvasOverlay(
                 val x2 = (ox + dxB * ax + dyB * bx).toFloat()
                 val y2 = (oy + dxB * ay + dyB * by).toFloat()
 
-                if (skipTinyLines && abs(x2 - x1) + abs(y2 - y1) < 1.5f) {
+                if (minScreenSpan > 0f && abs(x2 - x1) + abs(y2 - y1) < minScreenSpan) {
                     continue
                 }
 
-                if (count + 4 > lineBuffer.size) {
-                    lineBuffer = lineBuffer.copyOf(lineBuffer.size * 2)
-                }
                 lineBuffer[count++] = x1
                 lineBuffer[count++] = y1
                 lineBuffer[count++] = x2
                 lineBuffer[count++] = y2
+                drawnInGroup++
+
+                if (count >= DRAW_CHUNK_FLOATS) {
+                    flushChunk(canvas, count, drawDots, dotRadius)
+                    count = 0
+                }
             }
 
             if (count > 0) {
-                linePaint.color = ColorUtils.setAlphaComponent(group.colorInt, baseAlpha)
-                canvas.drawLines(lineBuffer, 0, count, linePaint)
-
-                if (drawDots) {
-                    dotPaint.color = group.colorInt
-                    var idx = 0
-                    while (idx < count) {
-                        canvas.drawCircle(lineBuffer[idx], lineBuffer[idx + 1], dotRadius, dotPaint)
-                        canvas.drawCircle(lineBuffer[idx + 2], lineBuffer[idx + 3], dotRadius, dotPaint)
-                        idx += 4
-                    }
-                }
+                flushChunk(canvas, count, drawDots, dotRadius)
             }
         }
 
@@ -215,6 +234,24 @@ class FhLinksCanvasOverlay(
             dotPaint.color = item.colorInt
             canvas.drawCircle(x1, y1, selectedDotRadius, dotPaint)
             canvas.drawCircle(x2, y2, selectedDotRadius, dotPaint)
+        }
+    }
+
+    private fun flushChunk(
+        canvas: Canvas,
+        floatCount: Int,
+        drawDots: Boolean,
+        dotRadius: Float
+    ) {
+        canvas.drawLines(lineBuffer, 0, floatCount, linePaint)
+        if (drawDots) {
+            var idx = 0
+            val limit = min(floatCount, lineBuffer.size)
+            while (idx + 3 < limit) {
+                canvas.drawCircle(lineBuffer[idx], lineBuffer[idx + 1], dotRadius, dotPaint)
+                canvas.drawCircle(lineBuffer[idx + 2], lineBuffer[idx + 3], dotRadius, dotPaint)
+                idx += 4
+            }
         }
     }
 
@@ -287,5 +324,10 @@ class FhLinksCanvasOverlay(
         val projX = x1 + t * dx
         val projY = y1 + t * dy
         return hypot(px - projX, py - projY)
+    }
+
+    private companion object {
+        // 2 000 lignes par lot = 8 000 floats pour éviter de saturer le RenderThread / GPU Adreno.
+        const val DRAW_CHUNK_FLOATS = 8_000
     }
 }
