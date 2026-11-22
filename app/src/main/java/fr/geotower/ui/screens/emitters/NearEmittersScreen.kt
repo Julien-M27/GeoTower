@@ -519,7 +519,7 @@ fun NearEmittersScreen(
     }
 
     val hsSitesKey = if (showOnlyOutOfServiceSites) sitesHs else Unit
-    LaunchedEffect(searchCenter, maxItemsToShow, isZbNearbySearch, nearbyFrequencyFilter, showOnlyOutOfServiceSites, hsSitesKey, refreshTrigger) {
+    LaunchedEffect(searchCenter, activeCountry, maxItemsToShow, isZbNearbySearch, nearbyFrequencyFilter, showOnlyOutOfServiceSites, hsSitesKey, refreshTrigger) {
         val currentLoc = searchCenter ?: return@LaunchedEffect
 
         if (!isRefreshing) {
@@ -550,13 +550,15 @@ fun NearEmittersScreen(
                         lat = currentLoc.latitude,
                         lon = currentLoc.longitude,
                         limit = queryLimit,
-                        detailBackedBandMask = detailBackedBandMask
+                        detailBackedBandMask = detailBackedBandMask,
+                        countryOverride = activeCountry
                     )
                     else -> repository.getNearest(
                         lat = currentLoc.latitude,
                         lon = currentLoc.longitude,
                         limit = queryLimit,
-                        detailBackedBandMask = detailBackedBandMask
+                        detailBackedBandMask = detailBackedBandMask,
+                        countryOverride = activeCountry
                     )
                 }
                 // Pas de rayon de recherche : on garde les sites les plus proches quelle que soit
@@ -777,7 +779,8 @@ fun NearEmittersScreen(
                                     lon = refLon,
                                     operatorKeys = matchedOperatorKeys,
                                     limit = nearbySearchLimit,
-                                    detailBackedBandMask = detailBackedBandMask
+                                    detailBackedBandMask = detailBackedBandMask,
+                                    countryOverride = activeCountry
                                 )
                             )
                         }
@@ -789,7 +792,8 @@ fun NearEmittersScreen(
                                 lat = referenceLocation.latitude,
                                 lon = referenceLocation.longitude,
                                 limit = nearbySearchLimit,
-                                detailBackedBandMask = detailBackedBandMask
+                                detailBackedBandMask = detailBackedBandMask,
+                                countryOverride = activeCountry
                             )
                         )
                     }
@@ -801,7 +805,8 @@ fun NearEmittersScreen(
                             lat = targetLat,
                             lon = targetLon,
                             limit = nearbySearchLimit,
-                            detailBackedBandMask = detailBackedBandMask
+                            detailBackedBandMask = detailBackedBandMask,
+                            countryOverride = activeCountry
                         )
                         globalAntennas.addAll(nearestResults)
                     }

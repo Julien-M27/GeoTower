@@ -1073,9 +1073,9 @@ fun SiteDetailScreen(
 
     // Identifiants réseau : lecture locale de la base optionnelle, avec repli sur l'API Live si absente.
     // Le bloc ne s'affiche pas si aucun eNB/gNB n'est rattaché au pylône.
-    LaunchedEffect(antenna?.idAnfr) {
+    LaunchedEffect(antenna?.idAnfr, technique) {
         val siteId = antenna?.idAnfr
-        caIsedDetails = if (siteId != null && siteId.startsWith("CA-")) {
+        caIsedDetails = if (siteId != null && siteId.startsWith("CA-", ignoreCase = true)) {
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                 fr.geotower.data.CaIsedSiteDetailsRepository.loadForSite(context, siteId)
             }

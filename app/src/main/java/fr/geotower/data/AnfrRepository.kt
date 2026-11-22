@@ -1392,16 +1392,18 @@ class AnfrRepository(
         lat: Double,
         lon: Double,
         limit: Int,
-        detailBackedBandMask: Int = 0
+        detailBackedBandMask: Int = 0,
+        countryOverride: fr.geotower.data.db.DatabaseCountry? = null
     ): List<LocalisationEntity> {
         val safeLimit = limit.coerceAtLeast(1)
         val candidateLimit = (safeLimit.toLong() * 8L).coerceAtMost(5000L).toInt()
-        if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_NEARBY)) {
-            return hideHiddenSites(getLiveNearest(lat, lon, candidateLimit, zbOnly = true))
+        val targetCountry = countryOverride ?: fr.geotower.data.db.DatabaseCountry.forCoordinates(lat, lon)
+        if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_NEARBY, targetCountry)) {
+            return hideHiddenSites(getLiveNearest(lat, lon, candidateLimit, zbOnly = true, country = targetCountry))
                 .take(safeLimit)
         }
 
-        val localisations = queryLocalDatabase(emptyList()) {
+        val localisations = queryLocalDatabaseForCountry(targetCountry, emptyList()) {
             this.getNearestZb(lat, lon, candidateLimit)
         }
         return hideHiddenSites(enrichRadioBandMasksFromDetails(localisations, detailBackedBandMask))
@@ -1413,22 +1415,24 @@ class AnfrRepository(
         lon: Double,
         operatorKeys: Set<String>,
         limit: Int,
-        detailBackedBandMask: Int = 0
+        detailBackedBandMask: Int = 0,
+        countryOverride: fr.geotower.data.db.DatabaseCountry? = null
     ): List<LocalisationEntity> {
         val selectedKeys = normalizedSelectedOperatorKeys(operatorKeys)
         if (selectedKeys.isEmpty()) return emptyList()
 
         val safeLimit = limit.coerceAtLeast(1)
         val candidateLimit = (safeLimit.toLong() * 8L).coerceAtMost(5000L).toInt()
-        if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_NEARBY)) {
-            return hideHiddenSites(getLiveNearest(lat, lon, candidateLimit, zbOnly = false))
+        val targetCountry = countryOverride ?: fr.geotower.data.db.DatabaseCountry.forCoordinates(lat, lon)
+        if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_NEARBY, targetCountry)) {
+            return hideHiddenSites(getLiveNearest(lat, lon, candidateLimit, zbOnly = false, country = targetCountry))
                 .filter { matchesSelectedOperatorKeys(it.operateur, selectedKeys) }
                 .take(safeLimit)
         }
 
-        val localisations = queryLocalDatabase(emptyList()) {
+        val localisations = queryLocalDatabaseForCountry(targetCountry, emptyList()) {
             val operatorIds = resolveMatchingOperatorIds(selectedKeys)
-            if (operatorIds.isEmpty()) return@queryLocalDatabase emptyList()
+            if (operatorIds.isEmpty()) return@queryLocalDatabaseForCountry emptyList()
             getNearestForOperators(
                 lat = lat,
                 lon = lon,
@@ -1444,11 +1448,12 @@ class AnfrRepository(
         lat: Double,
         lon: Double,
         limit: Int,
-        detailBackedBandMask: Int = 0
+        detailBackedBandMask: Int = 0,
+        countryOverride: fr.geotower.data.db.DatabaseCountry? = null
     ): List<LocalisationEntity> {
         val safeLimit = limit.coerceAtLeast(1)
         val candidateLimit = (safeLimit.toLong() * 8L).coerceAtMost(5000L).toInt()
-        val targetCountry = fr.geotower.data.db.DatabaseCountry.forCoordinates(lat, lon)
+        val targetCountry = countryOverride ?: fr.geotower.data.db.DatabaseCountry.forCoordinates(lat, lon)
         if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_NEARBY, targetCountry)) {
             return hideHiddenSites(getLiveNearest(lat, lon, candidateLimit, zbOnly = false, country = targetCountry))
                 .take(safeLimit)

@@ -3519,6 +3519,7 @@
     <string name="appstrings_release_v2130_summary_fh_map_world_bounds_and_min_zoom">Begrenzung des minimalen Zooms und der geografischen Grenzen auf der Richtfunk-Karte (FH)</string>
     <string name="appstrings_release_v2131_summary_fh_filters_export_and_wear_improvements">Entfernungsfilter und Export auf der FH-Karte, Kompass-/IGN-Hinweise, Paginierung im Netzwerkprotokoll und Wear OS-Verbesserungen</string>
     <string name="appstrings_release_v2132_summary_canada_support_and_watch_sync">Vollständige Kanada-Unterstützung (ISED-Datenbanken, 14 Anbieter, Bänder, Android Auto) und Wear OS/Garmin-API-Failover</string>
+    <string name="appstrings_release_v2133_summary_canada_nearby_country_and_detail_fix">Berücksichtigung des gewählten Landes in der Umgebungssuche und zuverlässiges Laden kanadischer (ISED) Standortdetails</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Netzwerkanfragen-Protokoll</string>

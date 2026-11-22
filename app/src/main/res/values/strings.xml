@@ -3542,6 +3542,7 @@
     <string name="appstrings_release_v2130_summary_fh_map_world_bounds_and_min_zoom">Minimum zoom and world map bounds enforcement on the microwave links (FH) map</string>
     <string name="appstrings_release_v2131_summary_fh_filters_export_and_wear_improvements">Distance filters and export on the FH map, compass/IGN alerts, network log pagination, and Wear OS enhancements</string>
     <string name="appstrings_release_v2132_summary_canada_support_and_watch_sync">Full Canada support (ISED databases, 14 operators, bands, Android Auto) and Wear OS/Garmin API failover</string>
+    <string name="appstrings_release_v2133_summary_canada_nearby_country_and_detail_fix">Respect selected country in Nearby queries and reliable loading of Canadian (ISED) site details</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Network requests log</string>
