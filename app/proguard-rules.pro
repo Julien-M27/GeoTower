@@ -36,6 +36,8 @@
 # here, along with a migration for the entries users would otherwise lose.
 -keep class fr.geotower.data.api.** { *; }
 -keep class fr.geotower.data.models.** { *; }
+-keep class fr.geotower.data.CaIsedSiteDetails { *; }
+-keep class fr.geotower.data.CaIsedSectorDetail { *; }
 -keep class fr.geotower.data.outages.CachedOutages { *; }
 -keep class fr.geotower.data.outages.CachedServerOutages { *; }
 -keep class fr.geotower.data.config.RemoteHomeAnnouncement* { *; }
