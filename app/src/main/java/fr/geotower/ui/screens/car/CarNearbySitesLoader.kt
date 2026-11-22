@@ -204,7 +204,7 @@ internal class CarNearbySitesLoader(
         val normalizedAddress = fullAddress.replace(Regex("\\s+"), " ").trim()
         val lastCommaIndex = normalizedAddress.lastIndexOf(',')
         if (lastCommaIndex < 0) {
-            val postalMatch = Regex("\\b\\d{5}\\b").find(normalizedAddress)
+            val postalMatch = Regex("\\b(?:\\d{5}|[A-Za-z]\\d[A-Za-z]\\s?\\d[A-Za-z]\\d)\\b").find(normalizedAddress)
             if (postalMatch != null && postalMatch.range.first > 0) {
                 return CarAddressParts(
                     title = normalizedAddress.substring(0, postalMatch.range.first).trim(),

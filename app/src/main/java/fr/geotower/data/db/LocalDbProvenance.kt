@@ -62,8 +62,11 @@ object LocalDbProvenance {
     private const val MOBILE_BUILD_SOURCE_REASON_KEY = "db_mobile_build_source_reason"
 
     /** Provenance de la base **mobile** installee (via `source_versions.provenance`). */
-    fun readMobile(context: Context): Info {
-        val dbPath = context.getDatabasePath(GeoTowerDatabaseValidator.DB_NAME)
+    fun readMobile(
+        context: Context,
+        country: DatabaseCountry = DatabaseCountryStore.getActive(context)
+    ): Info {
+        val dbPath = context.getDatabasePath(country.dbFileName)
         if (!dbPath.exists()) return Info.NONE
         return try {
             SQLiteDatabase.openDatabase(dbPath.absolutePath, null, SQLiteDatabase.OPEN_READONLY).use { db ->

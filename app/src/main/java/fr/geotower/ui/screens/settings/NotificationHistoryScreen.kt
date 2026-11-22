@@ -715,7 +715,7 @@ private fun NotificationHistoryRow(
         Spacer(modifier = Modifier.width(sizing.spacing(12.dp)))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = notificationTypeLabel(item.type),
+                text = notificationEntryTitle(item),
                 style = sizing.textStyle(MaterialTheme.typography.titleSmall),
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
@@ -791,6 +791,23 @@ private fun notificationTypeLabel(type: String): String = when (type) {
     else -> type
 }
 
+@Composable
+private fun notificationEntryTitle(item: NotificationHistoryEntry): String {
+    val base = notificationTypeLabel(item.type)
+    return when (item.type) {
+        NotificationHistoryStore.TYPE_DB_MOBILE,
+        NotificationHistoryStore.TYPE_DB_UPDATE -> {
+            val country = if (item.target.contains("db_mobile_ca")) "Canada" else "France"
+            "$base ($country)"
+        }
+        NotificationHistoryStore.TYPE_DB_RADIO,
+        NotificationHistoryStore.TYPE_DB_ENB,
+        NotificationHistoryStore.TYPE_DB_LOCAL_BUILD,
+        NotificationHistoryStore.TYPE_OUTAGES -> "$base (France)"
+        else -> base
+    }
+}
+
 /**
  * La phrase affichée sous le titre : ce sont les chaînes des notifications elles-mêmes, réassemblées
  * à partir des paramètres bruts enregistrés. Le journal dit donc mot pour mot ce que disait la
@@ -803,7 +820,7 @@ private fun notificationEntryDescription(item: NotificationHistoryEntry): String
         NotificationHistoryStore.TYPE_DB_MOBILE,
         NotificationHistoryStore.TYPE_DB_RADIO,
         NotificationHistoryStore.TYPE_DB_ENB -> {
-            val databaseName = notificationTypeLabel(item.type)
+            val databaseName = notificationEntryTitle(item)
             when {
                 isError -> stringResource(R.string.notification_database_download_failed_content)
                 item.status == NotificationHistoryStore.STATUS_INFO -> stringResource(
@@ -825,18 +842,15 @@ private fun notificationEntryDescription(item: NotificationHistoryEntry): String
                 stringResource(R.string.appstrings_local_build_notif_done)
             }
 
-        NotificationHistoryStore.TYPE_DB_UPDATE ->
+        NotificationHistoryStore.TYPE_DB_UPDATE -> {
+            val country = if (item.target.contains("db_mobile_ca")) "Canada" else "France"
+            val mobileName = "${stringResource(R.string.notification_history_type_db_mobile)} ($country)"
             if (item.detail == NotificationHistoryStore.DETAIL_DB_UPDATE_REBUILD) {
-                stringResource(
-                    R.string.notification_db_update_available_desc_rebuild,
-                    stringResource(R.string.notification_history_type_db_mobile)
-                )
+                stringResource(R.string.notification_db_update_available_desc_rebuild, mobileName)
             } else {
-                stringResource(
-                    R.string.notification_db_update_available_desc,
-                    stringResource(R.string.notification_history_type_db_mobile)
-                )
+                stringResource(R.string.notification_db_update_available_desc, mobileName)
             }
+        }
 
         NotificationHistoryStore.TYPE_APP_UPDATE ->
             stringResource(R.string.notification_app_update_available_desc, item.label)

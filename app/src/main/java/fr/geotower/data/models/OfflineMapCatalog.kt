@@ -1,5 +1,7 @@
 package fr.geotower.data.models
 
+import fr.geotower.data.db.DatabaseCountry
+
 /**
  * Catalogue des cartes vectorielles hors-ligne embarqué directement dans l'app.
  *
@@ -21,6 +23,8 @@ object OfflineMapCatalog {
 
     private const val MAPSFORGE_FRANCE_BASE =
         "https://download.mapsforge.org/maps/v5/europe/france"
+    private const val MAPSFORGE_CANADA_BASE =
+        "https://download.mapsforge.org/maps/v5/north-america/canada"
 
     /**
      * Construit une entrée : l'URL et le nom de fichier se déduisent de [id]
@@ -30,12 +34,13 @@ object OfflineMapCatalog {
         id: String,
         name: String,
         description: String,
-        estimatedSizeMb: Int
+        estimatedSizeMb: Int,
+        baseUrl: String = MAPSFORGE_FRANCE_BASE
     ): OfflineMapDto = OfflineMapDto(
         id = id,
         name = name,
         description = description,
-        mapUrl = "$MAPSFORGE_FRANCE_BASE/$id.map",
+        mapUrl = "$baseUrl/$id.map",
         estimatedSizeMb = estimatedSizeMb,
         mapFilename = "$id.map",
         sha256 = null
@@ -70,4 +75,25 @@ object OfflineMapCatalog {
         entry("mayotte", "Mayotte", "Ocean Indien", 7),
         entry("reunion", "La Reunion", "Ocean Indien", 21),
     )
+
+    val canadaEntries: List<OfflineMapDto> = listOf(
+        entry("quebec", "Québec", "Canada", 420, MAPSFORGE_CANADA_BASE),
+        entry("ontario", "Ontario", "Canada", 380, MAPSFORGE_CANADA_BASE),
+        entry("british-columbia", "Colombie-Britannique", "Canada", 230, MAPSFORGE_CANADA_BASE),
+        entry("alberta", "Alberta", "Canada", 190, MAPSFORGE_CANADA_BASE),
+        entry("manitoba", "Manitoba", "Canada", 85, MAPSFORGE_CANADA_BASE),
+        entry("saskatchewan", "Saskatchewan", "Canada", 80, MAPSFORGE_CANADA_BASE),
+        entry("nova-scotia", "Nouvelle-Écosse", "Canada", 45, MAPSFORGE_CANADA_BASE),
+        entry("new-brunswick", "Nouveau-Brunswick", "Canada", 45, MAPSFORGE_CANADA_BASE),
+        entry("newfoundland-and-labrador", "Terre-Neuve-et-Labrador", "Canada", 55, MAPSFORGE_CANADA_BASE),
+        entry("prince-edward-island", "Île-du-Prince-Édouard", "Canada", 8, MAPSFORGE_CANADA_BASE),
+        entry("yukon", "Yukon", "Canada", 30, MAPSFORGE_CANADA_BASE),
+        entry("northwest-territories", "Territoires du Nord-Ouest", "Canada", 40, MAPSFORGE_CANADA_BASE),
+        entry("nunavut", "Nunavut", "Canada", 45, MAPSFORGE_CANADA_BASE),
+    )
+
+    fun entriesFor(country: DatabaseCountry): List<OfflineMapDto> = when (country) {
+        DatabaseCountry.CA -> canadaEntries
+        DatabaseCountry.FR -> entries
+    }
 }

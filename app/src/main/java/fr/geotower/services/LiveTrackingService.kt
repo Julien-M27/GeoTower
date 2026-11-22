@@ -308,7 +308,8 @@ class LiveTrackingService : Service() {
 
         processingJob = serviceScope.launch {
             try {
-                val dao = AppDatabase.getDatabase(applicationContext).geoTowerDao()
+                val targetCountry = fr.geotower.data.db.DatabaseCountry.forCoordinates(location.latitude, location.longitude)
+                val dao = AppDatabase.getDatabase(applicationContext, targetCountry).geoTowerDao()
                 val opAntennas = findActiveAntennasByRadius(dao, location, defaultOp)
 
                 if (opAntennas.isEmpty()) {

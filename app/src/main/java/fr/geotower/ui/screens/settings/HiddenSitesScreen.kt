@@ -354,8 +354,13 @@ private fun HiddenSiteCard(
                         overflow = TextOverflow.Ellipsis
                     )
                     Spacer(modifier = Modifier.height(sizing.spacing(3.dp)))
+                    val idLabel = if (record.idAnfr.startsWith("CA-", ignoreCase = true)) {
+                        stringResource(R.string.appstrings_ca_ised_station_number_label)
+                    } else {
+                        stringResource(R.string.hidden_sites_anfr_id_label)
+                    }
                     Text(
-                        text = stringResource(R.string.hidden_sites_anfr_id_label) + " : " + anfrText,
+                        text = "$idLabel : $anfrText",
                         style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,

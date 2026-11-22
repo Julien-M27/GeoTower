@@ -181,8 +181,9 @@ fun SiteFrequenciesBlock(
                     }
                 }
 
-                // ✅ NOUVEAU : On vérifie l'option d'affichage
-                if (forceGridDisplay || AppConfig.siteFreqGridDisplay.value) {
+                // ✅ NOUVEAU : On vérifie l'option d'affichage (Canada = toujours tableau unique)
+                val isCanadaSite = info.idAnfr.startsWith("CA-")
+                if (isCanadaSite || forceGridDisplay || AppConfig.siteFreqGridDisplay.value) {
                     FrequenciesGridView(
                         parsedBands = parsedBands,
                         txtUnknown = txtUnknown,
@@ -506,31 +507,41 @@ fun SiteFrequenciesBlock(
 private fun shouldDisplayFrequencyBand(band: FreqBand): Boolean {
     return when (band.gen) {
         5 -> AppConfig.siteShowTechno5G.value && when (band.value) {
+            600 -> AppConfig.siteF5G_600.value
             700 -> AppConfig.siteF5G_700.value
+            850 -> AppConfig.siteF5G_850.value
             1400 -> AppConfig.siteF5G_1400.value
+            1900 -> AppConfig.siteF5G_1900.value
+            2000, 2010 -> AppConfig.siteF5G_2000.value
             2100 -> AppConfig.siteF5G_2100.value
+            2600 -> AppConfig.siteF5G_2600.value
             3500 -> AppConfig.siteF5G_3500.value
+            3800 -> AppConfig.siteF5G_3800.value
             4200 -> AppConfig.siteF5G_4200.value
             26000 -> AppConfig.siteF5G_26000.value
             else -> true
         }
         4 -> AppConfig.siteShowTechno4G.value && when (band.value) {
+            600 -> AppConfig.siteF4G_600.value
             700 -> AppConfig.siteF4G_700.value
-            800 -> AppConfig.siteF4G_800.value
+            800, 850 -> AppConfig.siteF4G_800.value
             900 -> AppConfig.siteF4G_900.value
-            1800 -> AppConfig.siteF4G_1800.value
+            1800, 1900 -> AppConfig.siteF4G_1800.value
             2100 -> AppConfig.siteF4G_2100.value
+            2300 -> AppConfig.siteF4G_2300.value
             2600 -> AppConfig.siteF4G_2600.value
+            3500 -> AppConfig.siteF4G_3500.value
             else -> true
         }
         3 -> AppConfig.siteShowTechno3G.value && when (band.value) {
-            900 -> AppConfig.siteF3G_900.value
+            850, 900 -> AppConfig.siteF3G_900.value
+            1900 -> AppConfig.siteF3G_1900.value
             2100 -> AppConfig.siteF3G_2100.value
             else -> true
         }
         2 -> AppConfig.siteShowTechno2G.value && when (band.value) {
-            900 -> AppConfig.siteF2G_900.value
-            1800 -> AppConfig.siteF2G_1800.value
+            850, 900 -> AppConfig.siteF2G_900.value
+            1800, 1900 -> AppConfig.siteF2G_1800.value
             else -> true
         }
         else -> AppConfig.siteShowTechnoFH.value
@@ -638,7 +649,7 @@ fun FrequenciesGridView(
     val showSpectrum = AppConfig.siteShowSpectrumRanges.value
     val showBandwidth =
         AppConfig.siteShowBandwidth.value && AppConfig.siteShowBandwidthPerRange.value
-    val showSpectrumColumn = showSpectrum || showBandwidth
+    val showSpectrumColumn = (showSpectrum || showBandwidth) && stationId?.startsWith("CA-") != true
 
     // --- TABLEAU 1 : ÉMETTEURS (Techno / Date / État) ---
     Card(

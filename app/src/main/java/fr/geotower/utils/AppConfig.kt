@@ -307,7 +307,7 @@ object AppConfig {
         OperatorColors.SFR_KEY,
         OperatorColors.BOUYGUES_KEY,
         OperatorColors.FREE_KEY
-    )
+    ) + OperatorColors.canada.map { it.key }.toSet()
     // Un seul opérateur peut être affiché à la fois pour la couverture SignalQuest.
     val defaultSignalQuestCoverageOperatorKeys = setOf(OperatorColors.ORANGE_KEY)
 
@@ -391,21 +391,31 @@ object AppConfig {
 
     // 3G UMTS
     var f3G_900 = mutableStateOf(true)
+    var f3G_1900 = mutableStateOf(true)
     var f3G_2100 = mutableStateOf(true)
 
     // 4G LTE
+    var f4G_600 = mutableStateOf(true)
     var f4G_700 = mutableStateOf(true)
     var f4G_800 = mutableStateOf(true)
     var f4G_900 = mutableStateOf(true)
     var f4G_1800 = mutableStateOf(true)
     var f4G_2100 = mutableStateOf(true)
+    var f4G_2300 = mutableStateOf(true)
     var f4G_2600 = mutableStateOf(true)
+    var f4G_3500 = mutableStateOf(true)
 
     // 5G NR
+    var f5G_600 = mutableStateOf(true)
     var f5G_700 = mutableStateOf(true)
+    var f5G_850 = mutableStateOf(true)
     var f5G_1400 = mutableStateOf(true)
+    var f5G_1900 = mutableStateOf(true)
+    var f5G_2000 = mutableStateOf(true)
     var f5G_2100 = mutableStateOf(true)
+    var f5G_2600 = mutableStateOf(true)
     var f5G_3500 = mutableStateOf(true)
+    var f5G_3800 = mutableStateOf(true)
     var f5G_4200 = mutableStateOf(true)
     var f5G_26000 = mutableStateOf(true)
 
@@ -419,17 +429,27 @@ object AppConfig {
     var siteF2G_900 = mutableStateOf(true)
     var siteF2G_1800 = mutableStateOf(true)
     var siteF3G_900 = mutableStateOf(true)
+    var siteF3G_1900 = mutableStateOf(true)
     var siteF3G_2100 = mutableStateOf(true)
+    var siteF4G_600 = mutableStateOf(true)
     var siteF4G_700 = mutableStateOf(true)
     var siteF4G_800 = mutableStateOf(true)
     var siteF4G_900 = mutableStateOf(true)
     var siteF4G_1800 = mutableStateOf(true)
     var siteF4G_2100 = mutableStateOf(true)
+    var siteF4G_2300 = mutableStateOf(true)
     var siteF4G_2600 = mutableStateOf(true)
+    var siteF4G_3500 = mutableStateOf(true)
+    var siteF5G_600 = mutableStateOf(true)
     var siteF5G_700 = mutableStateOf(true)
+    var siteF5G_850 = mutableStateOf(true)
     var siteF5G_1400 = mutableStateOf(true)
+    var siteF5G_1900 = mutableStateOf(true)
+    var siteF5G_2000 = mutableStateOf(true)
     var siteF5G_2100 = mutableStateOf(true)
+    var siteF5G_2600 = mutableStateOf(true)
     var siteF5G_3500 = mutableStateOf(true)
+    var siteF5G_3800 = mutableStateOf(true)
     var siteF5G_4200 = mutableStateOf(true)
     var siteF5G_26000 = mutableStateOf(true)
 
@@ -495,9 +515,9 @@ object AppConfig {
 
     var siteTechnoOrder = mutableStateOf(listOf("5G", "4G", "3G", "2G", "FH"))
 
-    var siteFreqOrder5G = mutableStateOf(listOf("26000", "4200", "3500", "2100", "1400", "700"))
-    var siteFreqOrder4G = mutableStateOf(listOf("2600", "2100", "1800", "900", "800", "700"))
-    var siteFreqOrder3G = mutableStateOf(listOf("2100", "900"))
+    var siteFreqOrder5G = mutableStateOf(listOf("26000", "4200", "3800", "3500", "2600", "2100", "2000", "1900", "1400", "850", "700", "600"))
+    var siteFreqOrder4G = mutableStateOf(listOf("3500", "2600", "2300", "2100", "1800", "900", "800", "700", "600"))
+    var siteFreqOrder3G = mutableStateOf(listOf("2100", "1900", "900"))
     var siteFreqOrder2G = mutableStateOf(listOf("1800", "900"))
 
     // --- PARTAGE PAR DÉFAUT (CARTE) ---
@@ -633,19 +653,29 @@ object AppConfig {
         f2G_1800.value = MapDisplayPrefs.f2G1800.read(prefs)
 
         f3G_900.value = MapDisplayPrefs.f3G900.read(prefs)
+        f3G_1900.value = MapDisplayPrefs.f3G1900.read(prefs)
         f3G_2100.value = MapDisplayPrefs.f3G2100.read(prefs)
 
+        f4G_600.value = MapDisplayPrefs.f4G600.read(prefs)
         f4G_700.value = MapDisplayPrefs.f4G700.read(prefs)
         f4G_800.value = MapDisplayPrefs.f4G800.read(prefs)
         f4G_900.value = MapDisplayPrefs.f4G900.read(prefs)
         f4G_1800.value = MapDisplayPrefs.f4G1800.read(prefs)
         f4G_2100.value = MapDisplayPrefs.f4G2100.read(prefs)
+        f4G_2300.value = MapDisplayPrefs.f4G2300.read(prefs)
         f4G_2600.value = MapDisplayPrefs.f4G2600.read(prefs)
+        f4G_3500.value = MapDisplayPrefs.f4G3500.read(prefs)
 
+        f5G_600.value = MapDisplayPrefs.f5G600.read(prefs)
         f5G_700.value = MapDisplayPrefs.f5G700.read(prefs)
+        f5G_850.value = MapDisplayPrefs.f5G850.read(prefs)
         f5G_1400.value = MapDisplayPrefs.f5G1400.read(prefs)
+        f5G_1900.value = MapDisplayPrefs.f5G1900.read(prefs)
+        f5G_2000.value = MapDisplayPrefs.f5G2000.read(prefs)
         f5G_2100.value = MapDisplayPrefs.f5G2100.read(prefs)
+        f5G_2600.value = MapDisplayPrefs.f5G2600.read(prefs)
         f5G_3500.value = MapDisplayPrefs.f5G3500.read(prefs)
+        f5G_3800.value = MapDisplayPrefs.f5G3800.read(prefs)
         f5G_4200.value = MapDisplayPrefs.f5G4200.read(prefs)
         f5G_26000.value = MapDisplayPrefs.f5G26000.read(prefs)
     }
@@ -1242,17 +1272,27 @@ object AppConfig {
         siteF2G_900.value = prefs.getBoolean("site_f2g_900", true)
         siteF2G_1800.value = prefs.getBoolean("site_f2g_1800", true)
         siteF3G_900.value = prefs.getBoolean("site_f3g_900", true)
+        siteF3G_1900.value = prefs.getBoolean("site_f3g_1900", true)
         siteF3G_2100.value = prefs.getBoolean("site_f3g_2100", true)
+        siteF4G_600.value = prefs.getBoolean("site_f4g_600", true)
         siteF4G_700.value = prefs.getBoolean("site_f4g_700", true)
         siteF4G_800.value = prefs.getBoolean("site_f4g_800", true)
         siteF4G_900.value = prefs.getBoolean("site_f4g_900", true)
         siteF4G_1800.value = prefs.getBoolean("site_f4g_1800", true)
         siteF4G_2100.value = prefs.getBoolean("site_f4g_2100", true)
+        siteF4G_2300.value = prefs.getBoolean("site_f4g_2300", true)
         siteF4G_2600.value = prefs.getBoolean("site_f4g_2600", true)
+        siteF4G_3500.value = prefs.getBoolean("site_f4g_3500", true)
+        siteF5G_600.value = prefs.getBoolean("site_f5g_600", true)
         siteF5G_700.value = prefs.getBoolean("site_f5g_700", true)
+        siteF5G_850.value = prefs.getBoolean("site_f5g_850", true)
         siteF5G_1400.value = prefs.getBoolean("site_f5g_1400", true)
+        siteF5G_1900.value = prefs.getBoolean("site_f5g_1900", true)
+        siteF5G_2000.value = prefs.getBoolean("site_f5g_2000", true)
         siteF5G_2100.value = prefs.getBoolean("site_f5g_2100", true)
+        siteF5G_2600.value = prefs.getBoolean("site_f5g_2600", true)
         siteF5G_3500.value = prefs.getBoolean("site_f5g_3500", true)
+        siteF5G_3800.value = prefs.getBoolean("site_f5g_3800", true)
         siteF5G_4200.value = prefs.getBoolean("site_f5g_4200", true)
         siteF5G_26000.value = prefs.getBoolean("site_f5g_26000", true)
 
@@ -1354,11 +1394,14 @@ object AppConfig {
         return normalizedKeys
     }
 
+    private const val PREF_CANADA_OPERATORS_INITIALIZED = "canada_operators_initialized_v1"
+
     fun saveSelectedOperatorKeys(prefs: SharedPreferences, keys: Set<String>) {
         val normalizedKeys = setSelectedOperatorKeys(keys)
 
         prefs.edit()
             .putStringSet(PREF_SELECTED_OPERATORS, normalizedKeys)
+            .putBoolean(PREF_CANADA_OPERATORS_INITIALIZED, true)
             .putBoolean("show_orange", showOrange.value)
             .putBoolean("show_sfr", showSfr.value)
             .putBoolean("show_bouygues", showBouygues.value)
@@ -1389,11 +1432,21 @@ object AppConfig {
     }
 
     private fun loadSelectedOperatorKeys(prefs: android.content.SharedPreferences): Set<String> {
+        val canadaKeys = OperatorColors.canada.map { it.key }.toSet()
         if (prefs.contains(PREF_SELECTED_OPERATORS)) {
-            return prefs.getStringSet(PREF_SELECTED_OPERATORS, emptySet())
+            val stored = prefs.getStringSet(PREF_SELECTED_OPERATORS, emptySet())
                 .orEmpty()
                 .mapNotNull { OperatorColors.specForKey(it)?.key }
                 .toSet()
+            if (!prefs.getBoolean(PREF_CANADA_OPERATORS_INITIALIZED, false)) {
+                val migrated = if (stored.none { it in canadaKeys }) stored + canadaKeys else stored
+                prefs.edit()
+                    .putStringSet(PREF_SELECTED_OPERATORS, migrated)
+                    .putBoolean(PREF_CANADA_OPERATORS_INITIALIZED, true)
+                    .apply()
+                return migrated
+            }
+            return stored
         }
 
         return buildSet {
@@ -1402,6 +1455,7 @@ object AppConfig {
             if (showBouygues.value) add(OperatorColors.BOUYGUES_KEY)
             if (showFree.value) add(OperatorColors.FREE_KEY)
             addAll(OperatorColors.overseas.map { it.key })
+            addAll(canadaKeys)
         }
     }
 

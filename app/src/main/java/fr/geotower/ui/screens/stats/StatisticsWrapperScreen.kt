@@ -5,10 +5,14 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -16,6 +20,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import fr.geotower.data.AnfrRepository
 import fr.geotower.ui.screens.changes.CHANGES_MAP_ROUTE
@@ -41,7 +47,8 @@ private fun splitDisplayEnabled(): Boolean {
 @Composable
 fun StatisticsWrapperScreen(
     navController: NavController,
-    repository: AnfrRepository
+    repository: AnfrRepository,
+    contentPadding: PaddingValues = PaddingValues(0.dp)
 ) {
     val splitDisplay = splitDisplayEnabled()
     var isChangesMapSplitOpen by rememberSaveable { mutableStateOf(false) }
@@ -52,6 +59,7 @@ fun StatisticsWrapperScreen(
         animationSpec = tween(durationMillis = 400, easing = FastOutSlowInEasing),
         label = "stats_split_anim"
     )
+    val layoutDirection = LocalLayoutDirection.current
 
     BackHandler(enabled = isSplitActive) {
         isChangesMapSplitOpen = false
@@ -62,6 +70,12 @@ fun StatisticsWrapperScreen(
             modifier = Modifier
                 .fillMaxWidth(leftWidthFraction)
                 .fillMaxHeight()
+                .padding(
+                    start = contentPadding.calculateStartPadding(layoutDirection),
+                    top = contentPadding.calculateTopPadding(),
+                    end = if (isSplitActive) 0.dp else contentPadding.calculateEndPadding(layoutDirection),
+                    bottom = contentPadding.calculateBottomPadding()
+                )
         ) {
             StatisticsScreen(
                 navController = navController,

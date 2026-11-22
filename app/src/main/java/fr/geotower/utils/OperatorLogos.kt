@@ -35,6 +35,20 @@ object OperatorLogos {
             OperatorColors.PMT_VODAFONE_KEY -> R.drawable.logo_pmt
             OperatorColors.VITI_KEY -> R.drawable.logo_viti
             OperatorColors.SPT_KEY -> R.drawable.logo_spt
+            OperatorColors.ROGERS_KEY -> R.drawable.logo_rogers
+            OperatorColors.BELL_KEY -> R.drawable.logo_bell
+            OperatorColors.TELUS_KEY -> R.drawable.logo_telus
+            OperatorColors.VIDEOTRON_KEY -> R.drawable.logo_videotron
+            OperatorColors.FREEDOM_MOBILE_KEY -> R.drawable.logo_freedom
+            OperatorColors.SASKTEL_KEY -> R.drawable.logo_sasktel
+            OperatorColors.XPLORE_KEY -> R.drawable.logo_xplore
+            OperatorColors.EASTLINK_KEY -> R.drawable.logo_eastlink
+            OperatorColors.TBAYTEL_KEY -> R.drawable.logo_tbaytel
+            OperatorColors.SSI_MICRO_KEY -> R.drawable.logo_ssi_micro
+            OperatorColors.ECOTEL_KEY -> R.drawable.logo_ecotel
+            OperatorColors.COGECO_KEY -> R.drawable.logo_cogeco
+            OperatorColors.SOGETEL_KEY -> R.drawable.logo_sogetel
+            OperatorColors.ICE_WIRELESS_KEY -> R.drawable.logo_ice_wireless
             else -> null
         }
     }

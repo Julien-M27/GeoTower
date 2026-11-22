@@ -58,6 +58,7 @@ fun WearApp(
         val currentLanguage by repository.language.collectAsStateWithLifecycle()
         val distanceUnit by repository.distanceUnit.collectAsStateWithLifecycle()
         val techOrder by repository.techOrder.collectAsStateWithLifecycle()
+        val apiServer by repository.apiServer.collectAsStateWithLifecycle()
         val towers by repository.towers.collectAsStateWithLifecycle()
         val selectedTowerId by repository.selectedTowerId.collectAsStateWithLifecycle()
         val operatorFilter by repository.operatorFilter.collectAsStateWithLifecycle()
@@ -88,20 +89,28 @@ fun WearApp(
         }
 
         // Chargement automatique dès que le fix GPS de la montre est obtenu ou qu'on se déplace (> 50m)
+        // Lancé dans `scope` (et non directement dans LaunchedEffect(gpsStatus)) pour qu'un nouveau
+        // tick GPS ne cancelle pas la requête réseau / Bluetooth en cours.
         LaunchedEffect(gpsStatus) {
             val status = gpsStatus
             if (status is GpsFixStatus.Fixed) {
                 val last = lastLoadedCoords
-                val shouldReload = if (last == null) {
-                    true
+                val movedMeters = if (last == null) {
+                    Float.MAX_VALUE
                 } else {
                     val distResults = FloatArray(1)
                     Location.distanceBetween(last.first, last.second, status.latitude, status.longitude, distResults)
-                    distResults[0] > 50f
+                    distResults[0]
                 }
-                if (shouldReload && !isLoading) {
+                if (movedMeters > 50f && !isLoading) {
                     lastLoadedCoords = Pair(status.latitude, status.longitude)
-                    repository.loadTowers(status.latitude, status.longitude)
+                    scope.launch {
+                        repository.loadTowers(
+                            latitude = status.latitude,
+                            longitude = status.longitude,
+                            clearExisting = movedMeters > 1000f
+                        )
+                    }
                 }
             }
         }
@@ -242,8 +251,18 @@ fun WearApp(
                             currentLanguage = currentLanguage,
                             distanceUnit = distanceUnit,
                             techOrder = techOrder,
+                            apiServer = apiServer,
                             onSourceChanged = { newSource ->
                                 repository.setDataSourceMode(newSource)
+                                val status = gpsStatus
+                                if (status is GpsFixStatus.Fixed) {
+                                    scope.launch {
+                                        repository.loadTowers(status.latitude, status.longitude)
+                                    }
+                                }
+                            },
+                            onApiServerChanged = { newServer ->
+                                repository.setApiServer(newServer)
                                 val status = gpsStatus
                                 if (status is GpsFixStatus.Fixed) {
                                     scope.launch {

@@ -51,18 +51,31 @@ fun DatabaseDownloadCard(
     title: String? = null,
     onSafeClick: SafeClick? = null,
     refreshState: DatabaseRefreshState? = null,
-    disableDownloadAction: Boolean = false
+    disableDownloadAction: Boolean = false,
+    country: fr.geotower.data.db.DatabaseCountry? = null
 ) {
     val context = LocalContext.current
     val sizing = LocalGeoTowerUiStyle.current.sizing
     val workManager = remember { androidx.work.WorkManager.getInstance(context) }
     val safeClick = onSafeClick ?: rememberSafeClick()
     val featureFlags by RemoteFeatureFlags.config
+    val activeCountryState by fr.geotower.data.db.DatabaseCountryStore.activeCountryState
+    val effectiveCountry = country ?: activeCountryState
+    val showCountrySelector = country == null
+    val expectedCountryTag = DatabaseDownloadWorker.countryTag(effectiveCountry)
     val workInfos by workManager.getWorkInfosByTagFlow(DatabaseDownloadWorker.WORK_TAG).collectAsState(initial = emptyList())
-    val currentWork = workInfos.firstOrNull { workInfo ->
+    val activeMobileWorks = workInfos.filter { workInfo ->
         workInfo.state == androidx.work.WorkInfo.State.RUNNING ||
             workInfo.state == androidx.work.WorkInfo.State.ENQUEUED ||
             workInfo.state == androidx.work.WorkInfo.State.BLOCKED
+    }
+    val currentWork = activeMobileWorks.firstOrNull { workInfo ->
+        val hasCountryTag = workInfo.tags.any { it.startsWith("database_download_country_") }
+        if (hasCountryTag) {
+            expectedCountryTag in workInfo.tags
+        } else {
+            effectiveCountry == activeCountryState
+        }
     }
 
     val isSyncing = currentWork != null
@@ -114,16 +127,22 @@ fun DatabaseDownloadCard(
     DatabaseRefreshMembership(refreshState, DatabaseRefreshIds.MOBILE)
 
     // ✅ ON AJOUTE dbRefreshTrigger AUX CLÉS DE L'EFFET
-    LaunchedEffect(isSyncing, dbRefreshTrigger, sectionRefreshKey, txtSearching, txtUnknown, txtNoDb, txtInvalidDb, txtOldDb, featureFlags) {
+    LaunchedEffect(isSyncing, dbRefreshTrigger, sectionRefreshKey, effectiveCountry, txtSearching, txtUnknown, txtNoDb, txtInvalidDb, txtOldDb, featureFlags) {
         withContext(Dispatchers.IO) {
             fun formatVersion(raw: String?): String {
-                if (raw != null && raw.length == 13) {
+                if (raw != null && raw.length == 13 && raw[8] == '_') {
                     val year = raw.substring(0, 4)
                     val month = raw.substring(4, 6)
                     val day = raw.substring(6, 8)
                     val hour = raw.substring(9, 11)
                     val minute = raw.substring(11, 13)
                     return "$day/$month/$year - $hour:$minute"
+                }
+                if (raw != null && raw.length == 10 && raw[4] == '.' && raw[7] == '.') {
+                    val year = raw.substring(0, 4)
+                    val month = raw.substring(5, 7)
+                    val day = raw.substring(8, 10)
+                    return "$day/$month/$year"
                 }
                 return raw ?: txtUnknown
             }
@@ -135,7 +154,7 @@ fun DatabaseDownloadCard(
             var shouldValidateLocalDb = false
 
             withContext(Dispatchers.IO) {
-                val dbPath = context.getDatabasePath(GeoTowerDatabaseValidator.DB_NAME)
+                val dbPath = context.getDatabasePath(effectiveCountry.dbFileName)
                 try {
                     if (dbPath.exists()) {
                         shouldValidateLocalDb = true
@@ -206,16 +225,19 @@ fun DatabaseDownloadCard(
             localAnfrDate = nextLocalAnfrDate
             localDbVersion = nextLocalVersion
             localDbVersionRaw = nextLocalRawVersion
-            AppConfig.localDatabaseState.value = nextLocalState
+            if (effectiveCountry == fr.geotower.data.db.DatabaseCountryStore.getActive()) {
+                AppConfig.localDatabaseState.value = nextLocalState
+            }
             // Provenance déterminée en même temps que la version locale (lecture disque, AVANT le réseau) :
             // la ligne « actuellement téléchargée » ne s'affiche qu'après cette vérification, sinon une base
             // générée y clignote quelques secondes le temps des appels réseau qui suivent.
             val mobileProvenance = LocalDbProvenance.readMobile(context)
-            isLocallyGenerated = mobileProvenance.locallyBuilt
-            canRebuildLocally = LocalDbRebuildOffer.forMobile(context, mobileProvenance)
+            isLocallyGenerated = effectiveCountry == fr.geotower.data.db.DatabaseCountry.FR && mobileProvenance.locallyBuilt
+            canRebuildLocally = effectiveCountry == fr.geotower.data.db.DatabaseCountry.FR &&
+                LocalDbRebuildOffer.forMobile(context, mobileProvenance)
 
             remoteDbVersion = try {
-                val remote = fr.geotower.data.api.DatabaseDownloader.getLatestDatabaseUpdateInfo()
+                val remote = fr.geotower.data.api.DatabaseDownloader.getLatestDatabaseUpdateInfo(country = effectiveCountry)
                 remoteDbUpdateInfo = remote
                 remoteDbVersionRaw = remote?.version
                 if (remote?.version != null) formatVersion(remote.version) else txtUnknown
@@ -227,9 +249,23 @@ fun DatabaseDownloadCard(
 
             if (shouldValidateLocalDb) {
                 val validatedState = withContext(Dispatchers.IO) {
-                    GeoTowerDatabaseValidator.getInstalledDatabaseStatus(context).state
+                    val file = context.getDatabasePath(effectiveCountry.dbFileName)
+                    if (!file.exists()) {
+                        GeoTowerDatabaseValidator.LocalDatabaseState.MISSING
+                    } else if (GeoTowerDatabaseValidator.validateDatabaseFile(
+                            file,
+                            checkIntegrity = false,
+                            expectedCountryCode = effectiveCountry.code
+                        ).isValid
+                    ) {
+                        GeoTowerDatabaseValidator.LocalDatabaseState.VALID
+                    } else {
+                        GeoTowerDatabaseValidator.LocalDatabaseState.INVALID
+                    }
                 }
-                AppConfig.localDatabaseState.value = validatedState
+                if (effectiveCountry == fr.geotower.data.db.DatabaseCountryStore.getActive()) {
+                    AppConfig.localDatabaseState.value = validatedState
+                }
                 if (validatedState == GeoTowerDatabaseValidator.LocalDatabaseState.INVALID && nextLocalVersion == txtOldDb) {
                     localDbVersionRaw = null
                     localAnfrDate = ""
@@ -241,7 +277,7 @@ fun DatabaseDownloadCard(
             }
 
             dbSizeMb = try {
-                fr.geotower.data.api.DatabaseDownloader.getDatabaseSize()
+                fr.geotower.data.api.DatabaseDownloader.getDatabaseSize(effectiveCountry)
             } catch (e: Exception) {
                 -1.0
             }
@@ -255,13 +291,13 @@ fun DatabaseDownloadCard(
     // comptage balaye un index de plusieurs millions d'entrées ; le mettre dans l'effet principal
     // retarderait d'autant l'affichage des versions et de la taille du fichier. Ensuite c'est une
     // simple lecture de prefs (cache par version, cf. MobileDbRowCounts).
-    LaunchedEffect(localDbVersionRaw, dbRefreshTrigger, sectionRefreshKey) {
+    LaunchedEffect(localDbVersionRaw, dbRefreshTrigger, sectionRefreshKey, effectiveCountry) {
         val versionRaw = localDbVersionRaw
         localAntennaCount = if (versionRaw == null) {
             null
         } else {
             withContext(Dispatchers.IO) {
-                fr.geotower.data.db.MobileDbRowCounts.antennaCount(context, versionRaw)
+                fr.geotower.data.db.MobileDbRowCounts.antennaCount(context, versionRaw, effectiveCountry)
             }
         }
     }
@@ -299,6 +335,40 @@ fun DatabaseDownloadCard(
                         style = sizing.textStyle(MaterialTheme.typography.titleMedium),
                         textAlign = TextAlign.Start
                     )
+                }
+            }
+
+            if (showCountrySelector) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = sizing.spacing(12.dp)),
+                    horizontalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))
+                ) {
+                    fr.geotower.data.db.DatabaseCountry.entries.forEach { countryOption ->
+                        val selected = effectiveCountry == countryOption
+                        val chipLabel = when (countryOption) {
+                            fr.geotower.data.db.DatabaseCountry.FR -> stringResource(R.string.country_db_chip_fr)
+                            fr.geotower.data.db.DatabaseCountry.CA -> stringResource(R.string.country_db_chip_ca)
+                        }
+                        FilterChip(
+                            selected = selected,
+                            onClick = {
+                                if (!isSyncing && !isGeneratingMobile && !selected) {
+                                    fr.geotower.data.db.DatabaseCountryStore.setActive(context, countryOption)
+                                    dbRefreshTrigger++
+                                }
+                            },
+                            enabled = !isSyncing && !isGeneratingMobile,
+                            label = {
+                                Text(
+                                    text = chipLabel,
+                                    maxLines = 1
+                                )
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                 }
             }
 
@@ -549,7 +619,7 @@ fun DatabaseDownloadCard(
                             if (RemoteFeatureFlags.isDatabaseDownloadAllowed(RemoteFeatureFlags.DatabaseTarget.MOBILE, remoteDbUpdateInfo?.version)) {
                                 OperationPauseStore.clear(context, OperationPauseStore.MOBILE_DB_DOWNLOAD)
                                 pauseStateVersion++
-                                DatabaseDownloadWorker.enqueue(workManager)
+                                DatabaseDownloadWorker.enqueue(workManager, effectiveCountry)
                             }
                         }
                     },
@@ -589,8 +659,12 @@ fun DatabaseDownloadCard(
                 }
             }
 
-            // ✅ AFFICHAGE CONDITIONNEL DE LA DATE DE L'ANFR (affichée seulement pour une base bien téléchargée)
-            if (isLocallyGenerated == false && localAnfrDate.isNotEmpty() && localAnfrDate != txtUnknown) {
+            // ✅ AFFICHAGE CONDITIONNEL DE LA DATE DE L'ANFR (uniquement FR, base bien téléchargée)
+            if (effectiveCountry == fr.geotower.data.db.DatabaseCountry.FR &&
+                isLocallyGenerated == false &&
+                localAnfrDate.isNotEmpty() &&
+                localAnfrDate != txtUnknown
+            ) {
                 Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
                 Text(
                     text = stringResource(R.string.database_weekly_downloaded_from, localAnfrDate),
@@ -647,9 +721,13 @@ fun DatabaseDownloadCard(
                     fr.geotower.data.db.AppDatabase.closeDatabase()
 
                     // 2. Supprimer la base et ses fichiers temporaires
-                    context.deleteDatabase(GeoTowerDatabaseValidator.DB_NAME)
-                    InstalledDatabaseArtifactIdentity.clearMobile(context)
-                    AppConfig.localDatabaseState.value = GeoTowerDatabaseValidator.LocalDatabaseState.MISSING
+                    context.deleteDatabase(effectiveCountry.dbFileName)
+                    if (effectiveCountry == fr.geotower.data.db.DatabaseCountry.FR) {
+                        InstalledDatabaseArtifactIdentity.clearMobile(context)
+                    }
+                    if (effectiveCountry == fr.geotower.data.db.DatabaseCountryStore.getActive()) {
+                        AppConfig.localDatabaseState.value = GeoTowerDatabaseValidator.LocalDatabaseState.MISSING
+                    }
 
                     // 3. Déclencher le rafraîchissement visuel instantanément
                     dbRefreshTrigger++

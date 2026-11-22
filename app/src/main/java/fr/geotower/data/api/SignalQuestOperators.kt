@@ -13,7 +13,21 @@ object SignalQuestOperators {
         OperatorColors.FREE_CARAIBE_KEY to "FREE",
         OperatorColors.TELCO_OI_KEY to "FREE",
         OperatorColors.SRR_KEY to "SFR",
-        OperatorColors.OUTREMER_TELECOM_KEY to "SFR"
+        OperatorColors.OUTREMER_TELECOM_KEY to "SFR",
+        OperatorColors.ROGERS_KEY to "ROGERS",
+        OperatorColors.BELL_KEY to "BELL",
+        OperatorColors.TELUS_KEY to "TELUS",
+        OperatorColors.VIDEOTRON_KEY to "VIDEOTRON",
+        OperatorColors.FREEDOM_MOBILE_KEY to "FREEDOM",
+        OperatorColors.SASKTEL_KEY to "SASKTEL",
+        OperatorColors.XPLORE_KEY to "XPLORE",
+        OperatorColors.EASTLINK_KEY to "EASTLINK",
+        OperatorColors.TBAYTEL_KEY to "TBAYTEL",
+        OperatorColors.SSI_MICRO_KEY to "SSIMICRO",
+        OperatorColors.ECOTEL_KEY to "ECOTEL",
+        OperatorColors.COGECO_KEY to "COGECO",
+        OperatorColors.SOGETEL_KEY to "SOGETEL",
+        OperatorColors.ICE_WIRELESS_KEY to "ICEWIRELESS"
     )
 
     private val speedtestPlmnByKey = mapOf(

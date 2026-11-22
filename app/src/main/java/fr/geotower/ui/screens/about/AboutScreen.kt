@@ -1102,6 +1102,9 @@ fun SectionVersions(
     val sizing = LocalGeoTowerUiStyle.current.sizing
     var appVersion by remember { mutableStateOf("-") }
     var dbVersion by remember { mutableStateOf("-") }
+    var caDbVersion by remember { mutableStateOf("-") }
+    var caIsdeDate by remember { mutableStateOf("-") }
+    var caZipVersion by remember { mutableStateOf("-") }
     var radioDbVersion by remember { mutableStateOf("-") }
     var enbDbVersion by remember { mutableStateOf("-") }
     var anfrDate by remember { mutableStateOf("-") }
@@ -1120,6 +1123,9 @@ fun SectionVersions(
     var liveDbInUse by remember { mutableStateOf(false) }
     var liveDbDataset by remember { mutableStateOf<LiveDatabaseDataset?>(null) }
     var liveDbUnreachable by remember { mutableStateOf(false) }
+    var caLiveDbInUse by remember { mutableStateOf(false) }
+    var caLiveDbDataset by remember { mutableStateOf<LiveDatabaseDataset?>(null) }
+    var caLiveDbUnreachable by remember { mutableStateOf(false) }
     var primaryApiVersions by remember { mutableStateOf(ApiServerDbVersionInfo(ApiServer.PRIMARY, isLoading = true)) }
     var mirrorApiVersions by remember { mutableStateOf(ApiServerDbVersionInfo(ApiServer.MIRROR, isLoading = true)) }
     val activeApiServer by ApiEndpoints.activeServer
@@ -1148,11 +1154,15 @@ fun SectionVersions(
                 appVersion = pInfo.versionName ?: "-"
             } catch (e: Exception) {}
 
-            // 2. Base de données locale (Extraction Directe)
+            // 2. Base de données locale France (Extraction Directe)
             try {
-                val dbPath = context.getDatabasePath(fr.geotower.data.db.GeoTowerDatabaseValidator.DB_NAME)
-                val localStatus = fr.geotower.data.db.GeoTowerDatabaseValidator.getInstalledDatabaseFileStatus(context)
-                if (localStatus.state == fr.geotower.data.db.GeoTowerDatabaseValidator.LocalDatabaseState.VALID) {
+                val dbPath = context.getDatabasePath(fr.geotower.data.db.DatabaseCountry.FR.dbFileName)
+                val frValidation = if (dbPath.exists()) {
+                    fr.geotower.data.db.GeoTowerDatabaseValidator.validateDatabaseFile(dbPath, checkIntegrity = false, expectedCountryCode = "FR")
+                } else {
+                    null
+                }
+                if (frValidation?.isValid == true) {
                     val db = android.database.sqlite.SQLiteDatabase.openDatabase(dbPath.absolutePath, null, android.database.sqlite.SQLiteDatabase.OPEN_READONLY)
 
                     // 🚨 Requêtes en "cascade" pour ne pas planter avec l'ancienne BDD
@@ -1186,7 +1196,7 @@ fun SectionVersions(
                     cursor.close()
                     db.close()
                 } else {
-                    dbVersion = if (localStatus.state == fr.geotower.data.db.GeoTowerDatabaseValidator.LocalDatabaseState.INVALID) {
+                    dbVersion = if (dbPath.exists()) {
                         txtInvalidLocalDatabase
                     } else {
                         txtNotInstalled
@@ -1198,6 +1208,46 @@ fun SectionVersions(
             } catch (e: Exception) {
                 quarterlyVersion = "-"
                 AppLogger.w(TAG_ABOUT, "Database version info could not be read", e)
+            }
+
+            // 2b. Base de données locale Canada (ISDE)
+            try {
+                val caDbPath = context.getDatabasePath(fr.geotower.data.db.DatabaseCountry.CA.dbFileName)
+                val caValidation = if (caDbPath.exists()) {
+                    fr.geotower.data.db.GeoTowerDatabaseValidator.validateDatabaseFile(caDbPath, checkIntegrity = false, expectedCountryCode = "CA")
+                } else {
+                    null
+                }
+                if (caValidation?.isValid == true) {
+                    SQLiteDatabase.openDatabase(caDbPath.absolutePath, null, SQLiteDatabase.OPEN_READONLY).use { caDb ->
+                        caDb.rawQuery("SELECT version, date_maj_anfr, zip_version FROM metadata LIMIT 1", null).use { cursor ->
+                            if (cursor.moveToFirst()) {
+                                caDbVersion = formatAboutDatabaseVersion(cursor.getString(0), txtVersionTimeAt)
+                                if (cursor.columnCount > 1 && !cursor.isNull(1)) {
+                                    caIsdeDate = formatAnfrWeeklyDate(cursor.getString(1))
+                                }
+                                caZipVersion = if (cursor.columnCount > 2 && !cursor.isNull(2)) {
+                                    cursor.getString(2)?.takeIf { it.isNotBlank() } ?: "Site_Data_Extract_FX.zip"
+                                } else {
+                                    "Site_Data_Extract_FX.zip"
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    caDbVersion = if (caDbPath.exists()) {
+                        txtInvalidLocalDatabase
+                    } else {
+                        txtNotInstalled
+                    }
+                    caIsdeDate = "-"
+                    caZipVersion = "-"
+                }
+            } catch (e: Exception) {
+                caDbVersion = "-"
+                caIsdeDate = "-"
+                caZipVersion = "-"
+                AppLogger.w(TAG_ABOUT, "CA database version info could not be read", e)
             }
 
             // 3. Données des sites HS (depuis les préférences)
@@ -1236,12 +1286,30 @@ fun SectionVersions(
 
             // 5. Base EN LIGNE : on récupère toujours ses métadonnées afin de les afficher, même
             // si une base locale valide est actuellement utilisée par la carte et la recherche.
-            liveDbInUse = LiveDatabaseStatus.isInUse(context)
+            liveDbInUse = fr.geotower.data.db.GeoTowerDatabaseValidator
+                .getInstalledDatabaseFileStatus(context)
+                .state != fr.geotower.data.db.GeoTowerDatabaseValidator.LocalDatabaseState.VALID
             // Une clé non nulle ne peut venir que du bouton : c'est là, et seulement là, qu'il faut
             // passer outre le cache de dix minutes.
-            val dataset = LiveDatabaseStatus.dataset(forceRefresh = versionsRefreshKey > 0)
+            val dataset = LiveDatabaseStatus.datasetForServer(
+                activeApiServer,
+                forceRefresh = versionsRefreshKey > 0,
+                country = fr.geotower.data.db.DatabaseCountry.FR
+            )
             liveDbDataset = dataset
             liveDbUnreachable = dataset == null
+
+            val caDbPathForLive = context.getDatabasePath(fr.geotower.data.db.DatabaseCountry.CA.dbFileName)
+            caLiveDbInUse = !caDbPathForLive.exists() || !fr.geotower.data.db.GeoTowerDatabaseValidator
+                .validateDatabaseFile(caDbPathForLive, checkIntegrity = false, expectedCountryCode = "CA")
+                .isValid
+            val caDataset = LiveDatabaseStatus.datasetForServer(
+                activeApiServer,
+                forceRefresh = versionsRefreshKey > 0,
+                country = fr.geotower.data.db.DatabaseCountry.CA
+            )
+            caLiveDbDataset = caDataset
+            caLiveDbUnreachable = caDataset == null
 
             // 6. Dates des fichiers sources eNB (Orange, SFR, Bouygues Telecom, Free Mobile)
             try {
@@ -1362,16 +1430,25 @@ fun SectionVersions(
             val radioDbVersionShown =
                 if (localBuild.radioRunning && radioDbVersion == txtNotInstalled) txtGenerating else radioDbVersion
 
-            val versionRows = listOf(
-                stringResource(R.string.appstrings_version_app_label) to appVersion,
-                stringResource(R.string.appstrings_version_db_label) to dbVersionShown,
-                stringResource(R.string.appstrings_version_radio_db_label) to radioDbVersionShown,
-                stringResource(R.string.appstrings_version_enb_db_label) to enbDbVersion,
-                stringResource(R.string.appstrings_version_weekly_label) to LocalizedDateLabels.formatWeeklyVersionWithWeekNumber(context, anfrDate),
-                stringResource(R.string.appstrings_version_monthly_label) to LocalizedDateLabels.formatMonthlyVersion(context, rawMonthlyVersion),
-                stringResource(R.string.appstrings_version_quarterly_label) to LocalizedDateLabels.formatQuarterlyVersion(context, quarterlyVersion),
-                hsLabel to hsValue
-            )
+            val versionRows = buildList {
+                add(stringResource(R.string.appstrings_version_app_label) to appVersion)
+                add("${stringResource(R.string.appstrings_version_db_label)} (France)" to dbVersionShown)
+                add("${stringResource(R.string.appstrings_version_db_label)} (Canada)" to caDbVersion)
+                add("${stringResource(R.string.appstrings_version_radio_db_label)} (France)" to radioDbVersionShown)
+                add("${stringResource(R.string.appstrings_version_enb_db_label)} (France)" to enbDbVersion)
+                add("${stringResource(R.string.appstrings_version_weekly_label).replace("\n", " ")} (France)" to LocalizedDateLabels.formatWeeklyVersionWithWeekNumber(context, anfrDate))
+                add("${stringResource(R.string.appstrings_version_monthly_label).replace("\n", " ")} (France)" to LocalizedDateLabels.formatMonthlyVersion(context, rawMonthlyVersion))
+                val caSourceFormatted = if (caZipVersion != "-" && caZipVersion.isNotBlank()) {
+                    caZipVersion
+                } else if (caIsdeDate != "-" && caIsdeDate.isNotBlank()) {
+                    LocalizedDateLabels.formatVersionDate(context, caIsdeDate, AppConfig.appLanguage.value)
+                } else {
+                    "-"
+                }
+                add("Données mensuelles (Canada)" to caSourceFormatted)
+                add("${stringResource(R.string.appstrings_version_quarterly_label).replace("\n", " ")} (France)" to LocalizedDateLabels.formatQuarterlyVersion(context, quarterlyVersion))
+                add("$hsLabel (France)" to hsValue)
+            }
 
             versionRows.forEachIndexed { index, row ->
                 VersionLine(row.first, row.second)
@@ -1404,7 +1481,20 @@ fun SectionVersions(
         dataset = liveDbDataset,
         isInUse = liveDbInUse,
         unreachable = liveDbUnreachable,
-        timeAtLabel = txtVersionTimeAt
+        timeAtLabel = txtVersionTimeAt,
+        countrySuffix = "France"
+    )
+
+    Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+    LiveDatabaseVersionsCard(
+        cardShape = cardShape,
+        cardColor = cardColor,
+        dataset = caLiveDbDataset,
+        isInUse = caLiveDbInUse,
+        unreachable = caLiveDbUnreachable,
+        timeAtLabel = txtVersionTimeAt,
+        countrySuffix = "Canada",
+        isCanada = true
     )
 
     Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
@@ -1466,7 +1556,9 @@ private fun LiveDatabaseVersionsCard(
     dataset: LiveDatabaseDataset?,
     isInUse: Boolean,
     unreachable: Boolean,
-    timeAtLabel: String
+    timeAtLabel: String,
+    countrySuffix: String = "France",
+    isCanada: Boolean = false
 ) {
     val context = LocalContext.current
     val sizing = LocalGeoTowerUiStyle.current.sizing
@@ -1488,7 +1580,7 @@ private fun LiveDatabaseVersionsCard(
                 Spacer(modifier = Modifier.width(sizing.spacing(12.dp)))
                 Column {
                     Text(
-                        stringResource(R.string.appstrings_version_live_db_title),
+                        "${stringResource(R.string.appstrings_version_live_db_title)} ($countrySuffix)",
                         style = sizing.textStyle(MaterialTheme.typography.titleMedium),
                         fontWeight = FontWeight.Bold
                     )
@@ -1531,15 +1623,17 @@ private fun LiveDatabaseVersionsCard(
                         stringResource(R.string.appstrings_version_live_db_label) to
                             formatAboutDatabaseVersion(dataset.offlineDbVersion, timeAtLabel)
                     )
+                    if (!isCanada) {
+                        add(
+                            stringResource(R.string.appstrings_version_weekly_label) to
+                                LocalizedDateLabels.formatWeeklyVersionWithWeekNumber(
+                                    context,
+                                    formatAnfrWeeklyDate(dataset.dateMajAnfr)
+                                )
+                        )
+                    }
                     add(
-                        stringResource(R.string.appstrings_version_weekly_label) to
-                            LocalizedDateLabels.formatWeeklyVersionWithWeekNumber(
-                                context,
-                                formatAnfrWeeklyDate(dataset.dateMajAnfr)
-                            )
-                    )
-                    add(
-                        stringResource(R.string.appstrings_version_monthly_label) to
+                        (if (isCanada) "Données mensuelles (Canada)" else stringResource(R.string.appstrings_version_monthly_label)) to
                             LocalizedDateLabels.formatMonthlyVersion(
                                 context,
                                 dataset.zipVersion?.takeIf { it.isNotBlank() } ?: "-"
@@ -1628,7 +1722,7 @@ private fun EnbDatabaseVersionsCard(
                 Spacer(modifier = Modifier.width(sizing.spacing(12.dp)))
                 Column {
                     Text(
-                        stringResource(R.string.appstrings_version_enb_card_title),
+                        "${stringResource(R.string.appstrings_version_enb_card_title)} (France)",
                         style = sizing.textStyle(MaterialTheme.typography.titleMedium),
                         fontWeight = FontWeight.Bold
                     )

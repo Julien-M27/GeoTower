@@ -6,6 +6,7 @@ import fr.geotower.wear.data.model.DataSourceMode
 import fr.geotower.wear.data.model.DistanceUnit
 import fr.geotower.wear.data.model.GpsRefreshInterval
 import fr.geotower.wear.data.model.TechOrder
+import fr.geotower.wear.data.model.WearApiServer
 import fr.geotower.wear.data.model.WearLanguage
 import fr.geotower.wear.data.model.WearMapTheme
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,6 +34,9 @@ class WearPreferences(context: Context) {
 
     private val _techOrder = MutableStateFlow(loadTechOrder())
     val techOrder: StateFlow<TechOrder> = _techOrder.asStateFlow()
+
+    private val _apiServer = MutableStateFlow(loadApiServer())
+    val apiServer: StateFlow<WearApiServer> = _apiServer.asStateFlow()
 
     private fun loadDataSourceMode(): DataSourceMode {
         val name = prefs.getString(KEY_DATA_SOURCE_MODE, DataSourceMode.AUTO.name)
@@ -118,6 +122,20 @@ class WearPreferences(context: Context) {
         _techOrder.value = order
     }
 
+    private fun loadApiServer(): WearApiServer {
+        val name = prefs.getString(KEY_API_SERVER, WearApiServer.AUTO.name)
+        return try {
+            WearApiServer.valueOf(name ?: WearApiServer.AUTO.name)
+        } catch (e: Exception) {
+            WearApiServer.AUTO
+        }
+    }
+
+    fun setApiServer(server: WearApiServer) {
+        prefs.edit().putString(KEY_API_SERVER, server.name).apply()
+        _apiServer.value = server
+    }
+
     companion object {
         private const val KEY_DATA_SOURCE_MODE = "pref_data_source_mode"
         private const val KEY_GPS_REFRESH_INTERVAL = "pref_gps_refresh_interval"
@@ -125,5 +143,6 @@ class WearPreferences(context: Context) {
         private const val KEY_LANGUAGE = "pref_language"
         private const val KEY_DISTANCE_UNIT = "pref_distance_unit"
         private const val KEY_TECH_ORDER = "pref_tech_order"
+        private const val KEY_API_SERVER = "pref_api_server"
     }
 }

@@ -31,11 +31,39 @@ val ColorOnati = Color(0xFF00A3E0)
 val ColorPmtVodafone = Color(0xFFE60000)
 val ColorViti = Color(0xFF005B2F)
 val ColorSpt = Color(0xFF00806A)
+val ColorRogers = Color(0xFFDA291C)
+val ColorBell = Color(0xFF00549A)
+val ColorTelus = Color(0xFF4B286D)
+val ColorVideotron = Color(0xFFFFD200)
+val ColorFreedom = Color(0xFFFF6900)
+val ColorSasktel = Color(0xFF00A4E4)
+val ColorXplore = Color(0xFF0072CE)
+val ColorEastlink = Color(0xFFE31837)
+val ColorTbaytel = Color(0xFF005DAA)
+val ColorSsiMicro = Color(0xFF2E8B57)
+val ColorEcotel = Color(0xFF008B8B)
+val ColorCogeco = Color(0xFF0066B3)
+val ColorSogetel = Color(0xFF1B5E20)
+val ColorIceWireless = Color(0xFF00B0F0)
 val ColorUnknown = Color(0xFF8E8E93)
 
 fun getOperatorColor(operatorName: String): Color {
     val upper = operatorName.uppercase()
     return when {
+        upper.contains("ROGERS") -> ColorRogers
+        upper.contains("BELL") -> ColorBell
+        upper.contains("TELUS") -> ColorTelus
+        upper.contains("VIDEOTRON") || upper.contains("VIDÉOTRON") -> ColorVideotron
+        upper.contains("FREEDOM") -> ColorFreedom
+        upper.contains("SASKTEL") -> ColorSasktel
+        upper.contains("XPLORE") -> ColorXplore
+        upper.contains("EASTLINK") -> ColorEastlink
+        upper.contains("TBAYTEL") -> ColorTbaytel
+        upper.contains("SSI") -> ColorSsiMicro
+        upper.contains("ECOTEL") -> ColorEcotel
+        upper.contains("COGECO") -> ColorCogeco
+        upper.contains("SOGETEL") -> ColorSogetel
+        upper.contains("ICE") -> ColorIceWireless
         upper.contains("FREE CARAIB") || upper.contains("FREE CARAÏB") -> ColorFreeCaraibe
         upper.contains("ORANGE") -> ColorOrange
         upper.contains("BOUYGUES") || upper.contains("BYTEL") -> ColorBouygues
@@ -86,6 +114,20 @@ fun getOperatorShortName(operatorName: String): String {
         upper.contains("VODAFONE") || upper.contains("PMT") -> "VODAFONE"
         upper.contains("VITI") || upper.contains("ORA") -> "ORA"
         upper.contains("SPT") -> "SPT"
+        upper.contains("ROGERS") -> "ROGERS"
+        upper.contains("BELL") -> "BELL"
+        upper.contains("TELUS") -> "TELUS"
+        upper.contains("VIDEOTRON") || upper.contains("VIDÉOTRON") -> "VIDÉOTRON"
+        upper.contains("FREEDOM") -> "FREEDOM"
+        upper.contains("SASKTEL") -> "SASKTEL"
+        upper.contains("XPLORE") -> "XPLORE"
+        upper.contains("EASTLINK") -> "EASTLINK"
+        upper.contains("TBAYTEL") -> "TBAYTEL"
+        upper.contains("SSI") -> "SSI MICRO"
+        upper.contains("ECOTEL") -> "ECOTEL"
+        upper.contains("COGECO") -> "COGECO"
+        upper.contains("SOGETEL") -> "SOGETEL"
+        upper.contains("ICE") -> "ICE"
         else -> operatorName.trim().take(8).uppercase()
     }
 }

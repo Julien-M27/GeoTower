@@ -83,6 +83,7 @@ import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.LocationCity
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Straighten
+import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material.icons.filled.Timeline
 import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material.icons.filled.Tune
@@ -1198,8 +1199,11 @@ private suspend fun buildMapSearchSuggestions(
 
     val exactOperators = matchOperatorSuggestions(query, exactOnly = true)
         .map(MapSearchSuggestion::Operator)
-    val adminAreas = FrenchAdminAreas.suggest(query, limit = 2)
-        .map(MapSearchSuggestion::AdminArea)
+    val adminAreas = if (fr.geotower.data.db.DatabaseCountryStore.activeCountryState.value == fr.geotower.data.db.DatabaseCountry.FR) {
+        FrenchAdminAreas.suggest(query, limit = 2).map(MapSearchSuggestion::AdminArea)
+    } else {
+        emptyList()
+    }
 
     // Même garde que la recherche d'identifiant à la validation : sans chiffre, aucune station ne
     // peut correspondre, et on s'épargne un balayage de la table.
@@ -1482,6 +1486,7 @@ private fun buildActiveMapFilterSummary(
             "3G",
             listOf(
                 Triple("900 MHz", frequencyFilter.f3G900, reference.frequency.f3G900),
+                Triple("1900 MHz", frequencyFilter.f3G1900, reference.frequency.f3G1900),
                 Triple("2100 MHz", frequencyFilter.f3G2100, reference.frequency.f3G2100)
             )
         )
@@ -1489,22 +1494,31 @@ private fun buildActiveMapFilterSummary(
             frequencyFilter.show4G,
             "4G",
             listOf(
+                Triple("600 MHz", frequencyFilter.f4G600, reference.frequency.f4G600),
                 Triple("700 MHz", frequencyFilter.f4G700, reference.frequency.f4G700),
                 Triple("800 MHz", frequencyFilter.f4G800, reference.frequency.f4G800),
                 Triple("900 MHz", frequencyFilter.f4G900, reference.frequency.f4G900),
                 Triple("1800 MHz", frequencyFilter.f4G1800, reference.frequency.f4G1800),
                 Triple("2100 MHz", frequencyFilter.f4G2100, reference.frequency.f4G2100),
-                Triple("2600 MHz", frequencyFilter.f4G2600, reference.frequency.f4G2600)
+                Triple("2300 MHz", frequencyFilter.f4G2300, reference.frequency.f4G2300),
+                Triple("2600 MHz", frequencyFilter.f4G2600, reference.frequency.f4G2600),
+                Triple("3500 MHz", frequencyFilter.f4G3500, reference.frequency.f4G3500)
             )
         )
         addBands(
             frequencyFilter.show5G,
             "5G",
             listOf(
+                Triple("600 MHz", frequencyFilter.f5G600, reference.frequency.f5G600),
                 Triple("700 MHz", frequencyFilter.f5G700, reference.frequency.f5G700),
+                Triple("850 MHz", frequencyFilter.f5G850, reference.frequency.f5G850),
                 Triple("1400 MHz", frequencyFilter.f5G1400, reference.frequency.f5G1400),
+                Triple("1900 MHz", frequencyFilter.f5G1900, reference.frequency.f5G1900),
+                Triple("2000 MHz", frequencyFilter.f5G2000, reference.frequency.f5G2000),
                 Triple("2100 MHz", frequencyFilter.f5G2100, reference.frequency.f5G2100),
+                Triple("2600 MHz", frequencyFilter.f5G2600, reference.frequency.f5G2600),
                 Triple("3500 MHz", frequencyFilter.f5G3500, reference.frequency.f5G3500),
+                Triple("3800 MHz", frequencyFilter.f5G3800, reference.frequency.f5G3800),
                 Triple("4200 MHz", frequencyFilter.f5G4200, reference.frequency.f5G4200),
                 Triple("26 GHz", frequencyFilter.f5G26000, reference.frequency.f5G26000)
             )
@@ -1542,7 +1556,8 @@ private fun buildActiveMapFilterSummary(
     if (showSignalQuestCoveragePoints &&
         (!reference.showSignalQuestCoveragePoints ||
             selectedSignalQuestCoverageOperatorKeys != reference.signalQuestCoverageOperatorKeys)) {
-        val coverageOperators = OperatorColors.metro.filter { it.key in AppConfig.signalQuestCoverageOperatorKeys }
+        val coverageOperators = (OperatorColors.metro + OperatorColors.canada)
+            .filter { it.key in AppConfig.signalQuestCoverageOperatorKeys }
         val selectedCoverageOperators = coverageOperators
             .filter { it.key in selectedSignalQuestCoverageOperatorKeys }
             .map { it.label }
@@ -1604,6 +1619,7 @@ fun MapScreen(
     // Cible de centrage / mise en valeur visuelle animée demandée à l'ouverture (ex: clic "Ouvrir la carte" depuis fiche)
     focusLat: Double? = null,
     focusLon: Double? = null,
+    compareSlot: String? = null,
     // Mode simplifié : fourni par l'hôte qui porte le tiroir. Non nul ⇒ le bouton en haut à
     // gauche ouvre le menu au lieu de revenir en arrière (la carte est la racine du backstack).
     onOpenSimpleModeMenu: (() -> Unit)? = null,
@@ -1777,6 +1793,7 @@ fun MapScreen(
         pendingSharedPhotoDraftId?.let { SignalQuestUploadDraftStore.peek(it).size } ?: 0
     }
     val isSharedPhotoSelectionMode = pendingSharedPhotoDraftId != null && pendingSharedPhotoCount > 0
+    val isComparatorSelectionMode = !compareSlot.isNullOrBlank()
 
     fun isMapProviderEnabled(providerId: Int): Boolean {
         return when (providerId) {
@@ -2451,8 +2468,9 @@ fun MapScreen(
             ?.let { OperatorColors.specForKey(it)?.label }
             ?: link.operatorLabel?.takeIf { it.isNotBlank() && !it.startsWith("adm_") && !it.startsWith("op_") }
             ?: "Opérateur inconnu"
+        val currentLocale = androidx.compose.ui.platform.LocalConfiguration.current.locales[0] ?: java.util.Locale.ROOT
         val distText = if (link.distanceM >= 1000) {
-            String.format(java.util.Locale.getDefault(), "%.2f km", link.distanceM / 1000.0)
+            String.format(currentLocale, "%.2f km", link.distanceM / 1000.0)
         } else {
             "${link.distanceM} m"
         }
@@ -2926,7 +2944,9 @@ fun MapScreen(
     }
     // Le slider temporel n'a de sens qu'avec la base ANFR locale (dates par site).
     // L'API live (fallback sans base) ne fournit pas les dates -> on masque le bouton.
-    val timeSliderAvailable = AppConfig.localDatabaseState.value ==
+    val timeSliderAvailable = fr.geotower.data.db.DatabaseCountryStore.activeCountryState.value ==
+        fr.geotower.data.db.DatabaseCountry.FR &&
+        AppConfig.localDatabaseState.value ==
         fr.geotower.data.db.GeoTowerDatabaseValidator.LocalDatabaseState.VALID
     val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = ROOT_FALLBACK_ROUTE)
     var operatorSearchPreviousOperatorKeys by rememberSaveable { mutableStateOf<List<String>?>(null) }
@@ -2999,25 +3019,32 @@ fun MapScreen(
     var effectiveProvider by remember { mutableIntStateOf(AppConfig.mapProvider.intValue) }
     var mapFiles by remember { mutableStateOf(emptyArray<java.io.File>()) }
 
+    val activeMapCountry by fr.geotower.data.db.DatabaseCountryStore.activeCountryState
+
     // Synchronisation si l'utilisateur change la carte dans les paramètres
-    LaunchedEffect(AppConfig.mapProvider.intValue, featureFlags) {
+    LaunchedEffect(AppConfig.mapProvider.intValue, featureFlags, activeMapCountry) {
         val requestedProvider = MapProviderRules.sanitize(AppConfig.mapProvider.intValue)
         val offlineDir = java.io.File(context.getExternalFilesDir(null), "maps")
         val availableFiles = offlineDir.listFiles { file -> file.extension == "map" && file.length() > 0L } ?: emptyArray()
         mapFiles = availableFiles
 
-        val nextProvider = if (requestedProvider == 4 && availableFiles.isEmpty()) {
+        val baseProvider = if (requestedProvider == 4 && availableFiles.isEmpty()) {
             fallbackMapProvider()
         } else if (isMapProviderEnabled(requestedProvider)) {
             requestedProvider
         } else {
             fallbackMapProvider()
         }
+        val nextProvider = if (baseProvider == 0 && activeMapCountry == fr.geotower.data.db.DatabaseCountry.CA) {
+            1
+        } else {
+            baseProvider
+        }
         val providerChanged = effectiveProvider != nextProvider
         effectiveProvider = nextProvider
-        if (nextProvider != requestedProvider) {
-            AppConfig.mapProvider.value = nextProvider
-            prefs.edit().putInt("map_provider", nextProvider).apply()
+        if (baseProvider != requestedProvider) {
+            AppConfig.mapProvider.value = baseProvider
+            prefs.edit().putInt("map_provider", baseProvider).apply()
         }
         if (providerChanged) {
             mapViewRef?.let { map ->
@@ -3538,16 +3565,28 @@ fun MapScreen(
         val encodedTargets = Uri.encode(
             SignalQuestUploadTargets.encode(targetsByOperator.values.toList())
         )
-        navController.navigate(
-            "sq_upload/${Uri.encode(support.supportId)}/${Uri.encode(first.uploadOperator)}" +
-                "?lat=${support.latitude}" +
-                "&lon=${support.longitude}" +
-                "&azimuts=${Uri.encode(first.azimuts)}" +
-                "&operatorTargets=$encodedTargets" +
-                "&address=${Uri.encode(support.address)}" +
-                "&tripId=${Uri.encode(tripId)}" +
-                "&tripStep=$stepIndex"
-        )
+        fun navigateWithSiteId(resolvedSiteId: String) {
+            navController.navigate(
+                "sq_upload/${Uri.encode(resolvedSiteId)}/${Uri.encode(first.uploadOperator)}" +
+                    "?lat=${support.latitude}" +
+                    "&lon=${support.longitude}" +
+                    "&azimuts=${Uri.encode(first.azimuts)}" +
+                    "&operatorTargets=$encodedTargets" +
+                    "&address=${Uri.encode(support.address)}" +
+                    "&tripId=${Uri.encode(tripId)}" +
+                    "&tripStep=$stepIndex"
+            )
+        }
+        if (support.supportId.startsWith("CA-", ignoreCase = true)) {
+            scope.launch {
+                val caRecordId = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    fr.geotower.data.CaIsedSiteDetailsRepository.loadForSite(context, support.supportId)
+                }?.recordId?.takeIf { it.isNotBlank() }
+                navigateWithSiteId(caRecordId ?: support.supportId)
+            }
+        } else {
+            navigateWithSiteId(support.supportId)
+        }
     }
 
     /**
@@ -3950,9 +3989,9 @@ fun MapScreen(
         antennas, AppConfig.selectedOperatorKeys.value,
         AppConfig.showTechnoFH.value, AppConfig.showTechno2G.value, AppConfig.showTechno3G.value, AppConfig.showTechno4G.value, AppConfig.showTechno5G.value,
         AppConfig.mobileTechnologyOnly.value,
-        AppConfig.f2G_900.value, AppConfig.f2G_1800.value, AppConfig.f3G_900.value, AppConfig.f3G_2100.value,
-        AppConfig.f4G_700.value, AppConfig.f4G_800.value, AppConfig.f4G_900.value, AppConfig.f4G_1800.value, AppConfig.f4G_2100.value, AppConfig.f4G_2600.value,
-        AppConfig.f5G_700.value, AppConfig.f5G_1400.value, AppConfig.f5G_2100.value, AppConfig.f5G_3500.value, AppConfig.f5G_4200.value, AppConfig.f5G_26000.value,
+        AppConfig.f2G_900.value, AppConfig.f2G_1800.value, AppConfig.f3G_900.value, AppConfig.f3G_1900.value, AppConfig.f3G_2100.value,
+        AppConfig.f4G_600.value, AppConfig.f4G_700.value, AppConfig.f4G_800.value, AppConfig.f4G_900.value, AppConfig.f4G_1800.value, AppConfig.f4G_2100.value, AppConfig.f4G_2300.value, AppConfig.f4G_2600.value, AppConfig.f4G_3500.value,
+        AppConfig.f5G_600.value, AppConfig.f5G_700.value, AppConfig.f5G_850.value, AppConfig.f5G_1400.value, AppConfig.f5G_1900.value, AppConfig.f5G_2000.value, AppConfig.f5G_2100.value, AppConfig.f5G_2600.value, AppConfig.f5G_3500.value, AppConfig.f5G_3800.value, AppConfig.f5G_4200.value, AppConfig.f5G_26000.value,
         AppConfig.showSitesInService.value, AppConfig.showSitesOutOfService.value, AppConfig.hideUndergroundSites.value, AppConfig.showOnlyZbSites.value,
         AppConfig.showProjectSites.value, sitesHs, currentCityPolygons,
         isTimeSliderVisible, timeSliderThreshold, adminAreaStatsAntennas, hiddenSites,
@@ -4368,6 +4407,15 @@ fun MapScreen(
 
         val targetPoint = GeoPoint(antenna.latitude, antenna.longitude)
         lastStableMapCenter = targetPoint
+
+        if (isComparatorSelectionMode) {
+            map.post {
+                navController.previousBackStackEntry?.savedStateHandle?.set("comparator_picked_slot", compareSlot)
+                navController.previousBackStackEntry?.savedStateHandle?.set("comparator_picked_site_id", supportId)
+                navController.popBackStack()
+            }
+            return
+        }
 
         if (onSupportClick?.invoke(supportId, antenna.operateur, antenna.latitude, antenna.longitude) == true) {
             map.post {
@@ -4975,17 +5023,27 @@ fun MapScreen(
         AppConfig.f2G_900.value,
         AppConfig.f2G_1800.value,
         AppConfig.f3G_900.value,
+        AppConfig.f3G_1900.value,
         AppConfig.f3G_2100.value,
+        AppConfig.f4G_600.value,
         AppConfig.f4G_700.value,
         AppConfig.f4G_800.value,
         AppConfig.f4G_900.value,
         AppConfig.f4G_1800.value,
         AppConfig.f4G_2100.value,
+        AppConfig.f4G_2300.value,
         AppConfig.f4G_2600.value,
+        AppConfig.f4G_3500.value,
+        AppConfig.f5G_600.value,
         AppConfig.f5G_700.value,
+        AppConfig.f5G_850.value,
         AppConfig.f5G_1400.value,
+        AppConfig.f5G_1900.value,
+        AppConfig.f5G_2000.value,
         AppConfig.f5G_2100.value,
+        AppConfig.f5G_2600.value,
         AppConfig.f5G_3500.value,
+        AppConfig.f5G_3800.value,
         AppConfig.f5G_4200.value,
         AppConfig.f5G_26000.value
     ) {
@@ -5128,17 +5186,27 @@ fun MapScreen(
         AppConfig.f2G_900.value,
         AppConfig.f2G_1800.value,
         AppConfig.f3G_900.value,
+        AppConfig.f3G_1900.value,
         AppConfig.f3G_2100.value,
+        AppConfig.f4G_600.value,
         AppConfig.f4G_700.value,
         AppConfig.f4G_800.value,
         AppConfig.f4G_900.value,
         AppConfig.f4G_1800.value,
         AppConfig.f4G_2100.value,
+        AppConfig.f4G_2300.value,
         AppConfig.f4G_2600.value,
+        AppConfig.f4G_3500.value,
+        AppConfig.f5G_600.value,
         AppConfig.f5G_700.value,
+        AppConfig.f5G_850.value,
         AppConfig.f5G_1400.value,
+        AppConfig.f5G_1900.value,
+        AppConfig.f5G_2000.value,
         AppConfig.f5G_2100.value,
+        AppConfig.f5G_2600.value,
         AppConfig.f5G_3500.value,
+        AppConfig.f5G_3800.value,
         AppConfig.f5G_4200.value,
         AppConfig.f5G_26000.value
     ) {
@@ -6635,7 +6703,13 @@ fun MapScreen(
             }
         }
 
-        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        var boxTopInRootPx by remember { mutableStateOf<Float?>(null) }
+
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxSize()
+                .onGloballyPositioned { boxTopInRootPx = it.positionInRoot().y }
+        ) {
         // ✅ 1. OUVRE LA CONDITION ICI POUR PROTÉGER TA VRAIE INTERFACE
         val isLandscapeLayout = maxWidth > maxHeight ||
             configuration.screenWidthDp > configuration.screenHeightDp
@@ -6647,7 +6721,53 @@ fun MapScreen(
         // garde la disposition portrait : toolbox verticale et recherche en haut.
         val toolboxExpandsLeft = isLandscapeLayout && maxHeight < 600.dp
 
+        var toolboxBoundsInRoot by remember { mutableStateOf<Rect?>(null) }
+        var searchBarBandTopPx by remember { mutableStateOf<Float?>(null) }
+        var searchBarBandBottomPx by remember { mutableStateOf<Float?>(null) }
+
         if (!isUltraCompact) {
+            // Repère permanent de la bande verticale de la barre de recherche : on évite ainsi
+            // de mesurer la barre elle-même (qui ne s'affiche qu'à l'ouverture) et on évite toute
+            // oscillation quand on réduit sa largeur pour laisser la place à la toolbox.
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = sizing.spacing(110.dp))
+                    .width(0.dp)
+                    .height(mapSearchBarHeight)
+                    .onGloballyPositioned { coordinates ->
+                        val top = coordinates.positionInRoot().y
+                        searchBarBandTopPx = top
+                        searchBarBandBottomPx = top + coordinates.size.height
+                    }
+            )
+            val toolboxOverlapsSearchBand = showToolbox &&
+                !toolboxExpandsLeft &&
+                !isPlannerMode &&
+                !isComparatorSelectionMode &&
+                searchBarBandTopPx != null &&
+                searchBarBandBottomPx != null &&
+                toolboxBoundsInRoot != null &&
+                toolboxBoundsInRoot!!.top < searchBarBandBottomPx!! &&
+                toolboxBoundsInRoot!!.bottom > searchBarBandTopPx!!
+            val defaultSearchBarTopPadding = sizing.spacing(110.dp)
+            val toolboxTopInBoxDp = if (toolboxOverlapsSearchBand && boxTopInRootPx != null) {
+                with(density) { (toolboxBoundsInRoot!!.top - boxTopInRootPx!!).coerceAtLeast(0f).toDp() }
+            } else {
+                defaultSearchBarTopPadding
+            }
+            val searchBarTopPadding by animateDpAsState(
+                targetValue = if (toolboxOverlapsSearchBand) toolboxTopInBoxDp else defaultSearchBarTopPadding,
+                label = "searchBarTopPadding"
+            )
+            val suggestionListEndPadding by animateDpAsState(
+                targetValue = if (toolboxOverlapsSearchBand) {
+                    sizing.spacing(16.dp) + mapControlButtonDiameter + sizing.spacing(10.dp)
+                } else {
+                    sizing.spacing(16.dp)
+                },
+                label = "suggestionListEndPadding"
+            )
 
             AnimatedVisibility(
                 visible = isSearchActive && !toolboxExpandsLeft,
@@ -6655,7 +6775,7 @@ fun MapScreen(
                 exit = fadeOut() + shrinkHorizontally(shrinkTowards = Alignment.End),
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                .padding(start = sizing.spacing(16.dp), end = sizing.spacing(16.dp), top = sizing.spacing(110.dp))
+                .padding(start = sizing.spacing(16.dp), end = sizing.spacing(16.dp), top = searchBarTopPadding)
         ) {
             MapSearchBar(
                 query = searchQuery,
@@ -6667,7 +6787,13 @@ fun MapScreen(
                 },
                 modifier = Modifier.fillMaxWidth(),
                 autoFocus = searchAutoFocusPending,
-                onAutoFocusHandled = { searchAutoFocusPending = false }
+                onAutoFocusHandled = { searchAutoFocusPending = false },
+                showTrailingSearchButton = !toolboxOverlapsSearchBand,
+                trailingReservedWidth = if (toolboxOverlapsSearchBand) {
+                    mapControlButtonDiameter + sizing.spacing(8.dp)
+                } else {
+                    0.dp
+                }
             )
         }
 
@@ -6721,8 +6847,8 @@ fun MapScreen(
                 .zIndex(2f)
                 .padding(
                     start = sizing.spacing(16.dp),
-                    end = sizing.spacing(16.dp),
-                    top = sizing.spacing(110.dp) + mapSearchBarHeight + sizing.spacing(8.dp)
+                    end = suggestionListEndPadding,
+                    top = searchBarTopPadding + mapSearchBarHeight + sizing.spacing(8.dp)
                 )
         ) {
             MapSearchSuggestionList(
@@ -6733,11 +6859,19 @@ fun MapScreen(
         }
 
         val compassTopPadding by animateDpAsState(
-            targetValue = sizing.spacing(if (isSearchActive) 186.dp else 112.dp),
+            targetValue = if (isSearchActive && !toolboxExpandsLeft) {
+                searchBarTopPadding + mapSearchBarHeight + sizing.spacing(8.dp)
+            } else {
+                sizing.spacing(if (isSearchActive) 186.dp else 112.dp)
+            },
             label = "compassAnim"
         )
         val toolsTopPadding by animateDpAsState(
-            targetValue = sizing.spacing(if (isSearchActive) 250.dp else 176.dp),
+            targetValue = if (isSearchActive && !toolboxExpandsLeft) {
+                searchBarTopPadding + mapSearchBarHeight + sizing.spacing(72.dp)
+            } else {
+                sizing.spacing(if (isSearchActive) 250.dp else 176.dp)
+            },
             label = "toolsAnim"
         )
         val useCompactCompassPlacement = configuration.screenHeightDp < 600
@@ -6758,7 +6892,6 @@ fun MapScreen(
         // On garde donc leurs emprises réelles plutôt que de masquer la boussole dès que la
         // toolbox est ouverte : elle ne doit disparaître que si la toolbox la recouvre vraiment.
         var compassBoundsInRoot by remember { mutableStateOf<Rect?>(null) }
-        var toolboxBoundsInRoot by remember { mutableStateOf<Rect?>(null) }
         val toolboxCoversCompass = compassBoundsInRoot?.let { compassBounds ->
             toolboxBoundsInRoot?.let { toolboxBounds ->
                 compassBounds.left < toolboxBounds.right &&
@@ -6769,6 +6902,112 @@ fun MapScreen(
         } ?: false
         val hideCompassForToolbox = showToolbox && isToolboxExpanded &&
             toolboxCoversCompass && !isPlannerMode
+
+        val measureHintTopPadding by animateDpAsState(
+            targetValue = if (isSearchActive && !toolboxExpandsLeft) {
+                searchBarTopPadding + mapSearchBarHeight + sizing.spacing(8.dp)
+            } else {
+                sizing.spacing(110.dp)
+            },
+            label = "measureHintTopPadding"
+        )
+        val toolboxOverlapsMeasureHint = showToolbox &&
+            !toolboxExpandsLeft &&
+            !isPlannerMode &&
+            !isComparatorSelectionMode &&
+            toolboxBoundsInRoot != null &&
+            measureHintBoundsInRoot != null &&
+            toolboxBoundsInRoot!!.top < measureHintBoundsInRoot!!.bottom &&
+            toolboxBoundsInRoot!!.bottom > measureHintBoundsInRoot!!.top
+        val topRightCompassVisible = showCompass &&
+            AppConfig.hasCompass.value &&
+            !useCompactCompassPlacement &&
+            !showCompassInMapHeader &&
+            !hideMapChrome &&
+            !isComparatorSelectionMode &&
+            !hideCompassForToolbox
+        val measureHintEndPadding by animateDpAsState(
+            targetValue = maxOf(
+                if (toolboxOverlapsMeasureHint) {
+                    sizing.spacing(16.dp) + mapControlButtonDiameter + sizing.spacing(10.dp)
+                } else {
+                    sizing.spacing(16.dp)
+                },
+                if (topRightCompassVisible) {
+                    compassEndPadding + mapControlButtonDiameter + sizing.spacing(10.dp)
+                } else {
+                    sizing.spacing(16.dp)
+                }
+            ),
+            label = "measureHintEndPadding"
+        )
+        AnimatedVisibility(
+            visible = showMeasureFirstPointHint,
+            enter = fadeIn() + expandVertically(expandFrom = Alignment.Top),
+            exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top),
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(
+                    start = sizing.spacing(16.dp) + mapControlButtonDiameter + sizing.spacing(10.dp),
+                    end = measureHintEndPadding,
+                    top = measureHintTopPadding
+                )
+        ) {
+            // Le repère de position n'est proposé que s'il est réellement affiché et localisé :
+            // sinon on désignerait quelque chose d'invisible.
+            val canStartFromMyLocation = myCurrentLoc != null && showLocationMarker
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onGloballyPositioned {
+                        val position = it.positionInRoot()
+                        measureHintBoundsInRoot = Rect(
+                            left = position.x,
+                            top = position.y,
+                            right = position.x + it.size.width,
+                            bottom = position.y + it.size.height
+                        )
+                    },
+                shape = RoundedCornerShape(24.dp),
+                color = MaterialTheme.colorScheme.surface.copy(alpha = AppConfig.floatingUiAlpha),
+                shadowElevation = sizing.component(2.dp + 3.dp * AppConfig.floatingUiOpacityProgress),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.20f + 0.20f * AppConfig.floatingUiOpacityProgress))
+            ) {
+                Row(
+                    modifier = Modifier.padding(
+                        horizontal = sizing.spacing(16.dp),
+                        vertical = sizing.spacing(10.dp)
+                    ),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.TouchApp,
+                        null,
+                        tint = Color(0xFF3B5998),
+                        modifier = Modifier.size(sizing.component(20.dp))
+                    )
+                    Spacer(Modifier.width(sizing.spacing(10.dp)))
+                    Column {
+                        Text(
+                            text = stringResource(R.string.appstrings_measure_first_point_title),
+                            fontSize = sizing.text(13.sp),
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = stringResource(
+                                if (canStartFromMyLocation) {
+                                    R.string.appstrings_measure_first_point_hint_location
+                                } else {
+                                    R.string.appstrings_measure_first_point_hint
+                                }
+                            ),
+                            fontSize = sizing.text(11.sp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
 
         val recordCompassBounds = Modifier.onGloballyPositioned { coordinates ->
             val position = coordinates.positionInRoot()
@@ -6808,7 +7047,7 @@ fun MapScreen(
         val trackingDrawerHeight = (trackingButtonHeight * trackingRowCount.toFloat()) +
             (trackingButtonSpacing * (trackingRowCount - 1).toFloat())
         val isBottomNavActive = AppConfig.isBottomNavActive()
-        val isBottomNavBarVisible = isBottomNavActive && !isPlannerMode && !isSharedPhotoSelectionMode
+        val isBottomNavBarVisible = isBottomNavActive && !isPlannerMode && !isSharedPhotoSelectionMode && !isComparatorSelectionMode
         val systemNavBars = WindowInsets.navigationBars.asPaddingValues()
         val rawBottomNavPadding = systemNavBars.calculateBottomPadding()
 
@@ -6865,6 +7104,11 @@ fun MapScreen(
         // Si le tiroir arrive sur Partager, il prend directement sa place. Au prochain passage de
         // layout, son emprise est alors stable à cet endroit et Partager reste masqué sans laisser
         // un espace vide entre le bouton Retour et les contrôles de mesure.
+        val showFloatingShareButton = showShareButton && !isComparatorSelectionMode &&
+            (!AppConfig.isBottomNavActive() || isSharedPhotoSelectionMode || isPlannerMode)
+        val topLeftExtraButtonsCount = (if (is3DSupported) 1 else 0) + (if (showFloatingShareButton) 1 else 0)
+        val topLeftButtonsHeight = mapControlButtonDiameter +
+            (mapControlButtonDiameter + sizing.spacing(8.dp)) * topLeftExtraButtonsCount
         val measureDrawerUsesShareSlot = isMeasuringMode && measureDrawerCoversShare
         val measureDrawerOnLeft = trackingDrawerTopLeft || measureDrawerPortraitLeft ||
             measureDrawerUsesShareSlot
@@ -6874,10 +7118,10 @@ fun MapScreen(
                 .padding(start = sizing.spacing(16.dp), top = compassTopPadding)
         } else if (measureDrawerOnLeft) {
             // Tablette paysage OU portrait toolbox dépliée : en haut à gauche,
-            // dans la zone dégagée sous le bouton de partage.
+            // dans la zone dégagée sous le sélecteur de pays et le bouton de partage.
             Modifier
                 .align(Alignment.TopStart)
-                .padding(start = sizing.spacing(16.dp), top = compassTopPadding + 70.dp)
+                .padding(start = sizing.spacing(16.dp), top = compassTopPadding + topLeftButtonsHeight + sizing.spacing(16.dp))
         } else if (!useCompactCompassPlacement) {
             // Portrait, toolbox repliée : place libre en haut à droite, sous la boussole.
             val compassShownTopRight = showCompass && AppConfig.hasCompass.value &&
@@ -6930,11 +7174,29 @@ fun MapScreen(
         val measureDrawerDrop by animateDpAsState(
             targetValue = run {
                 if (!measureDrawerAnchoredTop) return@run 0.dp
-                val crossesInfo = measureDrawerLeftPx < measureInfoRightPx &&
+                val infoDrop = if (measureDrawerLeftPx < measureInfoRightPx &&
                     measureDrawerRightPx > measureInfoLeftPx
-                if (!crossesInfo) return@run 0.dp
-                val overlapPx = measureInfoBottomPx - measureDrawerAnchorTopPx
-                if (overlapPx <= 0f) 0.dp else with(density) { overlapPx.toDp() } + sizing.spacing(12.dp)
+                ) {
+                    val overlapPx = measureInfoBottomPx - measureDrawerAnchorTopPx
+                    if (overlapPx <= 0f) 0.dp else with(density) { overlapPx.toDp() } + sizing.spacing(12.dp)
+                } else {
+                    0.dp
+                }
+                val hintDrop = if (showMeasureFirstPointHint) {
+                    measureHintBoundsInRoot?.let { hintBounds ->
+                        if (measureDrawerLeftPx < hintBounds.right &&
+                            measureDrawerRightPx > hintBounds.left
+                        ) {
+                            val overlapPx = hintBounds.bottom - measureDrawerAnchorTopPx
+                            if (overlapPx <= 0f) 0.dp else with(density) { overlapPx.toDp() } + sizing.spacing(12.dp)
+                        } else {
+                            0.dp
+                        }
+                    } ?: 0.dp
+                } else {
+                    0.dp
+                }
+                maxOf(infoDrop, hintDrop)
             },
             label = "measureDrawerDropAnim"
         )
@@ -6991,16 +7253,83 @@ fun MapScreen(
                 null
             }
 
-        // Bouton de Partage flottant (affiché uniquement hors mode barre de navigation,
-        // car en mode barre le bouton partager remplace directement le bouton retour dans l'en-tête).
-        val showFloatingShareButton = showShareButton && (!AppConfig.isBottomNavActive() || isSharedPhotoSelectionMode || isPlannerMode)
+        val activeMapCountry by fr.geotower.data.db.DatabaseCountryStore.activeCountryState
+        var manualMapCountry by remember { mutableStateOf<fr.geotower.data.db.DatabaseCountry?>(null) }
+        var isMapUsingOnlineDb by remember { mutableStateOf(false) }
+        var mapSwitchCheckTrigger by remember { mutableIntStateOf(0) }
+        var showMapSwitchToast by remember { mutableStateOf(false) }
+
+        LaunchedEffect(currentLat, map3dLon, manualMapCountry) {
+            val targetCountry = manualMapCountry ?: run {
+                val centerLon = mapViewRef?.mapCenter?.longitude ?: map3dLon
+                fr.geotower.data.db.DatabaseCountry.forCoordinates(currentLat, centerLon)
+            }
+            if (targetCountry != activeMapCountry) {
+                fr.geotower.data.db.DatabaseCountryStore.setActive(context, targetCountry)
+            }
+        }
+
+        LaunchedEffect(activeMapCountry, mapSwitchCheckTrigger) {
+            val online = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                fr.geotower.data.api.LiveDatabaseStatus.isInUse(context, activeMapCountry)
+            }
+            isMapUsingOnlineDb = online
+            if (showMapSwitchToast) {
+                showMapSwitchToast = false
+                Toast.makeText(
+                    context,
+                    resources.getString(
+                        if (online) R.string.country_db_source_status_online else R.string.country_db_source_status_local,
+                        activeMapCountry.code
+                    ),
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+
+        LaunchedEffect(activeMapCountry) {
+            mapViewRef?.loadVisibleAntennas(viewModel)
+        }
+
+        // Longueur totale de la chaîne : la somme des traits affichés (distance de l'itinéraire
+        // quand il est arrivé, à vol d'oiseau sinon). Les traits de suivi vers le site le plus
+        // proche n'y entrent pas : ils mesurent une portée radio, pas un parcours.
+        val measureTotalDistanceMeters = currentMeasureSegments.sumOf { segment ->
+            // Même recalage que le tracé, sinon le total et les étiquettes se contrediraient.
+            val route = measureRouteAlignedOnSegment(
+                segment,
+                measureRouteProfileValue
+                    ?.let { profile ->
+                        measureRoutes[measureRouteCacheKey(segment, profile, measureRouteOptimizationValue)]
+                    }
+                    ?.let { it as? MeasureRoute.Ready }
+            )
+            route?.distanceMeters ?: segment.start.distanceToAsDouble(segment.end)
+        }
+        val measureDistanceLabel = if (currentMeasureSegments.isNotEmpty()) {
+            stringResource(
+                R.string.appstrings_measure_total_distance,
+                formatSiteDistanceMeters(measureTotalDistanceMeters)
+            )
+        } else {
+            null
+        }
+
+        // Bouton de bascule FR / CA en haut à gauche + Bouton de Partage juste en dessous (affiché
+        // uniquement hors mode barre de navigation, car en mode barre le bouton partager remplace
+        // directement le bouton retour dans l'en-tête).
+        val topLeftSwitchTopPadding = if (isComparatorSelectionMode) {
+            compassTopPadding + sizing.spacing(84.dp)
+        } else {
+            compassTopPadding
+        }
         AnimatedVisibility(
-            visible = showFloatingShareButton,
+            visible = !hideMapChrome || showFloatingShareButton,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .padding(start = sizing.spacing(16.dp), top = compassTopPadding)
+                .padding(start = sizing.spacing(16.dp), top = topLeftSwitchTopPadding)
                 .onGloballyPositioned {
                     val position = it.positionInRoot()
                     shareBoundsInRoot = Rect(
@@ -7012,21 +7341,110 @@ fun MapScreen(
                     shareButtonBottomPx = position.y + it.size.height
                 }
         ) {
-            fr.geotower.ui.components.MapShareMenu(
-                useOneUi = fr.geotower.utils.AppConfig.useOneUiDesign,
-                globalMapRef = mapViewRef,
-                currentSpeed = speedText,
-                currentZoom = currentZoom,
-                currentLat = currentLat,
-                azimuth = azimuth,
-                measureOverlay = measureOverlay,
-                timeSliderDateLabel = if (isTimeSliderVisible) timeSliderThreshold?.let { timeSliderMonthLabel(it) } else null,
-                drawLocationMarker = drawLocationMarker
-            )
+            Column(
+                verticalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp)),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                if (showFloatingShareButton) {
+                    fr.geotower.ui.components.MapShareMenu(
+                        useOneUi = fr.geotower.utils.AppConfig.useOneUiDesign,
+                        globalMapRef = mapViewRef,
+                        currentSpeed = speedText,
+                        currentZoom = currentZoom,
+                        currentLat = currentLat,
+                        azimuth = azimuth,
+                        measureOverlay = measureOverlay,
+                        measureDistanceLabel = measureDistanceLabel,
+                        timeSliderDateLabel = if (isTimeSliderVisible) timeSliderThreshold?.let { timeSliderMonthLabel(it) } else null,
+                        drawLocationMarker = drawLocationMarker
+                    )
+                }
+                if (!hideMapChrome) {
+                    Surface(
+                        onClick = {
+                            safeClick("map_country_switch") {
+                                manualMapCountry = when (manualMapCountry) {
+                                    null -> fr.geotower.data.db.DatabaseCountry.FR
+                                    fr.geotower.data.db.DatabaseCountry.FR -> fr.geotower.data.db.DatabaseCountry.CA
+                                    fr.geotower.data.db.DatabaseCountry.CA -> null
+                                }
+                                showMapSwitchToast = true
+                                mapSwitchCheckTrigger++
+                                manualMapCountry?.let { chosen ->
+                                    if (chosen != activeMapCountry) {
+                                        fr.geotower.data.db.DatabaseCountryStore.setActive(context, chosen)
+                                    }
+                                }
+                            }
+                        },
+                        modifier = Modifier.size(sizing.component(54.dp)),
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = AppConfig.floatingUiAlpha),
+                        shadowElevation = AppConfig.floatingUiShadowElevation(4.dp),
+                        border = BorderStroke(1.dp, AppConfig.floatingUiBorderColor())
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = activeMapCountry.code,
+                                    style = sizing.textStyle(MaterialTheme.typography.labelLarge),
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = if (manualMapCountry == null) {
+                                        if (isMapUsingOnlineDb) "AUTO·LIVE" else "AUTO"
+                                    } else {
+                                        stringResource(
+                                            if (isMapUsingOnlineDb) R.string.country_db_source_online else R.string.country_db_source_local
+                                        )
+                                    },
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = sizing.text(7.sp),
+                                    color = if (isMapUsingOnlineDb) {
+                                        MaterialTheme.colorScheme.tertiary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    // --- Bouton circulaire de bascule 2D / 3D ---
+                    if (is3DSupported) {
+                        Surface(
+                            onClick = { safeClick { toggle3DMode() } },
+                            shape = CircleShape,
+                            color = if (is3DMode) MaterialTheme.colorScheme.primaryContainer.copy(alpha = AppConfig.floatingUiAlpha) else MaterialTheme.colorScheme.surface.copy(alpha = AppConfig.floatingUiAlpha),
+                            shadowElevation = AppConfig.floatingUiShadowElevation(6.dp),
+                            border = BorderStroke(
+                                width = if (is3DMode) 2.dp else 1.dp,
+                                color = if (is3DMode) MaterialTheme.colorScheme.primary else AppConfig.floatingUiBorderColor()
+                            ),
+                            modifier = Modifier.size(mapControlButtonDiameter)
+                        ) {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = if (is3DMode) stringResource(R.string.appstrings_map_mode_2d) else stringResource(R.string.appstrings_map_mode_3d),
+                                    style = MaterialTheme.typography.labelLarge.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp
+                                    ),
+                                    color = if (is3DMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         if (showCompass && AppConfig.hasCompass.value && !useCompactCompassPlacement &&
-            !showCompassInMapHeader && !hideMapChrome
+            !showCompassInMapHeader && !hideMapChrome && !isComparatorSelectionMode
         ) {
             Box(
                 modifier = Modifier
@@ -7272,69 +7690,11 @@ fun MapScreen(
 
 
         Column(modifier = Modifier.fillMaxWidth().padding(top = sizing.spacing(48.dp)), horizontalAlignment = Alignment.CenterHorizontally) {
-            Crossfade(targetState = showMeasureFirstPointHint, label = "mapHeaderMeasureHint") { showHint ->
-            if (showHint) {
-                // Le repère de position n'est proposé que s'il est réellement affiché et localisé :
-                // sinon on désignerait quelque chose d'invisible.
-                val canStartFromMyLocation = myCurrentLoc != null && showLocationMarker
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = sizing.spacing(16.dp))
-                        .onGloballyPositioned {
-                            val position = it.positionInRoot()
-                            measureHintBoundsInRoot = Rect(
-                                left = position.x,
-                                top = position.y,
-                                right = position.x + it.size.width,
-                                bottom = position.y + it.size.height
-                            )
-                        },
-                    shape = RoundedCornerShape(24.dp),
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = AppConfig.floatingUiAlpha),
-                    shadowElevation = sizing.component(2.dp + 3.dp * AppConfig.floatingUiOpacityProgress),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.20f + 0.20f * AppConfig.floatingUiOpacityProgress))
-                ) {
-                    Row(
-                        modifier = Modifier.padding(
-                            horizontal = sizing.spacing(16.dp),
-                            vertical = sizing.spacing(10.dp)
-                        ),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            Icons.Default.TouchApp,
-                            null,
-                            tint = measureLineColor,
-                            modifier = Modifier.size(sizing.component(20.dp))
-                        )
-                        Spacer(Modifier.width(sizing.spacing(10.dp)))
-                        Column {
-                            Text(
-                                text = stringResource(R.string.appstrings_measure_first_point_title),
-                                fontSize = sizing.text(13.sp),
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = stringResource(
-                                    if (canStartFromMyLocation) {
-                                        R.string.appstrings_measure_first_point_hint_location
-                                    } else {
-                                        R.string.appstrings_measure_first_point_hint
-                                    }
-                                ),
-                                fontSize = sizing.text(11.sp),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
-            } else {
             Box(modifier = Modifier.fillMaxWidth().padding(horizontal = sizing.spacing(16.dp))) {
                 // En mode simplifié la carte est la racine : le retour n'a plus de sens, le bouton
                 // ouvre le tiroir. La sélection de photo partagée garde en revanche son « annuler ».
-                val showSimpleModeMenuButton = onOpenSimpleModeMenu != null && !isSharedPhotoSelectionMode
-                val showBackButton = !AppConfig.isBottomNavActive() || isSharedPhotoSelectionMode || isPlannerMode
+                val showSimpleModeMenuButton = onOpenSimpleModeMenu != null && !isSharedPhotoSelectionMode && !isComparatorSelectionMode
+                val showBackButton = !AppConfig.isBottomNavActive() || isSharedPhotoSelectionMode || isPlannerMode || isComparatorSelectionMode
                 if (showSimpleModeMenuButton || showBackButton) {
                     SmallFloatingButton(
                         icon = if (showSimpleModeMenuButton) Icons.Default.Menu else Icons.AutoMirrored.Filled.ArrowBack,
@@ -7364,76 +7724,77 @@ fun MapScreen(
                         currentLat = currentLat,
                         azimuth = azimuth,
                         measureOverlay = measureOverlay,
+                        measureDistanceLabel = measureDistanceLabel,
                         timeSliderDateLabel = if (isTimeSliderVisible) timeSliderThreshold?.let { timeSliderMonthLabel(it) } else null,
                         drawLocationMarker = drawLocationMarker,
                         modifier = Modifier.align(Alignment.CenterStart)
                     )
                 }
-                Surface(
-                    modifier = Modifier.align(Alignment.Center),
-                    shape = RoundedCornerShape(32.dp),
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = AppConfig.floatingUiAlpha),
-                    shadowElevation = AppConfig.floatingUiShadowElevation(4.dp),
-                    border = BorderStroke(1.dp, AppConfig.floatingUiBorderColor())
-                ) {
-                    // Avec un trajet ouvert, la carte n'est plus « la carte des antennes » : elle
-                    // sert la tournée, et son en-tête doit le dire.
-                    Text(
-                        text = if (isPlannerMode) txtTripMapTitle else txtMapTitle,
-                        style = sizing.textStyle(MaterialTheme.typography.titleMedium),
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(horizontal = sizing.spacing(24.dp), vertical = sizing.spacing(12.dp))
-                    )
-                }
+                if (!isComparatorSelectionMode) {
+                    Surface(
+                        modifier = Modifier.align(Alignment.Center),
+                        shape = RoundedCornerShape(32.dp),
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = AppConfig.floatingUiAlpha),
+                        shadowElevation = AppConfig.floatingUiShadowElevation(4.dp),
+                        border = BorderStroke(1.dp, AppConfig.floatingUiBorderColor())
+                    ) {
+                        // Avec un trajet ouvert, la carte n'est plus « la carte des antennes » : elle
+                        // sert la tournée, et son en-tête doit le dire.
+                        Text(
+                            text = if (isPlannerMode) txtTripMapTitle else txtMapTitle,
+                            style = sizing.textStyle(MaterialTheme.typography.titleMedium),
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(horizontal = sizing.spacing(24.dp), vertical = sizing.spacing(12.dp))
+                        )
+                    }
 
-                Row(
-                    modifier = Modifier.align(Alignment.CenterEnd),
-                    horizontalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp)),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if (showCompassInMapHeader) {
-                        Box(
-                            modifier = Modifier
-                                .size(mapControlButtonDiameter)
-                                .then(recordCompassBounds)
-                        ) {
-                            if (!hideCompassForToolbox) {
-                                MapCompassButton(
-                                    azimuth = azimuth,
-                                    mapOrientation = { mapOrientationState.floatValue },
-                                    followActive = followOrientation,
-                                    onToggleFollow = if (PowerProfile.isEco) null else toggleFollowOrientation,
-                                    modifier = Modifier.fillMaxSize()
-                                ) {
-                                    safeClick { resetMapOrientation() }
+                    Row(
+                        modifier = Modifier.align(Alignment.CenterEnd),
+                        horizontalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp)),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (showCompassInMapHeader) {
+                            Box(
+                                modifier = Modifier
+                                    .size(mapControlButtonDiameter)
+                                    .then(recordCompassBounds)
+                            ) {
+                                if (!hideCompassForToolbox) {
+                                    MapCompassButton(
+                                        azimuth = azimuth,
+                                        mapOrientation = { mapOrientationState.floatValue },
+                                        followActive = followOrientation,
+                                        onToggleFollow = if (PowerProfile.isEco) null else toggleFollowOrientation,
+                                        modifier = Modifier.fillMaxSize()
+                                    ) {
+                                        safeClick { resetMapOrientation() }
+                                    }
                                 }
                             }
                         }
-                    }
 
-                    // « Réglages/filtres » : icône Tune et non Menu, sinon deux hamburgers
-                    // identiques encadrent la barre en mode simplifié.
-                    //
-                    // Avec un trajet ouvert, le bouton ne survit qu'en ÉDITION : c'est là qu'on
-                    // clique des marqueurs d'antennes pour poser des étapes, donc là que choisir
-                    // lesquelles voir a un sens. En consultation et en suivi, on ne clique plus
-                    // d'antennes et le panneau n'aurait rien à régler d'utile.
-                    if (!isPlannerMode || tripMode == TRIP_MODE_EDIT) {
-                        SmallFloatingButton(
-                            icon = Icons.Default.Tune,
-                            desc = txtFilter
-                        ) { safeClick { showSettingsSheet = true } }
+                        // « Réglages/filtres » : icône Tune et non Menu, sinon deux hamburgers
+                        // identiques encadrent la barre en mode simplifié.
+                        //
+                        // Avec un trajet ouvert, le bouton ne survit qu'en ÉDITION : c'est là qu'on
+                        // clique des marqueurs d'antennes pour poser des étapes, donc là que choisir
+                        // lesquelles voir a un sens. En consultation et en suivi, on ne clique plus
+                        // d'antennes et le panneau n'aurait rien à régler d'utile.
+                        if (!isPlannerMode || tripMode == TRIP_MODE_EDIT) {
+                            SmallFloatingButton(
+                                icon = Icons.Default.Tune,
+                                desc = txtFilter
+                            ) { safeClick { showSettingsSheet = true } }
+                        }
                     }
                 }
             } // fin de la barre du haut habituelle
-            } // fin du else
-            } // fin du Crossfade
 
             AnimatedVisibility(
                 // Même règle que le bouton Filtres : annoncer des filtres actifs là où on ne peut
                 // pas les régler serait une impasse.
                 visible = activeMapFilterSummary != null && !isSearchActive &&
-                    !isSharedPhotoSelectionMode && (!isPlannerMode || tripMode == TRIP_MODE_EDIT),
+                    !isSharedPhotoSelectionMode && !isComparatorSelectionMode && (!isPlannerMode || tripMode == TRIP_MODE_EDIT),
                 enter = fadeIn() + expandVertically(expandFrom = Alignment.Top),
                 exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top)
             ) {
@@ -7447,26 +7808,16 @@ fun MapScreen(
             }
 
             val deleteButtonSpacer by animateDpAsState(
-                targetValue = sizing.spacing(if (isSearchActive) 93.dp else 19.dp),
+                targetValue = if (isSearchActive && !toolboxExpandsLeft) {
+                    (searchBarTopPadding + mapSearchBarHeight + sizing.spacing(12.dp) -
+                        (sizing.spacing(48.dp) + mapControlButtonDiameter)).coerceAtLeast(sizing.spacing(12.dp))
+                } else {
+                    sizing.spacing(19.dp)
+                },
                 label = "deleteButtonAnim"
             )
             Spacer(modifier = Modifier.height(deleteButtonSpacer))
 
-            // Longueur totale de la chaîne : la somme des traits affichés (distance de l'itinéraire
-            // quand il est arrivé, à vol d'oiseau sinon). Les traits de suivi vers le site le plus
-            // proche n'y entrent pas : ils mesurent une portée radio, pas un parcours.
-            val measureTotalDistanceMeters = currentMeasureSegments.sumOf { segment ->
-                // Même recalage que le tracé, sinon le total et les étiquettes se contrediraient.
-                val route = measureRouteAlignedOnSegment(
-                    segment,
-                    measureRouteProfileValue
-                        ?.let { profile ->
-                            measureRoutes[measureRouteCacheKey(segment, profile, measureRouteOptimizationValue)]
-                        }
-                        ?.let { it as? MeasureRoute.Ready }
-                )
-                route?.distanceMeters ?: segment.start.distanceToAsDouble(segment.end)
-            }
             // Itinéraires encore attendus : la clé n'est pas dans le cache. Le total affiché est
             // alors encore celui des traits directs, et la pilule le dit (animation + ligne d'état).
             val measureRoutesPending = measureRouteProfileValue?.let { profile ->
@@ -7532,10 +7883,7 @@ fun MapScreen(
                             Spacer(Modifier.width(sizing.spacing(8.dp)))
                             Column {
                                 Text(
-                                    text = stringResource(
-                                        R.string.appstrings_measure_total_distance,
-                                        formatSiteDistanceMeters(measureTotalDistanceMeters)
-                                    ),
+                                    text = measureDistanceLabel.orEmpty(),
                                     fontSize = sizing.text(13.sp),
                                     fontWeight = FontWeight.Bold
                                 )
@@ -7620,6 +7968,50 @@ fun MapScreen(
             }
         }
 
+        if (isComparatorSelectionMode) {
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(start = sizing.spacing(16.dp), end = sizing.spacing(16.dp), top = sizing.spacing(112.dp))
+                    .fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.primaryContainer,
+                shadowElevation = 6.dp,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.24f))
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(12.dp)),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.CellTower,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Spacer(modifier = Modifier.width(sizing.spacing(12.dp)))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.site_comparator_pick_site, compareSlot ?: "B"),
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Text(
+                            text = "Touchez un site sur la carte",
+                            fontSize = sizing.text(13.sp),
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.78f)
+                        )
+                    }
+                    IconButton(onClick = { safeClick { navController.popBackStack() } }) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = stringResource(R.string.appstrings_cancel),
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                }
+            }
+        }
+
         Column(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
@@ -7635,7 +8027,7 @@ fun MapScreen(
             horizontalAlignment = Alignment.End,
             verticalArrangement = Arrangement.spacedBy(sizing.spacing(16.dp))
         ) {
-            if (showCompactCompass) {
+            if (showCompactCompass && !isComparatorSelectionMode) {
                 Box(
                     modifier = Modifier
                         .size(mapControlButtonDiameter)
@@ -7655,7 +8047,7 @@ fun MapScreen(
                 }
             }
 
-            if (showToolbox && !isPlannerMode) {
+            if (showToolbox && !isPlannerMode && !isComparatorSelectionMode) {
                 val toolboxContent: @Composable () -> Unit = {
                     Box(modifier = recordToolboxBounds) {
                         AntennaMapToolBox(
@@ -7669,13 +8061,7 @@ fun MapScreen(
                             },
                             isSearchActive = isSearchActive,
                             onToggleSearch = {
-                        if (!isSearchActive && showMeasureFirstPointHint) {
-                            // Le mode d'emploi de la mesure tient toute la barre du haut, juste où
-                            // la recherche viendrait s'ouvrir. Plutôt que de les empiler, on dit
-                            // quoi faire pour libérer la place. On ne bloque que l'OUVERTURE :
-                            // refermer une recherche déjà ouverte reste possible.
-                            showMeasureSearchBlockedDialog = true
-                        } else if (canUseMapSearch) {
+                        if (canUseMapSearch) {
                             isSearchActive = !isSearchActive
                         // Ouvrir la barre pose le curseur dans le champ et lève le clavier ; la
                         // refermer le range, sinon il resterait devant la carte qu'on vient de
@@ -7849,35 +8235,6 @@ fun MapScreen(
                                     mapViewRef?.controller?.zoomOut()
                                 }
                             }
-                        )
-                    }
-                }
-            }
-
-            // --- Bouton circulaire de bascule 2D / 3D ---
-            if (is3DSupported) {
-                Surface(
-                    onClick = { safeClick { toggle3DMode() } },
-                    shape = CircleShape,
-                    color = if (is3DMode) MaterialTheme.colorScheme.primaryContainer.copy(alpha = AppConfig.floatingUiAlpha) else MaterialTheme.colorScheme.surface.copy(alpha = AppConfig.floatingUiAlpha),
-                    shadowElevation = AppConfig.floatingUiShadowElevation(6.dp),
-                    border = BorderStroke(
-                        width = if (is3DMode) 2.dp else 1.dp,
-                        color = if (is3DMode) MaterialTheme.colorScheme.primary else AppConfig.floatingUiBorderColor()
-                    ),
-                    modifier = Modifier.size(mapControlButtonDiameter)
-                ) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = if (is3DMode) stringResource(R.string.appstrings_map_mode_2d) else stringResource(R.string.appstrings_map_mode_3d),
-                            style = MaterialTheme.typography.labelLarge.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
-                            ),
-                            color = if (is3DMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                         )
                     }
                 }
@@ -8498,31 +8855,41 @@ fun MapScreen(
                     } else {
                         // ✅ 2. LA COLONNE DES PREMIERS BOUTONS
                         Column(
+                            modifier = Modifier.fillMaxWidth(),
                             verticalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp))
                         ) {
                             // 🌐 ON N'AFFICHE LES CARTES EN LIGNE QUE SI ON A INTERNET
                             if (isOnline) {
+                                val isIgnAvailableHere = isMapProviderEnabled(0) &&
+                                    activeMapCountry != fr.geotower.data.db.DatabaseCountry.CA
                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp))) {
                                     if (isMapProviderEnabled(1)) {
-                                        MapLayerButton(txtMapOsmLayer, mapProvider == 1, Modifier.weight(1f)) {
+                                        MapLayerButton(txtMapOsmLayer, effectiveProvider == 1, Modifier.weight(1f)) {
                                             AppConfig.mapProvider.value = 1
                                             prefs.edit().putInt("map_provider", 1).apply()
                                             effectiveProvider = 1
                                             mapViewRef?.loadVisibleAntennas(viewModel)
                                         }
                                     }
-                                    if (isMapProviderEnabled(0)) {
-                                        MapLayerButton(txtMapIgnLayer, mapProvider == 0, Modifier.weight(1f)) {
+                                    if (isIgnAvailableHere) {
+                                        MapLayerButton(txtMapIgnLayer, effectiveProvider == 0, Modifier.weight(1f)) {
                                             AppConfig.mapProvider.value = 0
                                             prefs.edit().putInt("map_provider", 0).apply()
                                             effectiveProvider = 0
                                             mapViewRef?.loadVisibleAntennas(viewModel)
                                         }
+                                    } else if (isMapProviderEnabled(3)) {
+                                        MapLayerButton(txtMapTopo, effectiveProvider == 3, Modifier.weight(1f)) {
+                                            AppConfig.mapProvider.value = 3
+                                            prefs.edit().putInt("map_provider", 3).apply()
+                                            effectiveProvider = 3
+                                            mapViewRef?.loadVisibleAntennas(viewModel)
+                                        }
                                     }
                                 }
-                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp))) {
-                                    if (isMapProviderEnabled(3)) {
-                                        MapLayerButton(txtMapTopo, mapProvider == 3, Modifier.weight(1f)) {
+                                if (isIgnAvailableHere && isMapProviderEnabled(3)) {
+                                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp))) {
+                                        MapLayerButton(txtMapTopo, effectiveProvider == 3, Modifier.weight(1f)) {
                                             AppConfig.mapProvider.value = 3
                                             prefs.edit().putInt("map_provider", 3).apply()
                                             effectiveProvider = 3
@@ -8532,13 +8899,55 @@ fun MapScreen(
                                 }
                             } else {
                                 // 📵 MESSAGE HORS-LIGNE
-                                Text(
-                                    text = "⚠️ $txtOfflineMessage",
-                                    color = MaterialTheme.colorScheme.error,
-                                    fontWeight = FontWeight.Bold,
-                                    style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
-                                    modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = sizing.spacing(4.dp), top = sizing.spacing(8.dp))
-                                )
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(20.dp),
+                                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.25f))
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(
+                                            horizontal = sizing.spacing(16.dp),
+                                            vertical = sizing.spacing(14.dp)
+                                        ),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(sizing.component(40.dp))
+                                                .background(
+                                                    MaterialTheme.colorScheme.error.copy(alpha = 0.14f),
+                                                    CircleShape
+                                                ),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.WifiOff,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.error,
+                                                modifier = Modifier.size(sizing.component(22.dp))
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(sizing.spacing(14.dp)))
+                                        Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(2.dp))) {
+                                            Text(
+                                                text = txtOfflineMessage,
+                                                color = MaterialTheme.colorScheme.error,
+                                                fontWeight = FontWeight.Bold,
+                                                style = sizing.textStyle(MaterialTheme.typography.titleSmall)
+                                            )
+                                            if (!(hasOfflineMaps && isMapProviderEnabled(4))) {
+                                                Text(
+                                                    text = stringResource(R.string.appstrings_no_offline_maps_installed)
+                                                        .removePrefix("(")
+                                                        .removeSuffix(")"),
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    style = sizing.textStyle(MaterialTheme.typography.bodySmall)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
                             }
 
                             // 🗺️ LE BOUTON HORS-LIGNE NE S'AFFICHE QUE SI UNE CARTE EXISTE
@@ -8549,20 +8958,12 @@ fun MapScreen(
                                     effectiveProvider = 4
                                     mapViewRef?.loadVisibleAntennas(viewModel)
                                 }
-                            } else if (!isOnline) {
-                                // Optionnel : un petit message pour dire qu'aucune carte n'est dispo si on est hors ligne
-                                Text(
-                                    text = stringResource(R.string.appstrings_no_offline_maps_installed),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontSize = sizing.text(12.sp),
-                                    modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = sizing.spacing(8.dp))
-                                )
                             }
                         }
 
                         // ✅ 3. L'ANIMATION DES STYLES (Cachée si on est hors ligne !)
                         AnimatedVisibility(
-                            visible = isOnline && (mapProvider == 0 || mapProvider == 1),
+                            visible = isOnline && (effectiveProvider == 0 || effectiveProvider == 1),
                             enter = fadeIn() + slideInHorizontally(initialOffsetX = { it }) + expandVertically(expandFrom = Alignment.Top),
                             exit = fadeOut() + slideOutHorizontally(targetOffsetX = { it }) + shrinkVertically(shrinkTowards = Alignment.Top)
                         ) {
@@ -9055,7 +9456,9 @@ private fun MapSearchBar(
     onSearch: () -> Unit,
     modifier: Modifier = Modifier,
     autoFocus: Boolean = false,
-    onAutoFocusHandled: () -> Unit = {}
+    onAutoFocusHandled: () -> Unit = {},
+    showTrailingSearchButton: Boolean = true,
+    trailingReservedWidth: Dp = 0.dp
 ) {
     val sizing = LocalGeoTowerUiSizing.current
     val focusRequester = remember { FocusRequester() }
@@ -9084,12 +9487,18 @@ private fun MapSearchBar(
             modifier = Modifier.fillMaxSize(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = Icons.Default.Search,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = sizing.spacing(16.dp), end = sizing.spacing(12.dp))
-            )
+            IconButton(
+                onClick = onSearch,
+                modifier = Modifier
+                    .padding(start = sizing.spacing(4.dp))
+                    .size(sizing.component(44.dp))
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Search,
+                    contentDescription = stringResource(R.string.appstrings_search),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
 
             Box(modifier = Modifier.weight(1f)) {
                 if (query.isEmpty()) {
@@ -9122,18 +9531,22 @@ private fun MapSearchBar(
                 )
             }
 
-            IconButton(
-                onClick = onSearch,
-                modifier = Modifier
-                    .size(mapControlButtonDiameter)
-                    .background(MaterialTheme.colorScheme.primary, CircleShape)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Search,
-                    contentDescription = stringResource(R.string.appstrings_search),
-                    tint = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.size(sizing.component(26.dp))
-                )
+            if (showTrailingSearchButton) {
+                IconButton(
+                    onClick = onSearch,
+                    modifier = Modifier
+                        .size(mapControlButtonDiameter)
+                        .background(MaterialTheme.colorScheme.primary, CircleShape)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = stringResource(R.string.appstrings_search),
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(sizing.component(26.dp))
+                    )
+                }
+            } else if (trailingReservedWidth > 0.dp) {
+                Spacer(modifier = Modifier.width(trailingReservedWidth))
             }
         }
     }
@@ -10674,8 +11087,13 @@ private fun HiddenSiteDialog(
                                 style = sizing.textStyle(MaterialTheme.typography.titleSmall),
                                 fontWeight = FontWeight.SemiBold
                             )
+                            val idLabel = if (choice.idAnfr.startsWith("CA-", ignoreCase = true)) {
+                                stringResource(R.string.appstrings_ca_ised_station_number_label)
+                            } else {
+                                stringResource(R.string.hidden_sites_anfr_id_label)
+                            }
                             Text(
-                                text = stringResource(R.string.hidden_sites_anfr_id_label) + " : " + choice.idAnfr,
+                                text = "$idLabel : ${choice.idAnfr}",
                                 style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

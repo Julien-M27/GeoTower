@@ -18,10 +18,10 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import fr.geotower.R
+import fr.geotower.data.api.LiveDatabaseStatus
 import fr.geotower.data.config.RemoteFeatureFlags
-import fr.geotower.data.db.GeoTowerDatabaseValidator
+import fr.geotower.data.db.DatabaseCountryStore
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
-import fr.geotower.utils.AppConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -30,19 +30,18 @@ fun LiveDatabaseUsageWarningDialog(liveFeatureId: String) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val sizing = LocalGeoTowerUiStyle.current.sizing
-    val localDbState by AppConfig.localDatabaseState
+    val activeCountry by DatabaseCountryStore.activeCountryState
     val featureFlags by RemoteFeatureFlags.config
-    var showDialog by remember(liveFeatureId) { mutableStateOf(true) }
+    var isUsingLiveForCountry by remember(liveFeatureId, activeCountry) { mutableStateOf<Boolean?>(null) }
+    var showDialog by remember(liveFeatureId, activeCountry) { mutableStateOf(true) }
 
-    LaunchedEffect(localDbState) {
-        if (localDbState == null) {
-            AppConfig.localDatabaseState.value = withContext(Dispatchers.IO) {
-                GeoTowerDatabaseValidator.getInstalledDatabaseStatus(context).state
-            }
+    LaunchedEffect(activeCountry, featureFlags) {
+        isUsingLiveForCountry = withContext(Dispatchers.IO) {
+            LiveDatabaseStatus.isInUse(context, activeCountry)
         }
     }
 
-    DisposableEffect(lifecycleOwner, liveFeatureId) {
+    DisposableEffect(lifecycleOwner, liveFeatureId, activeCountry) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 showDialog = true
@@ -55,8 +54,7 @@ fun LiveDatabaseUsageWarningDialog(liveFeatureId: String) {
     }
 
     val isUsingLiveDatabase =
-        localDbState != null &&
-            localDbState != GeoTowerDatabaseValidator.LocalDatabaseState.VALID &&
+        isUsingLiveForCountry == true &&
             featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.LIVE_API_FR) &&
             featureFlags.isFeatureEnabled(liveFeatureId)
 

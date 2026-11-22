@@ -18,12 +18,15 @@ import retrofit2.http.Path
 import retrofit2.http.Query
 
 interface LiveSitesApiService {
-    /** Jeu de données servi par la base live : versions, dates ANFR, nombre de stations. */
-    @GET("api/v2/live/fr/status")
-    suspend fun getStatus(): Response<LiveDbStatusDto>
+    /** Jeu de données servi par la base live : versions, dates sources, nombre de stations. */
+    @GET("api/v2/live/{country}/status")
+    suspend fun getStatus(
+        @Path("country") country: String = "fr"
+    ): Response<LiveDbStatusDto>
 
-    @GET("api/v2/live/fr/sites/nearby")
+    @GET("api/v2/live/{country}/sites/nearby")
     suspend fun getNearbySites(
+        @Path("country") country: String,
         @Query("lat") lat: Double,
         @Query("lon") lon: Double,
         @Query("limit") limit: Int,
@@ -32,8 +35,9 @@ interface LiveSitesApiService {
         @Query("active_only") activeOnly: Boolean? = null
     ): Response<LiveSitesListResponseDto>
 
-    @GET("api/v2/live/fr/sites/bbox")
+    @GET("api/v2/live/{country}/sites/bbox")
     suspend fun getSitesInBox(
+        @Path("country") country: String,
         @Query("north") north: Double,
         @Query("south") south: Double,
         @Query("east") east: Double,
@@ -52,13 +56,15 @@ interface LiveSitesApiService {
         @Query("limit") limit: Int
     ): Response<LiveFhLinksResponseDto>
 
-    @GET("api/v2/live/fr/sites/{siteId}")
+    @GET("api/v2/live/{country}/sites/{siteId}")
     suspend fun getSite(
+        @Path("country") country: String,
         @Path("siteId") siteId: String
     ): Response<LiveSiteResponseDto>
 
-    @GET("api/v2/live/fr/stats/current")
+    @GET("api/v2/live/{country}/stats/current")
     suspend fun getCurrentRadioStats(
+        @Path("country") country: String,
         @Query("operator") operators: List<String>
     ): Response<LiveRadioStatsResponseDto>
 
@@ -67,11 +73,14 @@ interface LiveSitesApiService {
         @Query("operator") operators: List<String>
     ): Response<LiveWeeklyRadioStatsResponseDto>
 
-    @GET("api/v2/live/fr/stats/departments")
-    suspend fun getDepartmentStats(): Response<LiveDepartmentStatsResponseDto>
+    @GET("api/v2/live/{country}/stats/departments")
+    suspend fun getDepartmentStats(
+        @Path("country") country: String
+    ): Response<LiveDepartmentStatsResponseDto>
 
-    @GET("api/v2/live/fr/stats/departments/{deptCode}")
+    @GET("api/v2/live/{country}/stats/departments/{deptCode}")
     suspend fun getDepartmentOperatorTechStats(
+        @Path("country") country: String,
         @Path("deptCode") deptCode: String
     ): Response<LiveDepartmentOperatorStatsResponseDto>
 

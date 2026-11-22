@@ -1,5 +1,6 @@
 package fr.geotower.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -7,6 +8,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.SimCard
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -28,6 +31,7 @@ import fr.geotower.R
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppLocale
 import fr.geotower.utils.AppConfig
+import fr.geotower.utils.OperatorColorSpec
 import fr.geotower.utils.OperatorColors
 
 fun oneUiActionButtonShape(
@@ -175,6 +179,11 @@ fun OperatorSheet(current: String, onSelect: (String) -> Unit, onDismiss: () -> 
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(stringResource(R.string.settings_default_operator), style = sizing.textStyle(MaterialTheme.typography.titleLarge), fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = sizing.spacing(24.dp)))
+            val currentOpKey = OperatorColors.keyFor(current)
+            var isMetroExpanded by remember(currentOpKey) { mutableStateOf(false) }
+            var isOverseasExpanded by remember(currentOpKey) { mutableStateOf(false) }
+            var isCanadaExpanded by remember(currentOpKey) { mutableStateOf(false) }
+
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -184,29 +193,39 @@ fun OperatorSheet(current: String, onSelect: (String) -> Unit, onDismiss: () -> 
                 verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))
             ) {
                 OperatorItem(stringResource(R.string.common_none), null, Color.Gray, tempOp == "Aucun", useOneUi, bubbleColor, showSimFallback = true) { tempOp = "Aucun" }
-                OperatorGroupTitle(stringResource(R.string.operator_region_metro))
-                OperatorColors.metro.forEach { operator ->
-                    OperatorItem(
-                        name = operator.label,
-                        logoRes = fr.geotower.utils.OperatorLogos.drawableRes(operator.key),
-                        operatorColor = Color(operator.colorArgb),
-                        isSelected = OperatorColors.keyFor(tempOp) == operator.key,
-                        useOneUi = useOneUi,
-                        bubbleColor = bubbleColor
-                    ) { tempOp = operator.label }
-                }
 
-                OperatorGroupTitle(stringResource(R.string.operator_region_overseas))
-                OperatorColors.overseas.forEach { operator ->
-                    OperatorItem(
-                        name = operator.label,
-                        logoRes = fr.geotower.utils.OperatorLogos.drawableRes(operator.key),
-                        operatorColor = Color(operator.colorArgb),
-                        isSelected = OperatorColors.keyFor(tempOp) == operator.key,
-                        useOneUi = useOneUi,
-                        bubbleColor = bubbleColor
-                    ) { tempOp = operator.label }
-                }
+                OperatorSelectionGroup(
+                    title = stringResource(R.string.operator_region_metro),
+                    operators = OperatorColors.metro,
+                    selectedOperatorName = tempOp,
+                    isExpanded = isMetroExpanded,
+                    onExpandedChange = { isMetroExpanded = it },
+                    useOneUi = useOneUi,
+                    bubbleColor = bubbleColor,
+                    onSelectOperator = { tempOp = it }
+                )
+
+                OperatorSelectionGroup(
+                    title = stringResource(R.string.operator_region_overseas),
+                    operators = OperatorColors.overseas,
+                    selectedOperatorName = tempOp,
+                    isExpanded = isOverseasExpanded,
+                    onExpandedChange = { isOverseasExpanded = it },
+                    useOneUi = useOneUi,
+                    bubbleColor = bubbleColor,
+                    onSelectOperator = { tempOp = it }
+                )
+
+                OperatorSelectionGroup(
+                    title = stringResource(R.string.country_name_ca),
+                    operators = OperatorColors.canada,
+                    selectedOperatorName = tempOp,
+                    isExpanded = isCanadaExpanded,
+                    onExpandedChange = { isCanadaExpanded = it },
+                    useOneUi = useOneUi,
+                    bubbleColor = bubbleColor,
+                    onSelectOperator = { tempOp = it }
+                )
             }
 
             Button(
@@ -219,15 +238,87 @@ fun OperatorSheet(current: String, onSelect: (String) -> Unit, onDismiss: () -> 
 }
 
 @Composable
-private fun OperatorGroupTitle(text: String) {
+private fun OperatorSelectionGroup(
+    title: String,
+    operators: List<OperatorColorSpec>,
+    selectedOperatorName: String,
+    isExpanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    useOneUi: Boolean,
+    bubbleColor: Color,
+    onSelectOperator: (String) -> Unit
+) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
-    Text(
-        text = text,
-        style = sizing.textStyle(MaterialTheme.typography.labelLarge),
-        fontWeight = FontWeight.Bold,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.fillMaxWidth().padding(top = sizing.spacing(8.dp))
-    )
+    val selectedKey = OperatorColors.keyFor(selectedOperatorName)
+    val selectedInGroup = operators.firstOrNull { it.key == selectedKey }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Surface(
+            onClick = { onExpandedChange(!isExpanded) },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(sizing.component(12.dp)),
+            color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.55f),
+            border = BorderStroke(
+                sizing.component(1.dp),
+                if (selectedInGroup != null) {
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                } else {
+                    MaterialTheme.colorScheme.outlineVariant
+                }
+            )
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = sizing.spacing(14.dp), vertical = sizing.spacing(12.dp)),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = title,
+                        style = sizing.textStyle(MaterialTheme.typography.labelLarge),
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = selectedInGroup?.label ?: "${operators.size}",
+                        style = sizing.textStyle(MaterialTheme.typography.labelMedium),
+                        color = if (selectedInGroup != null) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                        fontWeight = if (selectedInGroup != null) FontWeight.SemiBold else FontWeight.Normal
+                    )
+                }
+                Icon(
+                    imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        AnimatedVisibility(visible = isExpanded) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = sizing.spacing(10.dp))
+            ) {
+                operators.forEach { operator ->
+                    OperatorItem(
+                        name = operator.label,
+                        logoRes = fr.geotower.utils.OperatorLogos.drawableRes(operator.key),
+                        operatorColor = Color(operator.colorArgb),
+                        isSelected = selectedKey == operator.key,
+                        useOneUi = useOneUi,
+                        bubbleColor = bubbleColor
+                    ) { onSelectOperator(operator.label) }
+                }
+            }
+        }
+    }
 }
 
 @Composable

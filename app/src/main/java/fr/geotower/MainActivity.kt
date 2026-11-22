@@ -1185,7 +1185,7 @@ class MainActivity : ComponentActivity() {
 
                             // Carte
                             composable(
-                                route = "map?photoDraftId={photoDraftId}&tripId={tripId}&tripMode={tripMode}&focusLat={focusLat}&focusLon={focusLon}",
+                                route = "map?photoDraftId={photoDraftId}&tripId={tripId}&tripMode={tripMode}&focusLat={focusLat}&focusLon={focusLon}&compareSlot={compareSlot}",
                                 arguments = listOf(
                                     navArgument("photoDraftId") {
                                         type = NavType.StringType
@@ -1213,6 +1213,11 @@ class MainActivity : ComponentActivity() {
                                         type = NavType.StringType
                                         nullable = true
                                         defaultValue = null
+                                    },
+                                    navArgument("compareSlot") {
+                                        type = NavType.StringType
+                                        nullable = true
+                                        defaultValue = null
                                     }
                                 )
                             ) { backStackEntry ->
@@ -1221,6 +1226,7 @@ class MainActivity : ComponentActivity() {
                                 val plannedTripMode = backStackEntry.arguments?.getString("tripMode")
                                 val focusLat = backStackEntry.arguments?.getString("focusLat")?.toDoubleOrNull()
                                 val focusLon = backStackEntry.arguments?.getString("focusLon")?.toDoubleOrNull()
+                                val compareSlot = backStackEntry.arguments?.getString("compareSlot")
                                 Box(modifier = Modifier.padding(bottom = rootBottomPadding)) { // MapScreen edge-to-edge
                                     if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.MAP)) {
                                         // Mode simplifié : la carte est la racine, le tiroir remplace
@@ -1242,6 +1248,7 @@ class MainActivity : ComponentActivity() {
                                                     plannedTripMode = plannedTripMode,
                                                     focusLat = focusLat,
                                                     focusLon = focusLon,
+                                                    compareSlot = compareSlot,
                                                     onOpenSimpleModeMenu = {
                                                         drawerScope.launch { drawerState.open() }
                                                     }
@@ -1257,7 +1264,8 @@ class MainActivity : ComponentActivity() {
                                                 plannedTripId = plannedTripId,
                                                 plannedTripMode = plannedTripMode,
                                                 focusLat = focusLat,
-                                                focusLon = focusLon
+                                                focusLon = focusLon,
+                                                compareSlot = compareSlot
                                             )
                                         }
                                     } else {
@@ -1329,11 +1337,17 @@ class MainActivity : ComponentActivity() {
 
                             // Statistiques
                             composable("stats") {
-                                Box(modifier = Modifier.padding(screenPadding)) {
-                                    // ✅ AJOUT DU REPOSITORY ICI 👇
-                                    if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.STATS)) {
-                                        StatisticsWrapperScreen(navController = navController, repository = repository)
-                                    } else {
+                                if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.STATS)) {
+                                    Box(modifier = Modifier.padding(bottom = rootBottomPadding)) {
+                                        // ✅ AJOUT DU REPOSITORY ICI 👇
+                                        StatisticsWrapperScreen(
+                                            navController = navController,
+                                            repository = repository,
+                                            contentPadding = screenPadding
+                                        )
+                                    }
+                                } else {
+                                    Box(modifier = Modifier.padding(screenPadding)) {
                                         DisabledFeatureRoute(navController, txtUnavailable)
                                     }
                                 }

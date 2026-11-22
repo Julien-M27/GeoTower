@@ -560,6 +560,7 @@ fun FirstStartScreen(
     val pendingDbSuccessPopup = fr.geotower.AppGlobalState.pendingDbSuccessPopups.firstOrNull()
     if (pendingDbSuccessPopup != null) {
         val isGeneration = pendingDbSuccessPopup.isGeneration
+        val mobileDbLabel = stringResource(R.string.notification_history_type_db_mobile)
         fun dismissDownloadedDatabasePopup() {
             showSuccessDialog = false
             fr.geotower.AppGlobalState.dismissDbSuccessPopup(pendingDbSuccessPopup.workId)
@@ -567,7 +568,7 @@ fun FirstStartScreen(
             fr.geotower.AppGlobalState.dbSuccessPopupName.value = null
             fr.geotower.AppGlobalState.dbSuccessPopupIsGeneration.value = false
             if (
-                pendingDbSuccessPopup.databaseName.contains(context.getString(R.string.notification_history_type_db_mobile)) &&
+                pendingDbSuccessPopup.databaseName.contains(mobileDbLabel) &&
                 steps.getOrNull(currentStep) == OnboardingStep.Database
             ) {
                 goToNextStep()
@@ -1578,15 +1579,29 @@ fun StepDatabaseDesign(useOneUi: Boolean, cardShape: Shape, cardBorder: BorderSt
 
             Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
 
-            // 🚀 APPEL DU NOUVEAU COMPOSANT PARTAGÉ
+            // 🚀 APPEL DES COMPOSANTS PARTAGÉS (FRANCE & CANADA)
             fr.geotower.ui.components.DatabaseDownloadCard(
                 useOneUi = useOneUi,
                 shape = cardShape,
                 border = cardBorder,
                 bubbleColor = bubbleColor,
-                title = stringResource(R.string.settings_section_database),
+                title = "${stringResource(R.string.settings_database_online_title)} (France — ANFR)",
                 onSafeClick = onSafeClick,
-                disableDownloadAction = disableIndividualDownloads
+                disableDownloadAction = disableIndividualDownloads,
+                country = fr.geotower.data.db.DatabaseCountry.FR
+            )
+
+            Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+
+            fr.geotower.ui.components.DatabaseDownloadCard(
+                useOneUi = useOneUi,
+                shape = cardShape,
+                border = cardBorder,
+                bubbleColor = bubbleColor,
+                title = "${stringResource(R.string.settings_database_online_title)} (Canada — ISDE)",
+                onSafeClick = onSafeClick,
+                disableDownloadAction = disableIndividualDownloads,
+                country = fr.geotower.data.db.DatabaseCountry.CA
             )
 
             Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))

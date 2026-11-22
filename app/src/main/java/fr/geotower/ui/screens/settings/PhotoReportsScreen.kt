@@ -962,6 +962,9 @@ private fun formatSiteCodeLabel(
 ): String? {
     if (siteId.isBlank()) return null
     return when {
+        siteId.startsWith("CA-", ignoreCase = true) -> {
+            "${stringResource(R.string.appstrings_ca_ised_station_number_label)} : $siteId"
+        }
         siteInfo?.isAnfrId == true -> {
             stringResource(R.string.photo_reports_code_anfr, siteId)
         }

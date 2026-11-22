@@ -301,11 +301,22 @@ fun SignalQuestUploadScreen(
     val ignStyle by AppConfig.ignStyle
 
     // ✅ NOUVEAU : Fournisseur effectif calculé une seule fois au chargement
-    var effectiveProvider by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(fr.geotower.utils.MapProviderRules.sanitize(AppConfig.mapProvider.intValue)) }
+    val isCanadaUploadSite = androidx.compose.runtime.remember(lat, lon) {
+        if (lat != 0.0 || lon != 0.0) {
+            fr.geotower.data.db.DatabaseCountry.forCoordinates(lat, lon) == fr.geotower.data.db.DatabaseCountry.CA
+        } else {
+            fr.geotower.data.db.DatabaseCountryStore.activeCountryState.value == fr.geotower.data.db.DatabaseCountry.CA
+        }
+    }
+    fun resolveEffectiveProvider(rawProvider: Int): Int {
+        val sanitized = fr.geotower.utils.MapProviderRules.sanitize(rawProvider)
+        return if (isCanadaUploadSite && sanitized == 0) 1 else sanitized
+    }
+    var effectiveProvider by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(resolveEffectiveProvider(AppConfig.mapProvider.intValue)) }
     var mapFiles by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(emptyArray<java.io.File>()) }
 
-    androidx.compose.runtime.LaunchedEffect(AppConfig.mapProvider.intValue) {
-        effectiveProvider = fr.geotower.utils.MapProviderRules.sanitize(AppConfig.mapProvider.intValue)
+    androidx.compose.runtime.LaunchedEffect(AppConfig.mapProvider.intValue, isCanadaUploadSite) {
+        effectiveProvider = resolveEffectiveProvider(AppConfig.mapProvider.intValue)
     }
 
     androidx.compose.runtime.LaunchedEffect(Unit) {

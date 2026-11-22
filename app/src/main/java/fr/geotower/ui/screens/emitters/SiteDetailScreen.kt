@@ -417,6 +417,7 @@ fun SiteDetailScreen(
     var technique by remember { mutableStateOf<TechniqueEntity?>(null) }
     // Identifiants eNB/gNB du pylône pour cet opérateur (base optionnelle geotower_fr_enb.db).
     var networkIds by remember { mutableStateOf(fr.geotower.data.EnbRepository.SiteNetworkIds()) }
+    var caIsedDetails by remember { mutableStateOf<fr.geotower.data.CaIsedSiteDetails?>(null) }
     var hsDataMap by remember { mutableStateOf<Map<String, fr.geotower.data.models.SiteHsEntity>>(emptyMap()) } // 🚨 AJOUT
     var supportAntennas by remember { mutableStateOf<List<LocalisationEntity>>(emptyList()) }
     var fullSupportHsData by remember { mutableStateOf<Map<String, fr.geotower.data.models.SiteHsEntity>>(emptyMap()) }
@@ -428,7 +429,12 @@ fun SiteDetailScreen(
     var refreshTrigger by remember { mutableIntStateOf(0) }
     val completedWorkIds = remember { mutableSetOf<UUID>() }
 
-    val currentUploadSiteId = physique?.idSupport?.takeIf { it.isNotBlank() } ?: antenna?.idAnfr.orEmpty()
+    val defaultUploadSiteId = physique?.idSupport?.takeIf { it.isNotBlank() } ?: antenna?.idAnfr.orEmpty()
+    val currentUploadSiteId = if (antenna?.idAnfr?.startsWith("CA-", ignoreCase = true) == true) {
+        caIsedDetails?.recordId?.takeIf { it.isNotBlank() } ?: defaultUploadSiteId
+    } else {
+        defaultUploadSiteId
+    }
     val unknownText = stringResource(R.string.appstrings_unknown)
 
     fun navigateToUploadWithUris(uris: List<Uri>) {
@@ -444,7 +450,12 @@ fun SiteDetailScreen(
         val selectedUris = uris
         if (selectedUris.isNotEmpty() && antenna != null) {
             val draftId = SignalQuestUploadDraftStore.put(selectedUris.map { it.toString() })
-            val uploadSiteId = physique?.idSupport?.takeIf { it.isNotBlank() } ?: antenna!!.idAnfr
+            val defaultUploadSiteId = physique?.idSupport?.takeIf { it.isNotBlank() } ?: antenna!!.idAnfr
+            val uploadSiteId = if (antenna!!.idAnfr.startsWith("CA-", ignoreCase = true)) {
+                caIsedDetails?.recordId?.takeIf { it.isNotBlank() } ?: defaultUploadSiteId
+            } else {
+                defaultUploadSiteId
+            }
             val safeOperator = Uri.encode(antenna!!.operateur ?: unknownText)
             val safeAzimuts = Uri.encode(antenna!!.azimuts ?: technique?.detailsAzimutsFrequences?.let {
                 FrequencyAzimuths.decode(it).values.flatten().distinct().sorted().joinToString(",").takeIf { s -> s.isNotBlank() }
@@ -554,6 +565,7 @@ fun SiteDetailScreen(
         featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.SITE_SPEEDTESTS) &&
             featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SITE_SPEEDTESTS) &&
             featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SIGNALQUEST_SPEEDTESTS)
+    val isCanadaSite = antenna?.idAnfr?.startsWith("CA-") == true
     val canUseElevationProfile =
         featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.ELEVATION_PROFILE) &&
             featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SITE_ELEVATION_PROFILE) &&
@@ -680,11 +692,13 @@ fun SiteDetailScreen(
     fun openSiteSpeedtests(site: LocalisationEntity, sitePhysique: PhysiqueEntity?) {
         if (!canUseSiteSpeedtests) return
         val plmn = SignalQuestOperators.speedtestPlmnFor(site.operateur)
+        val isCaSite = site.idAnfr.startsWith("CA-", ignoreCase = true)
+        val caRecordId = if (isCaSite) caIsedDetails?.recordId?.takeIf { it.isNotBlank() } else null
         val params = buildList {
-            sitePhysique?.idSupport?.trim()?.takeIf { it.isNotEmpty() }?.let {
+            (caRecordId ?: sitePhysique?.idSupport?.trim()?.takeIf { it.isNotEmpty() })?.let {
                 add("siteId=${Uri.encode(it)}")
             }
-            site.idAnfr.trim().takeIf { it.isNotEmpty() }?.let {
+            (caRecordId ?: site.idAnfr.trim().takeIf { it.isNotEmpty() })?.let {
                 add("anfrCode=${Uri.encode(it)}")
             }
             SignalQuestOperators.operatorParamFor(site.operateur)?.let {
@@ -696,7 +710,7 @@ fun SiteDetailScreen(
             plmn?.let {
                 add("mnc=${it.mnc}")
             }
-            add("market=FR")
+            add("market=${if (isCaSite) "CA" else "FR"}")
         }
         if (params.isNotEmpty()) {
             navController.navigate("site_speedtests?${params.joinToString("&")}")
@@ -802,7 +816,12 @@ fun SiteDetailScreen(
             )
             siteSiblings = box
             localData = box.firstOrNull { it.latitude.toFloat() == lat.toFloat() && it.longitude.toFloat() == lon.toFloat() && it.idAnfr.matchesRequestedAnfrId(antennaId) }
-                ?: box.firstOrNull { it.latitude.toFloat() == lat.toFloat() && it.longitude.toFloat() == lon.toFloat() }
+        }
+        if (localData == null && antennaId.isNotBlank()) {
+            localData = repository.getAntennasByExactId(antennaId).firstOrNull()
+        }
+        if (localData == null && siteSiblings.isNotEmpty()) {
+            localData = siteSiblings.firstOrNull { it.latitude.toFloat() == lat.toFloat() && it.longitude.toFloat() == lon.toFloat() }
         }
         if (localData != null || antenna == null) {
             antenna = localData
@@ -869,8 +888,16 @@ fun SiteDetailScreen(
 
         if (localData != null && localData.idAnfr.isNotBlank() && canUseSitePhotos) {
             val opName = localData.operateur ?: ""
-            // ✅ CORRECTION MAJEURE : On utilise le numéro de support physique universel
+            // ✅ CORRECTION MAJEURE : On utilise le numéro de support physique universel (ou le code site opérateur ISDE au Canada)
             val supportSiteId = physique?.idSupport ?: localData.idAnfr
+            val signalQuestSiteId = if (localData.idAnfr.startsWith("CA-", ignoreCase = true)) {
+                val caDetails = caIsedDetails ?: kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    fr.geotower.data.CaIsedSiteDetailsRepository.loadForSite(context, localData.idAnfr)
+                }
+                caDetails?.recordId?.takeIf { it.isNotBlank() } ?: supportSiteId
+            } else {
+                supportSiteId
+            }
             val signalQuestOperator = SignalQuestOperators.operatorParamFor(opName)
             val signalQuestOperatorKey = signalQuestOperator?.let { OperatorColors.keyFor(it) }
             val signalQuestOperatorLabel = OperatorColors.specForKey(signalQuestOperatorKey)?.label
@@ -898,7 +925,7 @@ fun SiteDetailScreen(
                 try {
                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                         val response = fr.geotower.data.api.SignalQuestClient.api.getSitePhotos(
-                            siteId = supportSiteId
+                            siteId = signalQuestSiteId
                         )
                         val allowedOperators = (listOfNotNull(signalQuestOperator) + supportAntennas.mapNotNull { it.operateur }).distinct()
                         response.body()?.data
@@ -941,7 +968,7 @@ fun SiteDetailScreen(
     }
 
     // 🚀 CHARGEMENT DU SPEEDTEST (Signal Quest) - Séparé pour plus de stabilité
-    LaunchedEffect(antenna?.idAnfr, antenna?.operateur, physique?.idSupport, speedtestBestMetric, refreshTrigger, featureFlags, showSpeedtest) {
+    LaunchedEffect(antenna?.idAnfr, antenna?.operateur, physique?.idSupport, caIsedDetails?.recordId, speedtestBestMetric, refreshTrigger, featureFlags, showSpeedtest) {
         val currentAntenna = antenna
         val currentPhysique = physique
         if (currentAntenna == null || currentAntenna.idAnfr.isBlank()) return@LaunchedEffect
@@ -956,11 +983,20 @@ fun SiteDetailScreen(
             speedtestData = null
             isSpeedtestLoading = true
             try {
+                val isCaSite = currentAntenna.idAnfr.startsWith("CA-", ignoreCase = true)
+                val caRecordId = if (isCaSite) {
+                    (caIsedDetails ?: kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        fr.geotower.data.CaIsedSiteDetailsRepository.loadForSite(context, currentAntenna.idAnfr)
+                    })?.recordId?.takeIf { it.isNotBlank() }
+                } else {
+                    null
+                }
                 speedtestData = fetchBestSignalQuestSpeedtest(
                     operator = currentAntenna.operateur,
-                    supportId = currentPhysique?.idSupport,
-                    anfrCode = currentAntenna.idAnfr,
-                    metric = SignalQuestSpeedtestSortMetric.fromStorageKey(speedtestBestMetric)
+                    supportId = caRecordId ?: currentPhysique?.idSupport,
+                    anfrCode = caRecordId ?: currentAntenna.idAnfr,
+                    metric = SignalQuestSpeedtestSortMetric.fromStorageKey(speedtestBestMetric),
+                    market = if (isCaSite) "CA" else "FR"
                 )
                 AppLogger.d(TAG_SPEEDTEST, "Speedtest data=$speedtestData")
             } catch (e: kotlinx.coroutines.CancellationException) {
@@ -1037,6 +1073,17 @@ fun SiteDetailScreen(
 
     // Identifiants réseau : lecture locale de la base optionnelle, avec repli sur l'API Live si absente.
     // Le bloc ne s'affiche pas si aucun eNB/gNB n'est rattaché au pylône.
+    LaunchedEffect(antenna?.idAnfr) {
+        val siteId = antenna?.idAnfr
+        caIsedDetails = if (siteId != null && siteId.startsWith("CA-")) {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                fr.geotower.data.CaIsedSiteDetailsRepository.loadForSite(context, siteId)
+            }
+        } else {
+            null
+        }
+    }
+
     LaunchedEffect(antenna?.idAnfr, physique?.idSupport, antenna?.operateur, antenna?.latitude, antenna?.longitude, showNetworkIds) {
         networkIds = if (showNetworkIds) {
             val localIds = fr.geotower.data.EnbRepository(context).getIdentifiersForSupport(
@@ -1439,17 +1486,22 @@ fun SiteDetailScreen(
             if (showSignalQuestSheet) {
                 val signalQuestOperator = SignalQuestOperators.operatorParamFor(info.operateur)
                 if (signalQuestOperator != null) {
+                    val isCaSite = info.idAnfr.startsWith("CA-", ignoreCase = true)
+                    val caRecordId = if (isCaSite) caIsedDetails?.recordId?.takeIf { it.isNotBlank() } else null
+                    val sqMarket = if (isCaSite) "CA" else "FR"
                     val websiteUrl = signalQuestWebsiteUrl(
-                        anfrCode = info.idAnfr,
+                        anfrCode = caRecordId ?: info.idAnfr,
                         operator = signalQuestOperator,
                         latitude = info.latitude,
-                        longitude = info.longitude
+                        longitude = info.longitude,
+                        market = sqMarket
                     )
                     val appDeeplinkUrl = signalQuestAppDeeplinkUrl(
-                        siteId = physique?.idSupport,
+                        siteId = caRecordId ?: physique?.idSupport ?: info.idAnfr,
                         operator = signalQuestOperator,
                         latitude = info.latitude,
-                        longitude = info.longitude
+                        longitude = info.longitude,
+                        market = sqMarket
                     )
 
                     ModalBottomSheet(onDismissRequest = { showSignalQuestSheet = false }, sheetState = sheetState, containerColor = sheetBgColor) {
@@ -1606,7 +1658,7 @@ fun SiteDetailScreen(
                     val blockCustomize = if (block == "bearing" && bearingHeightPaired) null else onCustomizeBlock
                     fr.geotower.ui.components.CustomizableBlock(block, blockCustomize) {
                     when (block) {
-                        "status" -> if (showStatus) {
+                        "status" -> if (showStatus && !isCanadaSite) {
                             val hsEntity = hsDataMap.values.firstOrNull()
                             val isOutage = hsEntity != null
                             val outageText = hsEntity?.let { fr.geotower.ui.components.formatOutageDetails(it) }
@@ -1672,8 +1724,7 @@ fun SiteDetailScreen(
                                 outageDetails = hsEntity,
                                 showVoiceRow = showStatusVoice,
                                 showDataRow = showStatusData,
-                                onAlertArcep = if (canUseSiteExternalLinks) {
-    val sizing = LocalGeoTowerUiSizing.current
+                                onAlertArcep = if (!info.idAnfr.startsWith("CA-", ignoreCase = true) && canUseSiteExternalLinks) {
                                     { safeClick("alert_arcep_${info.idAnfr}") { openWebsiteUrl(ARCEP_ALERT_URL) } }
                                 } else {
                                     null
@@ -1808,6 +1859,12 @@ fun SiteDetailScreen(
                             val opName = info.operateur ?: ""
                             // 🚨 CORRECTION : On affiche toujours le composant (plus de condition de liste vide)
                             if (showPhotos && canUseSitePhotos && info.idAnfr.isNotBlank()) {
+                                val sqSiteId = if (isCanadaSite) {
+                                    caIsedDetails?.recordId?.takeIf { it.isNotBlank() }
+                                        ?: (physique?.idSupport ?: info.idAnfr)
+                                } else {
+                                    physique?.idSupport ?: info.idAnfr
+                                }
                                 CommunityPhotosSectionShared(
                                     photos = communityPhotos,
                                     operatorName = opName,
@@ -1821,10 +1878,10 @@ fun SiteDetailScreen(
                                     } else {
                                         null
                                     },
-                                    favoriteScopeId = physique?.idSupport ?: info.idAnfr,
+                                    favoriteScopeId = sqSiteId,
                                     favoriteSelectionEnabled = true,
                                     // Même identifiant que celui ayant servi à charger les photos.
-                                    signalQuestSiteId = physique?.idSupport ?: info.idAnfr
+                                    signalQuestSiteId = sqSiteId
                                 )
                             }
                         }
@@ -2018,9 +2075,20 @@ fun SiteDetailScreen(
                                     }
                                 )
                             }
+                            caIsedDetails?.let { caDetails ->
+                                fr.geotower.ui.components.CaIsedDetailsCard(
+                                    details = caDetails,
+                                    cardBgColor = cardBgColor,
+                                    blockShape = blockShape
+                                )
+                            }
                         }
                         "links" -> {
-                            if (showLinks && canUseSiteExternalLinks && enbAnalyticsTable != null) {
+                            val hasCanadaLinks = isCanadaSite && (
+                                fr.geotower.data.api.CellMapperLinks.supports(info.operateur) ||
+                                    fr.geotower.data.api.SignalQuestOperators.operatorParamFor(info.operateur) != null
+                                )
+                            if (showLinks && canUseSiteExternalLinks && (enbAnalyticsTable != null || hasCanadaLinks)) {
                                 fr.geotower.ui.components.SiteExternalLinksBlock(
                                     info = info,
                                     cardBgColor = cardBgColor,
@@ -2231,6 +2299,7 @@ fun SiteDetailScreen(
                     useOneUi = uiStyle.useOneUi,
                     bubbleColor = uiStyle.bubbleColor,
                     highlightBlockId = settingsHighlightBlock,
+                    isCanadaSite = isCanadaSite,
                     // Inséré, le panneau ne règle que cette section-là : le dire dans le titre, sinon
                     // il se confond avec celui de la fiche site autonome.
                     title = if (embedded) stringResource(R.string.appstrings_page_site_embedded_settings) else null
@@ -3026,6 +3095,7 @@ private fun RadioSiteIdentifiersCard(
     blockShape: RoundedCornerShape
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
+    val resources = androidx.compose.ui.platform.LocalResources.current
 
     RadioSiteInfoCard(
         title = stringResource(R.string.appstrings_site_ids_option),
@@ -3039,9 +3109,9 @@ private fun RadioSiteIdentifiersCard(
             onCopy = {
                 copyRadioSiteValue(
                     context = context,
-                    label = context.getString(R.string.appstrings_id_support_copy),
+                    label = resources.getString(R.string.appstrings_id_support_copy),
                     value = marker.supportId,
-                    toastMessage = context.getString(R.string.appstrings_id_copied),
+                    toastMessage = resources.getString(R.string.appstrings_id_copied),
                     field = ShareHistoryStore.FIELD_ID_SUPPORT,
                     marker = marker
                 )
@@ -3053,9 +3123,9 @@ private fun RadioSiteIdentifiersCard(
             onCopy = {
                 copyRadioSiteValue(
                     context = context,
-                    label = context.getString(R.string.appstrings_station_anfr),
+                    label = resources.getString(R.string.appstrings_station_anfr),
                     value = marker.stationId,
-                    toastMessage = context.getString(R.string.appstrings_id_copied),
+                    toastMessage = resources.getString(R.string.appstrings_id_copied),
                     field = ShareHistoryStore.FIELD_ID_ANFR,
                     marker = marker
                 )
@@ -3072,6 +3142,7 @@ private fun RadioSiteAddressCard(
     blockShape: RoundedCornerShape
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
+    val resources = androidx.compose.ui.platform.LocalResources.current
     val gpsCoords = formatRadioSiteGps(marker.latitude, marker.longitude)
     val cleanGpsCoords = String.format(Locale.US, "%.5f, %.5f", marker.latitude, marker.longitude)
 
@@ -3087,9 +3158,9 @@ private fun RadioSiteAddressCard(
             onCopy = {
                 copyRadioSiteValue(
                     context = context,
-                    label = context.getString(R.string.appstrings_address_copy),
+                    label = resources.getString(R.string.appstrings_address_copy),
                     value = marker.addressSummary,
-                    toastMessage = context.getString(R.string.appstrings_address_copied),
+                    toastMessage = resources.getString(R.string.appstrings_address_copied),
                     field = ShareHistoryStore.FIELD_ADDRESS,
                     marker = marker
                 )
@@ -3101,9 +3172,9 @@ private fun RadioSiteAddressCard(
             onCopy = {
                 copyRadioSiteValue(
                     context = context,
-                    label = context.getString(R.string.appstrings_gps_coords_copy),
+                    label = resources.getString(R.string.appstrings_gps_coords_copy),
                     value = cleanGpsCoords,
-                    toastMessage = context.getString(R.string.appstrings_coords_copied),
+                    toastMessage = resources.getString(R.string.appstrings_coords_copied),
                     field = ShareHistoryStore.FIELD_GPS,
                     marker = marker
                 )
@@ -3313,7 +3384,7 @@ private fun enbAnalyticsMapUrl(
         .toString()
 }
 
-private fun signalQuestWebsiteUrl(anfrCode: String, operator: String, latitude: Double, longitude: Double): String {
+private fun signalQuestWebsiteUrl(anfrCode: String, operator: String, latitude: Double, longitude: Double, market: String = "FR"): String {
     return Uri.Builder()
         .scheme("https")
         .authority("signalquest.fr")
@@ -3322,12 +3393,13 @@ private fun signalQuestWebsiteUrl(anfrCode: String, operator: String, latitude: 
         .appendQueryParameter("operator", operator)
         .appendQueryParameter("lat", latitude.toString())
         .appendQueryParameter("lng", longitude.toString())
+        .appendQueryParameter("market", market)
         .appendQueryParameter("open", "antenna")
         .build()
         .toString()
 }
 
-private fun signalQuestAppDeeplinkUrl(siteId: String?, operator: String, latitude: Double, longitude: Double): String {
+private fun signalQuestAppDeeplinkUrl(siteId: String?, operator: String, latitude: Double, longitude: Double, market: String = "FR"): String {
     return Uri.Builder()
         .scheme("https")
         .authority("signalquest.fr")
@@ -3336,6 +3408,7 @@ private fun signalQuestAppDeeplinkUrl(siteId: String?, operator: String, latitud
         .appendQueryParameter("operator", operator)
         .appendQueryParameter("lat", latitude.toString())
         .appendQueryParameter("lng", longitude.toString())
+        .appendQueryParameter("market", market)
         .appendQueryParameter("open", "antenna")
         .appendQueryParameter("autoOpen", "0")
         .build()

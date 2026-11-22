@@ -75,7 +75,7 @@ object CommunityDataPreferences {
         communityOperator(OperatorColors.SRR_KEY),
         communityOperator(OperatorColors.FREE_CARAIBE_KEY),
         communityOperator(OperatorColors.TELCO_OI_KEY)
-    )
+    ) + OperatorColors.canada.map { communityOperator(it.key) }
 
     private fun communityOperator(
         key: String,

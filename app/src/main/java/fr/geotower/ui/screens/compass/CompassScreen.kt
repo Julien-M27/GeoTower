@@ -22,6 +22,7 @@ import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Spring
+import androidx.compose.ui.zIndex
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
@@ -176,6 +177,7 @@ fun CompassScreen(
     var showCompassSettingsSheet by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
     val rawAntennasList by viewModel.antennas.collectAsState()
+    val isCompassLoading by viewModel.isLoading.collectAsState()
     val hiddenSites by HiddenSitesStore.flow(context).collectAsState()
     val antennasList = remember(rawAntennasList, hiddenSites) {
         HiddenSitesStore.filter(context, rawAntennasList)
@@ -426,10 +428,46 @@ fun CompassScreen(
         }
     }
 
+    val activeCountry by fr.geotower.data.db.DatabaseCountryStore.activeCountryState
+    var manualCountry by remember { mutableStateOf<fr.geotower.data.db.DatabaseCountry?>(null) }
+    var isCompassUsingOnlineDb by remember { mutableStateOf(false) }
+    var compassSwitchCheckTrigger by remember { mutableIntStateOf(0) }
+    var showCompassSwitchToast by remember { mutableStateOf(false) }
+
+    LaunchedEffect(latitude, longitude, manualCountry) {
+        val targetCountry = manualCountry ?: if (latitude != 0.0 || longitude != 0.0) {
+            fr.geotower.data.db.DatabaseCountry.forCoordinates(latitude, longitude)
+        } else {
+            null
+        }
+        if (targetCountry != null && targetCountry != activeCountry) {
+            fr.geotower.data.db.DatabaseCountryStore.setActive(context, targetCountry)
+        }
+    }
+
+    val resources = androidx.compose.ui.platform.LocalResources.current
+    LaunchedEffect(activeCountry, compassSwitchCheckTrigger) {
+        val online = withContext(Dispatchers.IO) {
+            fr.geotower.data.api.LiveDatabaseStatus.isInUse(context, activeCountry)
+        }
+        isCompassUsingOnlineDb = online
+        if (showCompassSwitchToast) {
+            showCompassSwitchToast = false
+            android.widget.Toast.makeText(
+                context,
+                resources.getString(
+                    if (online) R.string.country_db_source_status_online else R.string.country_db_source_status_local,
+                    activeCountry.code
+                ),
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
     // =====================================================================
     // NOUVEAU BLOC : FORCE LA LECTURE DE LA DB AUTOUR DE L'UTILISATEUR
     // =====================================================================
-    LaunchedEffect(latitude, longitude) {
+    LaunchedEffect(latitude, longitude, activeCountry, compassSwitchCheckTrigger) {
         if (latitude != 0.0 && longitude != 0.0) {
             // On crée un carré virtuel d'environ 6 à 7 km autour de l'utilisateur
             val latOffset = 0.06
@@ -451,10 +489,16 @@ fun CompassScreen(
     // --- MOTEUR RADAR : CALCUL DES 10 SITES LES PLUS PROCHES ---
     var radarSites by remember { mutableStateOf<List<RadarSite>>(emptyList()) }
 
+    LaunchedEffect(activeCountry) {
+        radarSites = emptyList()
+    }
+
     // NOUVEAU : On ajoute defaultOp pour que ça se mette à jour si tu changes de préféré !
-    LaunchedEffect(latitude, longitude, antennasList, defaultOp) {
+    LaunchedEffect(latitude, longitude, antennasList, defaultOp, activeCountry, isCompassLoading) {
         while (true) {
-            if (latitude != 0.0 && longitude != 0.0 && antennasList.isNotEmpty()) {
+            if (latitude == 0.0 && longitude == 0.0 || antennasList.isEmpty() || (radarSites.isEmpty() && isCompassLoading)) {
+                radarSites = emptyList()
+            } else {
                 withContext(Dispatchers.Default) {
 
                     // --- 1. DÉFINITION DE L'ORDRE DE PRIORITÉ ---
@@ -483,7 +527,8 @@ fun CompassScreen(
                             .toList()
 
                         RadarSite(
-                            id = mainAntenna.idAnfr.toLongOrNull() ?: 0L,
+                            id = mainAntenna.idAnfr.toLongOrNull() ?: mainAntenna.idAnfr.hashCode().toLong(),
+                            siteKey = mainAntenna.idAnfr,
                             operateurs = ops,
                             distance = res[0],
                             bearing = bearing,
@@ -545,6 +590,49 @@ fun CompassScreen(
                 .background(compassBg)
                 .padding(padding)
         ) {
+        androidx.compose.material3.Surface(
+            onClick = {
+                manualCountry = when (manualCountry) {
+                    null -> fr.geotower.data.db.DatabaseCountry.FR
+                    fr.geotower.data.db.DatabaseCountry.FR -> fr.geotower.data.db.DatabaseCountry.CA
+                    fr.geotower.data.db.DatabaseCountry.CA -> null
+                }
+                showCompassSwitchToast = true
+                compassSwitchCheckTrigger++
+                manualCountry?.let { chosen ->
+                    if (chosen != activeCountry) {
+                        fr.geotower.data.db.DatabaseCountryStore.setActive(context, chosen)
+                    }
+                }
+            },
+            shape = androidx.compose.foundation.shape.CircleShape,
+            color = if (isCompassUsingOnlineDb) {
+                MaterialTheme.colorScheme.tertiaryContainer
+            } else {
+                MaterialTheme.colorScheme.secondaryContainer
+            },
+            shadowElevation = 2.dp,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(start = 16.dp, top = 4.dp)
+                .zIndex(1f)
+        ) {
+            val countryPrefix = if (manualCountry == null) "Auto·${activeCountry.code}" else activeCountry.code
+            val sourceLabel = stringResource(
+                if (isCompassUsingOnlineDb) R.string.country_db_source_online else R.string.country_db_source_local
+            )
+            Text(
+                text = "$countryPrefix · $sourceLabel",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = if (isCompassUsingOnlineDb) {
+                    MaterialTheme.colorScheme.onTertiaryContainer
+                } else {
+                    MaterialTheme.colorScheme.onSecondaryContainer
+                },
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+            )
+        }
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -615,7 +703,7 @@ fun CompassScreen(
                                     .putFloat("clicked_lat", site.latitude.toFloat())
                                     .putFloat("clicked_lon", site.longitude.toFloat())
                                     .apply()
-                                navController.navigate("support_detail/${site.id}")
+                                navController.navigate("support_detail/${android.net.Uri.encode(site.siteKey)}")
                             },
                             onClusterClick = { sites -> selectedClusterSites = sites }
                         )
@@ -647,7 +735,7 @@ fun CompassScreen(
                             .putFloat("clicked_lat", site.latitude.toFloat())
                             .putFloat("clicked_lon", site.longitude.toFloat())
                             .apply()
-                        navController.navigate("support_detail/${site.id}")
+                        navController.navigate("support_detail/${android.net.Uri.encode(site.siteKey)}")
                     },
                     onClusterClick = { sites -> selectedClusterSites = sites }
                 )
@@ -688,7 +776,7 @@ fun CompassScreen(
                                             .putFloat("clicked_lat", site.latitude.toFloat())
                                             .putFloat("clicked_lon", site.longitude.toFloat())
                                             .apply()
-                                        navController.navigate("support_detail/${site.id}")
+                                        navController.navigate("support_detail/${android.net.Uri.encode(site.siteKey)}")
                                     }.padding(vertical = sizing.spacing(12.dp)),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
@@ -1243,7 +1331,8 @@ data class RadarSite(
     val distance: Float,
     val bearing: Float, // L'angle par rapport au Nord vrai
     val latitude: Double,  // ✅ NOUVEAU
-    val longitude: Double  // ✅ NOUVEAU
+    val longitude: Double, // ✅ NOUVEAU
+    val siteKey: String = id.toString()
 )
 
 @Composable

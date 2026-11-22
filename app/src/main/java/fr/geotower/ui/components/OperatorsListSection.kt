@@ -387,9 +387,13 @@ fun OperatorDetailItem(
         // ✅ On utilise la ressource Android officielle
         val txtModif = stringResource(R.string.appstrings_last_modification)
 
-        // ✅ PLUS DE " : " EN TROP !
-        DateLine(stringResource(R.string.appstrings_implementation), dateImp)
-        DateLine(stringResource(R.string.appstrings_activated_on), dateSer)
+        val isCanadaSite = antenna.idAnfr.startsWith("CA-")
+        if (!isCanadaSite || dateImp != "-") {
+            DateLine(stringResource(R.string.appstrings_implementation), dateImp)
+        }
+        if (!isCanadaSite || dateSer != "-") {
+            DateLine(stringResource(R.string.appstrings_activated_on), dateSer)
+        }
 
         if (dateMod != "-") {
             DateLine(txtModif, dateMod)

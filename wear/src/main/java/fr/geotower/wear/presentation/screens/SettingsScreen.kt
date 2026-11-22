@@ -39,6 +39,7 @@ import fr.geotower.wear.data.model.DistanceUnit
 import fr.geotower.wear.data.model.GpsFixStatus
 import fr.geotower.wear.data.model.GpsRefreshInterval
 import fr.geotower.wear.data.model.TechOrder
+import fr.geotower.wear.data.model.WearApiServer
 import fr.geotower.wear.data.model.WearLanguage
 import fr.geotower.wear.data.model.WearMapTheme
 import fr.geotower.wear.presentation.components.GpsStatusHeader
@@ -53,7 +54,9 @@ fun SettingsScreen(
     currentLanguage: WearLanguage,
     distanceUnit: DistanceUnit,
     techOrder: TechOrder,
+    apiServer: WearApiServer = WearApiServer.AUTO,
     onSourceChanged: (DataSourceMode) -> Unit,
+    onApiServerChanged: (WearApiServer) -> Unit = {},
     onGpsRefreshIntervalChanged: (GpsRefreshInterval) -> Unit,
     onMapThemeChanged: (WearMapTheme) -> Unit,
     onLanguageChanged: (WearLanguage) -> Unit,
@@ -138,6 +141,39 @@ fun SettingsScreen(
                     )
                 },
                 colors = if (isSelected) ChipDefaults.primaryChipColors() else ChipDefaults.secondaryChipColors(),
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        // Section 1b : Serveur API Web (Failover / Principal / Miroir)
+        item {
+            Text(
+                text = "SERVEUR API WEB",
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colors.onSurfaceVariant,
+                modifier = Modifier.padding(start = 4.dp, top = 4.dp)
+            )
+        }
+        item {
+            Chip(
+                onClick = { onApiServerChanged(apiServer.next()) },
+                label = {
+                    Text(
+                        text = apiServer.label,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White
+                    )
+                },
+                secondaryLabel = {
+                    Text(
+                        text = apiServer.subtitle,
+                        fontSize = 9.sp,
+                        color = MaterialTheme.colors.onSurfaceVariant
+                    )
+                },
+                colors = ChipDefaults.secondaryChipColors(),
                 modifier = Modifier.fillMaxWidth()
             )
         }

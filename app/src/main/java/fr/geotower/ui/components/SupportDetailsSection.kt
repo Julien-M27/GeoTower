@@ -195,7 +195,9 @@ fun SupportDetailsSection(
 
             InfoLine(txtSupportHeight, hauteurStr)
             InfoLine(label = "$txtSupportNature : ", value = nature)
-            InfoLine(label = "$txtOwner : ", value = proprietaire)
+            if (!mainInfo.idAnfr.startsWith("CA-")) {
+                InfoLine(label = "$txtOwner : ", value = proprietaire)
+            }
             InfoLine(txtDistanceLabel, "$finalDistanceStr $txtFromMyPosition")
             InfoLine(txtBearingLabel, bearingStr)
         }
@@ -276,10 +278,15 @@ fun SiteSupportDetailsBlock(
             val likelyOrangeVendor = resolveLikelyOrangeVendor(info)
 
             InfoLine(label = "$txtSupportNature : ", value = nature)
-            Spacer(modifier = Modifier.height(sizing.spacing(4.dp)))
-            InfoLine(label = "$txtOwner : ", value = proprietaire)
-            Spacer(modifier = Modifier.height(sizing.spacing(4.dp)))
-            InfoLine(label = "$txtExploitant : ", value = exploitant)
+            if (!info.idAnfr.startsWith("CA-")) {
+                Spacer(modifier = Modifier.height(sizing.spacing(4.dp)))
+                InfoLine(label = "$txtOwner : ", value = proprietaire)
+                Spacer(modifier = Modifier.height(sizing.spacing(4.dp)))
+                InfoLine(label = "$txtExploitant : ", value = exploitant)
+            } else if (exploitant != txtNotSpecified) {
+                Spacer(modifier = Modifier.height(sizing.spacing(4.dp)))
+                InfoLine(label = "$txtExploitant : ", value = exploitant)
+            }
             if (likelyOrangeVendor != null) {
                 Spacer(modifier = Modifier.height(sizing.spacing(4.dp)))
                 InfoLine(label = "$txtLikelyNetworkVendor : ", value = likelyOrangeVendor)

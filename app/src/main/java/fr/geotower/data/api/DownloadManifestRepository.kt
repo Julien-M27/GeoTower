@@ -1,5 +1,7 @@
 package fr.geotower.data.api
 
+import fr.geotower.data.db.DatabaseCountry
+import fr.geotower.data.db.DatabaseCountryStore
 import fr.geotower.utils.AppConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -147,17 +149,24 @@ object DownloadManifestRepository {
         }
     }
 
-    suspend fun getPreferredMobileDatabase(forceRefresh: Boolean = false): ServedFrom<DownloadManifestDatabase>? {
+    suspend fun getPreferredMobileDatabase(
+        forceRefresh: Boolean = false,
+        country: DatabaseCountry = DatabaseCountryStore.getActive()
+    ): ServedFrom<DownloadManifestDatabase>? {
         if (AppConfig.blockServerDatabase()) return null
         val candidates = getPreferredCandidates(forceRefresh).mapNotNull { served ->
-            val db = served.value.database ?: return@mapNotNull null
-            if (!DatabaseDownloader.isOfficialDatabaseDownloadUrl(db.url) ||
+            val db = when (country) {
+                DatabaseCountry.CA -> served.value.caDatabase
+                DatabaseCountry.FR -> served.value.database
+            } ?: return@mapNotNull null
+            if (!DatabaseDownloader.isOfficialDatabaseDownloadUrl(db.url, country) ||
                 !DatabaseDownloader.isValidRemoteDatabaseInfo(
                     filename = db.filename,
                     sizeBytes = db.sizeBytes,
                     sha256 = db.sha256,
                     schemaVersion = db.schemaVersion,
-                    countryCode = db.countryCode
+                    countryCode = db.countryCode,
+                    expectedCountry = country
                 )
             ) null else ServedFrom(db, served.host)
         }
@@ -166,17 +175,24 @@ object DownloadManifestRepository {
         return DatabaseDownloader.selectPreferredDatabase(primary, mirror)
     }
 
-    fun getPreferredMobileDatabaseSync(forceRefresh: Boolean = false): ServedFrom<DownloadManifestDatabase>? {
+    fun getPreferredMobileDatabaseSync(
+        forceRefresh: Boolean = false,
+        country: DatabaseCountry = DatabaseCountryStore.getActive()
+    ): ServedFrom<DownloadManifestDatabase>? {
         if (AppConfig.blockServerDatabase()) return null
         val candidates = getPreferredCandidatesSync(forceRefresh).mapNotNull { served ->
-            val db = served.value.database ?: return@mapNotNull null
-            if (!DatabaseDownloader.isOfficialDatabaseDownloadUrl(db.url) ||
+            val db = when (country) {
+                DatabaseCountry.CA -> served.value.caDatabase
+                DatabaseCountry.FR -> served.value.database
+            } ?: return@mapNotNull null
+            if (!DatabaseDownloader.isOfficialDatabaseDownloadUrl(db.url, country) ||
                 !DatabaseDownloader.isValidRemoteDatabaseInfo(
                     filename = db.filename,
                     sizeBytes = db.sizeBytes,
                     sha256 = db.sha256,
                     schemaVersion = db.schemaVersion,
-                    countryCode = db.countryCode
+                    countryCode = db.countryCode,
+                    expectedCountry = country
                 )
             ) null else ServedFrom(db, served.host)
         }

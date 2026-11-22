@@ -1,4 +1,4 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <plurals name="upload_history_recorded">
         <item quantity="one">%1$d photo enregistrée</item>
         <item quantity="other">%1$d photos enregistrées</item>
@@ -84,11 +84,11 @@
         <item quantity="other">%1$d stations</item>
     </plurals>
     <plurals name="site_network_ids_4g">
-        <item quantity="one">Identifiant 4G</item>
+        <item quantity="one" tools:ignore="ImpliedQuantity">Identifiant 4G</item>
         <item quantity="other">Identifiants 4G</item>
     </plurals>
     <plurals name="site_network_ids_5g">
-        <item quantity="one">Identifiant 5G</item>
+        <item quantity="one" tools:ignore="ImpliedQuantity">Identifiant 5G</item>
         <item quantity="other">Identifiants 5G</item>
     </plurals>
     <plurals name="emitter_heights">

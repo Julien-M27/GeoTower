@@ -354,6 +354,7 @@ object GeoTowerDbBuilder {
         // 1/ CSV hebdomadaire : construit l'accumulateur station (RAM) + statuts par systeme (disque).
         val sysInserter = BatchInserter(db, "INSERT OR REPLACE INTO stg_sysstatus VALUES (?, ?, ?, ?, ?)")
         val sysAzimuthInserter = BatchInserter(db, "INSERT OR IGNORE INTO stg_sysazimut VALUES (?, ?, ?)")
+        val weeklySupportInserter = BatchInserter(db, "INSERT OR IGNORE INTO stg_support VALUES (?, ?, ?, ?, ?)")
         var weeklyRows = 0L
         for (row in sources.weekly) {
             val currentRow = ++weeklyRows
@@ -380,6 +381,24 @@ object GeoTowerDbBuilder {
             }
             if (AnfrParsing.isActiveStatus(row.get("statut"))) stations.setActive(stationIndex)
             stations.updateGeneration(stationIndex, row.get("generation"))
+            val weeklySupId = AnfrParsing.cleanText(row.get("sup_id"))
+            if (weeklySupId.isNotEmpty()) {
+                val natId = AnfrParsing.intOrNone(row.get("nat_id"))
+                val tpoId = AnfrParsing.intOrNone(row.get("tpo_id"))
+                val hauteur = AnfrParsing.floatOrNone(row.get("sup_nm_haut"))
+                if (natId != null) usedNat.add(natId)
+                if (tpoId != null) usedTpo.add(tpoId)
+                weeklySupportInserter.add(listOf(idAnfr, weeklySupId, natId, tpoId, hauteur))
+            }
+            val weeklyInsee = AnfrParsing.cleanText(row.get("com_cd_insee"))
+                .ifEmpty { AnfrParsing.cleanText(row.get("code_insee")) }
+                .ifEmpty { null }
+            if (weeklyInsee != null) {
+                usedCommunes.add(weeklyInsee)
+                stations.setInseeCode(stationIndex, weeklyInsee)
+            }
+            val weeklyAddress = buildSupportAddress(row, weeklyInsee, references.communes)
+            if (weeklyAddress.isNotEmpty()) stations.setAddress(stationIndex, weeklyAddress)
             val sysName = AnfrParsing.cleanText(row.get("emr_lb_systeme"))
             if (sysName.isNotEmpty()) {
                 val statutId = statutIds.getId(row.get("statut"))
@@ -399,6 +418,7 @@ object GeoTowerDbBuilder {
         }
         sysInserter.flush()
         sysAzimuthInserter.flush()
+        weeklySupportInserter.flush()
         stageFrequencyAzimuths(db)
         report(BuildPhase.READING_STATIONS, weeklyRows, SOURCE_OBSERVATOIRE, sourceCounts.weekly)
         onWeeklyConsumed()
@@ -633,18 +653,7 @@ object GeoTowerDbBuilder {
                 if (tpoId != null) usedTpo.add(tpoId)
                 if (codeInsee != null) usedCommunes.add(codeInsee)
 
-                val lieu = AnfrParsing.cleanText(row.get("adr_lb_lieu"))
-                val add1 = AnfrParsing.cleanText(row.get("adr_lb_add1"))
-                val add2 = AnfrParsing.cleanText(row.get("adr_lb_add2"))
-                val add3 = AnfrParsing.cleanText(row.get("adr_lb_add3"))
-                val cp = AnfrParsing.cleanText(row.get("adr_nm_cp"))
-                val ville = if (codeInsee != null) references.communes[codeInsee] ?: "" else ""
-                val rue = listOf(lieu, add1, add2, add3).filter { it.isNotEmpty() }.joinToString(", ")
-                var adresse = rue
-                if (cp.isNotEmpty() || ville.isNotEmpty()) {
-                    adresse = if (adresse.isNotEmpty()) "$adresse, " else ""
-                    adresse += "$cp $ville".trim()
-                }
+                val adresse = buildSupportAddress(row, codeInsee, references.communes)
                 if (adresse.isNotEmpty()) stations.setAddress(stationIndex, adresse)
                 if (codeInsee != null) stations.setInseeCode(stationIndex, codeInsee)
 
@@ -1124,6 +1133,27 @@ object GeoTowerDbBuilder {
         "CREATE TABLE ${prefix}stg_arcep (id_anfr TEXT, operator_upper TEXT, nidt TEXT, is_zb INTEGER, PRIMARY KEY(id_anfr, operator_upper))",
         "CREATE TABLE ${prefix}stg_details (id_anfr TEXT PRIMARY KEY, details TEXT)",
     )
+
+    /** Builds a formatted postal address from ANFR support address columns. */
+    private fun buildSupportAddress(
+        row: AnfrCsvRow,
+        codeInsee: String?,
+        communes: Map<String, String>,
+    ): String {
+        val lieu = AnfrParsing.cleanText(row.get("adr_lb_lieu"))
+        val add1 = AnfrParsing.cleanText(row.get("adr_lb_add1"))
+        val add2 = AnfrParsing.cleanText(row.get("adr_lb_add2"))
+        val add3 = AnfrParsing.cleanText(row.get("adr_lb_add3"))
+        val cp = AnfrParsing.cleanText(row.get("adr_nm_cp"))
+        val ville = if (codeInsee != null) communes[codeInsee] ?: "" else ""
+        val rue = listOf(lieu, add1, add2, add3).filter { it.isNotEmpty() }.joinToString(", ")
+        var adresse = rue
+        if (cp.isNotEmpty() || ville.isNotEmpty()) {
+            adresse = if (adresse.isNotEmpty()) "$adresse, " else ""
+            adresse += "$cp $ville".trim()
+        }
+        return adresse
+    }
 
     /** Builds deterministic per-station JSON while retaining at most one station mapping in RAM. */
     private fun stageFrequencyAzimuths(db: SqlDatabase) {

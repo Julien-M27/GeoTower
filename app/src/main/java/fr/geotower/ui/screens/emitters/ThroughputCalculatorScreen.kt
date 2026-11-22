@@ -90,12 +90,15 @@ import androidx.navigation.NavController
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import fr.geotower.data.AnfrRepository
+import fr.geotower.data.CaIsedSiteDetails
+import fr.geotower.data.CaIsedSiteDetailsRepository
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.ui.components.SecureScreenEffect
 import fr.geotower.data.models.PhysiqueEntity
 import fr.geotower.data.models.TechniqueEntity
 import fr.geotower.R
+import fr.geotower.radio.CaIsedThroughputModel
 import fr.geotower.radio.MobileOperator
 import fr.geotower.radio.DuplexMode
 import fr.geotower.radio.RadioThroughputEngine
@@ -146,6 +149,7 @@ import fr.geotower.utils.SitePagePrefs
 import fr.geotower.utils.ThroughputPrefs
 import fr.geotower.utils.parseAndSortFrequencies
 import fr.geotower.utils.radioFrequencyLabel
+import fr.geotower.utils.radioTechnologyFrequencyLabel
 import java.util.Locale
 import kotlin.math.PI
 import kotlin.math.asin
@@ -168,7 +172,7 @@ import fr.geotower.utils.ThroughputTextKey
 
 private const val PANEL_AZIMUTH_HALF_BEAM_DEGREES = 45.0
 private const val MAX_FR_UPLINK_AGGREGATED_CARRIERS = 2
-private val LTE_LOW_BAND_MHZ = setOf(700, 800, 900)
+private val LTE_LOW_BAND_MHZ = setOf(600, 700, 800, 850, 900)
 
 private const val DEFAULT_RECEIVER_HEIGHT_METERS = 2f
 private const val RECEIVER_HEIGHT_MIN_METERS = 2f
@@ -230,6 +234,7 @@ fun ThroughputCalculatorScreen(
     var site by remember { mutableStateOf<LocalisationEntity?>(null) }
     var physique by remember { mutableStateOf<PhysiqueEntity?>(null) }
     var technique by remember { mutableStateOf<TechniqueEntity?>(null) }
+    var caDetails by remember { mutableStateOf<CaIsedSiteDetails?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var coneMapView by remember { mutableStateOf<org.osmdroid.views.MapView?>(null) }
     var customSettings by remember {
@@ -330,6 +335,7 @@ fun ThroughputCalculatorScreen(
         site = loaded.site
         physique = loaded.physique
         technique = loaded.technique
+        caDetails = loaded.caDetails
         isLoading = false
     }
 
@@ -362,7 +368,8 @@ fun ThroughputCalculatorScreen(
     }
     val effectiveEnabledBandKeys = if (bandKeysInitialized) enabledBandKeys else availableBandKeys
     val supportHeightMeters = physique?.hauteur
-    val result = remember(parsedBands, site?.operateur, customSettings, bandOverrides, aggregationSettings, include4G, include5G, includePlanned, supportHeightMeters, effectiveEnabledBandKeys) {
+    val isCanadaSite = site?.idAnfr?.startsWith("CA-") == true
+    val result = remember(parsedBands, site?.operateur, customSettings, bandOverrides, aggregationSettings, include4G, include5G, includePlanned, supportHeightMeters, effectiveEnabledBandKeys, isCanadaSite, caDetails) {
         calculateThroughput(
             bands = parsedBands,
             operatorName = site?.operateur,
@@ -378,7 +385,9 @@ fun ThroughputCalculatorScreen(
             receiverHeightMeters = customSettings.receiverHeightMeters.toDouble(),
             siteLatitude = site?.latitude ?: 0.0,
             siteLongitude = site?.longitude ?: 0.0,
-            siteAzimuths = site?.azimuts
+            siteAzimuths = site?.azimuts,
+            isCanadaSite = isCanadaSite,
+            caDetails = caDetails
         )
     }
     val txtSiteDetailsTitle = stringResource(R.string.appstrings_site_detail_title)
@@ -749,6 +758,18 @@ fun ThroughputShareContent(
     blockShape: Shape,
     coneMapBitmap: android.graphics.Bitmap? = null
 ) {
+    val context = LocalContext.current
+    val isCanadaSite = site.idAnfr.startsWith("CA-")
+    var caDetails by remember(site.idAnfr) { mutableStateOf<CaIsedSiteDetails?>(null) }
+    LaunchedEffect(site.idAnfr, isCanadaSite) {
+        caDetails = if (isCanadaSite) {
+            withContext(Dispatchers.IO) {
+                CaIsedSiteDetailsRepository.loadForSite(context, site.idAnfr)
+            }
+        } else {
+            null
+        }
+    }
     val txtUnknown = stringResource(R.string.appstrings_unknown)
     val txtAzimuthNotSpecified = stringResource(R.string.appstrings_azimuth_not_specified)
     val rawFrequencies = technique?.detailsFrequences?.takeIf { it.isNotBlank() } ?: site.frequences
@@ -767,7 +788,7 @@ fun ThroughputShareContent(
             .map { throughputBandKey(it) }
             .toSet()
     }
-    val result = remember(parsedBands, customSettings, bandOverrides, aggregationSettings, include4G, include5G, includePlanned, enabledBandKeys, physique?.hauteur) {
+    val result = remember(parsedBands, customSettings, bandOverrides, aggregationSettings, include4G, include5G, includePlanned, enabledBandKeys, physique?.hauteur, isCanadaSite, caDetails) {
         calculateThroughput(
             bands = parsedBands,
             operatorName = site.operateur,
@@ -783,7 +804,9 @@ fun ThroughputShareContent(
             receiverHeightMeters = customSettings.receiverHeightMeters.toDouble(),
             siteLatitude = site.latitude,
             siteLongitude = site.longitude,
-            siteAzimuths = site.azimuts
+            siteAzimuths = site.azimuts,
+            isCanadaSite = isCanadaSite,
+            caDetails = caDetails
         )
     }
     val blockOrder = remember(prefs) {
@@ -2360,7 +2383,10 @@ private suspend fun loadThroughputSite(
     }
     val physique = selected?.let { repository.getPhysiqueByAnfr(it.idAnfr).firstOrNull() }
     val technique = selected?.let { repository.getTechniqueByAnfr(it.idAnfr).firstOrNull() }
-    return ThroughputSiteData(selected, physique, technique)
+    val caDetails = selected?.idAnfr?.takeIf { it.startsWith("CA-") }?.let {
+        CaIsedSiteDetailsRepository.loadForSite(context, it)
+    }
+    return ThroughputSiteData(selected, physique, technique, caDetails)
 }
 
 private fun readThroughputCustomSettings(prefs: SharedPreferences): CustomModulationSettings {
@@ -2477,8 +2503,29 @@ private fun calculateThroughput(
     receiverHeightMeters: Double,
     siteLatitude: Double,
     siteLongitude: Double,
-    siteAzimuths: String?
+    siteAzimuths: String?,
+    isCanadaSite: Boolean = false,
+    caDetails: CaIsedSiteDetails? = null
 ): ThroughputResult {
+    if (isCanadaSite) {
+        return calculateCanadianThroughput(
+            bands = bands,
+            preset = preset,
+            customSettings = customSettings,
+            bandOverrides = bandOverrides,
+            aggregationSettings = aggregationSettings,
+            include4G = include4G,
+            include5G = include5G,
+            includePlanned = includePlanned,
+            enabledBandKeys = enabledBandKeys,
+            supportHeightMeters = supportHeightMeters,
+            receiverHeightMeters = receiverHeightMeters,
+            siteLatitude = siteLatitude,
+            siteLongitude = siteLongitude,
+            siteAzimuths = siteAzimuths,
+            caDetails = caDetails
+        )
+    }
     val operator = MobileOperator.fromLabel(operatorName)
     val engineProfile = engineProfileFor(preset, customSettings)
     val engineResult = if (operator != null) {
@@ -2586,6 +2633,157 @@ private fun calculateThroughput(
         confidenceScore = engineResult?.confidenceScore ?: 35,
         calculationVersion = engineResult?.calculationVersion ?: fr.geotower.radio.THROUGHPUT_CALCULATION_VERSION,
         sourceSummary = engineResult?.sourceSummary ?: ThroughputTextKey.THROUGHPUT_SOURCE_SUMMARY_DEFAULT
+    )
+}
+
+private fun calculateCanadianThroughput(
+    bands: List<FreqBand>,
+    preset: ThroughputPreset,
+    customSettings: CustomModulationSettings,
+    bandOverrides: Map<String, ThroughputBandOverride>,
+    aggregationSettings: ThroughputAggregationSettings,
+    include4G: Boolean,
+    include5G: Boolean,
+    includePlanned: Boolean,
+    enabledBandKeys: Set<String>,
+    supportHeightMeters: Double?,
+    receiverHeightMeters: Double,
+    siteLatitude: Double,
+    siteLongitude: Double,
+    siteAzimuths: String?,
+    caDetails: CaIsedSiteDetails?
+): ThroughputResult {
+    val engineProfile = engineProfileFor(preset, customSettings)
+    val selectedLat = customSettings.selectedLatitude
+    val selectedLon = customSettings.selectedLongitude
+    val profiles = CaIsedThroughputModel.buildCanadianBandProfiles(
+        bands = bands,
+        caDetails = caDetails,
+        fallbackSupportHeightM = supportHeightMeters,
+        siteLat = siteLatitude,
+        siteLon = siteLongitude,
+        selectedLat = selectedLat,
+        selectedLon = selectedLon
+    )
+
+    val calculatedBands = profiles.map { profile ->
+        val band = profile.band
+        val key = profile.bandKey
+        val bandOverride = bandOverrides[key]
+        val isPlanned = isPlannedThroughputBand(band)
+        val generationAllowed = (band.gen == 4 && include4G) || (band.gen == 5 && include5G)
+        val bandAllowed = enabledBandKeys.contains(key)
+        val isIncluded = generationAllowed && bandAllowed && (includePlanned || !isPlanned)
+        val excludedReason = when {
+            !generationAllowed -> if (band.gen == 5) ThroughputTextKey.THROUGHPUT_REASON_5G_DISABLED else ThroughputTextKey.THROUGHPUT_REASON_4G_DISABLED
+            !bandAllowed -> ThroughputTextKey.THROUGHPUT_REASON_BAND_EXCLUDED
+            isPlanned && !includePlanned -> ThroughputTextKey.THROUGHPUT_REASON_PLANNED_BAND
+            else -> null
+        }
+
+        val customMultipliers = if (preset == ThroughputPreset.Custom) {
+            throughputMultipliersFor(preset, band.gen, customSettings)
+        } else {
+            CustomThroughputMultipliers()
+        }
+
+        val estimate = CaIsedThroughputModel.estimateBandThroughput(
+            profile = profile,
+            throughputProfile = engineProfile,
+            bandOverride = bandOverride,
+            siteLat = siteLatitude,
+            siteLon = siteLongitude,
+            selectedLat = selectedLat,
+            selectedLon = selectedLon,
+            receiverHeightMeters = receiverHeightMeters,
+            isCustomPreset = preset == ThroughputPreset.Custom,
+            customDlMultiplier = customMultipliers.down,
+            customUlMultiplier = customMultipliers.up
+        )
+
+        val fallbackAzimuths = if (profile.azimuths.isNotEmpty()) {
+            profile.azimuths
+        } else {
+            siteAzimuths
+                ?.split(",")
+                ?.mapNotNull { it.trim().replace(',', '.').toDoubleOrNull() }
+                ?.filter { it in 0.0..360.0 }
+                ?.distinctBy { it.roundToInt() }
+                .orEmpty()
+        }
+
+        val baseDetails = CaIsedThroughputModel.formatBandDetails(profile)
+        val detailsWithSinr = if (estimate.estimatedDlSinrDb != null) {
+            "$baseDetails \u2022 SINR ~${estimate.estimatedDlSinrDb.roundToInt()} dB"
+        } else {
+            baseDetails
+        }
+        val bandLabel = if (band.value > 0) {
+            "${radioTechnologyFrequencyLabel(band.gen, band.value)} (${profile.ratBand})"
+        } else {
+            throughputBandLabel(band)
+        }
+
+        ThroughputBandResult(
+            key = key,
+            label = bandLabel,
+            generation = band.gen,
+            frequencyMHz = band.value,
+            frequencyDetails = detailsWithSinr,
+            modulationLabel = throughputModulationLabel(
+                dlModulationOrder = estimate.dlModulationOrder,
+                ulModulationOrder = estimate.ulModulationOrder,
+                dlLayers = estimate.dlMimoLayers,
+                ulLayers = estimate.ulMimoLayers
+            ),
+            bandwidthMHz = bandOverride?.bandwidthMHz ?: profile.bandwidthMHz,
+            bandwidthIsEstimated = profile.bandwidthIsEstimated && bandOverride?.bandwidthMHz == null,
+            coneDistance = estimate.coneDistance,
+            azimuths = fallbackAzimuths,
+            status = band.status,
+            downMbps = estimate.dlMbps,
+            upMbps = estimate.ulMbps,
+            isIncluded = isIncluded,
+            excludedReason = excludedReason
+        )
+    }
+
+    val aggregationProfile = engineProfile.withAggregationSettings(aggregationSettings)
+    val aggregationAwareBands = applyCarrierAggregationPolicy(calculatedBands, aggregationProfile)
+    val aggregationWarnings = aggregationAwareBands
+        .mapNotNull { it.downAggregationExcludedReason }
+        .distinct()
+
+    val warnings = mutableListOf(ThroughputTextKey.THROUGHPUT_WARNING_NETWORK_UNKNOWN)
+    if (caDetails == null) {
+        warnings += ThroughputTextKey.THROUGHPUT_CA_WARNING_DETAILS_UNAVAILABLE
+    }
+    if (aggregationAwareBands.count { it.isIncluded && it.downAggregationExcludedReason == null && it.upMbps > 0.0 } > MAX_FR_UPLINK_AGGREGATED_CARRIERS) {
+        warnings += ThroughputTextKey.THROUGHPUT_WARNING_UPLINK_AGGREGATION
+    }
+    warnings += aggregationWarnings
+
+    val assumptions = mutableListOf<String>()
+    if (caDetails != null) {
+        assumptions += ThroughputTextKey.THROUGHPUT_CA_ASSUMPTION_TAFL
+    }
+    if (selectedLat != null && selectedLon != null) {
+        assumptions += ThroughputTextKey.THROUGHPUT_CA_ASSUMPTION_LINK_BUDGET
+    }
+
+    var confidence = if (caDetails != null) 95 else 65
+    if (profiles.any { !it.hasSectorData }) confidence -= 8
+    if (profiles.any { it.azimuths.isEmpty() }) confidence -= 5
+    if (profiles.any { it.eirpDbm == null }) confidence -= 4
+    confidence = confidence.coerceIn(45, 98)
+
+    return ThroughputResult(
+        bands = aggregationAwareBands,
+        warnings = warnings.distinct(),
+        assumptions = assumptions.distinct(),
+        confidenceScore = confidence,
+        calculationVersion = "CA_ISED_RADIO_THROUGHPUT_V1",
+        sourceSummary = ThroughputTextKey.THROUGHPUT_CA_SOURCE_SUMMARY
     )
 }
 
@@ -3173,7 +3371,8 @@ private val nrUpModulationOptions = listOf(
 private data class ThroughputSiteData(
     val site: LocalisationEntity?,
     val physique: PhysiqueEntity?,
-    val technique: TechniqueEntity?
+    val technique: TechniqueEntity?,
+    val caDetails: CaIsedSiteDetails? = null
 )
 
 private data class MapPoint(

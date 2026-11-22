@@ -49,17 +49,27 @@ object MapFilterDefaults {
         BooleanFilter("f2g_900", AppConfig.f2G_900, factory = true),
         BooleanFilter("f2g_1800", AppConfig.f2G_1800, factory = true),
         BooleanFilter("f3g_900", AppConfig.f3G_900, factory = true),
+        BooleanFilter("f3g_1900", AppConfig.f3G_1900, factory = true),
         BooleanFilter("f3g_2100", AppConfig.f3G_2100, factory = true),
+        BooleanFilter("f4g_600", AppConfig.f4G_600, factory = true),
         BooleanFilter("f4g_700", AppConfig.f4G_700, factory = true),
         BooleanFilter("f4g_800", AppConfig.f4G_800, factory = true),
         BooleanFilter("f4g_900", AppConfig.f4G_900, factory = true),
         BooleanFilter("f4g_1800", AppConfig.f4G_1800, factory = true),
         BooleanFilter("f4g_2100", AppConfig.f4G_2100, factory = true),
+        BooleanFilter("f4g_2300", AppConfig.f4G_2300, factory = true),
         BooleanFilter("f4g_2600", AppConfig.f4G_2600, factory = true),
+        BooleanFilter("f4g_3500", AppConfig.f4G_3500, factory = true),
+        BooleanFilter("f5g_600", AppConfig.f5G_600, factory = true),
         BooleanFilter("f5g_700", AppConfig.f5G_700, factory = true),
+        BooleanFilter("f5g_850", AppConfig.f5G_850, factory = true),
         BooleanFilter("f5g_1400", AppConfig.f5G_1400, factory = true),
+        BooleanFilter("f5g_1900", AppConfig.f5G_1900, factory = true),
+        BooleanFilter("f5g_2000", AppConfig.f5G_2000, factory = true),
         BooleanFilter("f5g_2100", AppConfig.f5G_2100, factory = true),
+        BooleanFilter("f5g_2600", AppConfig.f5G_2600, factory = true),
         BooleanFilter("f5g_3500", AppConfig.f5G_3500, factory = true),
+        BooleanFilter("f5g_3800", AppConfig.f5G_3800, factory = true),
         BooleanFilter("f5g_4200", AppConfig.f5G_4200, factory = true),
         BooleanFilter("f5g_26000", AppConfig.f5G_26000, factory = true),
         BooleanFilter(KEY_SITES_IN_SERVICE, AppConfig.showSitesInService, factory = true),
@@ -108,17 +118,27 @@ object MapFilterDefaults {
                 f2G900 = ref("f2g_900"),
                 f2G1800 = ref("f2g_1800"),
                 f3G900 = ref("f3g_900"),
+                f3G1900 = ref("f3g_1900"),
                 f3G2100 = ref("f3g_2100"),
+                f4G600 = ref("f4g_600"),
                 f4G700 = ref("f4g_700"),
                 f4G800 = ref("f4g_800"),
                 f4G900 = ref("f4g_900"),
                 f4G1800 = ref("f4g_1800"),
                 f4G2100 = ref("f4g_2100"),
+                f4G2300 = ref("f4g_2300"),
                 f4G2600 = ref("f4g_2600"),
+                f4G3500 = ref("f4g_3500"),
+                f5G600 = ref("f5g_600"),
                 f5G700 = ref("f5g_700"),
+                f5G850 = ref("f5g_850"),
                 f5G1400 = ref("f5g_1400"),
+                f5G1900 = ref("f5g_1900"),
+                f5G2000 = ref("f5g_2000"),
                 f5G2100 = ref("f5g_2100"),
+                f5G2600 = ref("f5g_2600"),
                 f5G3500 = ref("f5g_3500"),
+                f5G3800 = ref("f5g_3800"),
                 f5G4200 = ref("f5g_4200"),
                 f5G26000 = ref("f5g_26000"),
                 mobileTechnologyOnly = MobileTechnologyOnly.fromPreferenceValue(
@@ -275,17 +295,27 @@ object MapFilterDefaults {
         "f2g_900" -> frequency.f2G900
         "f2g_1800" -> frequency.f2G1800
         "f3g_900" -> frequency.f3G900
+        "f3g_1900" -> frequency.f3G1900
         "f3g_2100" -> frequency.f3G2100
+        "f4g_600" -> frequency.f4G600
         "f4g_700" -> frequency.f4G700
         "f4g_800" -> frequency.f4G800
         "f4g_900" -> frequency.f4G900
         "f4g_1800" -> frequency.f4G1800
         "f4g_2100" -> frequency.f4G2100
+        "f4g_2300" -> frequency.f4G2300
         "f4g_2600" -> frequency.f4G2600
+        "f4g_3500" -> frequency.f4G3500
+        "f5g_600" -> frequency.f5G600
         "f5g_700" -> frequency.f5G700
+        "f5g_850" -> frequency.f5G850
         "f5g_1400" -> frequency.f5G1400
+        "f5g_1900" -> frequency.f5G1900
+        "f5g_2000" -> frequency.f5G2000
         "f5g_2100" -> frequency.f5G2100
+        "f5g_2600" -> frequency.f5G2600
         "f5g_3500" -> frequency.f5G3500
+        "f5g_3800" -> frequency.f5G3800
         "f5g_4200" -> frequency.f5G4200
         "f5g_26000" -> frequency.f5G26000
         KEY_SITES_IN_SERVICE -> showSitesInService

@@ -104,7 +104,7 @@ internal fun calculateCarDistance(
 internal fun LocalisationEntity.operatorSummary(context: Context): String {
     return operateur
         ?.split(Regex("[/,\\-]"))
-        ?.map { it.trim().uppercase(Locale.FRANCE) }
+        ?.map { it.trim().uppercase(Locale.ROOT) }
         ?.filter { it.isNotEmpty() }
         ?.distinct()
         ?.joinToString(", ")

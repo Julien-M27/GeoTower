@@ -304,7 +304,8 @@ object SignalQuestUploadQueue {
         // envoyee est deja droite (et parfois redimensionnee), recopier celles de la source la
         // ferait pivoter une seconde fois.
         ExifInterface.TAG_ORIENTATION,
-        ExifInterface.TAG_THUMBNAIL_ORIENTATION,
+        // "ThumbnailOrientation" correspond a ExifInterface.TAG_THUMBNAIL_ORIENTATION (@RestrictTo)
+        "ThumbnailOrientation",
         ExifInterface.TAG_IMAGE_WIDTH,
         ExifInterface.TAG_IMAGE_LENGTH,
         ExifInterface.TAG_PIXEL_X_DIMENSION,
@@ -412,6 +413,10 @@ object SignalQuestUploadQueue {
                 )
             }
 
+            val operatorRegion = fr.geotower.utils.OperatorColors.keyFor(operator)
+                ?.let { fr.geotower.utils.OperatorColors.specForKey(it)?.region }
+            val isCanadaSite = normalizedSiteId.startsWith("CA-", ignoreCase = true) ||
+                operatorRegion == fr.geotower.utils.OperatorRegion.CANADA
             val manifest = SignalQuestUploadManifest(
                 uploadId = uploadId,
                 siteId = normalizedSiteId,
@@ -419,6 +424,9 @@ object SignalQuestUploadQueue {
                 description = description,
                 createdAtMillis = createdAtMillis,
                 files = files,
+                anfrCode = null,
+                nationalSiteCode = if (isCanadaSite) normalizedSiteId else null,
+                sourceCode = if (isCanadaSite) "ISED" else null,
                 stripExifBeforeUpload = stripExifBeforeUpload,
                 address = address?.trim()?.takeIf { it.isNotBlank() }
             )

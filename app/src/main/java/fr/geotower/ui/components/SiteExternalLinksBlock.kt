@@ -87,11 +87,13 @@ fun SiteExternalLinksBlock(
             }
             HorizontalDivider(modifier = Modifier.padding(vertical = sizing.spacing(12.dp)), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
+            val isCanadaSite = info.idAnfr.startsWith("CA-", ignoreCase = true)
             Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))) {
                 externalLinksOrder.forEach { block ->
                     when (block) {
                         "cartoradio" -> {
                             if (
+                                !isCanadaSite &&
                                 showCartoradio &&
                                 featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.EXTERNAL_LINKS_CARTORADIO) &&
                                 featureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.CARTORADIO) &&
@@ -104,6 +106,7 @@ fun SiteExternalLinksBlock(
                         }
                         "cellularfr" -> {
                             if (
+                                !isCanadaSite &&
                                 showCellularFr &&
                                 featureFlags.isSiteExternalLinkEnabled("cellularfr") &&
                                 featureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.CELLULARFR) &&
@@ -115,6 +118,7 @@ fun SiteExternalLinksBlock(
                         }
                         "rncmobile" -> {
                             if (
+                                !isCanadaSite &&
                                 showRncMobile &&
                                 featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.EXTERNAL_LINKS_RNC_MOBILE) &&
                                 featureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.RNC_MOBILE) &&
@@ -149,6 +153,7 @@ fun SiteExternalLinksBlock(
                         }
                         "enbanalytics" -> {
                             if (
+                                !isCanadaSite &&
                                 showEnbAnalytics &&
                                 featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.EXTERNAL_LINKS_ENB_ANALYTICS) &&
                                 featureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.ENB_ANALYTICS) &&
@@ -159,6 +164,7 @@ fun SiteExternalLinksBlock(
                         }
                         "anfr" -> {
                             if (
+                                !isCanadaSite &&
                                 showAnfr &&
                                 featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.EXTERNAL_LINKS_ANFR) &&
                                 featureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.ANFR) &&

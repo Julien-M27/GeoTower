@@ -24,6 +24,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.collectAsState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.CompareArrows
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
@@ -115,6 +116,26 @@ fun SiteComparatorScreen(
 
     var siteAId by rememberSaveable(initialSiteAId) { mutableStateOf(initialSiteAId?.takeIf { it.isNotBlank() }) }
     var siteBId by rememberSaveable(initialSiteBId) { mutableStateOf(initialSiteBId?.takeIf { it.isNotBlank() }) }
+
+    val savedStateHandle = navController.currentBackStackEntry?.savedStateHandle
+    val pickedSiteId by (savedStateHandle
+        ?.getStateFlow<String?>("comparator_picked_site_id", null)
+        ?.collectAsState()
+        ?: remember { mutableStateOf(null) })
+    val pickedSlot by (savedStateHandle
+        ?.getStateFlow<String?>("comparator_picked_slot", null)
+        ?.collectAsState()
+        ?: remember { mutableStateOf(null) })
+    LaunchedEffect(pickedSiteId, pickedSlot) {
+        val id = pickedSiteId?.takeIf { it.isNotBlank() } ?: return@LaunchedEffect
+        if (pickedSlot == "A") {
+            siteAId = id
+        } else {
+            siteBId = id
+        }
+        savedStateHandle?.remove<String>("comparator_picked_site_id")
+        savedStateHandle?.remove<String>("comparator_picked_slot")
+    }
 
     var summaryA by remember { mutableStateOf<ComparableSiteSummary?>(null) }
     var summaryB by remember { mutableStateOf<ComparableSiteSummary?>(null) }
@@ -243,10 +264,17 @@ fun SiteComparatorScreen(
                     onPickSiteA = { activePickerSlot = ComparatorSlot.A }
                 )
             } else if (a == null || b == null) {
+                val missingSlot = if (a == null) "A" else "B"
+                val refSite = if (a == null) b else a
                 SingleSitePrompt(
-                    missingSlot = if (a == null) "A" else "B",
+                    missingSlot = missingSlot,
                     onPickMissing = {
-                        activePickerSlot = if (a == null) ComparatorSlot.A else ComparatorSlot.B
+                        val focusParams = refSite?.let {
+                            "&focusLat=${it.latitude}&focusLon=${it.longitude}"
+                        }.orEmpty()
+                        navController.navigate("map?compareSlot=$missingSlot$focusParams") {
+                            launchSingleTop = true
+                        }
                     }
                 )
             } else {
@@ -266,7 +294,14 @@ fun SiteComparatorScreen(
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     OutlinedButton(
-                        onClick = { navController.navigate("site_detail/${a.idAnfr}") },
+                        onClick = {
+                            context.getSharedPreferences(fr.geotower.utils.PreferenceStores.APP, android.content.Context.MODE_PRIVATE)
+                                .edit()
+                                .putFloat("clicked_lat", a.latitude.toFloat())
+                                .putFloat("clicked_lon", a.longitude.toFloat())
+                                .apply()
+                            navController.navigate("site_detail/${a.idAnfr}")
+                        },
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp)
                     ) {
@@ -279,7 +314,14 @@ fun SiteComparatorScreen(
                         )
                     }
                     OutlinedButton(
-                        onClick = { navController.navigate("site_detail/${b.idAnfr}") },
+                        onClick = {
+                            context.getSharedPreferences(fr.geotower.utils.PreferenceStores.APP, android.content.Context.MODE_PRIVATE)
+                                .edit()
+                                .putFloat("clicked_lat", b.latitude.toFloat())
+                                .putFloat("clicked_lon", b.longitude.toFloat())
+                                .apply()
+                            navController.navigate("site_detail/${b.idAnfr}")
+                        },
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp)
                     ) {
@@ -441,7 +483,7 @@ private fun SiteSlotCard(
                         )
                     }
                     Text(
-                        text = "ANFR ${summary.idAnfr}",
+                        text = formatComparatorSiteIdLabel(summary.idAnfr),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.SemiBold
@@ -671,12 +713,16 @@ private fun SupportAndStatusCard(
             valueA = siteA.supportNature ?: "—",
             valueB = siteB.supportNature ?: "—"
         )
-        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), thickness = 0.5.dp)
-        ComparisonRow(
-            label = stringResource(R.string.site_comparator_support_owner),
-            valueA = siteA.supportOwner ?: "—",
-            valueB = siteB.supportOwner ?: "—"
-        )
+        val bothCanadian = siteA.idAnfr.startsWith("CA-", ignoreCase = true) &&
+            siteB.idAnfr.startsWith("CA-", ignoreCase = true)
+        if (!bothCanadian) {
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), thickness = 0.5.dp)
+            ComparisonRow(
+                label = stringResource(R.string.site_comparator_support_owner),
+                valueA = siteA.supportOwner ?: "—",
+                valueB = siteB.supportOwner ?: "—"
+            )
+        }
     }
 }
 
@@ -771,28 +817,37 @@ private fun AzimuthAndFhCard(
     siteA: ComparableSiteSummary,
     siteB: ComparableSiteSummary
 ) {
-    ComparisonSectionCard(title = stringResource(R.string.site_comparator_section_azimuth_fh)) {
+    val bothCanadian = siteA.idAnfr.startsWith("CA-", ignoreCase = true) &&
+        siteB.idAnfr.startsWith("CA-", ignoreCase = true)
+    val title = if (bothCanadian) {
+        stringResource(R.string.site_comparator_section_azimuths)
+    } else {
+        stringResource(R.string.site_comparator_section_azimuth_fh)
+    }
+    ComparisonSectionCard(title = title) {
         ComparisonRow(
             label = stringResource(R.string.site_comparator_azimuths),
             valueA = siteA.azimuths.takeIf { it.isNotEmpty() }?.joinToString("°, ", postfix = "°") ?: "—",
             valueB = siteB.azimuths.takeIf { it.isNotEmpty() }?.joinToString("°, ", postfix = "°") ?: "—"
         )
-        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), thickness = 0.5.dp)
-        val yesText = stringResource(R.string.site_comparator_yes)
-        val noText = stringResource(R.string.site_comparator_no)
-        ComparisonRow(
-            label = stringResource(R.string.site_comparator_fh_links),
-            valueA = if (siteA.hasFh) {
-                if (siteA.fhAzimuthsCount > 0) "$yesText (${siteA.fhAzimuthsCount})" else yesText
-            } else {
-                noText
-            },
-            valueB = if (siteB.hasFh) {
-                if (siteB.fhAzimuthsCount > 0) "$yesText (${siteB.fhAzimuthsCount})" else yesText
-            } else {
-                noText
-            }
-        )
+        if (!bothCanadian) {
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), thickness = 0.5.dp)
+            val yesText = stringResource(R.string.site_comparator_yes)
+            val noText = stringResource(R.string.site_comparator_no)
+            ComparisonRow(
+                label = stringResource(R.string.site_comparator_fh_links),
+                valueA = if (siteA.hasFh) {
+                    if (siteA.fhAzimuthsCount > 0) "$yesText (${siteA.fhAzimuthsCount})" else yesText
+                } else {
+                    noText
+                },
+                valueB = if (siteB.hasFh) {
+                    if (siteB.fhAzimuthsCount > 0) "$yesText (${siteB.fhAzimuthsCount})" else yesText
+                } else {
+                    noText
+                }
+            )
+        }
     }
 }
 
@@ -801,19 +856,30 @@ private fun DatesComparisonCard(
     siteA: ComparableSiteSummary,
     siteB: ComparableSiteSummary
 ) {
-    ComparisonSectionCard(title = stringResource(R.string.site_comparator_section_dates)) {
-        ComparisonRow(
-            label = stringResource(R.string.site_comparator_date_implantation),
-            valueA = siteA.dateImplantation ?: "—",
-            valueB = siteB.dateImplantation ?: "—"
-        )
-        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), thickness = 0.5.dp)
-        ComparisonRow(
-            label = stringResource(R.string.site_comparator_date_service),
-            valueA = siteA.dateService ?: "—",
-            valueB = siteB.dateService ?: "—"
-        )
-        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), thickness = 0.5.dp)
+    val isACanadian = siteA.idAnfr.startsWith("CA-", ignoreCase = true)
+    val isBCanadian = siteB.idAnfr.startsWith("CA-", ignoreCase = true)
+    val bothCanadian = isACanadian && isBCanadian
+    val anyCanadian = isACanadian || isBCanadian
+    val title = when {
+        bothCanadian -> stringResource(R.string.site_comparator_section_dates_ised)
+        anyCanadian -> stringResource(R.string.site_comparator_section_dates_mixed)
+        else -> stringResource(R.string.site_comparator_section_dates)
+    }
+    ComparisonSectionCard(title = title) {
+        if (!bothCanadian) {
+            ComparisonRow(
+                label = stringResource(R.string.site_comparator_date_implantation),
+                valueA = siteA.dateImplantation ?: "—",
+                valueB = siteB.dateImplantation ?: "—"
+            )
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), thickness = 0.5.dp)
+            ComparisonRow(
+                label = stringResource(R.string.site_comparator_date_service),
+                valueA = siteA.dateService ?: "—",
+                valueB = siteB.dateService ?: "—"
+            )
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), thickness = 0.5.dp)
+        }
         ComparisonRow(
             label = stringResource(R.string.site_comparator_date_modif),
             valueA = siteA.dateModif ?: "—",
@@ -985,11 +1051,22 @@ private fun SitePickerBottomSheet(
                 fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.height(10.dp))
+            val isCanadaPicker = excludedIdAnfr?.startsWith("CA-", ignoreCase = true) == true ||
+                fr.geotower.data.db.DatabaseCountryStore.activeCountryState.value == fr.geotower.data.db.DatabaseCountry.CA
+            val searchPlaceholder = if (isCanadaPicker) {
+                if (androidx.compose.ui.platform.LocalConfiguration.current.locales[0]?.language.equals("fr", ignoreCase = true)) {
+                    "ID ISDE, ville ou adresse..."
+                } else {
+                    "ISED ID, city or address..."
+                }
+            } else {
+                stringResource(R.string.site_comparator_search_hint)
+            }
             OutlinedTextField(
                 value = query,
                 onValueChange = { triggerSearch(it) },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text(stringResource(R.string.site_comparator_search_hint)) },
+                placeholder = { Text(searchPlaceholder) },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                 trailingIcon = {
                     if (query.isNotEmpty()) {
@@ -1097,7 +1174,7 @@ private fun SitePickerBottomSheet(
                                         }
                                     }
                                     Text(
-                                        text = "ANFR ${item.idAnfr}",
+                                        text = formatComparatorSiteIdLabel(item.idAnfr),
                                         style = MaterialTheme.typography.labelMedium,
                                         fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.primary
@@ -1147,4 +1224,12 @@ private fun SitePickerBottomSheet(
             }
         }
     }
+}
+
+private fun formatComparatorSiteIdLabel(siteId: String): String {
+    if (siteId.startsWith("CA-", ignoreCase = true)) {
+        val prefix = if (Locale.getDefault().language.equals("fr", ignoreCase = true)) "ISDE" else "ISED"
+        return "$prefix $siteId"
+    }
+    return "ANFR $siteId"
 }

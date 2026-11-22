@@ -43,7 +43,8 @@ object DatabaseBulkUpdate {
 
     data class TargetAction(
         val target: Target,
-        val action: Action
+        val action: Action,
+        val country: fr.geotower.data.db.DatabaseCountry? = null
     )
 
     data class AvailableUpdatesResult(
@@ -143,35 +144,84 @@ object DatabaseBulkUpdate {
     )
 
     private suspend fun checkMobile(context: Context, workManager: WorkManager): TargetCheckResult {
-        if (
-            LocalDbProvenance.readMobile(context).locallyBuilt ||
-            hasUnfinishedWork(workManager, LocalDbBuildWorker.UNIQUE_WORK_NAME) ||
-            hasUnfinishedWork(workManager, DatabaseDownloadWorker.UNIQUE_WORK_NAME)
-        ) {
-            return TargetCheckResult()
+        val frInstalled = GeoTowerDatabaseValidator.getInstalledDatabaseVersion(
+            context,
+            fr.geotower.data.db.DatabaseCountry.FR
+        ) != null
+        val caInstalled = GeoTowerDatabaseValidator.getInstalledDatabaseVersion(
+            context,
+            fr.geotower.data.db.DatabaseCountry.CA
+        ) != null
+        val installedCountries = buildList {
+            val active = fr.geotower.data.db.DatabaseCountryStore.getActive(context)
+            val other = if (active == fr.geotower.data.db.DatabaseCountry.FR) {
+                fr.geotower.data.db.DatabaseCountry.CA
+            } else {
+                fr.geotower.data.db.DatabaseCountry.FR
+            }
+            if ((active == fr.geotower.data.db.DatabaseCountry.FR && frInstalled) ||
+                (active == fr.geotower.data.db.DatabaseCountry.CA && caInstalled)
+            ) {
+                add(active)
+            }
+            if ((other == fr.geotower.data.db.DatabaseCountry.FR && frInstalled) ||
+                (other == fr.geotower.data.db.DatabaseCountry.CA && caInstalled)
+            ) {
+                add(other)
+            }
         }
 
-        val remote = DatabaseDownloader.getLatestDatabaseUpdateInfo()
-        val local = GeoTowerDatabaseValidator.getInstalledDatabaseVersion(context)
-        val isMissing = local == null
-        if (remote == null) {
-            return TargetCheckResult(isComplete = false, hasMissingDatabase = isMissing)
-        }
-        if (!RemoteFeatureFlags.isDatabaseDownloadAllowed(RemoteFeatureFlags.DatabaseTarget.MOBILE, remote.version)) {
-            return TargetCheckResult(hasMissingDatabase = isMissing)
-        }
-        if (!DatabaseDownloader.isRemoteDatabaseUpdateAvailable(context, remote, local)) {
-            return TargetCheckResult(hasMissingDatabase = isMissing)
+        if (installedCountries.isEmpty()) {
+            val active = fr.geotower.data.db.DatabaseCountryStore.getActive(context)
+            if ((active == fr.geotower.data.db.DatabaseCountry.FR &&
+                    (LocalDbProvenance.readMobile(context, active).locallyBuilt ||
+                        hasUnfinishedWork(workManager, LocalDbBuildWorker.UNIQUE_WORK_NAME))) ||
+                hasUnfinishedWork(workManager, DatabaseDownloadWorker.uniqueWorkNameFor(active))
+            ) {
+                return TargetCheckResult()
+            }
+            val remote = DatabaseDownloader.getLatestDatabaseUpdateInfo(country = active)
+                ?: return TargetCheckResult(isComplete = false, hasMissingDatabase = true)
+            if (!RemoteFeatureFlags.isDatabaseDownloadAllowed(RemoteFeatureFlags.DatabaseTarget.MOBILE, remote.version)) {
+                return TargetCheckResult(hasMissingDatabase = true)
+            }
+            if (!DatabaseDownloader.isRemoteDatabaseUpdateAvailable(context, remote, null, active)) {
+                return TargetCheckResult(hasMissingDatabase = true)
+            }
+            return TargetCheckResult(
+                targetAction = TargetAction(Target.MOBILE, Action.DOWNLOAD, active),
+                hasMissingDatabase = true,
+                hasDatabaseUpdate = false
+            )
         }
 
-        return TargetCheckResult(
-            targetAction = TargetAction(
-                Target.MOBILE,
-                if (isMissing) Action.DOWNLOAD else Action.UPDATE
-            ),
-            hasMissingDatabase = isMissing,
-            hasDatabaseUpdate = !isMissing
-        )
+        var allComplete = true
+        for (country in installedCountries) {
+            if ((country == fr.geotower.data.db.DatabaseCountry.FR &&
+                    (LocalDbProvenance.readMobile(context, country).locallyBuilt ||
+                        hasUnfinishedWork(workManager, LocalDbBuildWorker.UNIQUE_WORK_NAME))) ||
+                hasUnfinishedWork(workManager, DatabaseDownloadWorker.uniqueWorkNameFor(country))
+            ) {
+                continue
+            }
+            val remote = DatabaseDownloader.getLatestDatabaseUpdateInfo(country = country)
+            if (remote == null) {
+                allComplete = false
+                continue
+            }
+            val local = GeoTowerDatabaseValidator.getInstalledDatabaseVersion(context, country)
+            if (!RemoteFeatureFlags.isDatabaseDownloadAllowed(RemoteFeatureFlags.DatabaseTarget.MOBILE, remote.version)) {
+                continue
+            }
+            if (DatabaseDownloader.isRemoteDatabaseUpdateAvailable(context, remote, local, country)) {
+                return TargetCheckResult(
+                    targetAction = TargetAction(Target.MOBILE, Action.UPDATE, country),
+                    hasMissingDatabase = false,
+                    hasDatabaseUpdate = true
+                )
+            }
+        }
+        return TargetCheckResult(isComplete = allComplete, hasMissingDatabase = false)
     }
 
     private suspend fun checkRadio(context: Context, workManager: WorkManager): TargetCheckResult {
@@ -259,7 +309,7 @@ object DatabaseBulkUpdate {
             }
             RemoteFeatureFlags.isDatabaseDownloadAllowed(dbTarget)
         }
-        val requests = allowedTargetActions.distinctBy { it.target }.mapNotNull(::requestFor)
+        val requests = allowedTargetActions.distinctBy { it.target to it.country }.mapNotNull(::requestFor)
         if (requests.isEmpty()) return
 
         var continuation = workManager.beginUniqueWork(
@@ -276,7 +326,8 @@ object DatabaseBulkUpdate {
     private fun requestFor(targetAction: TargetAction): OneTimeWorkRequest? = when (targetAction.target) {
         Target.MOBILE -> DatabaseDownloadWorker.buildRequest(
             continueAfterFailure = true,
-            bulkActionTag = actionTag(targetAction.action)
+            bulkActionTag = actionTag(targetAction.action),
+            country = targetAction.country
         )
         Target.RADIO -> RadioDatabaseDownloadWorker.buildRequest(
             continueAfterFailure = true,

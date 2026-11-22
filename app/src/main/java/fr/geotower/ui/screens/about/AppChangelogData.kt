@@ -27,10 +27,17 @@ data class ChangelogMilestone(
 object AppChangelogRepository {
     val milestones: List<ChangelogMilestone> = listOf(
         ChangelogMilestone(
+            versionName = "2.1.32",
+            releaseDate = "2026-11-22",
+            isCurrent = true,
+            isMajor = true,
+            badge = MilestoneBadge.CURRENT,
+            summary = "Support complet du Canada (bases ISED, 14 opérateurs, fréquences, Android Auto) et bascule API sur Wear OS/Garmin",
+            itemResIds = listOf(R.string.appstrings_release_v2132_summary_canada_support_and_watch_sync)
+        ),
+        ChangelogMilestone(
             versionName = "2.1.31",
             releaseDate = "2026-11-18",
-            isCurrent = true,
-            badge = MilestoneBadge.CURRENT,
             summary = "Filtres de distance et export sur la carte FH, alertes boussole/IGN, pagination du journal réseau et améliorations Wear OS",
             itemResIds = listOf(R.string.appstrings_release_v2131_summary_fh_filters_export_and_wear_improvements)
         ),

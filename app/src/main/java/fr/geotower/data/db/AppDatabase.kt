@@ -47,22 +47,26 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun geoTowerDao(): GeoTowerDao
 
     companion object {
-        @Volatile
-        private var INSTANCE: AppDatabase? = null
+        private val INSTANCES = java.util.EnumMap<DatabaseCountry, AppDatabase>(DatabaseCountry::class.java)
 
-        fun getDatabase(context: Context): AppDatabase {
-            return INSTANCE ?: synchronized(this) {
+        fun getDatabase(
+            context: Context,
+            country: DatabaseCountry = DatabaseCountryStore.getActive(context)
+        ): AppDatabase {
+            INSTANCES[country]?.let { return it }
+            return synchronized(this) {
+                INSTANCES[country]?.let { return it }
                 val appContext = context.applicationContext
-                val fileStatus = GeoTowerDatabaseValidator.getInstalledDatabaseFileStatus(appContext)
+                val fileStatus = GeoTowerDatabaseValidator.getInstalledDatabaseFileStatus(appContext, country)
                 if (fileStatus.state != GeoTowerDatabaseValidator.LocalDatabaseState.VALID) {
-                    closeDatabase()
+                    closeDatabase(country)
                     throw InvalidGeoTowerDatabaseException(fileStatus.reason ?: "Base GeoTower absente")
                 }
 
                 val instance = Room.databaseBuilder(
                     appContext,
                     AppDatabase::class.java,
-                    GeoTowerDatabaseValidator.DB_NAME
+                    country.dbFileName
                 )
                     .addCallback(object : RoomDatabase.Callback() {
                         override fun onOpen(db: SupportSQLiteDatabase) {
@@ -75,26 +79,33 @@ abstract class AppDatabase : RoomDatabase() {
                     .build()
                 try {
                     instance.openHelper.readableDatabase
-                    GeoTowerDatabaseValidator.clearInstalledDatabaseInvalid(appContext)
+                    GeoTowerDatabaseValidator.clearInstalledDatabaseInvalid(appContext, country)
                 } catch (e: Exception) {
                     instance.close()
                     GeoTowerDatabaseValidator.markInstalledDatabaseInvalid(
                         appContext,
-                        e.message ?: "Schema Room incompatible"
+                        e.message ?: "Schema Room incompatible",
+                        country
                     )
                     throw InvalidGeoTowerDatabaseException(
-                        "Schema Room incompatible avec ${GeoTowerDatabaseValidator.DB_NAME}",
+                        "Schema Room incompatible avec ${country.dbFileName}",
                         e
                     )
                 }
-                INSTANCE = instance
+                INSTANCES[country] = instance
                 instance
             }
         }
 
-        fun closeDatabase() {
-            INSTANCE?.close()
-            INSTANCE = null
+        fun closeDatabase(country: DatabaseCountry? = null) {
+            synchronized(this) {
+                if (country != null) {
+                    INSTANCES.remove(country)?.close()
+                } else {
+                    INSTANCES.values.forEach { it.close() }
+                    INSTANCES.clear()
+                }
+            }
         }
     }
 }

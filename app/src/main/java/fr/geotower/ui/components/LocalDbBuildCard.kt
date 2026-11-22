@@ -208,7 +208,7 @@ fun LocalDbBuildCard(
                 )
                 Spacer(modifier = Modifier.width(sizing.spacing(12.dp)))
                 Text(
-                    text = stringResource(R.string.appstrings_local_build_title),
+                    text = "${stringResource(R.string.appstrings_local_build_title)} (France)",
                     fontWeight = FontWeight.Bold,
                     style = sizing.textStyle(MaterialTheme.typography.titleMedium),
                 )

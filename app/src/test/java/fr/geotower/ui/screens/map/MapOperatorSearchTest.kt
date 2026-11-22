@@ -37,10 +37,9 @@ class MapOperatorSearchTest {
             listOf(OperatorColors.OPT_NC_KEY),
             suggestOperatorsForExplicitQuery("op:opt").map { it.key }
         )
-        assertEquals(
-            listOf(OperatorColors.FREE_KEY, OperatorColors.FREE_CARAIBE_KEY),
-            suggestOperatorsForExplicitQuery("op:free").map { it.key }
-        )
+        val freeKeys = suggestOperatorsForExplicitQuery("op:free").map { it.key }
+        assertTrue(OperatorColors.FREE_KEY in freeKeys)
+        assertTrue(OperatorColors.FREE_CARAIBE_KEY in freeKeys)
         assertEquals(
             listOf(OperatorColors.ONATI_KEY, OperatorColors.VITI_KEY),
             suggestOperatorsForExplicitQuery("op:vini").map { it.key }

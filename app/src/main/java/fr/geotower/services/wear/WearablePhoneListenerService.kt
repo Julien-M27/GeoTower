@@ -103,17 +103,50 @@ class WearablePhoneListenerService : WearableListenerService() {
         radiusKm: Double,
         limit: Int
     ): String {
-        val dao = AppDatabase.getDatabase(applicationContext).geoTowerDao()
-        val safeCos = max(0.1, abs(cos(Math.toRadians(centerLat))))
-        val offsetLat = radiusKm / KM_PER_LAT_DEGREE
-        val offsetLon = offsetLat / safeCos
+        val targetCountry = fr.geotower.data.db.DatabaseCountry.forCoordinates(centerLat, centerLon)
+        val repo = (applicationContext as? fr.geotower.GeoTowerApp)?.repository
+        val rawRows = if (
+            repo != null &&
+            fr.geotower.data.config.RemoteFeatureFlags.isFeatureEnabled(fr.geotower.data.config.RemoteFeatureFlags.Features.LIVE_API_FR_NEARBY) &&
+            fr.geotower.data.api.LiveDatabaseStatus.isInUse(applicationContext, targetCountry)
+        ) {
+            val liveLimit = (limit * 6).coerceIn(25, 300)
+            val liveSites = repo.getNearest(centerLat, centerLon, liveLimit)
+            val ids = liveSites.map { it.idAnfr }.distinct()
+            val techById = runCatching { repo.getTechniqueSummariesByIds(ids) }.getOrDefault(emptyMap())
+            val physById = runCatching { repo.getPhysiqueSummariesByIds(ids) }.getOrDefault(emptyMap())
+            liveSites.map { site ->
+                val tech = techById[site.idAnfr]
+                val phys = physById[site.idAnfr]?.firstOrNull()
+                WearNearbySiteRawRow(
+                    idAnfr = site.idAnfr,
+                    idSupport = phys?.idSupport,
+                    operateur = site.operateur,
+                    latitude = site.latitude,
+                    longitude = site.longitude,
+                    azimuts = site.azimuts,
+                    codeInsee = site.codeInsee,
+                    commune = site.codeInsee,
+                    adresse = tech?.adresse,
+                    natureSupport = phys?.natureSupport,
+                    hauteur = phys?.hauteur,
+                    techMask = site.techMask,
+                    bandMask = site.bandMask
+                )
+            }
+        } else {
+            val dao = AppDatabase.getDatabase(applicationContext, targetCountry).geoTowerDao()
+            val safeCos = max(0.1, abs(cos(Math.toRadians(centerLat))))
+            val offsetLat = radiusKm / KM_PER_LAT_DEGREE
+            val offsetLon = offsetLat / safeCos
 
-        val rawRows = dao.getWearNearbySiteRows(
-            minLat = centerLat - offsetLat,
-            maxLat = centerLat + offsetLat,
-            minLon = centerLon - offsetLon,
-            maxLon = centerLon + offsetLon
-        )
+            dao.getWearNearbySiteRows(
+                minLat = centerLat - offsetLat,
+                maxLat = centerLat + offsetLat,
+                minLon = centerLon - offsetLon,
+                maxLon = centerLon + offsetLon
+            )
+        }
 
         val hsAnfrIds = runCatching {
             (applicationContext as? fr.geotower.GeoTowerApp)?.repository?.getSitesHs()

@@ -199,7 +199,7 @@ fun EnbDatabaseDownloadCard(
                 }
                 Spacer(modifier = Modifier.width(textStartPadding))
                 Text(
-                    text = stringResource(R.string.enb_database_title),
+                    text = "${stringResource(R.string.enb_database_title)} (France)",
                     fontWeight = FontWeight.Bold,
                     style = sizing.textStyle(MaterialTheme.typography.titleMedium),
                     textAlign = TextAlign.Start

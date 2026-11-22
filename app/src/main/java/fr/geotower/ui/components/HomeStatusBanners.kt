@@ -240,13 +240,14 @@ fun HomeStatusBanners(
     val localDbState by AppConfig.localDatabaseState
     var wasSyncing by remember { mutableStateOf(isSyncing) }
     var isUpdateAvailable by remember { mutableStateOf(false) }
+    var isFrUpdateAvailable by remember { mutableStateOf(false) }
+    var isCaUpdateAvailable by remember { mutableStateOf(false) }
     var availableDatabaseUpdates by remember {
         mutableStateOf<List<DatabaseBulkUpdate.TargetAction>>(emptyList())
     }
     var isRebuildOffer by remember { mutableStateOf(false) }
-    val isDbChecked = localDbState != null
-    val isDbMissing = localDbState == GeoTowerDatabaseValidator.LocalDatabaseState.MISSING
-    val isDbInvalid = localDbState == GeoTowerDatabaseValidator.LocalDatabaseState.INVALID
+    var frDbState by remember { mutableStateOf<GeoTowerDatabaseValidator.LocalDatabaseState?>(null) }
+    var caDbState by remember { mutableStateOf<GeoTowerDatabaseValidator.LocalDatabaseState?>(null) }
 
     LaunchedEffect(localBuild.mobileRunning) {
         if (localBuild.mobileRunning) isRebuildStarting = false
@@ -254,31 +255,70 @@ fun HomeStatusBanners(
 
     LaunchedEffect(isSyncing) {
         if (isSyncing) isDownloadStarting = false
-        if (!isSyncing && (AppConfig.localDatabaseState.value == null || wasSyncing)) {
-            AppConfig.localDatabaseState.value = withContext(Dispatchers.IO) {
+        val (frState, caState, activeState) = withContext(Dispatchers.IO) {
+            Triple(
+                GeoTowerDatabaseValidator.getInstalledDatabaseStatus(
+                    context,
+                    country = fr.geotower.data.db.DatabaseCountry.FR
+                ).state,
+                GeoTowerDatabaseValidator.getInstalledDatabaseStatus(
+                    context,
+                    country = fr.geotower.data.db.DatabaseCountry.CA
+                ).state,
                 GeoTowerDatabaseValidator.getInstalledDatabaseStatus(context).state
-            }
+            )
+        }
+        frDbState = frState
+        caDbState = caState
+        if (!isSyncing && (AppConfig.localDatabaseState.value == null || wasSyncing)) {
+            AppConfig.localDatabaseState.value = activeState
         }
         wasSyncing = isSyncing
     }
 
     // Vérification réseau à chaque retour sur l'écran (ON_RESUME)
-    DisposableEffect(lifecycleOwner, isOnline, isSyncing, localDbState) {
+    DisposableEffect(lifecycleOwner, isOnline, isSyncing, frDbState, caDbState) {
         val observer = LifecycleEventObserver { _, event ->
             if (
                 event == Lifecycle.Event.ON_RESUME &&
                 isOnline &&
                 !isSyncing &&
-                localDbState == GeoTowerDatabaseValidator.LocalDatabaseState.VALID
+                (frDbState == GeoTowerDatabaseValidator.LocalDatabaseState.VALID ||
+                    caDbState == GeoTowerDatabaseValidator.LocalDatabaseState.VALID)
             ) {
                 scope.launch(Dispatchers.IO) {
                     try {
-                        val remote = DatabaseDownloader.getLatestDatabaseUpdateInfo()
-                        val localVersion = GeoTowerDatabaseValidator.getInstalledDatabaseVersion(context)
-                        val hasRemoteUpdate = DatabaseDownloader
-                            .isRemoteDatabaseUpdateAvailable(context, remote, localVersion)
-                        val rebuildOffer = hasRemoteUpdate && LocalDbRebuildOffer.forMobile(context)
-                        val mobileUpdateActions = if (hasRemoteUpdate) {
+                        val frValid = frDbState == GeoTowerDatabaseValidator.LocalDatabaseState.VALID
+                        val caValid = caDbState == GeoTowerDatabaseValidator.LocalDatabaseState.VALID
+
+                        val hasFrUpdate = if (frValid) {
+                            val remoteFr = DatabaseDownloader.getLatestDatabaseUpdateInfo(
+                                country = fr.geotower.data.db.DatabaseCountry.FR
+                            )
+                            val localFrVersion = GeoTowerDatabaseValidator.getInstalledDatabaseVersion(
+                                context,
+                                fr.geotower.data.db.DatabaseCountry.FR
+                            )
+                            DatabaseDownloader.isRemoteDatabaseUpdateAvailable(context, remoteFr, localFrVersion)
+                        } else {
+                            false
+                        }
+                        val hasCaUpdate = if (caValid) {
+                            val remoteCa = DatabaseDownloader.getLatestDatabaseUpdateInfo(
+                                country = fr.geotower.data.db.DatabaseCountry.CA
+                            )
+                            val localCaVersion = GeoTowerDatabaseValidator.getInstalledDatabaseVersion(
+                                context,
+                                fr.geotower.data.db.DatabaseCountry.CA
+                            )
+                            DatabaseDownloader.isRemoteDatabaseUpdateAvailable(context, remoteCa, localCaVersion)
+                        } else {
+                            false
+                        }
+
+                        val rebuildOffer = hasFrUpdate && LocalDbRebuildOffer.forMobile(context)
+                        val hasAnyMobileUpdate = hasFrUpdate || hasCaUpdate
+                        val mobileUpdateActions = if (hasAnyMobileUpdate) {
                             listOf(
                                 DatabaseBulkUpdate.TargetAction(
                                     DatabaseBulkUpdate.Target.MOBILE,
@@ -290,6 +330,8 @@ fun HomeStatusBanners(
                         }
                         withContext(Dispatchers.Main) {
                             isRebuildOffer = rebuildOffer
+                            isFrUpdateAvailable = hasFrUpdate
+                            isCaUpdateAvailable = hasCaUpdate
                             availableDatabaseUpdates = mobileUpdateActions
                             isUpdateAvailable = mobileUpdateActions.isNotEmpty()
                             AppConfig.isDbUpdateAvailable.value = mobileUpdateActions.isNotEmpty()
@@ -301,7 +343,7 @@ fun HomeStatusBanners(
                                         it.target != DatabaseBulkUpdate.Target.MOBILE
                                 }
                                 val partialUpdateActions = buildList {
-                                    if (hasRemoteUpdate) {
+                                    if (hasAnyMobileUpdate) {
                                         add(
                                             DatabaseBulkUpdate.TargetAction(
                                                 DatabaseBulkUpdate.Target.MOBILE,
@@ -324,7 +366,7 @@ fun HomeStatusBanners(
                                     it.target != DatabaseBulkUpdate.Target.MOBILE
                             }
                         val updateActions = buildList {
-                            if (hasRemoteUpdate) {
+                            if (hasAnyMobileUpdate) {
                                 add(
                                     DatabaseBulkUpdate.TargetAction(
                                         DatabaseBulkUpdate.Target.MOBILE,
@@ -351,8 +393,18 @@ fun HomeStatusBanners(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    val isDbUnavailable = isDbChecked && localDbState != GeoTowerDatabaseValidator.LocalDatabaseState.VALID
-    val isDbBannerVisible = isDbUnavailable || isUpdateAvailable || isDownloading || isGeneratingDb
+    val activeCountry by fr.geotower.data.db.DatabaseCountryStore.activeCountryState
+    val isCanadaActive = activeCountry == fr.geotower.data.db.DatabaseCountry.CA
+    val isDbChecked = frDbState != null && caDbState != null
+    val isFrMissing = frDbState == GeoTowerDatabaseValidator.LocalDatabaseState.MISSING
+    val isCaMissing = caDbState == GeoTowerDatabaseValidator.LocalDatabaseState.MISSING
+    val isFrInvalid = frDbState == GeoTowerDatabaseValidator.LocalDatabaseState.INVALID
+    val isCaInvalid = caDbState == GeoTowerDatabaseValidator.LocalDatabaseState.INVALID
+    val effectiveDbMissing = isDbChecked && isFrMissing && isCaMissing
+    val effectiveDbInvalid = isDbChecked && (isFrInvalid || isCaInvalid)
+    val effectiveUpdateAvailable = isUpdateAvailable || isFrUpdateAvailable || isCaUpdateAvailable
+    val isDbUnavailable = effectiveDbMissing || effectiveDbInvalid
+    val isDbBannerVisible = isDbUnavailable || effectiveUpdateAvailable || isDownloading || isGeneratingDb
     val hideHomeLogo = isDbBannerVisible || isServerUnreachable
 
     val languageTag = LocalConfiguration.current.locales[0]?.toLanguageTag()
@@ -370,35 +422,59 @@ fun HomeStatusBanners(
         onBannerVisibilityChange?.invoke(hideHomeLogo, hasBanner)
     }
 
-    val isRebuildBanner = isRebuildOffer && isUpdateAvailable && !isDbMissing && !isDbInvalid
+    val isRebuildBanner = isRebuildOffer && effectiveUpdateAvailable && !effectiveDbMissing && !effectiveDbInvalid
     val databaseBannerTargetSection = when {
         isGeneratingDb -> "db_local_build"
         isDownloading -> currentWorkTarget?.let(::databaseSettingsSection) ?: "database"
-        isRebuildBanner || AppConfig.dbForcedLocal() -> "db_local_build"
+        isRebuildBanner || (!isCanadaActive && AppConfig.dbForcedLocal()) -> "db_local_build"
+        (isCaInvalid || isCaUpdateAvailable) && !isFrInvalid && !isFrUpdateAvailable -> "db_mobile_ca"
+        (isFrInvalid || isFrUpdateAvailable) && !isCaInvalid && !isCaUpdateAvailable -> "db_mobile"
         availableDatabaseUpdates.size == 1 ->
             databaseSettingsSection(availableDatabaseUpdates.first().target)
         else -> "database"
     }
 
+    val mobileBaseName = stringResource(R.string.notification_history_type_db_mobile)
     val databaseNamesByTarget = mapOf(
-        DatabaseBulkUpdate.Target.MOBILE to stringResource(R.string.notification_history_type_db_mobile),
-        DatabaseBulkUpdate.Target.RADIO to stringResource(R.string.notification_history_type_db_radio),
-        DatabaseBulkUpdate.Target.ENB to stringResource(R.string.notification_history_type_db_enb)
+        DatabaseBulkUpdate.Target.MOBILE to "$mobileBaseName (France)",
+        DatabaseBulkUpdate.Target.RADIO to "${stringResource(R.string.notification_history_type_db_radio)} (France)",
+        DatabaseBulkUpdate.Target.ENB to "${stringResource(R.string.notification_history_type_db_enb)} (France)"
     )
-    val displayedDatabaseTargets = buildList {
-        if (isDbUnavailable) add(DatabaseBulkUpdate.Target.MOBILE)
-        if (isGeneratingDb) {
-            if (localBuild.mobileRunning) add(DatabaseBulkUpdate.Target.MOBILE)
-            if (localBuild.radioRunning) add(DatabaseBulkUpdate.Target.RADIO)
+    val displayedDatabaseNames = buildList {
+        if (effectiveDbMissing) {
+            add(mobileBaseName)
         }
-        addAll(availableDatabaseUpdates.map { it.target })
-        currentWorkTarget?.let(::add)
+        if (isFrInvalid || isFrUpdateAvailable) {
+            add("$mobileBaseName (France)")
+        }
+        if (isCaInvalid || isCaUpdateAvailable) {
+            add("$mobileBaseName (Canada)")
+        }
+        if (isGeneratingDb) {
+            if (localBuild.mobileRunning) add(databaseNamesByTarget.getValue(DatabaseBulkUpdate.Target.MOBILE))
+            if (localBuild.radioRunning) add(databaseNamesByTarget.getValue(DatabaseBulkUpdate.Target.RADIO))
+        }
+        availableDatabaseUpdates.forEach { action ->
+            if (action.target != DatabaseBulkUpdate.Target.MOBILE) {
+                databaseNamesByTarget[action.target]?.let(::add)
+            }
+        }
+        currentWorkTarget?.let { target ->
+            if (isCanadaActive && target == DatabaseBulkUpdate.Target.MOBILE) {
+                add("$mobileBaseName (Canada)")
+            } else {
+                databaseNamesByTarget[target]?.let(::add)
+            }
+        }
     }.distinct()
-    val displayedDatabaseNames = displayedDatabaseTargets.mapNotNull(databaseNamesByTarget::get)
 
     val onDownloadClick: () -> Unit = {
         val updatesToProcess = availableDatabaseUpdates
+        val frNeedsDownload = isFrInvalid || isFrUpdateAvailable
+        val caNeedsDownload = isCaInvalid || isCaUpdateAvailable
         isUpdateAvailable = false
+        isFrUpdateAvailable = false
+        isCaUpdateAvailable = false
         AppConfig.isDbUpdateAvailable.value = false
 
         if (isRebuildBanner) {
@@ -419,7 +495,7 @@ fun HomeStatusBanners(
                 }
                 DatabaseBulkUpdate.enqueueDetailed(workManager, otherUpdates)
             }
-        } else if (updatesToProcess.isNotEmpty() && canStartDatabaseDownload &&
+        } else if ((updatesToProcess.isNotEmpty() || frNeedsDownload || caNeedsDownload) && canStartDatabaseDownload &&
             RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.DATABASE_DOWNLOAD) &&
             RemoteFeatureFlags.isActionEnabled(RemoteFeatureFlags.Actions.START_DATABASE_DOWNLOAD) &&
             RemoteFeatureFlags.isWorkerEnabled(RemoteFeatureFlags.Workers.DATABASE_DOWNLOAD)
@@ -427,12 +503,28 @@ fun HomeStatusBanners(
             updatesToProcess.forEach { update ->
                 OperationPauseStore.clear(context, databasePauseKey(update.target))
             }
+            if (frNeedsDownload || caNeedsDownload) {
+                OperationPauseStore.clear(context, OperationPauseStore.MOBILE_DB_DOWNLOAD)
+            }
             isDownloadStarting = true
-            if (updatesToProcess.size == 1 &&
-                updatesToProcess.first().target == DatabaseBulkUpdate.Target.MOBILE
-            ) {
-                DatabaseDownloadWorker.enqueue(workManager)
-            } else {
+            if (frNeedsDownload) {
+                DatabaseDownloadWorker.enqueue(
+                    workManager,
+                    country = fr.geotower.data.db.DatabaseCountry.FR
+                )
+            }
+            if (caNeedsDownload) {
+                DatabaseDownloadWorker.enqueue(
+                    workManager,
+                    country = fr.geotower.data.db.DatabaseCountry.CA
+                )
+            }
+            val otherUpdates = updatesToProcess.filter {
+                it.target != DatabaseBulkUpdate.Target.MOBILE
+            }
+            if (otherUpdates.isNotEmpty()) {
+                DatabaseBulkUpdate.enqueueDetailed(workManager, otherUpdates)
+            } else if (!frNeedsDownload && !caNeedsDownload && updatesToProcess.isNotEmpty()) {
                 DatabaseBulkUpdate.enqueueDetailed(workManager, updatesToProcess)
             }
         } else if (canStartDatabaseDownload &&
@@ -500,9 +592,9 @@ fun HomeStatusBanners(
         )
 
         DatabaseWarningBanner(
-            isMissing = isDbMissing,
-            isInvalid = isDbInvalid,
-            isUpdateAvailable = isUpdateAvailable,
+            isMissing = effectiveDbMissing,
+            isInvalid = effectiveDbInvalid,
+            isUpdateAvailable = effectiveUpdateAvailable,
             isDownloading = isDownloading,
             isGenerating = isGeneratingDb,
             isRebuildOffer = isRebuildBanner,
@@ -763,10 +855,12 @@ fun DatabaseWarningBanner(
                             color = contentColor,
                             style = MaterialTheme.typography.bodySmall
                         )
-                    } ?: databaseNamesText.takeIf { it.isNotBlank() }?.let { names ->
+                    }
+                    databaseNamesText.takeIf { it.isNotBlank() }?.let { names ->
                         Text(
                             text = names,
                             color = contentColor,
+                            fontWeight = FontWeight.Medium,
                             style = MaterialTheme.typography.bodySmall
                         )
                     }

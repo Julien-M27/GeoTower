@@ -34,7 +34,8 @@ suspend fun fetchBestSignalQuestSpeedtest(
     operator: String?,
     supportId: String?,
     anfrCode: String?,
-    metric: SignalQuestSpeedtestSortMetric
+    metric: SignalQuestSpeedtestSortMetric,
+    market: String = "FR"
 ): SqSpeedtestData? {
     val plmn = SignalQuestOperators.speedtestPlmnFor(operator)
     val fallbackOperator = SignalQuestOperators.operatorParamFor(operator).takeIf { plmn == null }
@@ -57,6 +58,7 @@ suspend fun fetchBestSignalQuestSpeedtest(
                     operator = fallbackOperator,
                     mcc = plmn?.mcc,
                     mnc = plmn?.mnc,
+                    market = market,
                     bestOnly = false,
                     limit = SPEEDTEST_PAGE_SIZE,
                     offset = offset

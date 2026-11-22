@@ -36,6 +36,10 @@ object ThroughputTextKey {
     const val THROUGHPUT_PROFILE_CUSTOM_LABEL = "Personnalisé"
     const val THROUGHPUT_PROFILE_CUSTOM_DESC = "Profil personnalisé : modulations descendantes et montantes choisies dans l'interface, débit montant traité comme celui d'un téléphone."
     const val THROUGHPUT_PROFILE_CUSTOM_SHORT_DESC = "Profil personnalisé : modulations DL/UL choisies dans l'interface, UL traité comme un téléphone."
+    const val THROUGHPUT_CA_WARNING_DETAILS_UNAVAILABLE = "Détails sectoriels ISDE indisponibles pour ce site : largeurs de bande et puissances estimées."
+    const val THROUGHPUT_CA_ASSUMPTION_TAFL = "Données radio ISDE/TAFL réelles : largeur de bande par porteuse, PIRE, hauteur, MIMO TX/RX et ratio TDD."
+    const val THROUGHPUT_CA_ASSUMPTION_LINK_BUDGET = "Bilan de liaison 3GPP TR 38.901 (UMa) basé sur la PIRE réelle, la fréquence, la hauteur et le diagramme d'antenne."
+    const val THROUGHPUT_CA_SOURCE_SUMMARY = "ISDE/ISED (TAFL) pour les fréquences, largeurs de bande, MIMO et PIRE réels, 3GPP TR 38.901 / TS 38.306 pour le modèle radio."
 }
 
 object ThroughputDisplayText {
@@ -131,6 +135,7 @@ object ThroughputDisplayText {
             warning == ThroughputTextKey.THROUGHPUT_WARNING_LOW_BAND_AGGREGATION -> stringResource(R.string.throughput_warning_low_band_aggregation)
             warning == ThroughputTextKey.THROUGHPUT_WARNING_LTE_AGGREGATION_LIMIT -> stringResource(R.string.throughput_warning_lte_aggregation_limit)
             warning == ThroughputTextKey.THROUGHPUT_WARNING_NR_AGGREGATION_LIMIT -> stringResource(R.string.throughput_warning_nr_aggregation_limit)
+            warning == ThroughputTextKey.THROUGHPUT_CA_WARNING_DETAILS_UNAVAILABLE -> stringResource(R.string.throughput_ca_warning_details_unavailable)
             else -> warning
         }
     }
@@ -142,6 +147,8 @@ object ThroughputDisplayText {
         ThroughputTextKey.THROUGHPUT_PROFILE_IDEAL_DESC -> stringResource(R.string.throughput_profile_ideal_engine_desc)
         ThroughputTextKey.THROUGHPUT_PROFILE_CUSTOM_DESC,
         ThroughputTextKey.THROUGHPUT_PROFILE_CUSTOM_SHORT_DESC -> stringResource(R.string.throughput_profile_custom_engine_desc)
+        ThroughputTextKey.THROUGHPUT_CA_ASSUMPTION_TAFL -> stringResource(R.string.throughput_ca_assumption_tafl)
+        ThroughputTextKey.THROUGHPUT_CA_ASSUMPTION_LINK_BUDGET -> stringResource(R.string.throughput_ca_assumption_link_budget)
         else -> assumption
     }
 
@@ -167,6 +174,7 @@ object ThroughputDisplayText {
     fun translateSourceSummary(summary: String): String = when (summary) {
         ThroughputTextKey.THROUGHPUT_SOURCE_SUMMARY_ENGINE -> stringResource(R.string.throughput_source_summary_engine)
         ThroughputTextKey.THROUGHPUT_SOURCE_SUMMARY_DEFAULT -> stringResource(R.string.throughput_source_summary_default)
+        ThroughputTextKey.THROUGHPUT_CA_SOURCE_SUMMARY -> stringResource(R.string.throughput_ca_source_summary)
         else -> summary
     }
 

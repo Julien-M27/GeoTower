@@ -11,13 +11,13 @@ import org.junit.Test
 class AppChangelogRepositoryTest {
 
     @Test
-    fun `milestones should contain extensive version history from 1_0_0 to 2_1_31`() {
+    fun `milestones should contain extensive version history from 1_0_0 to 2_1_32`() {
         val milestones = AppChangelogRepository.milestones
         assertTrue("Changelog repository should have rich history", milestones.size >= 90)
 
         // Latest version check
         val latest = milestones.first()
-        assertEquals("2.1.31", latest.versionName)
+        assertEquals("2.1.32", latest.versionName)
         assertTrue(latest.isCurrent)
         assertEquals(MilestoneBadge.CURRENT, latest.badge)
         assertFalse(latest.summary.isBlank())

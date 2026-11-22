@@ -153,7 +153,17 @@ class FrequencyFilterSelectionTest {
             f5G2100 = false,
             f5G3500 = false,
             f5G4200 = false,
-            f5G26000 = true
+            f5G26000 = true,
+            f3G1900 = false,
+            f4G600 = false,
+            f4G2300 = false,
+            f4G3500 = false,
+            f5G600 = false,
+            f5G850 = false,
+            f5G1900 = false,
+            f5G2000 = false,
+            f5G2600 = false,
+            f5G3800 = false
         )
     }
 
@@ -178,7 +188,17 @@ class FrequencyFilterSelectionTest {
             f5G2100 = false,
             f5G3500 = false,
             f5G4200 = true,
-            f5G26000 = false
+            f5G26000 = false,
+            f3G1900 = false,
+            f4G600 = false,
+            f4G2300 = false,
+            f4G3500 = false,
+            f5G600 = false,
+            f5G850 = false,
+            f5G1900 = false,
+            f5G2000 = false,
+            f5G2600 = false,
+            f5G3800 = false
         )
     }
 
@@ -204,7 +224,17 @@ class FrequencyFilterSelectionTest {
         f5G3500: Boolean = true,
         f5G4200: Boolean = true,
         f5G26000: Boolean = true,
-        mobileTechnologyOnly: MobileTechnologyOnly = MobileTechnologyOnly.NONE
+        mobileTechnologyOnly: MobileTechnologyOnly = MobileTechnologyOnly.NONE,
+        f3G1900: Boolean = true,
+        f4G600: Boolean = true,
+        f4G2300: Boolean = true,
+        f4G3500: Boolean = true,
+        f5G600: Boolean = true,
+        f5G850: Boolean = true,
+        f5G1900: Boolean = true,
+        f5G2000: Boolean = true,
+        f5G2600: Boolean = true,
+        f5G3800: Boolean = true
     ): FrequencyFilterSelection {
         return FrequencyFilterSelection(
             show2G = show2G,
@@ -228,7 +258,17 @@ class FrequencyFilterSelectionTest {
             f5G3500 = f5G3500,
             f5G4200 = f5G4200,
             f5G26000 = f5G26000,
-            mobileTechnologyOnly = mobileTechnologyOnly
+            mobileTechnologyOnly = mobileTechnologyOnly,
+            f3G1900 = f3G1900,
+            f4G600 = f4G600,
+            f4G2300 = f4G2300,
+            f4G3500 = f4G3500,
+            f5G600 = f5G600,
+            f5G850 = f5G850,
+            f5G1900 = f5G1900,
+            f5G2000 = f5G2000,
+            f5G2600 = f5G2600,
+            f5G3800 = f5G3800
         )
     }
 

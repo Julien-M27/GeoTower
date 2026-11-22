@@ -73,6 +73,7 @@ private val OperatorFilterButtonHeight = 76.dp
 internal val ProjectFilterColor = FrequencyStatusPalette.Approved
 private const val PREF_OPERATOR_FILTER_METRO_EXPANDED = "map_operator_filter_metro_expanded"
 private const val PREF_OPERATOR_FILTER_OVERSEAS_EXPANDED = "map_operator_filter_overseas_expanded"
+private const val PREF_OPERATOR_FILTER_CANADA_EXPANDED = "map_operator_filter_canada_expanded"
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -198,48 +199,68 @@ fun MapFiltersControls(
             modifier = modifier
         ) {
 
+            val activeCountry by fr.geotower.data.db.DatabaseCountryStore.activeCountryState
+            val isFranceSelected = activeCountry == fr.geotower.data.db.DatabaseCountry.FR
+
             // 1. OPÉRATEURS
             SectionTitle(stringResource(R.string.appstrings_operators_title))
             fun saveOperatorSelection(next: Set<String>) {
                 AppConfig.saveSelectedOperatorKeys(prefs, next)
                 selectedOperatorKeys = AppConfig.selectedOperatorKeys.value
             }
-            val metroOperators = listOfNotNull(
-                OperatorColors.specForKey(OperatorColors.ORANGE_KEY),
-                OperatorColors.specForKey(OperatorColors.SFR_KEY),
-                OperatorColors.specForKey(OperatorColors.BOUYGUES_KEY)?.copy(label = "Bouygues"),
-                OperatorColors.specForKey(OperatorColors.FREE_KEY)?.copy(label = "Free")
-            )
-            val defaultOperatorKey = OperatorColors.keyFor(AppConfig.defaultOperator.value)
-            val defaultOperatorIsMetro = metroOperators.any { it.key == defaultOperatorKey }
-            val defaultOperatorIsOverseas = OperatorColors.overseas.any { it.key == defaultOperatorKey }
-            var isMetroExpanded by remember(defaultOperatorKey) {
-                mutableStateOf(prefs.getBoolean(PREF_OPERATOR_FILTER_METRO_EXPANDED, defaultOperatorIsMetro))
-            }
-            var isOverseasExpanded by remember(defaultOperatorKey) {
-                mutableStateOf(prefs.getBoolean(PREF_OPERATOR_FILTER_OVERSEAS_EXPANDED, defaultOperatorIsOverseas))
-            }
-            Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))) {
-                OperatorFilterGroup(
-                    title = stringResource(R.string.operator_region_metro),
-                    operators = metroOperators,
-                    selectedKeys = selectedOperatorKeys,
-                    isExpanded = isMetroExpanded,
-                    onExpandedChange = {
-                        isMetroExpanded = it
-                        prefs.edit().putBoolean(PREF_OPERATOR_FILTER_METRO_EXPANDED, it).apply()
-                    },
-                    onSelectionChange = ::saveOperatorSelection
+            if (isFranceSelected) {
+                val metroOperators = listOfNotNull(
+                    OperatorColors.specForKey(OperatorColors.ORANGE_KEY),
+                    OperatorColors.specForKey(OperatorColors.SFR_KEY),
+                    OperatorColors.specForKey(OperatorColors.BOUYGUES_KEY)?.copy(label = "Bouygues"),
+                    OperatorColors.specForKey(OperatorColors.FREE_KEY)?.copy(label = "Free")
                 )
+                val defaultOperatorKey = OperatorColors.keyFor(AppConfig.defaultOperator.value)
+                val defaultOperatorIsMetro = metroOperators.any { it.key == defaultOperatorKey }
+                val defaultOperatorIsOverseas = OperatorColors.overseas.any { it.key == defaultOperatorKey }
+                var isMetroExpanded by remember(defaultOperatorKey) {
+                    mutableStateOf(prefs.getBoolean(PREF_OPERATOR_FILTER_METRO_EXPANDED, defaultOperatorIsMetro))
+                }
+                var isOverseasExpanded by remember(defaultOperatorKey) {
+                    mutableStateOf(prefs.getBoolean(PREF_OPERATOR_FILTER_OVERSEAS_EXPANDED, defaultOperatorIsOverseas))
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))) {
+                    OperatorFilterGroup(
+                        title = stringResource(R.string.operator_region_metro),
+                        operators = metroOperators,
+                        selectedKeys = selectedOperatorKeys,
+                        isExpanded = isMetroExpanded,
+                        onExpandedChange = {
+                            isMetroExpanded = it
+                            prefs.edit().putBoolean(PREF_OPERATOR_FILTER_METRO_EXPANDED, it).apply()
+                        },
+                        onSelectionChange = ::saveOperatorSelection
+                    )
 
+                    OperatorFilterGroup(
+                        title = stringResource(R.string.operator_region_overseas),
+                        operators = OperatorColors.overseas,
+                        selectedKeys = selectedOperatorKeys,
+                        isExpanded = isOverseasExpanded,
+                        onExpandedChange = {
+                            isOverseasExpanded = it
+                            prefs.edit().putBoolean(PREF_OPERATOR_FILTER_OVERSEAS_EXPANDED, it).apply()
+                        },
+                        onSelectionChange = ::saveOperatorSelection
+                    )
+                }
+            } else {
+                var isCanadaExpanded by remember {
+                    mutableStateOf(prefs.getBoolean(PREF_OPERATOR_FILTER_CANADA_EXPANDED, true))
+                }
                 OperatorFilterGroup(
-                    title = stringResource(R.string.operator_region_overseas),
-                    operators = OperatorColors.overseas,
+                    title = stringResource(R.string.country_name_ca),
+                    operators = OperatorColors.canada,
                     selectedKeys = selectedOperatorKeys,
-                    isExpanded = isOverseasExpanded,
+                    isExpanded = isCanadaExpanded,
                     onExpandedChange = {
-                        isOverseasExpanded = it
-                        prefs.edit().putBoolean(PREF_OPERATOR_FILTER_OVERSEAS_EXPANDED, it).apply()
+                        isCanadaExpanded = it
+                        prefs.edit().putBoolean(PREF_OPERATOR_FILTER_CANADA_EXPANDED, it).apply()
                     },
                     onSelectionChange = ::saveOperatorSelection
                 )
@@ -296,18 +317,20 @@ fun MapFiltersControls(
                 SelectableButton("2G", show2G, Modifier.weight(1f)) {
                     show2G = it; prefs.edit().putBoolean("show_techno_2g", it).apply()
                 }
-                SelectableButton("FH", showFH, Modifier.weight(1f)) {
-                    showFH = it; prefs.edit().putBoolean("show_techno_fh", it).apply()
+                if (isFranceSelected) {
+                    SelectableButton("FH", showFH, Modifier.weight(1f)) {
+                        showFH = it; prefs.edit().putBoolean("show_techno_fh", it).apply()
+                    }
                 }
             }
 
-            if (showFH) {
+            if (isFranceSelected && showFH) {
                 Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
                 SelectableButton("Liaisons FH (grands traits)", showFhLinks, Modifier.fillMaxWidth()) {
                     showFhLinks = it; prefs.edit().putBoolean("show_fh_links", it).apply()
                 }
             }
-            if (onOpenFhMap != null) {
+            if (isFranceSelected && onOpenFhMap != null) {
                 Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
                 OutlinedButton(
                     onClick = onOpenFhMap,
@@ -371,49 +394,97 @@ fun MapFiltersControls(
             // 3. FRÉQUENCES
             SectionTitle(stringResource(R.string.appstrings_frequencies_title))
 
-            AnimatedVisibility(visible = show5G) {
-                Column {
-                    FreqRow("5G") {
-                        FilterToggleButton("700 MHz", "f5g_700", AppConfig.f5G_700, prefs)
-                        FilterToggleButton("1400 MHz (exp)", "f5g_1400", AppConfig.f5G_1400, prefs)
-                        FilterToggleButton("2100 MHz", "f5g_2100", AppConfig.f5G_2100, prefs)
-                        FilterToggleButton("3500 MHz", "f5g_3500", AppConfig.f5G_3500, prefs)
-                        FilterToggleButton("4200 MHz (exp)", "f5g_4200", AppConfig.f5G_4200, prefs)
-                        FilterToggleButton("26 GHz (exp)", "f5g_26000", AppConfig.f5G_26000, prefs)
-                    }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                }
+            val freqOrder = AppConfig.resolveOrderForScreen(fr.geotower.utils.ScreenPageTarget.SITE_DETAIL)
+            val descending = freqOrder == fr.geotower.utils.TechFrequencyOrder.DESCENDING
+
+            data class BandToggleSpec(val label: String, val prefKey: String, val state: MutableState<Boolean>)
+            val bands5G = if (isFranceSelected) {
+                listOf(
+                    BandToggleSpec("700 MHz", "f5g_700", AppConfig.f5G_700),
+                    BandToggleSpec("1400 MHz (exp)", "f5g_1400", AppConfig.f5G_1400),
+                    BandToggleSpec("2100 MHz", "f5g_2100", AppConfig.f5G_2100),
+                    BandToggleSpec("3500 MHz", "f5g_3500", AppConfig.f5G_3500),
+                    BandToggleSpec("4200 MHz (exp)", "f5g_4200", AppConfig.f5G_4200),
+                    BandToggleSpec("26 GHz (exp)", "f5g_26000", AppConfig.f5G_26000)
+                )
+            } else {
+                listOf(
+                    BandToggleSpec("600 MHz (n71)", "f5g_600", AppConfig.f5G_600),
+                    BandToggleSpec("700 MHz (n12/n29)", "f5g_700", AppConfig.f5G_700),
+                    BandToggleSpec("850 MHz (n5)", "f5g_850", AppConfig.f5G_850),
+                    BandToggleSpec("1900 MHz (PCS)", "f5g_1900", AppConfig.f5G_1900),
+                    BandToggleSpec("2000 MHz (AWS-4)", "f5g_2000", AppConfig.f5G_2000),
+                    BandToggleSpec("2100 MHz (AWS)", "f5g_2100", AppConfig.f5G_2100),
+                    BandToggleSpec("2600 MHz (BRS)", "f5g_2600", AppConfig.f5G_2600),
+                    BandToggleSpec("3500 MHz (n78)", "f5g_3500", AppConfig.f5G_3500),
+                    BandToggleSpec("3800 MHz (n77)", "f5g_3800", AppConfig.f5G_3800),
+                    BandToggleSpec("26/28/38 GHz", "f5g_26000", AppConfig.f5G_26000)
+                )
+            }
+            val bands4G = if (isFranceSelected) {
+                listOf(
+                    BandToggleSpec("700 MHz", "f4g_700", AppConfig.f4G_700),
+                    BandToggleSpec("800 MHz", "f4g_800", AppConfig.f4G_800),
+                    BandToggleSpec("900 MHz", "f4g_900", AppConfig.f4G_900),
+                    BandToggleSpec("1800 MHz", "f4g_1800", AppConfig.f4G_1800),
+                    BandToggleSpec("2100 MHz", "f4g_2100", AppConfig.f4G_2100),
+                    BandToggleSpec("2600 MHz", "f4g_2600", AppConfig.f4G_2600)
+                )
+            } else {
+                listOf(
+                    BandToggleSpec("600 MHz (B71)", "f4g_600", AppConfig.f4G_600),
+                    BandToggleSpec("700 MHz", "f4g_700", AppConfig.f4G_700),
+                    BandToggleSpec("850 MHz", "f4g_800", AppConfig.f4G_800),
+                    BandToggleSpec("1900 MHz (PCS)", "f4g_1800", AppConfig.f4G_1800),
+                    BandToggleSpec("2100 MHz (AWS)", "f4g_2100", AppConfig.f4G_2100),
+                    BandToggleSpec("2300 MHz (WCS)", "f4g_2300", AppConfig.f4G_2300),
+                    BandToggleSpec("2600 MHz (BRS)", "f4g_2600", AppConfig.f4G_2600),
+                    BandToggleSpec("3500 MHz", "f4g_3500", AppConfig.f4G_3500)
+                )
+            }
+            val bands3G = if (isFranceSelected) {
+                listOf(
+                    BandToggleSpec("900 MHz", "f3g_900", AppConfig.f3G_900),
+                    BandToggleSpec("2100 MHz", "f3g_2100", AppConfig.f3G_2100)
+                )
+            } else {
+                listOf(
+                    BandToggleSpec("850 MHz", "f3g_900", AppConfig.f3G_900),
+                    BandToggleSpec("1900 MHz (PCS)", "f3g_1900", AppConfig.f3G_1900),
+                    BandToggleSpec("2100 MHz (AWS)", "f3g_2100", AppConfig.f3G_2100)
+                )
+            }
+            val bands2G = if (isFranceSelected) {
+                listOf(
+                    BandToggleSpec("900 MHz", "f2g_900", AppConfig.f2G_900),
+                    BandToggleSpec("1800 MHz", "f2g_1800", AppConfig.f2G_1800)
+                )
+            } else {
+                listOf(
+                    BandToggleSpec("850 MHz", "f2g_900", AppConfig.f2G_900),
+                    BandToggleSpec("1900 MHz (PCS)", "f2g_1800", AppConfig.f2G_1800)
+                )
             }
 
-            AnimatedVisibility(visible = show4G) {
-                Column {
-                    FreqRow("4G") {
-                        FilterToggleButton("700 MHz", "f4g_700", AppConfig.f4G_700, prefs)
-                        FilterToggleButton("800 MHz", "f4g_800", AppConfig.f4G_800, prefs)
-                        FilterToggleButton("900 MHz", "f4g_900", AppConfig.f4G_900, prefs)
-                        FilterToggleButton("1800 MHz", "f4g_1800", AppConfig.f4G_1800, prefs)
-                        FilterToggleButton("2100 MHz", "f4g_2100", AppConfig.f4G_2100, prefs)
-                        FilterToggleButton("2600 MHz", "f4g_2600", AppConfig.f4G_2600, prefs)
-                    }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                }
-            }
+            val techRows = listOf(
+                Triple("5G", show5G, if (descending) bands5G.reversed() else bands5G),
+                Triple("4G", show4G, if (descending) bands4G.reversed() else bands4G),
+                Triple("3G", show3G, if (descending) bands3G.reversed() else bands3G),
+                Triple("2G", show2G, if (descending) bands2G.reversed() else bands2G)
+            ).let { rows -> if (descending) rows else rows.reversed() }
 
-            AnimatedVisibility(visible = show3G) {
-                Column {
-                    FreqRow("3G") {
-                        FilterToggleButton("900 MHz", "f3g_900", AppConfig.f3G_900, prefs)
-                        FilterToggleButton("2100 MHz", "f3g_2100", AppConfig.f3G_2100, prefs)
-                    }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                }
-            }
-
-            AnimatedVisibility(visible = show2G) {
-                Column {
-                    FreqRow("2G") {
-                        FilterToggleButton("900 MHz", "f2g_900", AppConfig.f2G_900, prefs)
-                        FilterToggleButton("1800 MHz", "f2g_1800", AppConfig.f2G_1800, prefs)
+            val visibleTechRows = techRows.filter { it.second }
+            techRows.forEach { (techTitle, isTechVisible, bandList) ->
+                AnimatedVisibility(visible = isTechVisible) {
+                    Column {
+                        FreqRow(techTitle) {
+                            bandList.forEach { spec ->
+                                FilterToggleButton(spec.label, spec.prefKey, spec.state, prefs)
+                            }
+                        }
+                        if (visibleTechRows.lastOrNull()?.first != techTitle) {
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        }
                     }
                 }
             }
@@ -495,12 +566,16 @@ fun MapFiltersControls(
                 }
 
                 AnimatedVisibility(visible = showSignalQuestCoveragePoints) {
-                    val coverageOperators = listOfNotNull(
-                        OperatorColors.specForKey(OperatorColors.ORANGE_KEY),
-                        OperatorColors.specForKey(OperatorColors.SFR_KEY),
-                        OperatorColors.specForKey(OperatorColors.BOUYGUES_KEY)?.copy(label = "Bouygues"),
-                        OperatorColors.specForKey(OperatorColors.FREE_KEY)?.copy(label = "Free")
-                    )
+                    val coverageOperators = if (isFranceSelected) {
+                        listOfNotNull(
+                            OperatorColors.specForKey(OperatorColors.ORANGE_KEY),
+                            OperatorColors.specForKey(OperatorColors.SFR_KEY),
+                            OperatorColors.specForKey(OperatorColors.BOUYGUES_KEY)?.copy(label = "Bouygues"),
+                            OperatorColors.specForKey(OperatorColors.FREE_KEY)?.copy(label = "Free")
+                        )
+                    } else {
+                        OperatorColors.canada
+                    }
                     var isCoverageOperatorsExpanded by remember { mutableStateOf(true) }
 
                     Column(modifier = Modifier.padding(top = sizing.spacing(12.dp))) {
@@ -521,128 +596,131 @@ fun MapFiltersControls(
                 }
             }
 
-            if (hasRadioDatabase) {
-                Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+            if (isFranceSelected) {
 
-                SectionTitle(stringResource(R.string.appstrings_radio_filters_title))
-                Row(horizontalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))) {
-                    SelectableButton(
-                        label = stringResource(R.string.appstrings_radio_category_tv),
-                        isSelected = showRadioTv,
-                        modifier = Modifier.weight(1f),
-                        selectedColor = Color(0xFF8BC34A)
-                    ) {
-                        showRadioTv = it
-                        saveRadioCategory(AppConfig.PREF_SHOW_RADIO_TV, it)
+                if (hasRadioDatabase) {
+                    Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+
+                    SectionTitle(stringResource(R.string.appstrings_radio_filters_title))
+                    Row(horizontalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))) {
+                        SelectableButton(
+                            label = stringResource(R.string.appstrings_radio_category_tv),
+                            isSelected = showRadioTv,
+                            modifier = Modifier.weight(1f),
+                            selectedColor = Color(0xFF8BC34A)
+                        ) {
+                            showRadioTv = it
+                            saveRadioCategory(AppConfig.PREF_SHOW_RADIO_TV, it)
+                        }
+                        SelectableButton(
+                            label = stringResource(R.string.appstrings_radio_category_radio),
+                            isSelected = showRadioBroadcast,
+                            modifier = Modifier.weight(1f),
+                            selectedColor = Color(0xFFFDD835)
+                        ) {
+                            showRadioBroadcast = it
+                            saveRadioCategory(AppConfig.PREF_SHOW_RADIO_BROADCAST, it)
+                        }
                     }
+
+                    Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))) {
+                        SelectableButton(
+                            label = stringResource(R.string.appstrings_radio_category_private_mobile),
+                            isSelected = showRadioPrivateMobile,
+                            modifier = Modifier.weight(1f),
+                            selectedColor = Color(0xFF006D77),
+                            minHeight = 68.dp,
+                            maxLines = 3
+                        ) {
+                            showRadioPrivateMobile = it
+                            saveRadioCategory(AppConfig.PREF_SHOW_RADIO_PRIVATE_MOBILE, it)
+                        }
+                        SelectableButton(
+                            label = stringResource(R.string.appstrings_radio_category_fh),
+                            isSelected = showRadioFh,
+                            modifier = Modifier.weight(1f),
+                            selectedColor = Color(0xFF0D47A1),
+                            minHeight = 68.dp,
+                            maxLines = 3
+                        ) {
+                            showRadioFh = it
+                            saveRadioCategory(AppConfig.PREF_SHOW_RADIO_FH, it)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+
                     SelectableButton(
-                        label = stringResource(R.string.appstrings_radio_category_radio),
-                        isSelected = showRadioBroadcast,
-                        modifier = Modifier.weight(1f),
-                        selectedColor = Color(0xFFFDD835)
+                        label = stringResource(R.string.appstrings_radio_category_other),
+                        isSelected = showRadioOther,
+                        modifier = Modifier.fillMaxWidth(),
+                        selectedColor = Color.Black
                     ) {
-                        showRadioBroadcast = it
-                        saveRadioCategory(AppConfig.PREF_SHOW_RADIO_BROADCAST, it)
+                        showRadioOther = it
+                        saveRadioCategory(AppConfig.PREF_SHOW_RADIO_OTHER, it)
                     }
                 }
 
-                Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+                Spacer(modifier = Modifier.height(sizing.spacing(32.dp)))
 
+                SectionTitle(stringResource(R.string.appstrings_site_display_title))
                 Row(horizontalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))) {
                     SelectableButton(
-                        label = stringResource(R.string.appstrings_radio_category_private_mobile),
-                        isSelected = showRadioPrivateMobile,
-                        modifier = Modifier.weight(1f),
-                        selectedColor = Color(0xFF006D77),
-                        minHeight = 68.dp,
-                        maxLines = 3
+                        label = stringResource(R.string.appstrings_sites_in_service_label),
+                        isSelected = showSitesInService,
+                        modifier = Modifier.weight(1f)
                     ) {
-                        showRadioPrivateMobile = it
-                        saveRadioCategory(AppConfig.PREF_SHOW_RADIO_PRIVATE_MOBILE, it)
+                        showSitesInService = it
+                        prefs.edit().putBoolean("show_sites_in_service", it).apply()
                     }
+
                     SelectableButton(
-                        label = stringResource(R.string.appstrings_radio_category_fh),
-                        isSelected = showRadioFh,
+                        label = stringResource(R.string.appstrings_sites_out_of_service_label),
+                        isSelected = showSitesOutOfService,
                         modifier = Modifier.weight(1f),
-                        selectedColor = Color(0xFF0D47A1),
-                        minHeight = 68.dp,
-                        maxLines = 3
+                        selectedColor = MaterialTheme.colorScheme.error
                     ) {
-                        showRadioFh = it
-                        saveRadioCategory(AppConfig.PREF_SHOW_RADIO_FH, it)
+                        showSitesOutOfService = it
+                        prefs.edit().putBoolean("show_sites_out_of_service", it).apply()
+                    }
+
+                    // Sites dont AUCUNE émission n'est en service (pas ceux qui ont seulement
+                    // quelques nouvelles fréquences en projet).
+                    SelectableButton(
+                        label = stringResource(R.string.appstrings_sites_project_label),
+                        isSelected = showProjectSites,
+                        modifier = Modifier.weight(1f),
+                        selectedColor = ProjectFilterColor
+                    ) {
+                        showProjectSites = it
+                        prefs.edit().putBoolean(AppConfig.PREF_SHOW_PROJECT_SITES, it).apply()
                     }
                 }
 
                 Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
 
                 SelectableButton(
-                    label = stringResource(R.string.appstrings_radio_category_other),
-                    isSelected = showRadioOther,
+                    label = stringResource(R.string.appstrings_show_only_zb_sites_label),
+                    isSelected = showOnlyZbSites,
                     modifier = Modifier.fillMaxWidth(),
-                    selectedColor = Color.Black
+                    selectedColor = MaterialTheme.colorScheme.tertiary
                 ) {
-                    showRadioOther = it
-                    saveRadioCategory(AppConfig.PREF_SHOW_RADIO_OTHER, it)
+                    showOnlyZbSites = it
+                    prefs.edit().putBoolean(AppConfig.PREF_SHOW_ONLY_ZB_SITES, it).apply()
                 }
-            }
 
-            Spacer(modifier = Modifier.height(sizing.spacing(32.dp)))
-
-            SectionTitle(stringResource(R.string.appstrings_site_display_title))
-            Row(horizontalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))) {
-                SelectableButton(
-                    label = stringResource(R.string.appstrings_sites_in_service_label),
-                    isSelected = showSitesInService,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    showSitesInService = it
-                    prefs.edit().putBoolean("show_sites_in_service", it).apply()
-                }
+                Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
 
                 SelectableButton(
-                    label = stringResource(R.string.appstrings_sites_out_of_service_label),
-                    isSelected = showSitesOutOfService,
-                    modifier = Modifier.weight(1f),
-                    selectedColor = MaterialTheme.colorScheme.error
+                    label = stringResource(R.string.appstrings_hide_underground_sites_label),
+                    isSelected = hideUndergroundSites,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    showSitesOutOfService = it
-                    prefs.edit().putBoolean("show_sites_out_of_service", it).apply()
+                    hideUndergroundSites = it
+                    prefs.edit().putBoolean(AppConfig.PREF_HIDE_UNDERGROUND_SITES, it).apply()
                 }
-
-                // Sites dont AUCUNE émission n'est en service (pas ceux qui ont seulement
-                // quelques nouvelles fréquences en projet).
-                SelectableButton(
-                    label = stringResource(R.string.appstrings_sites_project_label),
-                    isSelected = showProjectSites,
-                    modifier = Modifier.weight(1f),
-                    selectedColor = ProjectFilterColor
-                ) {
-                    showProjectSites = it
-                    prefs.edit().putBoolean(AppConfig.PREF_SHOW_PROJECT_SITES, it).apply()
-                }
-            }
-
-            Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
-
-            SelectableButton(
-                label = stringResource(R.string.appstrings_show_only_zb_sites_label),
-                isSelected = showOnlyZbSites,
-                modifier = Modifier.fillMaxWidth(),
-                selectedColor = MaterialTheme.colorScheme.tertiary
-            ) {
-                showOnlyZbSites = it
-                prefs.edit().putBoolean(AppConfig.PREF_SHOW_ONLY_ZB_SITES, it).apply()
-            }
-
-            Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
-
-            SelectableButton(
-                label = stringResource(R.string.appstrings_hide_underground_sites_label),
-                isSelected = hideUndergroundSites,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                hideUndergroundSites = it
-                prefs.edit().putBoolean(AppConfig.PREF_HIDE_UNDERGROUND_SITES, it).apply()
             }
         }
 }

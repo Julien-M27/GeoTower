@@ -663,7 +663,8 @@ private fun SiteSpeedtestsHeader(
     ) {
         val identifiers = buildList {
             siteId?.let { add("Site $it") }
-            anfrCode?.let { add("ANFR $it") }
+            val codePrefix = if (market.equals("CA", ignoreCase = true)) "ISDE" else "ANFR"
+            anfrCode?.let { add("$codePrefix $it") }
         }.joinToString("  •  ")
         val contextLine = buildList {
             operator?.let { add(it) }

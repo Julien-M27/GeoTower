@@ -243,6 +243,7 @@ private const val SECTION_COUNT = SettingsSectionIds.COUNT
 // `section=database` s'arrête au titre de la section. `db_outages` n'est émis par aucun worker
 // (les pannes se téléchargent depuis la carte elle-même), il reste une cible de lien valable.
 private const val ANCHOR_DB_MOBILE = "db_mobile"
+private const val ANCHOR_DB_MOBILE_CA = "db_mobile_ca"
 private const val ANCHOR_DB_RADIO = "db_radio"
 private const val ANCHOR_DB_ENB = "db_enb"
 private const val ANCHOR_DB_OUTAGES = "db_outages"
@@ -251,6 +252,7 @@ private const val ANCHOR_DB_APP_UPDATE = "app_update"
 private const val ANCHOR_DB_APP_UPDATE_ALT = "db_app_update"
 private val DATABASE_CARD_ANCHORS = listOf(
     ANCHOR_DB_MOBILE,
+    ANCHOR_DB_MOBILE_CA,
     ANCHOR_DB_RADIO,
     ANCHOR_DB_ENB,
     ANCHOR_DB_OUTAGES,
@@ -353,7 +355,11 @@ fun SettingsScreen(
     // sites en panne,
     // generation locale) : la notif d'un telechargement doit arriver precisement sur SA carte, pas
     // au titre de la section.
-    val initialDatabaseCardAnchor = initialSection?.takeIf { it in DATABASE_CARD_ANCHORS }
+    val initialDatabaseCardAnchor = when (initialSection) {
+        "db_mobile_fr" -> ANCHOR_DB_MOBILE
+        "db_mobile_ca" -> ANCHOR_DB_MOBILE_CA
+        else -> initialSection?.takeIf { it in DATABASE_CARD_ANCHORS }
+    }
     val databaseCardRequesters = remember { DATABASE_CARD_ANCHORS.associateWith { BringIntoViewRequester() } }
     val databaseCardBounds = remember { mutableStateMapOf<String, SettingsSectionBounds>() }
     var pendingDatabaseCardAnchor by rememberSaveable(initialSection) { mutableStateOf(initialDatabaseCardAnchor) }
@@ -1051,7 +1057,8 @@ fun SettingsScreen(
     }
 
     // Recherche : index de tous les paramètres trouvables depuis la barre de recherche.
-    val settingsSearchEntries = remember(featureFlags, appLanguage, isWideScreen) {
+    val resources = androidx.compose.ui.platform.LocalResources.current
+    val settingsSearchEntries = remember(featureFlags, appLanguage, isWideScreen, resources) {
         buildList {
             fun entry(title: String, keywords: String, section: Int, openAction: (() -> Unit)? = null) {
                 val meta = menuItems[section]
@@ -1073,7 +1080,7 @@ fun SettingsScreen(
                     SettingsSearchEntry(
                         title = title,
                         keywords = keywords,
-                        sectionLabel = context.getString(R.string.nav_settings),
+                        sectionLabel = resources.getString(R.string.nav_settings),
                         icon = icon,
                         onClick = { searchOpen(null, action) }
                     )
@@ -1081,192 +1088,192 @@ fun SettingsScreen(
             }
 
             // --- Apparence ---
-            entry(context.getString(R.string.appearance_theme_title), "theme thème clair sombre systeme dark light mode nuit jour couleur apparence", SECTION_APPEARANCE)
-            entry(context.getString(R.string.settings_nav_mode_title), "mode navigation barre selection onglets bas accueil standard", SECTION_APPEARANCE) { showNavModeSheet = true }
+            entry(resources.getString(R.string.appearance_theme_title), "theme thème clair sombre systeme dark light mode nuit jour couleur apparence", SECTION_APPEARANCE)
+            entry(resources.getString(R.string.settings_nav_mode_title), "mode navigation barre selection onglets bas accueil standard", SECTION_APPEARANCE) { showNavModeSheet = true }
             if (useOneUi) {
-                entry(context.getString(R.string.settings_bottom_nav_opacity_title), "transparence flou blur opacite barre navigation bas selection one ui", SECTION_APPEARANCE)
+                entry(resources.getString(R.string.settings_bottom_nav_opacity_title), "transparence flou blur opacite barre navigation bas selection one ui", SECTION_APPEARANCE)
             }
-            entry(context.getString(R.string.appstrings_color_palette_title), "palette couleur color accent teinte material", SECTION_APPEARANCE) { showColorPalettePage = true }
-            entry(context.getString(R.string.appearance_oled_title), "oled noir pur black amoled sombre economie", SECTION_APPEARANCE)
-            entry(context.getString(R.string.appearance_one_ui_title), "one ui oneui samsung style interface bulle", SECTION_APPEARANCE)
-            entry(context.getString(R.string.appearance_scroll_blur_title), "flou blur defilement transparence effet", SECTION_APPEARANCE)
-            entry(context.getString(R.string.appearance_app_icon_title), "icone icon launcher logo application accueil", SECTION_APPEARANCE) { showIconSheet = true }
-            entry(context.getString(R.string.appearance_in_app_logo_title), "logo dessin drawing application interne", SECTION_APPEARANCE) { showLogoDrawingSheet = true }
-            entry(context.getString(R.string.appearance_logo_material_waves_title), "logo accent couleur waves material palette theme geotower georadio fun", SECTION_APPEARANCE)
-            entry(context.getString(R.string.appearance_menu_size_title), "taille menu size police texte echelle zoom", SECTION_APPEARANCE)
+            entry(resources.getString(R.string.appstrings_color_palette_title), "palette couleur color accent teinte material", SECTION_APPEARANCE) { showColorPalettePage = true }
+            entry(resources.getString(R.string.appearance_oled_title), "oled noir pur black amoled sombre economie", SECTION_APPEARANCE)
+            entry(resources.getString(R.string.appearance_one_ui_title), "one ui oneui samsung style interface bulle", SECTION_APPEARANCE)
+            entry(resources.getString(R.string.appearance_scroll_blur_title), "flou blur defilement transparence effet", SECTION_APPEARANCE)
+            entry(resources.getString(R.string.appearance_app_icon_title), "icone icon launcher logo application accueil", SECTION_APPEARANCE) { showIconSheet = true }
+            entry(resources.getString(R.string.appearance_in_app_logo_title), "logo dessin drawing application interne", SECTION_APPEARANCE) { showLogoDrawingSheet = true }
+            entry(resources.getString(R.string.appearance_logo_material_waves_title), "logo accent couleur waves material palette theme geotower georadio fun", SECTION_APPEARANCE)
+            entry(resources.getString(R.string.appearance_menu_size_title), "taille menu size police texte echelle zoom", SECTION_APPEARANCE)
             if (isWideScreen) {
-                entry(context.getString(R.string.settings_display_style_title), "affichage display plein ecran split divise tablette", SECTION_APPEARANCE)
+                entry(resources.getString(R.string.settings_display_style_title), "affichage display plein ecran split divise tablette", SECTION_APPEARANCE)
             }
 
             // --- Cartographie ---
-            entry(context.getString(R.string.settings_section_mapping), "carte map fond fournisseur ign osm topo provider tuiles", SECTION_MAPPING)
-            entry(context.getString(R.string.mapping_style_title), "style carte clair sombre satellite couleur", SECTION_MAPPING)
-            entry(context.getString(R.string.appstrings_map_smooth_location_option), "repere position gps fluide glissement lissage", SECTION_MAPPING)
-            entry(context.getString(R.string.settings_map_location_zoom_title), "zoom niveau localisation position recentrage bouton gps echelle", SECTION_MAPPING)
-            entry(context.getString(R.string.map_clustering_strength_title), "cluster clustering densite regroupement antennes marqueurs force puissance intensite", SECTION_MAPPING)
-            entry(context.getString(R.string.appstrings_offline_maps_title), "cartes hors ligne offline maps telechargement tuiles mapsforge", SECTION_MAPPING)
+            entry(resources.getString(R.string.settings_section_mapping), "carte map fond fournisseur ign osm topo provider tuiles", SECTION_MAPPING)
+            entry(resources.getString(R.string.mapping_style_title), "style carte clair sombre satellite couleur", SECTION_MAPPING)
+            entry(resources.getString(R.string.appstrings_map_smooth_location_option), "repere position gps fluide glissement lissage", SECTION_MAPPING)
+            entry(resources.getString(R.string.settings_map_location_zoom_title), "zoom niveau localisation position recentrage bouton gps echelle", SECTION_MAPPING)
+            entry(resources.getString(R.string.map_clustering_strength_title), "cluster clustering densite regroupement antennes marqueurs force puissance intensite", SECTION_MAPPING)
+            entry(resources.getString(R.string.appstrings_offline_maps_title), "cartes hors ligne offline maps telechargement tuiles mapsforge", SECTION_MAPPING)
 
             // --- Préférences ---
-            entry(context.getString(R.string.settings_default_operator), "operateur operator orange sfr free bouygues sim defaut", SECTION_PREFERENCES) { showOperatorSheet = true }
-            entry(context.getString(R.string.settings_app_language), "langue language francais anglais traduction locale", SECTION_PREFERENCES) { showLanguageSheet = true }
-            entry(context.getString(R.string.settings_units_title), "unites units distance vitesse metre km mesure imperial", SECTION_PREFERENCES) { showUnitSheet = true }
-            entry(context.getString(R.string.settings_tech_order_title), "ordre tri technologies frequences 5g 4g 3g 2g croissant decroissant", SECTION_PREFERENCES) { showTechOrderSheet = true }
+            entry(resources.getString(R.string.settings_default_operator), "operateur operator orange sfr free bouygues rogers bell telus videotron freedom sasktel canada sim defaut", SECTION_PREFERENCES) { showOperatorSheet = true }
+            entry(resources.getString(R.string.settings_app_language), "langue language francais anglais traduction locale", SECTION_PREFERENCES) { showLanguageSheet = true }
+            entry(resources.getString(R.string.settings_units_title), "unites units distance vitesse metre km mesure imperial", SECTION_PREFERENCES) { showUnitSheet = true }
+            entry(resources.getString(R.string.settings_tech_order_title), "ordre tri technologies frequences 5g 4g 3g 2g croissant decroissant", SECTION_PREFERENCES) { showTechOrderSheet = true }
             if (featureFlags.isMenuEnabled(RemoteFeatureFlags.Menus.EXTERNAL_LINKS_SETTINGS)) {
-                entry(context.getString(R.string.settings_external_links_title), "liens externes links cartoradio sites web", SECTION_PREFERENCES) { showExternalLinksSheet = true }
+                entry(resources.getString(R.string.settings_external_links_title), "liens externes links cartoradio sites web", SECTION_PREFERENCES) { showExternalLinksSheet = true }
             }
             if (featureFlags.isMenuEnabled(RemoteFeatureFlags.Menus.SHARE_SETTINGS)) {
-                entry(context.getString(R.string.settings_default_share_content_title), "partage share image contenu carte antenne support", SECTION_PREFERENCES) { showShareSelectorSheet = true }
+                entry(resources.getString(R.string.settings_default_share_content_title), "partage share image contenu carte antenne support", SECTION_PREFERENCES) { showShareSelectorSheet = true }
             }
 
             // --- Pages ---
             // Une entrée PAR page, et non plus une seule pour toute la personnalisation : taper
             // « boussole » ou « azimut » doit tomber sur le réglage, pas sur un menu à fouiller.
             if (pagesCustomizationEnabled) {
-                entry(context.getString(R.string.settings_pages_customization_title), "pages personnalisation blocs reorganiser masquer astuces bulle rappel appui long defilement", SECTION_PAGES)
+                entry(resources.getString(R.string.settings_pages_customization_title), "pages personnalisation blocs reorganiser masquer astuces bulle rappel appui long defilement", SECTION_PAGES)
                 if (!AppConfig.simpleModeActive()) {
-                    entry(context.getString(R.string.appstrings_startup_page_settings), "demarrage startup page ouverture lancement", SECTION_PAGES) { showStartupPageSheet = true }
+                    entry(resources.getString(R.string.appstrings_startup_page_settings), "demarrage startup page ouverture lancement", SECTION_PAGES) { showStartupPageSheet = true }
                     if (!AppConfig.isBottomNavActive()) {
-                        entry(context.getString(R.string.appstrings_page_home_settings), "accueil home menu ordre pages bouton aide reorganiser appui long", SECTION_PAGES) { showHomeSettingsSheet = true }
+                        entry(resources.getString(R.string.appstrings_page_home_settings), "accueil home menu ordre pages bouton aide reorganiser appui long", SECTION_PAGES) { showHomeSettingsSheet = true }
                     } else {
-                        entry(context.getString(R.string.settings_page_more_title), "plus menu ordre pages reorganiser appui long", SECTION_PAGES) { showMoreSettingsSheet = true }
-                        entry(context.getString(R.string.settings_page_bottom_nav_title), "barre navigation onglets ordre bas", SECTION_PAGES) { showBottomNavSettingsSheet = true }
+                        entry(resources.getString(R.string.settings_page_more_title), "plus menu ordre pages reorganiser appui long", SECTION_PAGES) { showMoreSettingsSheet = true }
+                        entry(resources.getString(R.string.settings_page_bottom_nav_title), "barre navigation onglets ordre bas", SECTION_PAGES) { showBottomNavSettingsSheet = true }
                     }
                 } else {
-                    entry(context.getString(R.string.settings_page_simple_drawer_title), "volet lateral tiroir drawer mode simplifie ordre boutons reorganiser appui long", SECTION_PAGES) { showSimpleDrawerSettingsSheet = true }
+                    entry(resources.getString(R.string.settings_page_simple_drawer_title), "volet lateral tiroir drawer mode simplifie ordre boutons reorganiser appui long", SECTION_PAGES) { showSimpleDrawerSettingsSheet = true }
                 }
                 if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.NEARBY)) {
-                    entry(context.getString(R.string.appstrings_page_nearby_settings), "proximite nearby recherche suggestions rayon distance", SECTION_PAGES) { showNearbySettingsSheet = true }
+                    entry(resources.getString(R.string.appstrings_page_nearby_settings), "proximite nearby recherche suggestions rayon distance", SECTION_PAGES) { showNearbySettingsSheet = true }
                 }
                 if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.MAP)) {
-                    entry(context.getString(R.string.appstrings_page_map_settings), "carte map marqueur azimut cone boite a outils filtres position echelle boussole vitesse", SECTION_PAGES) { showMapSettingsSheet = true }
+                    entry(resources.getString(R.string.appstrings_page_map_settings), "carte map marqueur azimut cone boite a outils filtres position echelle boussole vitesse", SECTION_PAGES) { showMapSettingsSheet = true }
                 }
                 if (AppConfig.hasCompass.value && featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.COMPASS)) {
-                    entry(context.getString(R.string.appstrings_page_compass_settings), "boussole compass azimut cap precision gps blocs", SECTION_PAGES) { showCompassSettingsSheet = true }
+                    entry(resources.getString(R.string.appstrings_page_compass_settings), "boussole compass azimut cap precision gps blocs", SECTION_PAGES) { showCompassSettingsSheet = true }
                 }
                 if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.STATS)) {
-                    entry(context.getString(R.string.appstrings_stats_title), "statistiques stats blocs frequences graphiques affichage", SECTION_PAGES) { showStatsSettingsSheet = true }
-                    entry(context.getString(R.string.department_stats_title), "departement department statistiques blocs autorisations", SECTION_PAGES) { showDepartmentStatsSettingsSheet = true }
+                    entry(resources.getString(R.string.appstrings_stats_title), "statistiques stats blocs frequences graphiques affichage", SECTION_PAGES) { showStatsSettingsSheet = true }
+                    entry(resources.getString(R.string.department_stats_title), "departement department statistiques blocs autorisations", SECTION_PAGES) { showDepartmentStatsSettingsSheet = true }
                 }
                 if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.ABOUT)) {
-                    entry(context.getString(R.string.appstrings_about), "a propos about parties sections ordre visibilite defilant defilement scrolling une a la fois", SECTION_PAGES) { showAboutPageSettingsSheet = true }
-                    entry(context.getString(R.string.appstrings_changelogs_history_title), "changelog changelogs historique versions evolutions mises a jour notes statistiques scroll aides", SECTION_PAGES) { showChangelogSettingsSheet = true }
+                    entry(resources.getString(R.string.appstrings_about), "a propos about parties sections ordre visibilite defilant defilement scrolling une a la fois", SECTION_PAGES) { showAboutPageSettingsSheet = true }
+                    entry(resources.getString(R.string.appstrings_changelogs_history_title), "changelog changelogs historique versions evolutions mises a jour notes statistiques scroll aides", SECTION_PAGES) { showChangelogSettingsSheet = true }
                 }
                 if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.SUPPORT_DETAIL)) {
-                    entry(context.getString(R.string.appstrings_page_support_settings), "support pylone fiche blocs mini carte photos operateurs", SECTION_PAGES) { showSupportSettingsSheet = true }
+                    entry(resources.getString(R.string.appstrings_page_support_settings), "support pylone fiche blocs mini carte photos operateurs", SECTION_PAGES) { showSupportSettingsSheet = true }
                 }
                 if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.SITE_DETAIL)) {
                     val siteEntryTitle = if (AppConfig.simpleModeActive()) {
-                        context.getString(R.string.appstrings_page_site_embedded_settings)
+                        resources.getString(R.string.appstrings_page_site_embedded_settings)
                     } else {
-                        context.getString(R.string.appstrings_page_site_settings)
+                        resources.getString(R.string.appstrings_page_site_settings)
                     }
                     entry(siteEntryTitle, "site antenne fiche operateur blocs frequences photos speedtest hauteur azimut", SECTION_PAGES) { showSiteSettingsSheet = true }
                     if (featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SITE_FREQUENCIES)) {
                         entry(
-                            context.getString(R.string.appstrings_frequency_reference_title),
+                            resources.getString(R.string.appstrings_frequency_reference_title),
                             "frequences bandes frequency reference spectre mhz ghz 2g 3g 4g 5g france international ordre tri",
                             SECTION_PAGES
                         ) { showFrequencyReferenceSettingsSheet = true }
                     }
-                    entry(context.getString(R.string.appstrings_page_speedtests_settings), "speedtests debits mesures filtres tri enb", SECTION_PAGES) { showSpeedtestsSettingsSheet = true }
+                    entry(resources.getString(R.string.appstrings_page_speedtests_settings), "speedtests debits mesures filtres tri enb", SECTION_PAGES) { showSpeedtestsSettingsSheet = true }
                 }
                 if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.THEORETICAL_COVERAGE)) {
-                    entry(context.getString(R.string.appstrings_coverage_button), "couverture theorique coverage lobe propagation portee", SECTION_PAGES) { showCoverageDefaultsSheet = true }
+                    entry(resources.getString(R.string.appstrings_coverage_button), "couverture theorique coverage lobe propagation portee", SECTION_PAGES) { showCoverageDefaultsSheet = true }
                 }
                 if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.ELEVATION_PROFILE)) {
-                    entry(context.getString(R.string.appstrings_elevation_profile_title), "profil altimetrique elevation terrain batiments obstacles relief", SECTION_PAGES) { showElevationDefaultsSheet = true }
+                    entry(resources.getString(R.string.appstrings_elevation_profile_title), "profil altimetrique elevation terrain batiments obstacles relief", SECTION_PAGES) { showElevationDefaultsSheet = true }
                 }
                 if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.THROUGHPUT_CALCULATOR)) {
-                    entry(context.getString(R.string.appstrings_throughput_calculator_title), "calculateur debit throughput blocs hypotheses bandes", SECTION_PAGES) { showThroughputCalculatorSettingsSheet = true }
+                    entry(resources.getString(R.string.appstrings_throughput_calculator_title), "calculateur debit throughput blocs hypotheses bandes", SECTION_PAGES) { showThroughputCalculatorSettingsSheet = true }
                 }
             }
 
             // --- Notifications et arrière-plan ---
-            entry(context.getString(R.string.appstrings_app_notifications_title), "notifications app autoriser permission activer couper toutes", SECTION_BACKGROUND)
-            entry(context.getString(R.string.appstrings_update_notif_setting_title), "notification mise a jour update base donnees alerte", SECTION_BACKGROUND)
-            entry(context.getString(R.string.appstrings_live_notification_title), "notification live suivi temps reel antenne direct", SECTION_BACKGROUND)
-            entry(context.getString(R.string.appstrings_live_location_accuracy_title), "precision gps position live exactitude", SECTION_BACKGROUND)
+            entry(resources.getString(R.string.appstrings_app_notifications_title), "notifications app autoriser permission activer couper toutes", SECTION_BACKGROUND)
+            entry(resources.getString(R.string.appstrings_update_notif_setting_title), "notification mise a jour update base donnees alerte", SECTION_BACKGROUND)
+            entry(resources.getString(R.string.appstrings_live_notification_title), "notification live suivi temps reel antenne direct", SECTION_BACKGROUND)
+            entry(resources.getString(R.string.appstrings_live_location_accuracy_title), "precision gps position live exactitude", SECTION_BACKGROUND)
             entry(
-                context.getString(R.string.appstrings_low_power_title),
+                resources.getString(R.string.appstrings_low_power_title),
                 "faible consommation economie batterie eco energie basse performance low power mode",
                 SettingsSectionIds.forSearchEntry(SettingsSearchEntryId.LOW_POWER)
             )
-            entry(context.getString(R.string.appstrings_widget_refresh_title), "widget frequence rafraichissement synchronisation accueil", SECTION_BACKGROUND)
+            entry(resources.getString(R.string.appstrings_widget_refresh_title), "widget frequence rafraichissement synchronisation accueil", SECTION_BACKGROUND)
 
             // --- Système ---
-            entry(context.getString(R.string.appstrings_manage_permissions), "permissions autorisations systeme application acces", SECTION_SYSTEM)
-            entry(context.getString(R.string.appstrings_bg_location_perm_title), "position arriere plan background localisation permission autorisation", SECTION_SYSTEM)
+            entry(resources.getString(R.string.appstrings_manage_permissions), "permissions autorisations systeme application acces", SECTION_SYSTEM)
+            entry(resources.getString(R.string.appstrings_bg_location_perm_title), "position arriere plan background localisation permission autorisation", SECTION_SYSTEM)
             entry(
-                context.getString(R.string.appstrings_diagnostic_api_dialog_title),
+                resources.getString(R.string.appstrings_diagnostic_api_dialog_title),
                 "serveur server miroir mirror principal secours bascule api hote host reseau geotower cajejuma",
                 SettingsSectionIds.forSearchEntry(SettingsSearchEntryId.API_SERVER)
             )
-            entry(context.getString(R.string.appstrings_diagnostic_title), "diagnostic logs debogage info journal probleme", SECTION_SYSTEM) { navController.navigate("diagnostic") }
+            entry(resources.getString(R.string.appstrings_diagnostic_title), "diagnostic logs debogage info journal probleme", SECTION_SYSTEM) { navController.navigate("diagnostic") }
 
             // --- Base de données ---
-            entry(context.getString(R.string.settings_section_database), "base de donnees database telechargement anfr support antenne", SECTION_DATABASE)
+            entry(resources.getString(R.string.settings_section_database), "base de donnees database telechargement anfr isde ised canada support antenne", SECTION_DATABASE)
             entry(
-                context.getString(R.string.appstrings_about_download_app_title),
+                resources.getString(R.string.appstrings_about_download_app_title),
                 "mettre a jour application play store telecharger version mise a jour app store",
                 SECTION_DATABASE
             )
-            entry(context.getString(R.string.appstrings_radio_data_title), "radio donnees frequences base anfr", SECTION_DATABASE)
+            entry(resources.getString(R.string.appstrings_radio_data_title), "radio donnees frequences base anfr", SECTION_DATABASE)
             // Pannes : la carte de la section télécharge le fichier serveur, ou lance la génération
             // locale selon le niveau de traitement local — les deux vocabulaires mènent donc ici.
-            entry(context.getString(R.string.outage_download_title), "pannes sites hs telecharger actualiser generer copie hors ligne serveur coupures", SECTION_DATABASE)
+            entry(resources.getString(R.string.outage_download_title), "pannes sites hs telecharger actualiser generer copie hors ligne serveur coupures", SECTION_DATABASE)
             // La page a été rebaptisée « Provenance des données » : on garde son ancien nom dans les
             // mots-clés, pour qui la cherche encore sous « traitement local ».
-            entry(context.getString(R.string.local_mode_settings_title), "provenance origine source des donnees serveur appareil traitement local autonomie hors ligne generation", SECTION_DATABASE) { navController.navigate("local_mode") }
+            entry(resources.getString(R.string.local_mode_settings_title), "provenance origine source des donnees serveur appareil traitement local autonomie hors ligne generation", SECTION_DATABASE) { navController.navigate("local_mode") }
             // Les pannes n'ont pas de page dédiée : leurs réglages d'exécution (fréquence,
             // arrière-plan, mise à jour immédiate) s'affichent DANS cette section, sous la carte
             // des sites en panne, dès que le cran les récupère sur l'appareil. La recherche mène
             // donc à la section, plus à la page « Provenance des données » qui ne porte que le choix.
-            entry(context.getString(R.string.outage_local_settings_title), "coupures pannes source sites hs operateurs frequence arriere plan", SECTION_DATABASE)
+            entry(resources.getString(R.string.outage_local_settings_title), "coupures pannes source sites hs operateurs frequence arriere plan", SECTION_DATABASE)
 
             // --- Entrées directes (hors section) ---
             // Le mode simplifié vit en tête des réglages : le résultat referme la recherche (et la
             // section ouverte) pour ramener sur la page où sa carte est visible.
             if (featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SIMPLE_MODE_ENABLED)) {
                 directEntry(
-                    context.getString(R.string.settings_simple_mode_title),
+                    resources.getString(R.string.settings_simple_mode_title),
                     "mode simplifie simple carte demarrage tiroir menu lateral debutant epure",
                     Icons.Outlined.Tune
                 ) { openSection(null) }
             }
             directEntry(
-                context.getString(R.string.photos_favorites_title),
+                resources.getString(R.string.photos_favorites_title),
                 "photos favorites galerie images preferees",
                 Icons.Default.PhotoLibrary
             ) { navController.navigate("photos_favorites") }
             directEntry(
-                context.getString(R.string.photo_reports_title),
+                resources.getString(R.string.photo_reports_title),
                 "signalements signaler photos signalquest moderation retrait",
                 Icons.Default.Flag
             ) { navController.navigate("photo_reports") }
             // Les deux journaux locaux sont derrière un bouton commun : la recherche garde leurs
             // deux vocabulaires, mais mène à la page qui les regroupe.
             directEntry(
-                context.getString(R.string.histories_title),
+                resources.getString(R.string.histories_title),
                 "historiques historique envoi photos signalquest upload signalements signalement partages partage export pdf sites supports genere notifications notification journal alertes rappels",
                 Icons.Default.History
             ) { navController.navigate("histories") }
             directEntry(
-                context.getString(R.string.department_stats_title),
+                resources.getString(R.string.department_stats_title),
                 "statistiques departement departements supports stations antennes densite habitants km2 population",
                 Icons.Default.BarChart
             ) { navController.navigate(DEPARTMENT_STATS_ROUTE) }
             directEntry(
-                context.getString(R.string.backup_title),
+                resources.getString(R.string.backup_title),
                 "sauvegarde backup restauration restaurer export exporter import importer transfert changer telephone migration donnees historiques fusion",
                 Icons.Outlined.Backup
             ) { navController.navigate("backup") }
             directEntry(
-                context.getString(R.string.hidden_sites_title),
+                resources.getString(R.string.hidden_sites_title),
                 "sites masques cachés cache retrait operateur antenne retablir restaurer",
                 Icons.Outlined.VisibilityOff
             ) { navController.navigate("hidden_sites") }
             directEntry(
-                context.getString(R.string.preference_profiles_title),
+                resources.getString(R.string.preference_profiles_title),
                 "profil profils profiles preferences sauvegarde configuration",
                 Icons.Outlined.Bookmarks
             ) { showPreferenceProfilesSheet = true }
@@ -2134,6 +2141,7 @@ fun SettingsScreen(
         if (showFrequenciesSheet) {
             fr.geotower.ui.screens.settings.SiteFreqFiltersSheet(
                 onDismiss = { showFrequenciesSheet = false },
+                allowCountrySwitch = true,
                 onBack = {
                     // ✅ 3. LOGIQUE DE RETOUR
                     showFrequenciesSheet = false
@@ -4887,14 +4895,30 @@ fun SectionDatabase(
                     shape = shape,
                     border = border,
                     bubbleColor = bubbleColor,
-                    title = stringResource(R.string.settings_database_online_title),
+                    title = "${stringResource(R.string.settings_database_online_title)} (France — ANFR)",
                     refreshState = refreshState,
-                    disableDownloadAction = disableIndividualDownloads
+                    disableDownloadAction = disableIndividualDownloads,
+                    country = fr.geotower.data.db.DatabaseCountry.FR
                 )
             }
 
             Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
         }
+
+        Box(modifier = cardAnchor(ANCHOR_DB_MOBILE_CA).fillMaxWidth()) {
+            fr.geotower.ui.components.DatabaseDownloadCard(
+                useOneUi = useOneUi,
+                shape = shape,
+                border = border,
+                bubbleColor = bubbleColor,
+                title = "${stringResource(R.string.settings_database_online_title)} (Canada — ISDE)",
+                refreshState = refreshState,
+                disableDownloadAction = disableIndividualDownloads,
+                country = fr.geotower.data.db.DatabaseCountry.CA
+            )
+        }
+
+        Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
 
         if (showRadioCard) {
             Box(modifier = cardAnchor(ANCHOR_DB_RADIO).fillMaxWidth()) {
@@ -4945,43 +4969,45 @@ fun SectionDatabase(
             )
         }
 
-        // Sites en panne : fichier national du serveur, conservé sur l'appareil pour l'afficher
-        // hors ligne. Il vit ici, avec les autres données téléchargées, plutôt que dans l'écran
-        // Traitement local qui ne porte que la source ALTERNATIVE (récupération sur l'appareil).
-        Box(modifier = cardAnchor(ANCHOR_DB_OUTAGES).fillMaxWidth()) {
-            fr.geotower.ui.components.OutageDownloadCard(
-                repository = repository,
-                useOneUi = useOneUi,
-                shape = shape,
-                border = border,
-                bubbleColor = bubbleColor,
-                onSafeClick = safeClick,
-                refreshState = refreshState
-            )
-        }
-
-        // Réglages d'exécution des pannes récupérées sur l'appareil (fréquence, arrière-plan, mise
-        // à jour immédiate) : ils vivent SOUS la carte qu'ils pilotent, et non plus sur la page du
-        // cran de traitement local, qui ne porte que le choix.
-        if (AppConfig.outagesLocal()) {
-            Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
-            OutageLocalControls()
-        }
-
-        // Génération locale : masquée sur un appareil qui ne peut pas la lancer (RAM/stockage).
-        // Une carte dont l'action ne s'activera jamais n'apprend rien ici ; l'explication chiffrée
-        // est sur la page « Provenance des données », où le choix se fait (LocalBuildIneligibleCard).
-        if (buildEligibility.eligible) {
-            Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
-
-            Box(modifier = cardAnchor(ANCHOR_DB_LOCAL_BUILD).fillMaxWidth()) {
-                fr.geotower.ui.components.LocalDbBuildCard(
+        run {
+            // Sites en panne : fichier national du serveur, conservé sur l'appareil pour l'afficher
+            // hors ligne. Il vit ici, avec les autres données téléchargées, plutôt que dans l'écran
+            // Traitement local qui ne porte que la source ALTERNATIVE (récupération sur l'appareil).
+            Box(modifier = cardAnchor(ANCHOR_DB_OUTAGES).fillMaxWidth()) {
+                fr.geotower.ui.components.OutageDownloadCard(
+                    repository = repository,
                     useOneUi = useOneUi,
                     shape = shape,
                     border = border,
                     bubbleColor = bubbleColor,
+                    onSafeClick = safeClick,
                     refreshState = refreshState
                 )
+            }
+
+            // Réglages d'exécution des pannes récupérées sur l'appareil (fréquence, arrière-plan, mise
+            // à jour immédiate) : ils vivent SOUS la carte qu'ils pilotent, et non plus sur la page du
+            // cran de traitement local, qui ne porte que le choix.
+            if (AppConfig.outagesLocal()) {
+                Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+                OutageLocalControls()
+            }
+
+            // Génération locale : masquée sur un appareil qui ne peut pas la lancer (RAM/stockage).
+            // Une carte dont l'action ne s'activera jamais n'apprend rien ici ; l'explication chiffrée
+            // est sur la page « Provenance des données », où le choix se fait (LocalBuildIneligibleCard).
+            if (buildEligibility.eligible) {
+                Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+
+                Box(modifier = cardAnchor(ANCHOR_DB_LOCAL_BUILD).fillMaxWidth()) {
+                    fr.geotower.ui.components.LocalDbBuildCard(
+                        useOneUi = useOneUi,
+                        shape = shape,
+                        border = border,
+                        bubbleColor = bubbleColor,
+                        refreshState = refreshState
+                    )
+                }
             }
         }
     }

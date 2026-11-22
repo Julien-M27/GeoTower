@@ -124,6 +124,7 @@ fun TheoreticalCoverageScreen(
 ) {
     SecureScreenEffect(RemoteFeatureFlags.SecureScreens.THEORETICAL_COVERAGE)
     val context = LocalContext.current
+    val resources = androidx.compose.ui.platform.LocalResources.current
     val prefs = context.getSharedPreferences(COVERAGE_DEFAULTS_PREFS, Context.MODE_PRIVATE)
     val scope = rememberCoroutineScope()
     val safeBack = rememberSafeBackNavigation(navController, fallbackRoute = "site_detail/$idAnfr")
@@ -242,7 +243,7 @@ fun TheoreticalCoverageScreen(
                 AppLogger.w("TheoreticalCoverage", "compute failed", e)
                 android.widget.Toast.makeText(
                     context,
-                    e.localizedMessage ?: context.getString(R.string.appstrings_coverage_compute_error),
+                    e.localizedMessage ?: resources.getString(R.string.appstrings_coverage_compute_error),
                     android.widget.Toast.LENGTH_LONG
                 ).show()
             } finally {
@@ -281,11 +282,11 @@ fun TheoreticalCoverageScreen(
                 val params = "≈ ${(radius / 1000).toInt()} km · ${angular.toInt()}° · ${sample.toInt()} m · $frequencyMHz MHz · tilt ${tiltDeg.roundToInt()}°"
                 val uri = withContext(Dispatchers.IO) {
                     val image = TheoreticalCoverageShareGenerator.create(
-                        title = context.getString(R.string.appstrings_coverage_button),
+                        title = resources.getString(R.string.appstrings_coverage_button),
                         subtitle = "ANFR ${cov.idAnfr}" + (cov.operator?.let { " · $it" } ?: ""),
                         paramsLine = params,
-                        disclaimer = context.getString(R.string.appstrings_coverage_disclaimer_short),
-                        source = context.getString(R.string.appstrings_coverage_share_source),
+                        disclaimer = resources.getString(R.string.appstrings_coverage_disclaimer_short),
+                        source = resources.getString(R.string.appstrings_coverage_share_source),
                         mapBitmap = mapBitmap,
                         forceDark = false
                     )
@@ -300,10 +301,10 @@ fun TheoreticalCoverageScreen(
                     addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 }
                 // FLAG_ACTIVITY_NEW_TASK requis : contexte localisé (LocaleProvider), pas une Activity → sinon crash OnePlus.
-                context.startActivity(android.content.Intent.createChooser(intent, context.getString(R.string.appstrings_coverage_share)).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+                context.startActivity(android.content.Intent.createChooser(intent, resources.getString(R.string.appstrings_coverage_share)).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
             }.onFailure {
                 AppLogger.w("TheoreticalCoverage", "share failed", it)
-                android.widget.Toast.makeText(context, context.getString(R.string.appstrings_error), android.widget.Toast.LENGTH_SHORT).show()
+                android.widget.Toast.makeText(context, resources.getString(R.string.appstrings_error), android.widget.Toast.LENGTH_SHORT).show()
             }
         }
     }

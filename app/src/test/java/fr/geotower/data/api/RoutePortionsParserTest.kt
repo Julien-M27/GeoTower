@@ -118,4 +118,65 @@ class RoutePortionsParserTest {
         assertNull(arrival.modifier)
         assertEquals("QU DE L'HORLOGE", arrival.roadName)
     }
+
+    @Test
+    fun parsesOsrmRoutePathAndPortionsForCanada() {
+        val osrmJson = """
+            {
+              "code": "Ok",
+              "routes": [
+                {
+                  "distance": 420.5,
+                  "duration": 65.0,
+                  "geometry": {
+                    "type": "LineString",
+                    "coordinates": [[-79.3871, 43.6532], [-79.3832, 43.6561]]
+                  },
+                  "legs": [
+                    {
+                      "distance": 420.5,
+                      "duration": 65.0,
+                      "steps": [
+                        {
+                          "distance": 250.0,
+                          "duration": 35.0,
+                          "name": "University Avenue",
+                          "geometry": {
+                            "type": "LineString",
+                            "coordinates": [[-79.3871, 43.6532], [-79.3850, 43.6545]]
+                          },
+                          "maneuver": { "type": "depart", "modifier": "straight" }
+                        },
+                        {
+                          "distance": 170.5,
+                          "duration": 30.0,
+                          "name": "",
+                          "geometry": {
+                            "type": "LineString",
+                            "coordinates": [[-79.3850, 43.6545], [-79.3832, 43.6561]]
+                          },
+                          "maneuver": { "type": "arrive" }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val path = parseOsrmRoutePath(osrmJson)
+        assertEquals(2, path.points.size)
+        assertEquals(420.5, path.distanceMeters, 0.01)
+
+        val portions = parseOsrmRoutePortions(osrmJson)
+        assertEquals(1, portions.size)
+        assertEquals(3, portions[0].points.size)
+        assertEquals(420.5, portions[0].distanceMeters, 0.01)
+        assertEquals(65.0, portions[0].durationSeconds, 0.01)
+        assertEquals(2, portions[0].maneuvers.size)
+        assertEquals("depart", portions[0].maneuvers[0].type)
+        assertEquals("University Avenue", portions[0].maneuvers[0].roadName)
+        assertNull(portions[0].maneuvers[1].roadName)
+    }
 }

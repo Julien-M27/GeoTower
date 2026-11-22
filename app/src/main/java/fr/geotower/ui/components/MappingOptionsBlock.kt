@@ -26,19 +26,28 @@ fun MappingOptionsBlock(
     shape: Shape, border: BorderStroke?, bubbleColor: Color, useOneUi: Boolean, safeClick: SafeClick
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
+    val isCanadaActive = fr.geotower.data.db.DatabaseCountryStore.activeCountryState.value ==
+        fr.geotower.data.db.DatabaseCountry.CA
+    val effectiveProvider = if (isCanadaActive && mapProvider == 0) 1 else mapProvider
     // 1. Les trois fournisseurs répartis sur deux lignes pour ne pas écraser l'interface
     Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp)), verticalAlignment = Alignment.CenterVertically) {
-            SettingsOptionCard(stringResource(R.string.mapping_provider_osm), Icons.Default.Public, mapProvider == 1, { safeClick("mapping_provider_osm") { onMapProviderChange(1) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
-            SettingsOptionCard(stringResource(R.string.mapping_provider_ign), Icons.Default.Layers, mapProvider == 0, { safeClick("mapping_provider_ign") { onMapProviderChange(0) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
+            SettingsOptionCard(stringResource(R.string.mapping_provider_osm), Icons.Default.Public, effectiveProvider == 1, { safeClick("mapping_provider_osm") { onMapProviderChange(1) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
+            if (!isCanadaActive) {
+                SettingsOptionCard(stringResource(R.string.mapping_provider_ign), Icons.Default.Layers, effectiveProvider == 0, { safeClick("mapping_provider_ign") { onMapProviderChange(0) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
+            } else {
+                SettingsOptionCard(stringResource(R.string.mapping_provider_topo), Icons.Default.Terrain, effectiveProvider == 3, { safeClick("mapping_provider_topo") { onMapProviderChange(3) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
+            }
         }
-        SettingsOptionCard(stringResource(R.string.mapping_provider_topo), Icons.Default.Terrain, mapProvider == 3, { safeClick("mapping_provider_topo") { onMapProviderChange(3) } }, Modifier.fillMaxWidth(), shape, border, bubbleColor, useOneUi)
+        if (!isCanadaActive) {
+            SettingsOptionCard(stringResource(R.string.mapping_provider_topo), Icons.Default.Terrain, effectiveProvider == 3, { safeClick("mapping_provider_topo") { onMapProviderChange(3) } }, Modifier.fillMaxWidth(), shape, border, bubbleColor, useOneUi)
+        }
     }
 
     // 2. Sous-options (Clair / Sombre / Sat)
     // S'affiche pour l'IGN (0) ET pour OSM (1)
     AnimatedVisibility(
-        visible = mapProvider == 0 || mapProvider == 1,
+        visible = effectiveProvider == 0 || effectiveProvider == 1,
         enter = fadeIn() + slideInHorizontally(initialOffsetX = { it }) + expandVertically(expandFrom = Alignment.Top),
         exit = fadeOut() + slideOutHorizontally(targetOffsetX = { it }) + shrinkVertically(shrinkTowards = Alignment.Top)
     ) {
@@ -54,7 +63,7 @@ fun MappingOptionsBlock(
                 // Le Satellite s'affiche pour l'IGN (0) et pour OSM (1). Icône : un vrai satellite
                 // (SatelliteAlt), pas le cadre d'image générique — les deux autres calques sont
                 // figurés par ce qu'ils montrent, celui-ci ne l'était pas.
-                if (mapProvider == 0 || mapProvider == 1) {
+                if (effectiveProvider == 0 || effectiveProvider == 1) {
                     SettingsOptionCard(stringResource(R.string.mapping_style_satellite), Icons.Default.SatelliteAlt, ignStyle == 2, { safeClick("mapping_style_satellite") { onIgnStyleChange(2) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
                 }
             }

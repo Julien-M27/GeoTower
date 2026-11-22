@@ -99,6 +99,7 @@ fun NetworkLogScreen(
     navController: NavController
 ) {
     val context = LocalContext.current
+    val resources = androidx.compose.ui.platform.LocalResources.current
     val scope = rememberCoroutineScope()
     val uiStyle = LocalGeoTowerUiStyle.current
     val sizing = uiStyle.sizing
@@ -117,16 +118,16 @@ fun NetworkLogScreen(
     var showExportDialog by remember { mutableStateOf(false) }
 
     val retentionDays = remember { NetworkLogStore.getRetentionDays(context) }
-    val retentionLabel = remember(retentionDays) {
+    val retentionLabel = remember(retentionDays, resources) {
         when (retentionDays) {
-            1 -> context.getString(R.string.network_log_duration_1_day)
-            7 -> context.getString(R.string.network_log_duration_7_days)
-            15 -> context.getString(R.string.network_log_duration_15_days)
-            30 -> context.getString(R.string.network_log_duration_30_days)
-            90 -> context.getString(R.string.network_log_duration_3_months)
-            180 -> context.getString(R.string.network_log_duration_6_months)
-            365 -> context.getString(R.string.network_log_duration_12_months)
-            else -> context.getString(R.string.network_log_duration_always)
+            1 -> resources.getString(R.string.network_log_duration_1_day)
+            7 -> resources.getString(R.string.network_log_duration_7_days)
+            15 -> resources.getString(R.string.network_log_duration_15_days)
+            30 -> resources.getString(R.string.network_log_duration_30_days)
+            90 -> resources.getString(R.string.network_log_duration_3_months)
+            180 -> resources.getString(R.string.network_log_duration_6_months)
+            365 -> resources.getString(R.string.network_log_duration_12_months)
+            else -> resources.getString(R.string.network_log_duration_always)
         }
     }
 
@@ -385,7 +386,7 @@ fun NetworkLogScreen(
                                 showExportDialog = false
                                 val ok = NetworkLogStore.shareLog(
                                     context = context,
-                                    chooserTitle = context.getString(R.string.network_log_share),
+                                    chooserTitle = resources.getString(R.string.network_log_share),
                                     format = format,
                                     requests = requests
                                 )
@@ -596,6 +597,7 @@ private fun NetworkRequestDetailDialog(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
+    val resources = androidx.compose.ui.platform.LocalResources.current
     val sizing = LocalGeoTowerUiStyle.current.sizing
     val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US) }
     val dateStr = remember(entry.timestamp) { dateFormat.format(Date(entry.timestamp)) }

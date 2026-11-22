@@ -23,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Straighten
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material3.*
@@ -63,6 +64,10 @@ import fr.geotower.R
 import fr.geotower.ui.theme.GeoTowerExportUiStyleProvider
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import java.util.Locale
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private const val TAG_MAP_SHARE = "GeoTowerMap"
 
@@ -221,7 +226,8 @@ private fun shareFullMapCapture(
     txtInitError: String,
     destination: MapShareDestination = MapShareDestination.Share,
     txtCopiedToClipboard: String = "",
-    txtTimeSliderDate: String? = null
+    txtTimeSliderDate: String? = null,
+    txtMeasureDistance: String? = null
 ) {
     try {
         val composeView = ComposeView(context).apply {
@@ -257,14 +263,52 @@ private fun shareFullMapCapture(
                                     )
                                 }
 
-                                // Superposition du compteur de vitesse
-                                if (incSpeedometer && currentSpeed.isNotEmpty()) {
-                                    Surface(
+                                // Superposition du compteur de vitesse et de la distance mesurée (haut gauche)
+                                val showSpeedBadge = incSpeedometer && currentSpeed.isNotEmpty()
+                                if (showSpeedBadge || txtMeasureDistance != null) {
+                                    Column(
                                         modifier = Modifier.align(Alignment.TopStart).padding(12.dp),
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = Color.White.copy(alpha = 0.8f)
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        Text(text = currentSpeed, color = Color.Black, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                        if (showSpeedBadge) {
+                                            Surface(
+                                                shape = RoundedCornerShape(8.dp),
+                                                color = Color.White.copy(alpha = 0.8f)
+                                            ) {
+                                                Text(
+                                                    text = currentSpeed,
+                                                    color = Color.Black,
+                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 14.sp
+                                                )
+                                            }
+                                        }
+                                        if (txtMeasureDistance != null) {
+                                            Surface(
+                                                shape = RoundedCornerShape(8.dp),
+                                                color = Color.White.copy(alpha = 0.85f)
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Straighten,
+                                                        contentDescription = null,
+                                                        tint = Color(0xFF3B5998),
+                                                        modifier = Modifier.size(16.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Text(
+                                                        text = txtMeasureDistance,
+                                                        color = Color.Black,
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = 13.sp
+                                                    )
+                                                }
+                                            }
+                                        }
                                     }
                                 }
 
@@ -334,17 +378,25 @@ private fun shareFullMapCapture(
                 val cachePath = File(context.cacheDir, "images")
                 cachePath.mkdirs()
                 val file = File(cachePath, "Geotower_map_capture.png")
-                FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-
-                val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-                shareOrCopyMapImageUri(
-                    context = context,
-                    uri = uri,
-                    label = "Capture",
-                    chooserTitle = txtShareSiteVia,
-                    destination = destination,
-                    copiedMessage = txtCopiedToClipboard
-                )
+                CoroutineScope(Dispatchers.Main).launch {
+                    try {
+                        withContext(Dispatchers.IO) {
+                            FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                        }
+                        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                        shareOrCopyMapImageUri(
+                            context = context,
+                            uri = uri,
+                            label = "Capture",
+                            chooserTitle = txtShareSiteVia,
+                            destination = destination,
+                            copiedMessage = txtCopiedToClipboard
+                        )
+                    } catch (e: Exception) {
+                        AppLogger.w(TAG_MAP_SHARE, "Map share capture failed", e)
+                        Toast.makeText(context, txtInitError, Toast.LENGTH_SHORT).show()
+                    }
+                }
             } catch (e: Exception) {
                 AppLogger.w(TAG_MAP_SHARE, "Map share capture failed", e)
                 Toast.makeText(context, txtInitError, Toast.LENGTH_SHORT).show()
@@ -393,6 +445,7 @@ fun MapShareMenu(
     currentLat: Double,
     azimuth: Float,
     measureOverlay: org.osmdroid.views.overlay.FolderOverlay? = null, // ✅ AJOUT : Le calque des mesures
+    measureDistanceLabel: String? = null,
     timeSliderDateLabel: String? = null,
     /**
      * Repeint le repère « ma position » sur le canvas de la capture. Non nul uniquement quand le
@@ -461,8 +514,14 @@ fun MapShareMenu(
 
     // Mêmes crédits que le coin bas gauche de la carte : une seule source de vérité,
     // sinon l'image partagée finit par citer un fournisseur qui n'a pas servi les tuiles.
+    val activeCountry by fr.geotower.data.db.DatabaseCountryStore.activeCountryState
+    val effectiveProvider = if (activeCountry == fr.geotower.data.db.DatabaseCountry.CA && AppConfig.mapProvider.intValue == 0) {
+        1
+    } else {
+        AppConfig.mapProvider.intValue
+    }
     val txtAttributionDesc = MapUtils.MapAttribution.text(
-        AppConfig.mapProvider.intValue,
+        effectiveProvider,
         AppConfig.ignStyle.intValue
     )
 
@@ -647,7 +706,8 @@ fun MapShareMenu(
                         txtInitError = txtInitError,
                         destination = destination,
                         txtCopiedToClipboard = txtPhotoCopiedToClipboard,
-                        txtTimeSliderDate = timeSliderDateLabel
+                        txtTimeSliderDate = timeSliderDateLabel,
+                        txtMeasureDistance = if (incConfidential) null else measureDistanceLabel
                     )
                 }, 300)
             }
@@ -737,7 +797,8 @@ fun MapShareMenu(
                                     currentLat = currentLat,
                                     incQrCode = incQrCode,
                                     qrUri = mapDeepLink,
-                                    txtInitError = txtInitError
+                                    txtInitError = txtInitError,
+                                    txtMeasureDistance = if (incConfidential) null else measureDistanceLabel
                                 )
                             }, 300)
                         },

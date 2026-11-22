@@ -17,7 +17,8 @@ data class LiveSiteResponseDto(
     @SerializedName("detail") val detail: LiveSiteDetailDto? = null,
     @SerializedName("supports") val supports: List<LiveSiteSupportDto> = emptyList(),
     @SerializedName("antennas") val antennas: List<LiveSiteAntennaDto> = emptyList(),
-    @SerializedName("network_ids") val networkIds: LiveSiteNetworkIdsDto? = null
+    @SerializedName("network_ids") val networkIds: LiveSiteNetworkIdsDto? = null,
+    @SerializedName("ca_ised_details") val caIsedDetails: fr.geotower.data.CaIsedSiteDetails? = null
 )
 
 data class LiveSiteNetworkIdsDto(

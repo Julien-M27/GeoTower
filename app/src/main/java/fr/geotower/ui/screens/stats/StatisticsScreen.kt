@@ -125,11 +125,17 @@ private data class OperatorStatValue(
     val activeCount: Int
 )
 
+internal object StatsCountryStore {
+    val selectedCountry = mutableStateOf(fr.geotower.data.db.DatabaseCountryStore.activeCountryState.value)
+}
+
 private object StatisticsScreenCache {
+    var country: fr.geotower.data.db.DatabaseCountry? = null
     var data: StatisticsData? = null
 }
 
 private object FrequencyStatsScreenCache {
+    var country: fr.geotower.data.db.DatabaseCountry? = null
     val dataByTech = mutableMapOf<String, List<FrequencyBandStats>>()
 }
 
@@ -154,9 +160,15 @@ private fun operatorQueryNames(operatorKey: String): List<String> {
 
 private fun overseasStatsOperatorName(operatorKey: String): String = "${operatorKey}_OVERSEAS"
 
-private fun operatorStatsTargets(defaultOp: String): List<OperatorStatsTarget> {
+private fun operatorStatsTargets(
+    defaultOp: String,
+    country: fr.geotower.data.db.DatabaseCountry = fr.geotower.data.db.DatabaseCountry.FR
+): List<OperatorStatsTarget> {
+    val isCanada = country == fr.geotower.data.db.DatabaseCountry.CA
     return operatorDisplayOrder(defaultOp).flatMap { operatorKey ->
         val spec = OperatorColors.specForKey(operatorKey) ?: return@flatMap emptyList()
+        if (isCanada && spec.region != OperatorRegion.CANADA) return@flatMap emptyList()
+        if (!isCanada && spec.region == OperatorRegion.CANADA) return@flatMap emptyList()
         val queryNames = operatorQueryNames(operatorKey)
         if (spec.region == OperatorRegion.METRO) {
             listOf(
@@ -181,7 +193,8 @@ private fun operatorStatsTargets(defaultOp: String): List<OperatorStatsTarget> {
                     id = spec.key,
                     name = spec.label,
                     colorKey = spec.key,
-                    queryNames = queryNames
+                    queryNames = queryNames,
+                    allowLegacyFallback = !isCanada
                 )
             )
         }
@@ -217,7 +230,46 @@ private fun statCount(rows: List<RadioStatRow>, category: String, itemKey: Strin
     ).normalized()
 }
 
-private fun frequencyBandsForTech(tech: String): List<FrequencyBandSpec> {
+private fun frequencyBandsForTech(
+    tech: String,
+    isCanada: Boolean = false
+): List<FrequencyBandSpec> {
+    if (isCanada) {
+        return when (normalizeTech(tech)) {
+            "2G" -> listOf(
+                FrequencyBandSpec("850", "850 MHz", RadioFilterMasks.BAND_2G_900, "2G|850"),
+                FrequencyBandSpec("1900", "1900 MHz", RadioFilterMasks.BAND_2G_1800, "2G|1900")
+            )
+            "3G" -> listOf(
+                FrequencyBandSpec("850", "850 MHz", RadioFilterMasks.BAND_3G_900, "3G|850"),
+                FrequencyBandSpec("1900", "1900 MHz", RadioFilterMasks.BAND_3G_1900, "3G|1900"),
+                FrequencyBandSpec("2100", "2100 MHz (AWS)", RadioFilterMasks.BAND_3G_2100, "3G|2100")
+            )
+            "4G" -> listOf(
+                FrequencyBandSpec("600", "600 MHz", RadioFilterMasks.BAND_4G_600, "4G|600"),
+                FrequencyBandSpec("700", "700 MHz", RadioFilterMasks.BAND_4G_700, "4G|700"),
+                FrequencyBandSpec("850", "850 MHz", RadioFilterMasks.BAND_4G_800, "4G|850"),
+                FrequencyBandSpec("1900", "1900 MHz (PCS)", RadioFilterMasks.BAND_4G_1800, "4G|1900"),
+                FrequencyBandSpec("2100", "2100 MHz (AWS)", RadioFilterMasks.BAND_4G_2100, "4G|2100"),
+                FrequencyBandSpec("2300", "2300 MHz (WCS)", RadioFilterMasks.BAND_4G_2300, "4G|2300"),
+                FrequencyBandSpec("2600", "2600 MHz (BRS)", RadioFilterMasks.BAND_4G_2600, "4G|2600"),
+                FrequencyBandSpec("3500", "3500 MHz", RadioFilterMasks.BAND_4G_3500, "4G|3500")
+            )
+            "5G" -> listOf(
+                FrequencyBandSpec("600", "600 MHz", RadioFilterMasks.BAND_5G_600, "5G|600"),
+                FrequencyBandSpec("700", "700 MHz", RadioFilterMasks.BAND_5G_700, "5G|700"),
+                FrequencyBandSpec("850", "850 MHz", RadioFilterMasks.BAND_5G_850, "5G|850"),
+                FrequencyBandSpec("1900", "1900 MHz (PCS)", RadioFilterMasks.BAND_5G_1900, "5G|1900"),
+                FrequencyBandSpec("2000", "2000 MHz (AWS-4)", RadioFilterMasks.BAND_5G_2000, "5G|2000"),
+                FrequencyBandSpec("2100", "2100 MHz (AWS)", RadioFilterMasks.BAND_5G_2100, "5G|2100"),
+                FrequencyBandSpec("2600", "2600 MHz (BRS)", RadioFilterMasks.BAND_5G_2600, "5G|2600"),
+                FrequencyBandSpec("3500", "3500 MHz", RadioFilterMasks.BAND_5G_3500, "5G|3500"),
+                FrequencyBandSpec("3800", "3800 MHz", RadioFilterMasks.BAND_5G_3800, "5G|3800"),
+                FrequencyBandSpec("26000", radioFrequencyLabel(26000), RadioFilterMasks.BAND_5G_26000, "5G|26000")
+            )
+            else -> emptyList()
+        }
+    }
     return when (normalizeTech(tech)) {
         "2G" -> listOf(
             FrequencyBandSpec("900", "900 MHz", RadioFilterMasks.BAND_2G_900, "2G|900"),
@@ -250,8 +302,10 @@ private fun frequencyBandsForTech(tech: String): List<FrequencyBandSpec> {
 private fun visibleFrequencyStats(
     prefs: android.content.SharedPreferences,
     tech: String,
-    stats: List<FrequencyBandStats>
+    stats: List<FrequencyBandStats>,
+    isCanada: Boolean = false
 ): List<FrequencyBandStats> {
+    if (isCanada) return stats
     val statsByFrequency = stats.associateBy { it.frequencyId }
     return StatsPreferences.statsFrequencyOrder(prefs, tech)
         .mapNotNull { frequencyId -> statsByFrequency[frequencyId] }
@@ -270,17 +324,18 @@ private fun frequencyDetailTitle(tech: String): String {
 
 private suspend fun loadStatisticsData(
     repository: AnfrRepository,
-    defaultOp: String
+    defaultOp: String,
+    country: fr.geotower.data.db.DatabaseCountry
 ): StatisticsData = withContext(Dispatchers.IO) {
     val totalMap = mutableMapOf<String, StatCount>()
     val counts2GMap = mutableMapOf<String, StatCount>()
     val counts3GMap = mutableMapOf<String, StatCount>()
     val counts4GMap = mutableMapOf<String, StatCount>()
     val counts5GMap = mutableMapOf<String, StatCount>()
-    val targets = operatorStatsTargets(defaultOp)
+    val targets = operatorStatsTargets(defaultOp, country)
 
     for (target in targets) {
-        val currentStats = repository.getCurrentRadioStatsByOperator(target.queryNames)
+        val currentStats = repository.getCurrentRadioStatsByOperator(target.queryNames, country)
         if (currentStats.isNotEmpty()) {
             totalMap[target.id] = statCount(currentStats, CATEGORY_SUPPORT, ITEM_ALL)
             counts2GMap[target.id] = statCount(currentStats, CATEGORY_TECH, "2G")
@@ -330,16 +385,18 @@ private suspend fun loadStatisticsData(
 private suspend fun loadFrequencyStatsData(
     repository: AnfrRepository,
     defaultOp: String,
-    tech: String
+    tech: String,
+    country: fr.geotower.data.db.DatabaseCountry
 ): List<FrequencyBandStats> = withContext(Dispatchers.IO) {
     val normalizedTech = normalizeTech(tech)
-    val targets = operatorStatsTargets(defaultOp)
-    val bands = frequencyBandsForTech(normalizedTech)
+    val isCanada = country == fr.geotower.data.db.DatabaseCountry.CA
+    val targets = operatorStatsTargets(defaultOp, country)
+    val bands = frequencyBandsForTech(normalizedTech, isCanada = isCanada)
     val currentRowsByTarget = mutableMapOf<String, List<RadioStatRow>>()
     val activeCountsByTarget = mutableMapOf<String, ActiveSupportRadioCounts>()
 
     for (target in targets) {
-        val currentStats = repository.getCurrentRadioStatsByOperator(target.queryNames)
+        val currentStats = repository.getCurrentRadioStatsByOperator(target.queryNames, country)
         currentRowsByTarget[target.id] = currentStats
         if (currentStats.isEmpty() && target.allowLegacyFallback) {
             activeCountsByTarget[target.id] = repository.getActiveSupportRadioCountsByOperator(target.queryNames)
@@ -396,8 +453,11 @@ fun StatisticsScreen(
 
     val mainBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.background
     val cardBgColor = MaterialTheme.colorScheme.surfaceVariant
-    val cachedStats = StatisticsScreenCache.data
+    val selectedCountry by StatsCountryStore.selectedCountry
+    val isCanadaStats = selectedCountry == fr.geotower.data.db.DatabaseCountry.CA
+    val cachedStats = if (StatisticsScreenCache.country == selectedCountry) StatisticsScreenCache.data else null
     var displayMode by AppConfig.statsDisplayMode
+    val effectiveDisplayMode = if (isCanadaStats) StatsDisplayMode.Active else displayMode
     var showStatsSettingsSheet by remember { mutableStateOf(false) }
     // Bloc visé par un appui long : le panneau défile jusqu'à sa ligne et la met en surbrillance.
     var settingsHighlightBlock by remember { mutableStateOf<String?>(null) }
@@ -408,12 +468,12 @@ fun StatisticsScreen(
     val statsSettingsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     // --- ÉTAT DES DONNÉES ---
-    var supportCounts by remember { mutableStateOf(cachedStats?.supports ?: emptyList()) }
-    var support2GCounts by remember { mutableStateOf(cachedStats?.supports2G ?: emptyList()) }
-    var support3GCounts by remember { mutableStateOf(cachedStats?.supports3G ?: emptyList()) }
-    var support4GCounts by remember { mutableStateOf(cachedStats?.supports4G ?: emptyList()) }
-    var support5GCounts by remember { mutableStateOf(cachedStats?.supports5G ?: emptyList()) }
-    var isLoading by remember { mutableStateOf(cachedStats == null) }
+    var supportCounts by remember(selectedCountry) { mutableStateOf(cachedStats?.supports ?: emptyList()) }
+    var support2GCounts by remember(selectedCountry) { mutableStateOf(cachedStats?.supports2G ?: emptyList()) }
+    var support3GCounts by remember(selectedCountry) { mutableStateOf(cachedStats?.supports3G ?: emptyList()) }
+    var support4GCounts by remember(selectedCountry) { mutableStateOf(cachedStats?.supports4G ?: emptyList()) }
+    var support5GCounts by remember(selectedCountry) { mutableStateOf(cachedStats?.supports5G ?: emptyList()) }
+    var isLoading by remember(selectedCountry) { mutableStateOf(cachedStats == null) }
     val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = ROOT_FALLBACK_ROUTE)
     val lazyListState = rememberLazyListState()
 
@@ -421,20 +481,19 @@ fun StatisticsScreen(
         safeBackNavigation.navigateBack()
     }
 
-    LaunchedEffect(defaultOp) {
-        if (StatisticsScreenCache.data == null) {
+    LaunchedEffect(defaultOp, selectedCountry) {
+        if (StatisticsScreenCache.country != selectedCountry || StatisticsScreenCache.data == null) {
             isLoading = true
         }
 
-        val refreshedStats = loadStatisticsData(repository, defaultOp)
-        if (refreshedStats != StatisticsScreenCache.data) {
-            StatisticsScreenCache.data = refreshedStats
-            supportCounts = refreshedStats.supports
-            support2GCounts = refreshedStats.supports2G
-            support3GCounts = refreshedStats.supports3G
-            support4GCounts = refreshedStats.supports4G
-            support5GCounts = refreshedStats.supports5G
-        }
+        val refreshedStats = loadStatisticsData(repository, defaultOp, selectedCountry)
+        StatisticsScreenCache.country = selectedCountry
+        StatisticsScreenCache.data = refreshedStats
+        supportCounts = refreshedStats.supports
+        support2GCounts = refreshedStats.supports2G
+        support3GCounts = refreshedStats.supports3G
+        support4GCounts = refreshedStats.supports4G
+        support5GCounts = refreshedStats.supports5G
         isLoading = false
     }
 
@@ -516,30 +575,60 @@ fun StatisticsScreen(
                     Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
                 }
 
-                item(key = "display_mode_selector") {
-                    StatsDisplayModeSelector(
-                        displayMode = displayMode,
-                        onDisplayModeChange = { newMode ->
-                            displayMode = newMode
-                            prefs.edit().putString(StatsPreferences.PREF_DISPLAY_MODE, newMode.storageKey).apply()
-                        },
-                        bgColor = cardBgColor
-                    )
+                item(key = "country_selector") {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = sizing.spacing(16.dp))
+                            .padding(bottom = sizing.spacing(12.dp)),
+                        horizontalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))
+                    ) {
+                        fr.geotower.data.db.DatabaseCountry.entries.forEach { countryOption ->
+                            val isSelected = selectedCountry == countryOption
+                            val label = when (countryOption) {
+                                fr.geotower.data.db.DatabaseCountry.FR -> "France"
+                                fr.geotower.data.db.DatabaseCountry.CA -> "Canada"
+                            }
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = {
+                                    if (!isSelected) {
+                                        StatsCountryStore.selectedCountry.value = countryOption
+                                    }
+                                },
+                                label = { Text(text = label, maxLines = 1) },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
                 }
 
-                item(key = "changes_map_entry") {
-                    Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
-                    ChangesMapEntryCard(
-                        bgColor = cardBgColor,
-                        onClick = {
-                            if (onOpenChangesMap != null) {
-                                onOpenChangesMap()
-                            } else {
-                                navController.navigate(CHANGES_MAP_ROUTE)
-                            }
-                        },
-                        isSelected = isChangesMapOpen
-                    )
+                if (!isCanadaStats) {
+                    item(key = "display_mode_selector") {
+                        StatsDisplayModeSelector(
+                            displayMode = displayMode,
+                            onDisplayModeChange = { newMode ->
+                                displayMode = newMode
+                                prefs.edit().putString(StatsPreferences.PREF_DISPLAY_MODE, newMode.storageKey).apply()
+                            },
+                            bgColor = cardBgColor
+                        )
+                    }
+
+                    item(key = "changes_map_entry") {
+                        Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
+                        ChangesMapEntryCard(
+                            bgColor = cardBgColor,
+                            onClick = {
+                                if (onOpenChangesMap != null) {
+                                    onOpenChangesMap()
+                                } else {
+                                    navController.navigate(CHANGES_MAP_ROUTE)
+                                }
+                            },
+                            isSelected = isChangesMapOpen
+                        )
+                    }
                 }
 
                 items(
@@ -554,7 +643,7 @@ fun StatisticsScreen(
                             data = card.data,
                             isLoading = isLoading,
                             bgColor = cardBgColor,
-                            displayMode = displayMode,
+                            displayMode = effectiveDisplayMode,
                             onClick = card.onClick
                         )
                     }
@@ -564,6 +653,7 @@ fun StatisticsScreen(
                     Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
                     DepartmentStatsEntryCard(
                         bgColor = cardBgColor,
+                        isCanada = isCanadaStats,
                         onClick = { navController.navigate(DEPARTMENT_STATS_ROUTE) }
                     )
                 }
@@ -616,11 +706,18 @@ fun FrequencyStatsDetailScreen(navController: NavController, repository: AnfrRep
 
     val mainBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.background
     val cardBgColor = MaterialTheme.colorScheme.surfaceVariant
-    val cachedStats = FrequencyStatsScreenCache.dataByTech[normalizedTech]
+    val selectedCountry by StatsCountryStore.selectedCountry
+    val isCanadaStats = selectedCountry == fr.geotower.data.db.DatabaseCountry.CA
+    val cachedStats = if (FrequencyStatsScreenCache.country == selectedCountry) {
+        FrequencyStatsScreenCache.dataByTech[normalizedTech]
+    } else {
+        null
+    }
 
     var displayMode by AppConfig.statsDisplayMode
-    var frequencyStats by remember(normalizedTech) { mutableStateOf(cachedStats ?: emptyList()) }
-    var isLoading by remember(normalizedTech) { mutableStateOf(cachedStats == null) }
+    val effectiveDisplayMode = if (isCanadaStats) StatsDisplayMode.Active else displayMode
+    var frequencyStats by remember(normalizedTech, selectedCountry) { mutableStateOf(cachedStats ?: emptyList()) }
+    var isLoading by remember(normalizedTech, selectedCountry) { mutableStateOf(cachedStats == null) }
     val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = "stats")
     val lazyListState = rememberLazyListState()
 
@@ -628,12 +725,16 @@ fun FrequencyStatsDetailScreen(navController: NavController, repository: AnfrRep
         safeBackNavigation.navigateBack()
     }
 
-    LaunchedEffect(defaultOp, normalizedTech) {
+    LaunchedEffect(defaultOp, normalizedTech, selectedCountry) {
+        if (FrequencyStatsScreenCache.country != selectedCountry) {
+            FrequencyStatsScreenCache.country = selectedCountry
+            FrequencyStatsScreenCache.dataByTech.clear()
+        }
         if (FrequencyStatsScreenCache.dataByTech[normalizedTech] == null) {
             isLoading = true
         }
 
-        val refreshedStats = loadFrequencyStatsData(repository, defaultOp, normalizedTech)
+        val refreshedStats = loadFrequencyStatsData(repository, defaultOp, normalizedTech, selectedCountry)
         if (refreshedStats != FrequencyStatsScreenCache.dataByTech[normalizedTech]) {
             FrequencyStatsScreenCache.dataByTech[normalizedTech] = refreshedStats
             frequencyStats = refreshedStats
@@ -657,7 +758,7 @@ fun FrequencyStatsDetailScreen(navController: NavController, repository: AnfrRep
             )
         }
     ) { padding ->
-        val orderedFrequencyStats = visibleFrequencyStats(prefs, normalizedTech, frequencyStats)
+        val orderedFrequencyStats = visibleFrequencyStats(prefs, normalizedTech, frequencyStats, isCanada = isCanadaStats)
 
         Box(modifier = Modifier.fillMaxSize().padding(padding).background(mainBgColor)) {
             LazyColumn(
@@ -671,12 +772,14 @@ fun FrequencyStatsDetailScreen(navController: NavController, repository: AnfrRep
                     Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
                 }
 
-                item(key = "display_mode_selector") {
-                    StatsDisplayModeSelector(
-                        displayMode = displayMode,
-                        onDisplayModeChange = ::updateDisplayMode,
-                        bgColor = cardBgColor
-                    )
+                if (!isCanadaStats) {
+                    item(key = "display_mode_selector") {
+                        StatsDisplayModeSelector(
+                            displayMode = displayMode,
+                            onDisplayModeChange = ::updateDisplayMode,
+                            bgColor = cardBgColor
+                        )
+                    }
                 }
 
                 when {
@@ -689,7 +792,7 @@ fun FrequencyStatsDetailScreen(navController: NavController, repository: AnfrRep
                                 data = emptyList(),
                                 isLoading = true,
                                 bgColor = cardBgColor,
-                                displayMode = displayMode
+                                displayMode = effectiveDisplayMode
                             )
                         }
                     }
@@ -724,7 +827,7 @@ fun FrequencyStatsDetailScreen(navController: NavController, repository: AnfrRep
                                 data = band.data,
                                 isLoading = false,
                                 bgColor = cardBgColor,
-                                displayMode = displayMode
+                                displayMode = effectiveDisplayMode
                             )
                         }
                     }
@@ -742,7 +845,7 @@ fun FrequencyStatsDetailScreen(navController: NavController, repository: AnfrRep
 @Composable
 private fun statsDisplayModeLabel(mode: StatsDisplayMode): String {
     return when (mode) {
-        StatsDisplayMode.Sites -> stringResource(R.string.appstrings_sites_label)
+        StatsDisplayMode.Sites -> stringResource(R.string.appstrings_declared_sites_label)
         StatsDisplayMode.Active -> stringResource(R.string.appstrings_active_sites_label)
         StatsDisplayMode.Both -> stringResource(R.string.appstrings_active_declared_sites_label)
     }

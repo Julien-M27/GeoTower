@@ -1,4 +1,4 @@
-﻿<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="antenna_map_widget_label">Mapa de antenas próximas</string>
     <string name="antenna_widget_label">Antenas próximas</string>
     <string name="common_logo">Logótipo</string>
@@ -1650,15 +1650,15 @@
     <string name="appstrings_db_generation_in_progress">A gerar…</string>
     <string name="appstrings_update_db_banner_title">Atualizações disponíveis</string>
     <plurals name="appstrings_update_db_banner_title_plural">
-        <item quantity="one">Atualização disponível</item>
+        <item quantity="one" tools:ignore="ImpliedQuantity">Atualização disponível</item>
         <item quantity="other">Atualizações disponíveis</item>
     </plurals>
     <plurals name="appstrings_update_db_banner_summary">
-        <item quantity="one">1 base de dados a atualizar</item>
+        <item quantity="one">%1$d base de dados a atualizar</item>
         <item quantity="other">%1$d bases de dados a atualizar</item>
     </plurals>
     <plurals name="appstrings_download_db_banner_summary">
-        <item quantity="one">1 base de dados a transferir</item>
+        <item quantity="one">%1$d base de dados a transferir</item>
         <item quantity="other">%1$d bases de dados a transferir</item>
     </plurals>
     <string name="appstrings_db_banner_databases">Bases afetadas: %1$s</string>
@@ -3518,6 +3518,7 @@
     <string name="appstrings_release_v2129_summary_fh_map_rendering_optimization">Otimização da fluidez do mapa de ligações FH através de renderização em lotes e nível de detalhe adaptativo ao zoom</string>
     <string name="appstrings_release_v2130_summary_fh_map_world_bounds_and_min_zoom">Limitação do zoom mínimo e dos limites geográficos no mapa de ligações por feixes hertzianos (FH)</string>
     <string name="appstrings_release_v2131_summary_fh_filters_export_and_wear_improvements">Filtros por distância e exportação no mapa FH, alertas de bússola/IGN, paginação do registo de rede e melhorias no Wear OS</string>
+    <string name="appstrings_release_v2132_summary_canada_support_and_watch_sync">Suporte completo para o Canadá (bases ISED, 14 operadoras, bandas, Android Auto) e failover de API no Wear OS/Garmin</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registo de pedidos de rede</string>
@@ -3669,7 +3670,7 @@
     <string name="fh_map_empty_area">Sem ligações FH nesta zona</string>
     <string name="fh_map_distance_5_20km">5–20 km</string>
     <string name="appstrings_compass_calibration_needed">Baixa precisão da bússola: calibre movendo em forma de 8</string>
-    <string name="fh_map_title">Mapa de feixes hertzianos</string>
+    <string name="fh_map_title">Mapa de feixes hertzianos (França)</string>
     <string name="appstrings_coverage_compute_error">Erro ao calcular a cobertura teórica</string>
     <string name="fh_map_distance_all">Todas as distâncias</string>
     <string name="fh_map_export">Exportar ligações FH</string>
@@ -3680,4 +3681,53 @@
     <string name="fh_map_filter_operators">Escolher operadores FH</string>
     <string name="fh_map_subtitle_counts">%1$s / %2$s ligações • %3$d/%4$d operadores</string>
     <string name="network_log_load_more">Carregar mais</string>
+    <string name="country_db_source_online">Online</string>
+    <string name="country_db_source_local">Local</string>
+    <string name="country_db_source_status_online">%1$s: base online</string>
+    <string name="country_db_source_status_local">%1$s: base local</string>
+    <string name="appstrings_date_singular">Data</string>
+    <string name="appstrings_identifier_singular">Identificador</string>
+    <string name="appstrings_declared_sites_label">Locais declarados</string>
+    <string name="country_name_ca">Canadá</string>
+    <string name="appstrings_ca_ised_station_number_label">Número de estação ISED</string>
+    <string name="site_isde_title">Site ISED %1$s</string>
+    <string name="car_technical_ids_isde">Identificadores ISED</string>
+    <string name="about_source_ca_ised_title">Antenas móveis (Canadá — ISED)</string>
+    <string name="about_source_ca_ised_desc">Dados técnicos e frequências das estações celulares publicados por Innovation, Science and Economic Development Canada (ISED).</string>
+    <string name="about_source_ca_tafl_label">Dados TAFL (Site Data Extract)</string>
+    <string name="fh_map_no_table_hint">Transfira ou atualize a base de dados de França para mostrar os feixes hertzianos.</string>
+    <string name="fh_map_live_zoom_title">Base em linha (Live) ativa</string>
+    <string name="fh_map_live_zoom_desc">Está a ser utilizada a base de dados em linha (Live). Aumente o zoom para ver os feixes hertzianos.</string>
+    <string name="fh_map_empty_area_hint">Afaste o zoom ou mova o mapa para mostrar os feixes hertzianos.</string>
+    <string name="database_viewer_info_mobile_ca">Ficheiro: geotower_ca.db. É a base principal dos locais móveis da ISED Canadá. localisation contém cada local e as suas coordenadas; technique contém estado de serviço, datas e detalhes de frequências; support, antenne e ca_ised_site_details descrevem suportes físicos, painéis de rádio e parâmetros setoriais TAFL. metadata e source_versions indicam a versão e as fontes dos dados. radio_stat_* e dept_stat_* armazenam estatísticas calculadas; room_master_table guarda a identidade do esquema Room.</string>
+    <string name="local_mode_canada_note">Para o Canadá (ISED), a base de dados é preparada apenas no servidor (o ficheiro de origem é demasiado grande para processamento no telemóvel) e não existe feed de avarias.</string>
+    <string name="country_db_chip_fr">França (ANFR)</string>
+    <string name="country_db_chip_ca">Canadá (ISED)</string>
+    <string name="site_comparator_section_azimuths">Azimutes</string>
+    <string name="site_comparator_section_dates_ised">Data ISED</string>
+    <string name="site_comparator_section_dates_mixed">Datas ANFR / ISED</string>
+    <string name="throughput_ca_warning_details_unavailable">Detalhes setoriais ISED indisponíveis para este local: larguras de banda e potências estimadas.</string>
+    <string name="throughput_ca_assumption_tafl">Dados de rádio ISED/TAFL reais: largura de banda por portadora, PIRE, altura, MIMO TX/RX e rácio TDD.</string>
+    <string name="throughput_ca_assumption_link_budget">Balanço de ligação 3GPP TR 38.901 (UMa) baseado na PIRE real, frequência, altura e diagrama de antena.</string>
+    <string name="throughput_ca_source_summary">ISED (TAFL) para frequências, larguras de banda, MIMO e PIRE reais; 3GPP TR 38.901 / TS 38.306 para o modelo de rádio.</string>
+    <string name="ca_ised_card_title">Detalhes técnicos ISED (Canadá)</string>
+    <string name="ca_ised_record_id">Código do local do operador</string>
+    <string name="ca_ised_licence_area">Área de licença</string>
+    <string name="ca_ised_province">Província</string>
+    <string name="ca_ised_site_type">Instalação</string>
+    <string name="ca_ised_site_type_outdoor">Exterior (O)</string>
+    <string name="ca_ised_site_type_indoor">Interior (I)</string>
+    <string name="ca_ised_account">Conta ISED</string>
+    <string name="ca_ised_import">Importação ISED</string>
+    <string name="ca_ised_sectors_title">Setores e parâmetros RF (%1$d)</string>
+    <string name="ca_ised_collapse">Recolher</string>
+    <string name="ca_ised_show_all_sectors">Mostrar todos os %1$d setores</string>
+    <string name="ca_ised_azimuth">Azimute</string>
+    <string name="ca_ised_height">Altura</string>
+    <string name="ca_ised_tilt">Inclinação</string>
+    <string name="ca_ised_beamwidth">Abertura</string>
+    <string name="ca_ised_eirp">PIRE</string>
+    <string name="ca_ised_type">Tipo</string>
+    <string name="ca_ised_antenna">Antena</string>
+    <string name="ca_ised_radio">Rádio</string>
 </resources>

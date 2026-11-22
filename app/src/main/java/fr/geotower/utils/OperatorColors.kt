@@ -13,7 +13,8 @@ data class OperatorColorSpec(
 
 enum class OperatorRegion {
     METRO,
-    OVERSEAS
+    OVERSEAS,
+    CANADA
 }
 
 object OperatorColors {
@@ -37,6 +38,20 @@ object OperatorColors {
     const val PMT_VODAFONE_KEY = "PMT_VODAFONE"
     const val VITI_KEY = "VITI"
     const val SPT_KEY = "SPT"
+    const val ROGERS_KEY = "ROGERS"
+    const val BELL_KEY = "BELL"
+    const val TELUS_KEY = "TELUS"
+    const val VIDEOTRON_KEY = "VIDEOTRON"
+    const val FREEDOM_MOBILE_KEY = "FREEDOM_MOBILE"
+    const val SASKTEL_KEY = "SASKTEL"
+    const val XPLORE_KEY = "XPLORE"
+    const val EASTLINK_KEY = "EASTLINK"
+    const val TBAYTEL_KEY = "TBAYTEL"
+    const val SSI_MICRO_KEY = "SSI_MICRO"
+    const val ECOTEL_KEY = "ECOTEL"
+    const val COGECO_KEY = "COGECO"
+    const val SOGETEL_KEY = "SOGETEL"
+    const val ICE_WIRELESS_KEY = "ICE_WIRELESS"
 
     const val ORANGE_HEX = "#FF7900"
     const val BOUYGUES_HEX = "#009FE3"
@@ -70,12 +85,27 @@ object OperatorColors {
         OperatorColorSpec(ONATI_KEY, "ONATi (Vini)", "#00A3E0", 0xFF00A3E0, listOf("ONATI", "ONATI VINI", "VINI"), OperatorRegion.OVERSEAS),
         OperatorColorSpec(PMT_VODAFONE_KEY, "PMT/Vodafone", "#E60000", 0xFFE60000, listOf("PMT/VODAFONE", "PMT", "VODAFONE"), OperatorRegion.OVERSEAS),
         OperatorColorSpec(VITI_KEY, "Ora (Vini)", "#005B2F", 0xFF005B2F, listOf("ORA", "ORA VINI", "VITI", "VITI SAS"), OperatorRegion.OVERSEAS),
-        OperatorColorSpec(SPT_KEY, "SPT", "#00806A", 0xFF00806A, listOf("SPT"), OperatorRegion.OVERSEAS)
+        OperatorColorSpec(SPT_KEY, "SPT", "#00806A", 0xFF00806A, listOf("SPT"), OperatorRegion.OVERSEAS),
+        OperatorColorSpec(ROGERS_KEY, "Rogers", "#EE2722", 0xFFEE2722, listOf("ROGERS", "ROGERS COMMUNICATIONS", "ROGERS WIRELESS"), OperatorRegion.CANADA),
+        OperatorColorSpec(BELL_KEY, "Bell", "#00549A", 0xFF00549A, listOf("BELL", "BELL MOBILITY", "BELL CANADA", "BELL MTS", "BELL ALIANT"), OperatorRegion.CANADA),
+        OperatorColorSpec(TELUS_KEY, "Telus", "#4B286D", 0xFF4B286D, listOf("TELUS", "TELUS COMMUNICATIONS", "TELUS MOBILITY"), OperatorRegion.CANADA),
+        OperatorColorSpec(VIDEOTRON_KEY, "Vidéotron", "#FFD200", 0xFFFFD200, listOf("VIDEOTRON", "VIDÉOTRON", "QUEBECOR", "FIZZ"), OperatorRegion.CANADA),
+        OperatorColorSpec(FREEDOM_MOBILE_KEY, "Freedom Mobile", "#EE6B1E", 0xFFEE6B1E, listOf("FREEDOM MOBILE", "FREEDOM", "SHAW TELECOM"), OperatorRegion.CANADA),
+        OperatorColorSpec(SASKTEL_KEY, "SaskTel", "#0072CE", 0xFF0072CE, listOf("SASKTEL", "SASKATCHEWAN TELECOMMUNICATIONS"), OperatorRegion.CANADA),
+        OperatorColorSpec(XPLORE_KEY, "Xplore", "#00A99D", 0xFF00A99D, listOf("XPLORE", "XPLORNET"), OperatorRegion.CANADA),
+        OperatorColorSpec(EASTLINK_KEY, "Eastlink", "#E31837", 0xFFE31837, listOf("EASTLINK", "BRAGG COMMUNICATIONS"), OperatorRegion.CANADA),
+        OperatorColorSpec(TBAYTEL_KEY, "Tbaytel", "#0085CA", 0xFF0085CA, listOf("TBAYTEL"), OperatorRegion.CANADA),
+        OperatorColorSpec(SSI_MICRO_KEY, "SSI Micro", "#2E7D32", 0xFF2E7D32, listOf("SSI MICRO", "SSIMICRO"), OperatorRegion.CANADA),
+        OperatorColorSpec(ECOTEL_KEY, "Ecotel", "#4CAF50", 0xFF4CAF50, listOf("ECOTEL"), OperatorRegion.CANADA),
+        OperatorColorSpec(COGECO_KEY, "Cogeco", "#003B71", 0xFF003B71, listOf("COGECO"), OperatorRegion.CANADA),
+        OperatorColorSpec(SOGETEL_KEY, "Sogetel", "#1B5E20", 0xFF1B5E20, listOf("SOGETEL"), OperatorRegion.CANADA),
+        OperatorColorSpec(ICE_WIRELESS_KEY, "Ice Wireless", "#0288D1", 0xFF0288D1, listOf("ICE WIRELESS", "ICEWIRELESS"), OperatorRegion.CANADA)
     )
 
     val orderedKeys: List<String> = all.map { it.key }
     val metro: List<OperatorColorSpec> = all.filter { it.region == OperatorRegion.METRO }
     val overseas: List<OperatorColorSpec> = all.filter { it.region == OperatorRegion.OVERSEAS }
+    val canada: List<OperatorColorSpec> = all.filter { it.region == OperatorRegion.CANADA }
     val defaultVisibleKeys: Set<String> = orderedKeys.toSet()
 
     private val specsByKey: Map<String, OperatorColorSpec> = all.associateBy { it.key }

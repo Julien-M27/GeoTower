@@ -27,9 +27,26 @@ fun SiteDatesBlock(
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
     val txtDates = stringResource(R.string.appstrings_dates)
+    val txtDateSingular = stringResource(R.string.appstrings_date_singular)
     val txtImplementation = stringResource(R.string.appstrings_implementation)
     val txtActivatedOn = stringResource(R.string.appstrings_activated_on)
     val txtLastModification = stringResource(R.string.appstrings_last_modification) // ✅ NOUVELLE TRADUCTION
+
+    // ✅ ON RÉCUPÈRE ET ON FORMATE LES DATES
+    val dateImp = technique?.dateImplantation?.takeIf { it.isNotBlank() }
+    val dateSer = technique?.dateService?.takeIf { it.isNotBlank() }
+    val dateMod = technique?.dateModif?.takeIf { it.isNotBlank() } // ✅ RÉCUPÉRATION DE LA MODIFICATION
+
+    val dateImpStr = dateImp?.let { formatDateToFrench(it) } ?: stringResource(R.string.appstrings_not_specified)
+    val dateSerStr = dateSer?.let { formatDateToFrench(it) } ?: stringResource(R.string.appstrings_not_specified)
+    val dateModStr = dateMod?.let { formatDateToFrench(it) } ?: "-"
+
+    val isCanadaSite = technique?.idAnfr?.startsWith("CA-") == true
+    val showImp = !isCanadaSite || dateImp != null
+    val showSer = !isCanadaSite || dateSer != null
+    val showMod = dateModStr != "-" && dateModStr != stringResource(R.string.appstrings_not_specified)
+    val visibleDateCount = listOf(showImp, showSer, showMod).count { it }
+    val blockTitle = if (visibleDateCount == 1) txtDateSingular else txtDates
 
     Card(
         shape = blockShape,
@@ -41,30 +58,28 @@ fun SiteDatesBlock(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.DateRange, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
-                Text(text = txtDates, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                Text(text = blockTitle, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
             }
             HorizontalDivider(
                 modifier = Modifier.padding(vertical = sizing.spacing(12.dp)),
                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
             )
 
-            // ✅ ON RÉCUPÈRE ET ON FORMATE LES DATES
-            val dateImp = technique?.dateImplantation?.takeIf { it.isNotBlank() }
-            val dateSer = technique?.dateService?.takeIf { it.isNotBlank() }
-            val dateMod = technique?.dateModif?.takeIf { it.isNotBlank() } // ✅ RÉCUPÉRATION DE LA MODIFICATION
-
-            val dateImpStr = dateImp?.let { formatDateToFrench(it) } ?: stringResource(R.string.appstrings_not_specified)
-            val dateSerStr = dateSer?.let { formatDateToFrench(it) } ?: stringResource(R.string.appstrings_not_specified)
-            val dateModStr = dateMod?.let { formatDateToFrench(it) } ?: "-"
-
-            // ✅ PLUS DE " : " EN TROP ICI NON PLUS !
-            InfoLine(txtImplementation, dateImpStr)
-            Spacer(modifier = Modifier.height(sizing.spacing(4.dp)))
-            InfoLine(txtActivatedOn, dateSerStr)
+            if (showImp) {
+                InfoLine(txtImplementation, dateImpStr)
+                if (showSer || showMod) {
+                    Spacer(modifier = Modifier.height(sizing.spacing(4.dp)))
+                }
+            }
+            if (showSer) {
+                InfoLine(txtActivatedOn, dateSerStr)
+                if (showMod) {
+                    Spacer(modifier = Modifier.height(sizing.spacing(4.dp)))
+                }
+            }
 
             // ✅ CONDITION : On affiche la dernière modification seulement si elle existe
-            if (dateModStr != "-" && dateModStr != stringResource(R.string.appstrings_not_specified)) {
-                Spacer(modifier = Modifier.height(sizing.spacing(4.dp)))
+            if (showMod) {
                 InfoLine(txtLastModification, dateModStr)
             }
         }

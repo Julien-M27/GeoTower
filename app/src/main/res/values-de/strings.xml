@@ -1,4 +1,4 @@
-﻿<resources>
+<resources>
     <string name="antenna_map_widget_label">Karte nahegelegener Antennen</string>
     <string name="antenna_widget_label">Antennen in der Nähe</string>
     <string name="common_logo">Logo</string>
@@ -3518,6 +3518,7 @@
     <string name="appstrings_release_v2129_summary_fh_map_rendering_optimization">Optimierte Flüssigkeit auf der Richtfunk-Karte (FH) durch Batch-Rendering und zoomabhängige Detailstufe</string>
     <string name="appstrings_release_v2130_summary_fh_map_world_bounds_and_min_zoom">Begrenzung des minimalen Zooms und der geografischen Grenzen auf der Richtfunk-Karte (FH)</string>
     <string name="appstrings_release_v2131_summary_fh_filters_export_and_wear_improvements">Entfernungsfilter und Export auf der FH-Karte, Kompass-/IGN-Hinweise, Paginierung im Netzwerkprotokoll und Wear OS-Verbesserungen</string>
+    <string name="appstrings_release_v2132_summary_canada_support_and_watch_sync">Vollständige Kanada-Unterstützung (ISED-Datenbanken, 14 Anbieter, Bänder, Android Auto) und Wear OS/Garmin-API-Failover</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Netzwerkanfragen-Protokoll</string>
@@ -3669,7 +3670,7 @@
     <string name="fh_map_empty_area">Keine Richtfunkstrecken in diesem Bereich</string>
     <string name="fh_map_distance_5_20km">5–20 km</string>
     <string name="appstrings_compass_calibration_needed">Geringe Kompassgenauigkeit: In einer Acht bewegen zum Kalibrieren</string>
-    <string name="fh_map_title">Richtfunkkarte</string>
+    <string name="fh_map_title">Richtfunkkarte (Frankreich)</string>
     <string name="appstrings_coverage_compute_error">Fehler bei der Berechnung der theoretischen Abdeckung</string>
     <string name="fh_map_distance_all">Alle Längen</string>
     <string name="fh_map_export">Richtfunkstrecken exportieren</string>
@@ -3680,4 +3681,53 @@
     <string name="fh_map_filter_operators">Richtfunkbetreiber auswählen</string>
     <string name="fh_map_subtitle_counts">%1$s / %2$s Strecken • %3$d/%4$d Betreiber</string>
     <string name="network_log_load_more">Mehr laden</string>
+    <string name="country_db_source_online">Online</string>
+    <string name="country_db_source_local">Lokal</string>
+    <string name="country_db_source_status_online">%1$s: Online-Datenbank</string>
+    <string name="country_db_source_status_local">%1$s: lokale Datenbank</string>
+    <string name="appstrings_date_singular">Datum</string>
+    <string name="appstrings_identifier_singular">Kennung</string>
+    <string name="appstrings_declared_sites_label">Gemeldete Standorte</string>
+    <string name="country_name_ca">Kanada</string>
+    <string name="appstrings_ca_ised_station_number_label">ISED-Stationsnummer</string>
+    <string name="site_isde_title">ISED-Standort %1$s</string>
+    <string name="car_technical_ids_isde">ISED-Kennungen</string>
+    <string name="about_source_ca_ised_title">Mobilfunkantennen (Kanada — ISED)</string>
+    <string name="about_source_ca_ised_desc">Technische Daten und Frequenzen von Mobilfunkstationen, veröffentlicht von Innovation, Science and Economic Development Canada (ISED).</string>
+    <string name="about_source_ca_tafl_label">TAFL-Daten (Site Data Extract)</string>
+    <string name="fh_map_no_table_hint">Laden Sie die Frankreich-Datenbank herunter oder aktualisieren Sie sie, um Richtfunkstrecken anzuzeigen.</string>
+    <string name="fh_map_live_zoom_title">Live-Datenbank aktiv</string>
+    <string name="fh_map_live_zoom_desc">Die Online-Live-Datenbank wird verwendet. Zoomen Sie näher heran, um die Richtfunkstrecken anzuzeigen.</string>
+    <string name="fh_map_empty_area_hint">Zoomen Sie heraus oder verschieben Sie die Karte, um Richtfunkstrecken anzuzeigen.</string>
+    <string name="database_viewer_info_mobile_ca">Datei: geotower_ca.db. Dies ist die Hauptdatenbank der Mobilfunkstandorte von ISED Kanada. localisation enthält jeden Standort und seine Koordinaten; technique enthält Betriebsstatus, Daten und Frequenzdetails; support, antenne und ca_ised_site_details beschreiben physische Träger, Funkmodule und TAFL-Sektorparameter. metadata und source_versions geben Version und Datenquellen an. radio_stat_* und dept_stat_* speichern berechnete Statistiken; room_master_table bewahrt die Room-Schema-Identität.</string>
+    <string name="local_mode_canada_note">Für Kanada (ISED) wird die Datenbank nur serverseitig vorbereitet (die Quelldatei ist für eine Verarbeitung auf dem Mobilgerät zu groß), und es gibt keinen Störungsfeed.</string>
+    <string name="country_db_chip_fr">Frankreich (ANFR)</string>
+    <string name="country_db_chip_ca">Kanada (ISED)</string>
+    <string name="site_comparator_section_azimuths">Azimute</string>
+    <string name="site_comparator_section_dates_ised">ISED-Datum</string>
+    <string name="site_comparator_section_dates_mixed">ANFR- / ISED-Daten</string>
+    <string name="throughput_ca_warning_details_unavailable">ISED-Sektordetails für diesen Standort nicht verfügbar: Bandbreiten und Sendeleistungen werden geschätzt.</string>
+    <string name="throughput_ca_assumption_tafl">Echte ISED/TAFL-Funkdaten: Bandbreite pro Träger, EIRP, Höhe, MIMO TX/RX und TDD-Verhältnis.</string>
+    <string name="throughput_ca_assumption_link_budget">3GPP TR 38.901 (UMa) Link-Budget basierend auf realer EIRP, Frequenz, Höhe und Antennendiagramm.</string>
+    <string name="throughput_ca_source_summary">ISED (TAFL) für reale Frequenzen, Bandbreiten, MIMO und EIRP; 3GPP TR 38.901 / TS 38.306 für das Funkmodell.</string>
+    <string name="ca_ised_card_title">Technische Details ISED (Kanada)</string>
+    <string name="ca_ised_record_id">Betreiber-Standortcode</string>
+    <string name="ca_ised_licence_area">Lizenzgebiet</string>
+    <string name="ca_ised_province">Provinz</string>
+    <string name="ca_ised_site_type">Standorttyp</string>
+    <string name="ca_ised_site_type_outdoor">Außenbereich (O)</string>
+    <string name="ca_ised_site_type_indoor">Innenbereich (I)</string>
+    <string name="ca_ised_account">ISED-Konto</string>
+    <string name="ca_ised_import">ISED-Import</string>
+    <string name="ca_ised_sectors_title">Sektoren &amp; HF-Parameter (%1$d)</string>
+    <string name="ca_ised_collapse">Einklappen</string>
+    <string name="ca_ised_show_all_sectors">Alle %1$d Sektoren anzeigen</string>
+    <string name="ca_ised_azimuth">Azimut</string>
+    <string name="ca_ised_height">Höhe</string>
+    <string name="ca_ised_tilt">Neigung</string>
+    <string name="ca_ised_beamwidth">Öffnungswinkel</string>
+    <string name="ca_ised_eirp">EIRP</string>
+    <string name="ca_ised_type">Typ</string>
+    <string name="ca_ised_antenna">Antenne</string>
+    <string name="ca_ised_radio">Funk</string>
 </resources>

@@ -50,8 +50,9 @@ class DatabaseDownloadWorker(
         // Chrono de telechargement (live pendant, duree finale apres) affiche par DatabaseDownloadCard.
         DbOperationTimings.markStart(context, DbOperationTimings.MOBILE_DOWNLOAD)
         return try {
+            val country = targetCountry()
             isUpdatingExistingDatabase = GeoTowerDatabaseValidator
-                .getInstalledDatabaseStatus(context)
+                .getInstalledDatabaseStatus(context, country = country)
                 .state == GeoTowerDatabaseValidator.LocalDatabaseState.VALID
 
             // 1. Démarrer en premier plan
@@ -59,7 +60,7 @@ class DatabaseDownloadWorker(
             awaitIfPaused(0)
 
             // 2. Lancer le téléchargement
-            val success = DatabaseDownloader.downloadUpdate(context) { progress ->
+            val success = DatabaseDownloader.downloadUpdate(context, country = targetCountry()) { progress ->
                 awaitIfPaused(progress)
                 setProgress(workDataOf(KEY_PROGRESS to progress, KEY_PAUSED to false))
                 notifySafely(notificationId, createNotification(progress, paused = false))
@@ -74,8 +75,7 @@ class DatabaseDownloadWorker(
                 Result.success(
                     workDataOf(
                         DownloadNotificationCenter.KEY_SUCCESSFUL_DATABASE_DOWNLOAD to true,
-                        DownloadNotificationCenter.KEY_DATABASE_DISPLAY_NAME to
-                            context.getString(R.string.notification_history_type_db_mobile)
+                        DownloadNotificationCenter.KEY_DATABASE_DISPLAY_NAME to mobileDatabaseDisplayName()
                     )
                 )
             } else {
@@ -155,7 +155,7 @@ class DatabaseDownloadWorker(
     }
 
     private fun createNotification(progress: Int, paused: Boolean = false): android.app.Notification {
-        val databaseName = context.getString(R.string.notification_history_type_db_mobile)
+        val databaseName = mobileDatabaseDisplayName()
         val title = context.getString(
             if (isUpdatingExistingDatabase) R.string.notification_database_download_title
             else R.string.notification_database_first_download_title,
@@ -240,7 +240,7 @@ class DatabaseDownloadWorker(
         recordHistory(NotificationHistoryStore.STATUS_SUCCESS)
         val pendingIntent = settingsPendingIntent(1, showSuccessPopup = true)
 
-        val databaseName = context.getString(R.string.notification_history_type_db_mobile)
+        val databaseName = mobileDatabaseDisplayName()
         val title = context.getString(R.string.notification_database_downloaded_title, databaseName)
         val content = context.getString(R.string.notification_database_downloaded_content, databaseName)
 
@@ -259,7 +259,7 @@ class DatabaseDownloadWorker(
         recordHistory(NotificationHistoryStore.STATUS_ERROR)
         val title = context.getString(
             R.string.notification_database_download_failed_title,
-            context.getString(R.string.notification_history_type_db_mobile)
+            mobileDatabaseDisplayName()
         )
         val content = context.getString(R.string.notification_database_download_failed_content)
 
@@ -283,10 +283,28 @@ class DatabaseDownloadWorker(
             context = context,
             type = NotificationHistoryStore.TYPE_DB_MOBILE,
             status = status,
-            target = "geotower://settings?section=db_mobile",
+            target = "geotower://settings?section=${activeSection()}",
             posted = AppNotifications.canPost(context)
         )
     }
+
+    private fun targetCountry(): fr.geotower.data.db.DatabaseCountry =
+        inputData.getString(KEY_COUNTRY)
+            ?.let { raw -> runCatching { fr.geotower.data.db.DatabaseCountry.valueOf(raw) }.getOrNull() }
+            ?: GeoTowerDatabaseValidator.activeCountry(context)
+
+    private fun mobileDatabaseDisplayName(): String {
+        val base = context.getString(R.string.notification_history_type_db_mobile)
+        val country = if (targetCountry() == fr.geotower.data.db.DatabaseCountry.CA) "Canada" else "France"
+        return "$base ($country)"
+    }
+
+    private fun activeSection(): String =
+        if (targetCountry() == fr.geotower.data.db.DatabaseCountry.CA) {
+            "db_mobile_ca"
+        } else {
+            "db_mobile_fr"
+        }
 
     /**
      * Cible la carte « base de données mobile » précisément, pas seulement le haut de la section
@@ -298,12 +316,12 @@ class DatabaseDownloadWorker(
     private fun settingsPendingIntent(requestCode: Int, showSuccessPopup: Boolean): PendingIntent {
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            data = android.net.Uri.parse("geotower://settings?section=db_mobile")
+            data = android.net.Uri.parse("geotower://settings?section=${activeSection()}")
             if (showSuccessPopup) {
                 putExtra("SHOW_DB_SUCCESS_POPUP", true)
                 putExtra(
                     DownloadNotificationCenter.EXTRA_DATABASE_DISPLAY_NAME,
-                    context.getString(R.string.notification_history_type_db_mobile)
+                    mobileDatabaseDisplayName()
                 )
             }
         }
@@ -321,30 +339,52 @@ class DatabaseDownloadWorker(
         const val KEY_PROGRESS = "progress"
         const val KEY_PAUSED = "paused"
         private const val KEY_CONTINUE_AFTER_FAILURE = "continue_after_failure"
+        private const val KEY_COUNTRY = "country"
 
         private const val TAG = "GeoTowerDb"
         private const val MAX_RETRY_ATTEMPTS = 3
+
+        fun countryTag(country: fr.geotower.data.db.DatabaseCountry): String =
+            "database_download_country_${country.code}"
+
         fun buildRequest(
             continueAfterFailure: Boolean = false,
-            bulkActionTag: String? = null
-        ) = OneTimeWorkRequestBuilder<DatabaseDownloadWorker>()
-            .setConstraints(
-                Constraints.Builder()
-                    .setRequiredNetworkType(NetworkType.CONNECTED)
-                    .build()
-            )
-            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
-            .setInputData(workDataOf(KEY_CONTINUE_AFTER_FAILURE to continueAfterFailure))
-            .addTag(WORK_TAG)
-            .addTag(DownloadNotificationCenter.DATABASE_DOWNLOADS_WORK_TAG)
-            .apply { bulkActionTag?.let(::addTag) }
-            .build()
+            bulkActionTag: String? = null,
+            country: fr.geotower.data.db.DatabaseCountry? = null
+        ): androidx.work.OneTimeWorkRequest {
+            val resolvedCountry = country ?: fr.geotower.data.db.DatabaseCountryStore.getActive()
+            return OneTimeWorkRequestBuilder<DatabaseDownloadWorker>()
+                .setConstraints(
+                    Constraints.Builder()
+                        .setRequiredNetworkType(NetworkType.CONNECTED)
+                        .build()
+                )
+                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
+                .setInputData(
+                    workDataOf(
+                        KEY_CONTINUE_AFTER_FAILURE to continueAfterFailure,
+                        KEY_COUNTRY to resolvedCountry.name
+                    )
+                )
+                .addTag(WORK_TAG)
+                .addTag(countryTag(resolvedCountry))
+                .addTag(DownloadNotificationCenter.DATABASE_DOWNLOADS_WORK_TAG)
+                .apply { bulkActionTag?.let(::addTag) }
+                .build()
+        }
 
-        fun enqueue(workManager: WorkManager) {
+        fun uniqueWorkNameFor(country: fr.geotower.data.db.DatabaseCountry): String =
+            "${UNIQUE_WORK_NAME}_${country.code}"
+
+        fun enqueue(
+            workManager: WorkManager,
+            country: fr.geotower.data.db.DatabaseCountry? = null
+        ) {
+            val resolvedCountry = country ?: fr.geotower.data.db.DatabaseCountryStore.getActive()
             workManager.enqueueUniqueWork(
-                UNIQUE_WORK_NAME,
+                uniqueWorkNameFor(resolvedCountry),
                 ExistingWorkPolicy.KEEP,
-                buildRequest()
+                buildRequest(country = resolvedCountry)
             )
         }
     }

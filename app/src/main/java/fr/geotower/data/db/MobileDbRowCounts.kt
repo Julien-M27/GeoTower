@@ -28,13 +28,21 @@ object MobileDbRowCounts {
      *   le comptage est fait mais rien n'est memorise.
      * @return le nombre de lignes de `antenne`, ou null si la base est absente ou illisible.
      */
-    fun antennaCount(context: Context, versionRaw: String?): Int? {
-        val dbPath = context.getDatabasePath(GeoTowerDatabaseValidator.DB_NAME)
+    fun antennaCount(
+        context: Context,
+        versionRaw: String?,
+        country: DatabaseCountry = DatabaseCountryStore.getActive(context)
+    ): Int? {
+        val dbName = country.dbFileName
+        val dbPath = context.getDatabasePath(dbName)
         if (!dbPath.exists()) return null
 
+        val versionPrefKey = if (country == DatabaseCountry.FR) CACHE_VERSION_KEY else "${CACHE_VERSION_KEY}_${country.code}"
+        val valuePrefKey = if (country == DatabaseCountry.FR) CACHE_VALUE_KEY else "${CACHE_VALUE_KEY}_${country.code}"
+        val cacheKey = versionRaw?.let { "$dbName:$it" }
         val prefs = context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
-        if (versionRaw != null && prefs.getString(CACHE_VERSION_KEY, null) == versionRaw) {
-            val cached = prefs.getInt(CACHE_VALUE_KEY, -1)
+        if (cacheKey != null && prefs.getString(versionPrefKey, null) == cacheKey) {
+            val cached = prefs.getInt(valuePrefKey, -1)
             if (cached >= 0) return cached
         }
 
@@ -43,10 +51,10 @@ object MobileDbRowCounts {
                 val count = db.rawQuery("SELECT COUNT(*) FROM antenne", null).use { cursor ->
                     if (cursor.moveToFirst()) cursor.getInt(0) else null
                 }
-                if (count != null && versionRaw != null) {
+                if (count != null && cacheKey != null) {
                     prefs.edit()
-                        .putString(CACHE_VERSION_KEY, versionRaw)
-                        .putInt(CACHE_VALUE_KEY, count)
+                        .putString(versionPrefKey, cacheKey)
+                        .putInt(valuePrefKey, count)
                         .apply()
                 }
                 count

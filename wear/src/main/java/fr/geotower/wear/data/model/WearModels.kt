@@ -109,6 +109,17 @@ enum class DataSourceMode(val label: String, val shortLabel: String) {
     WEB_API("API Web directe", "Web API")
 }
 
+enum class WearApiServer(val label: String, val subtitle: String, val baseUrl: String) {
+    AUTO("Auto (Failover)", "api.geotower.fr → api.cajejuma.fr", "https://api.geotower.fr/"),
+    PRIMARY("Principal", "api.geotower.fr", "https://api.geotower.fr/"),
+    MIRROR("Miroir", "api.cajejuma.fr", "https://api.cajejuma.fr/");
+
+    fun next(): WearApiServer {
+        val values = values()
+        return values[(ordinal + 1) % values.size]
+    }
+}
+
 /**
  * Fréquence d'actualisation du GPS de la montre (comme sur Garmin).
  */

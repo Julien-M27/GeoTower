@@ -500,6 +500,57 @@ class GeoTowerDbBuilderTest {
     }
 
     @Test
+    fun weeklyStationWithoutMonthlySupportStillGetsSupportIdAndAddress() {
+        val file = File.createTempFile("geotower_weekly_sup_test", ".db").apply { deleteOnExit() }
+        val sources = AnfrSources(
+            weekly = listOf(
+                row(
+                    "sta_nm_anfr" to "0032750221",
+                    "sup_id" to "23444",
+                    "coordonnees" to "46.1775, 3.374167",
+                    "adm_lb_nom" to "BOUYGUES TELECOM",
+                    "statut" to "Projet approuve",
+                    "generation" to "5G",
+                    "emr_lb_systeme" to "5G NR 2100",
+                    "emr_dt" to "02/02/2023",
+                    "date_maj" to "2026-11-19",
+                    "nat_id" to "23",
+                    "tpo_id" to "72",
+                    "sup_nm_haut" to "20",
+                    "adr_lb_lieu" to "LE BOUCHEREAUD",
+                    "adr_lb_add1" to "rte de vendat",
+                    "adr_nm_cp" to "03110",
+                    "com_cd_insee" to "03258",
+                ),
+            ),
+            stations = emptyList(),
+            bandes = emptyList(),
+            emetteurs = emptyList(),
+            antennes = emptyList(),
+            supports = emptyList(),
+        )
+        val refs = AnfrReferences(communes = mapOf("03258" to "Vendat"))
+
+        JdbcSqlDatabase(file.absolutePath).use { db ->
+            GeoTowerDbBuilder.build(db, sources, refs, emptyMap(), BuildConfig(version = "20261119_1515"))
+        }
+
+        DriverManager.getConnection("jdbc:sqlite:${file.absolutePath}").use { conn ->
+            val sup = conn.one("SELECT * FROM support WHERE id_anfr = '0032750221'") ?: error("support row missing")
+            assertEquals("23444", sup["id_support"])
+            assertEquals(23, sup["nat_id"])
+            assertEquals(72, sup["tpo_id"])
+            assertEquals(20.0, sup["hauteur"] as Double, 0.01)
+
+            val loc = conn.one("SELECT * FROM localisation WHERE id_anfr = '0032750221'")!!
+            assertEquals("03258", loc["code_insee"])
+
+            val tech = conn.one("SELECT * FROM technique WHERE id_anfr = '0032750221'")!!
+            assertEquals("LE BOUCHEREAUD, rte de vendat, 03110 Vendat", tech["adresse"])
+        }
+    }
+
+    @Test
     fun detailQueriesAggregateWithoutATemporarySort() {
         // La propriete PERF des requetes : elles doivent exploiter les cles id_anfr des tables de
         // staging sans « USE TEMP B-TREE ». Un tri de ~2,5 M de lignes sur le telephone est

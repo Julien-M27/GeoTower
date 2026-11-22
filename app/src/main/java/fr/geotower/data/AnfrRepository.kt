@@ -242,10 +242,10 @@ private fun frequencyKeysFromRawDetails(rawFrequency: String): Set<String> {
 }
 
 private fun mobileFrequencyValuesForGeneration(gen: Int): Set<Int> = when (gen) {
-    5 -> setOf(700, 1400, 2100, 3500, 4200, 26000)
-    4 -> setOf(700, 800, 900, 1800, 2100, 2600)
-    3 -> setOf(900, 2100)
-    2 -> setOf(900, 1800)
+    5 -> setOf(600, 700, 850, 1400, 1900, 2000, 2100, 2600, 3500, 3800, 4200, 26000)
+    4 -> setOf(600, 700, 800, 850, 900, 1800, 1900, 2100, 2300, 2600, 3500)
+    3 -> setOf(850, 900, 1900, 2100)
+    2 -> setOf(850, 900, 1800, 1900)
     else -> emptySet()
 }
 
@@ -274,28 +274,43 @@ private fun frequencyValuesForRange(gen: Int, start: Double?, end: Double?): Set
     if (start == null || end == null) return emptySet()
     return when (gen) {
         5 -> buildSet {
+            if (frequencyRangeOverlaps(start, end, 600.0, 699.0)) add(600)
             if (frequencyRangeOverlaps(start, end, 700.0, 790.0)) add(700)
+            if (frequencyRangeOverlaps(start, end, 824.0, 894.0)) add(850)
             if (frequencyRangeOverlaps(start, end, 1427.0, 1518.0)) add(1400)
-            if (frequencyRangeOverlaps(start, end, 1920.0, 2170.0)) add(2100)
-            if (frequencyRangeOverlaps(start, end, 3300.0, 3800.0)) add(3500)
-            if (frequencyRangeOverlaps(start, end, 3800.1, 4200.0)) add(4200)
+            if (frequencyRangeOverlaps(start, end, 1850.0, 1919.0)) add(1900)
+            if (frequencyRangeOverlaps(start, end, 2000.0, 2020.0)) add(2000)
+            if (frequencyRangeOverlaps(start, end, 1920.0, 2180.0)) add(2100)
+            if (frequencyRangeOverlaps(start, end, 2500.0, 2690.0)) add(2600)
+            if (frequencyRangeOverlaps(start, end, 3300.0, 3700.0)) add(3500)
+            if (frequencyRangeOverlaps(start, end, 3700.1, 3980.0)) add(3800)
+            if (frequencyRangeOverlaps(start, end, 3980.1, 4200.0)) add(4200)
             if (frequencyRangeOverlaps(start, end, 24000.0, 27500.0)) add(26000)
         }
         4 -> buildSet {
+            if (frequencyRangeOverlaps(start, end, 600.0, 699.0)) add(600)
             if (frequencyRangeOverlaps(start, end, 700.0, 790.0)) add(700)
             if (frequencyRangeOverlaps(start, end, 791.0, 862.0)) add(800)
+            if (frequencyRangeOverlaps(start, end, 824.0, 894.0)) add(850)
             if (frequencyRangeOverlaps(start, end, 880.0, 960.0)) add(900)
             if (frequencyRangeOverlaps(start, end, 1710.0, 1880.0)) add(1800)
+            if (frequencyRangeOverlaps(start, end, 1850.0, 1919.0)) add(1900)
             if (frequencyRangeOverlaps(start, end, 1920.0, 2170.0)) add(2100)
+            if (frequencyRangeOverlaps(start, end, 2300.0, 2400.0)) add(2300)
             if (frequencyRangeOverlaps(start, end, 2500.0, 2690.0)) add(2600)
+            if (frequencyRangeOverlaps(start, end, 3400.0, 3700.0)) add(3500)
         }
         3 -> buildSet {
+            if (frequencyRangeOverlaps(start, end, 824.0, 894.0)) add(850)
             if (frequencyRangeOverlaps(start, end, 880.0, 960.0)) add(900)
+            if (frequencyRangeOverlaps(start, end, 1850.0, 1919.0)) add(1900)
             if (frequencyRangeOverlaps(start, end, 1920.0, 2170.0)) add(2100)
         }
         2 -> buildSet {
+            if (frequencyRangeOverlaps(start, end, 824.0, 894.0)) add(850)
             if (frequencyRangeOverlaps(start, end, 880.0, 960.0)) add(900)
             if (frequencyRangeOverlaps(start, end, 1710.0, 1880.0)) add(1800)
+            if (frequencyRangeOverlaps(start, end, 1850.0, 1990.0)) add(1900)
         }
         else -> emptySet()
     }
@@ -318,17 +333,27 @@ private fun bandKeysFromMask(mask: Int): Set<String> = buildSet {
     if ((mask and RadioFilterMasks.BAND_2G_900) != 0) add("2G|900")
     if ((mask and RadioFilterMasks.BAND_2G_1800) != 0) add("2G|1800")
     if ((mask and RadioFilterMasks.BAND_3G_900) != 0) add("3G|900")
+    if ((mask and RadioFilterMasks.BAND_3G_1900) != 0) add("3G|1900")
     if ((mask and RadioFilterMasks.BAND_3G_2100) != 0) add("3G|2100")
+    if ((mask and RadioFilterMasks.BAND_4G_600) != 0) add("4G|600")
     if ((mask and RadioFilterMasks.BAND_4G_700) != 0) add("4G|700")
     if ((mask and RadioFilterMasks.BAND_4G_800) != 0) add("4G|800")
     if ((mask and RadioFilterMasks.BAND_4G_900) != 0) add("4G|900")
     if ((mask and RadioFilterMasks.BAND_4G_1800) != 0) add("4G|1800")
     if ((mask and RadioFilterMasks.BAND_4G_2100) != 0) add("4G|2100")
+    if ((mask and RadioFilterMasks.BAND_4G_2300) != 0) add("4G|2300")
     if ((mask and RadioFilterMasks.BAND_4G_2600) != 0) add("4G|2600")
+    if ((mask and RadioFilterMasks.BAND_4G_3500) != 0) add("4G|3500")
+    if ((mask and RadioFilterMasks.BAND_5G_600) != 0) add("5G|600")
     if ((mask and RadioFilterMasks.BAND_5G_700) != 0) add("5G|700")
+    if ((mask and RadioFilterMasks.BAND_5G_850) != 0) add("5G|850")
     if ((mask and RadioFilterMasks.BAND_5G_1400) != 0) add("5G|1400")
+    if ((mask and RadioFilterMasks.BAND_5G_1900) != 0) add("5G|1900")
+    if ((mask and RadioFilterMasks.BAND_5G_2000) != 0) add("5G|2000")
     if ((mask and RadioFilterMasks.BAND_5G_2100) != 0) add("5G|2100")
+    if ((mask and RadioFilterMasks.BAND_5G_2600) != 0) add("5G|2600")
     if ((mask and RadioFilterMasks.BAND_5G_3500) != 0) add("5G|3500")
+    if ((mask and RadioFilterMasks.BAND_5G_3800) != 0) add("5G|3800")
     if ((mask and RadioFilterMasks.BAND_5G_4200) != 0) add("5G|4200")
     if ((mask and RadioFilterMasks.BAND_5G_26000) != 0) add("5G|26000")
 }
@@ -338,17 +363,27 @@ private fun radioBandMaskForKey(key: String): Int {
         "2G|900" -> RadioFilterMasks.BAND_2G_900
         "2G|1800" -> RadioFilterMasks.BAND_2G_1800
         "3G|900" -> RadioFilterMasks.BAND_3G_900
+        "3G|1900" -> RadioFilterMasks.BAND_3G_1900
         "3G|2100" -> RadioFilterMasks.BAND_3G_2100
+        "4G|600" -> RadioFilterMasks.BAND_4G_600
         "4G|700" -> RadioFilterMasks.BAND_4G_700
         "4G|800" -> RadioFilterMasks.BAND_4G_800
         "4G|900" -> RadioFilterMasks.BAND_4G_900
         "4G|1800" -> RadioFilterMasks.BAND_4G_1800
         "4G|2100" -> RadioFilterMasks.BAND_4G_2100
+        "4G|2300" -> RadioFilterMasks.BAND_4G_2300
         "4G|2600" -> RadioFilterMasks.BAND_4G_2600
+        "4G|3500" -> RadioFilterMasks.BAND_4G_3500
+        "5G|600" -> RadioFilterMasks.BAND_5G_600
         "5G|700" -> RadioFilterMasks.BAND_5G_700
+        "5G|850" -> RadioFilterMasks.BAND_5G_850
         "5G|1400" -> RadioFilterMasks.BAND_5G_1400
+        "5G|1900" -> RadioFilterMasks.BAND_5G_1900
+        "5G|2000" -> RadioFilterMasks.BAND_5G_2000
         "5G|2100" -> RadioFilterMasks.BAND_5G_2100
+        "5G|2600" -> RadioFilterMasks.BAND_5G_2600
         "5G|3500" -> RadioFilterMasks.BAND_5G_3500
+        "5G|3800" -> RadioFilterMasks.BAND_5G_3800
         "5G|4200" -> RadioFilterMasks.BAND_5G_4200
         "5G|26000" -> RadioFilterMasks.BAND_5G_26000
         else -> 0
@@ -495,9 +530,35 @@ class AnfrRepository(
      * la page « À propos » s'en sert pour annoncer les données servies par la base en ligne, et ne
      * doit jamais s'en écarter.
      */
-    private fun shouldUseLiveApiFallback(featureId: String): Boolean {
+    private fun countryForSiteId(siteId: String): fr.geotower.data.db.DatabaseCountry =
+        if (siteId.startsWith("CA-", ignoreCase = true)) {
+            fr.geotower.data.db.DatabaseCountry.CA
+        } else {
+            fr.geotower.data.db.DatabaseCountry.FR
+        }
+
+    private suspend fun <T> queryLocalDatabaseForCountry(
+        country: fr.geotower.data.db.DatabaseCountry,
+        defaultValue: T,
+        block: suspend GeoTowerDao.() -> T
+    ): T {
+        currentCoroutineContext().ensureActive()
+        return try {
+            AppDatabase.getDatabase(context, country).geoTowerDao().block()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLogger.w(TAG_DB, "Local database query failed for ${country.code}", e)
+            defaultValue
+        }
+    }
+
+    private fun shouldUseLiveApiFallback(
+        featureId: String,
+        country: fr.geotower.data.db.DatabaseCountry = fr.geotower.data.db.DatabaseCountryStore.getActive(context)
+    ): Boolean {
         if (!RemoteFeatureFlags.isFeatureEnabled(featureId)) return false
-        return LiveDatabaseStatus.isInUse(context)
+        return LiveDatabaseStatus.isInUse(context, country)
     }
 
     private fun liveNearbyRadiusKm(): Double {
@@ -524,8 +585,9 @@ class AnfrRepository(
         val maxDegrees = liveBboxMaxDegrees()
         val tiles = mutableListOf<LiveBboxTile>()
 
+        val coverageList = activeLiveCoverageBounds()
         bounds.longitudeRanges.forEach { lonRange ->
-            liveCoverageBounds.forEach { coverage ->
+            coverageList.forEach { coverage ->
                 val south = maxOf(bounds.minLat, coverage.minLat)
                 val north = minOf(bounds.maxLat, coverage.maxLat)
                 val west = maxOf(lonRange.min, coverage.minLon)
@@ -615,7 +677,8 @@ class AnfrRepository(
         lat: Double,
         lon: Double,
         limit: Int,
-        zbOnly: Boolean
+        zbOnly: Boolean,
+        country: fr.geotower.data.db.DatabaseCountry? = null
     ): List<LocalisationEntity> {
         val radii = liveNearbyRadiusEscalationKm(liveNearbyRadiusKm())
         radii.forEachIndexed { index, radiusKm ->
@@ -626,7 +689,8 @@ class AnfrRepository(
                 lon = lon,
                 limit = limit,
                 zbOnly = zbOnly,
-                radiusKm = radiusKm
+                radiusKm = radiusKm,
+                country = country
             ) ?: return emptyList()
 
             if (result.sites.isNotEmpty()) {
@@ -643,15 +707,26 @@ class AnfrRepository(
         return emptyList()
     }
 
+    private fun liveCountryCode(
+        siteId: String? = null,
+        country: fr.geotower.data.db.DatabaseCountry? = null
+    ): String {
+        if (siteId?.startsWith("CA-", ignoreCase = true) == true) return "ca"
+        val resolved = country ?: fr.geotower.data.db.DatabaseCountryStore.getActive(context)
+        return if (resolved == fr.geotower.data.db.DatabaseCountry.CA) "ca" else "fr"
+    }
+
     private suspend fun getLiveNearestWithinRadius(
         lat: Double,
         lon: Double,
         limit: Int,
         zbOnly: Boolean,
-        radiusKm: Double
+        radiusKm: Double,
+        country: fr.geotower.data.db.DatabaseCountry? = null
     ): LiveNearestFetchResult? {
         return try {
             val response = LiveSitesClient.api.getNearbySites(
+                country = liveCountryCode(country = country),
                 lat = lat,
                 lon = lon,
                 limit = limit.coerceAtLeast(1),
@@ -708,6 +783,7 @@ class AnfrRepository(
     private suspend fun getLiveSitesInTile(tile: LiveBboxTile, limit: Int): LiveBboxFetchResult {
         return try {
             val response = LiveSitesClient.api.getSitesInBox(
+                country = liveCountryCode(),
                 north = tile.north,
                 south = tile.south,
                 east = tile.east,
@@ -734,9 +810,13 @@ class AnfrRepository(
     private suspend fun getLiveSite(siteId: String): LiveSiteResponseDto? {
         if (siteId.isBlank()) return null
         return try {
-            val response = LiveSitesClient.api.getSite(siteId)
+            val response = LiveSitesClient.api.getSite(liveCountryCode(siteId), siteId)
             if (!response.isSuccessful) return null
-            response.body()
+            val body = response.body()
+            if (body?.caIsedDetails != null) {
+                CaIsedSiteDetailsRepository.cacheLiveDetails(siteId, body.caIsedDetails)
+            }
+            body
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -753,9 +833,12 @@ class AnfrRepository(
             .mapNotNull { id -> getLiveSite(id) }
     }
 
-    private suspend fun getLiveCurrentRadioStatsByOperator(operatorNames: List<String>): List<RadioStatRow> {
+    private suspend fun getLiveCurrentRadioStatsByOperator(
+        operatorNames: List<String>,
+        countryCode: String = liveCountryCode()
+    ): List<RadioStatRow> {
         return try {
-            val response = LiveSitesClient.api.getCurrentRadioStats(operatorNames)
+            val response = LiveSitesClient.api.getCurrentRadioStats(countryCode, operatorNames)
             if (!response.isSuccessful) return emptyList()
             response.body()
                 ?.rows
@@ -1365,12 +1448,13 @@ class AnfrRepository(
     ): List<LocalisationEntity> {
         val safeLimit = limit.coerceAtLeast(1)
         val candidateLimit = (safeLimit.toLong() * 8L).coerceAtMost(5000L).toInt()
-        if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_NEARBY)) {
-            return hideHiddenSites(getLiveNearest(lat, lon, candidateLimit, zbOnly = false))
+        val targetCountry = fr.geotower.data.db.DatabaseCountry.forCoordinates(lat, lon)
+        if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_NEARBY, targetCountry)) {
+            return hideHiddenSites(getLiveNearest(lat, lon, candidateLimit, zbOnly = false, country = targetCountry))
                 .take(safeLimit)
         }
 
-        val localisations = queryLocalDatabase(emptyList()) {
+        val localisations = queryLocalDatabaseForCountry(targetCountry, emptyList()) {
             val radii = listOf(0.03, 0.08, 0.18, 0.45, 1.0, 2.5, 5.0)
             var bestResult = emptyList<LocalisationEntity>()
 
@@ -1387,7 +1471,7 @@ class AnfrRepository(
                 )
 
                 if (nearest.size > bestResult.size) bestResult = nearest
-                if (nearest.size >= candidateLimit) return@queryLocalDatabase nearest
+                if (nearest.size >= candidateLimit) return@queryLocalDatabaseForCountry nearest
             }
 
             this.getNearest(lat, lon, candidateLimit).ifEmpty { bestResult }
@@ -1467,7 +1551,7 @@ class AnfrRepository(
     // 2. POUR LES DÉTAILS (Quand on clique sur une antenne)
     // =================================================================
     private suspend fun isLocalAnfrIdHidden(idAnfr: String): Boolean {
-        return queryLocalDatabase(false) {
+        return queryLocalDatabaseForCountry(countryForSiteId(idAnfr), false) {
             getAntennasByExactId(idAnfr).any { antenna -> HiddenSitesStore.isHidden(context, antenna) }
         }
     }
@@ -1479,29 +1563,45 @@ class AnfrRepository(
     }
 
     suspend fun getTechniqueDetails(idAnfr: String): TechniqueEntity? {
-        if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_SITE_DETAIL)) {
+        val siteCountry = countryForSiteId(idAnfr)
+        if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_SITE_DETAIL, siteCountry)) {
             val site = getLiveSite(idAnfr)
             if (isLiveSiteHidden(site)) return null
             return site?.detail?.toTechniqueEntity()
         }
 
         if (isLocalAnfrIdHidden(idAnfr)) return null
-        return queryLocalDatabase(null) {
+        val local = queryLocalDatabaseForCountry(siteCountry, null) {
             getTechniqueDetails(idAnfr)
         }
+        if (local != null) return local
+        if (RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.LIVE_API_FR_SITE_DETAIL)) {
+            val site = getLiveSite(idAnfr)
+            if (isLiveSiteHidden(site)) return null
+            return site?.detail?.toTechniqueEntity()
+        }
+        return null
     }
 
     suspend fun getPhysiqueDetails(idAnfr: String): List<PhysiqueEntity> {
-        if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_SITE_DETAIL)) {
+        val siteCountry = countryForSiteId(idAnfr)
+        if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_SITE_DETAIL, siteCountry)) {
             val site = getLiveSite(idAnfr)
             if (isLiveSiteHidden(site)) return emptyList()
             return site?.supports?.mapNotNull { it.toPhysiqueEntity() }.orEmpty()
         }
 
         if (isLocalAnfrIdHidden(idAnfr)) return emptyList()
-        return queryLocalDatabase(emptyList()) {
+        val local = queryLocalDatabaseForCountry(siteCountry, emptyList()) {
             getPhysiqueDetails(idAnfr)
         }
+        if (local.isNotEmpty()) return local
+        if (RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.LIVE_API_FR_SITE_DETAIL)) {
+            val site = getLiveSite(idAnfr)
+            if (isLiveSiteHidden(site)) return emptyList()
+            return site?.supports?.mapNotNull { it.toPhysiqueEntity() }.orEmpty()
+        }
+        return emptyList()
     }
 
     /**
@@ -1512,7 +1612,7 @@ class AnfrRepository(
         if (!RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.ENB_DATABASE)) {
             return null
         }
-        if (!shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_SITE_DETAIL)) {
+        if (!shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_SITE_DETAIL, countryForSiteId(idAnfr))) {
             return null
         }
         val site = getLiveSite(idAnfr) ?: return null
@@ -1523,7 +1623,7 @@ class AnfrRepository(
     /** Antennes brutes d'un site (couverture théorique). FH inclus : le moteur filtre `is_fh`. */
     suspend fun getAntennesForCoverage(idAnfr: String): List<AntenneDbEntity> {
         if (isLocalAnfrIdHidden(idAnfr)) return emptyList()
-        return queryLocalDatabase(emptyList()) {
+        return queryLocalDatabaseForCountry(countryForSiteId(idAnfr), emptyList()) {
             getAntennesByIdAnfr(idAnfr)
         }
     }
@@ -1537,119 +1637,143 @@ class AnfrRepository(
 
     /** Position + opérateur d'un site (couverture théorique). */
     suspend fun getCoverageSiteLocation(idAnfr: String): CoverageSiteLocationEntity? {
+        val siteCountry = countryForSiteId(idAnfr)
         if (isLocalAnfrIdHidden(idAnfr)) return null
-        return queryLocalDatabase(null) {
+        val local = queryLocalDatabaseForCountry(siteCountry, null) {
             getCoverageSiteLocation(idAnfr)
         }
+        if (local != null) return local
+        if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_SITE_DETAIL, siteCountry)) {
+            val site = getLiveSite(idAnfr)
+            val match = site?.matches?.firstOrNull()?.toLocalisationEntity()
+            if (match != null) {
+                return CoverageSiteLocationEntity(
+                    idAnfr = match.idAnfr,
+                    operateur = match.operateur,
+                    latitude = match.latitude,
+                    longitude = match.longitude,
+                    supportHeight = site.supports.firstOrNull()?.hauteur
+                )
+            }
+        }
+        return null
     }
 
     suspend fun getTechniqueDetailsByIds(idAnfrs: List<String>): Map<String, TechniqueEntity> {
         val distinctIds = idAnfrs.filter { it.isNotBlank() }.distinct()
         if (distinctIds.isEmpty()) return emptyMap()
 
-        if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_SITE_DETAIL)) {
-            return getLiveSites(distinctIds)
-                .mapNotNull { site -> site.detail?.toTechniqueEntity() }
-                .associateBy { it.idAnfr }
-        }
-
-        return distinctIds.chunked(SQLITE_IN_CLAUSE_BATCH_SIZE)
-            .flatMap { chunk ->
-                queryLocalDatabase(emptyList<TechniqueEntity>()) {
-                    getTechniqueDetailsByIds(chunk)
+        return distinctIds.groupBy { countryForSiteId(it) }.flatMap { (siteCountry, countryIds) ->
+            if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_SITE_DETAIL, siteCountry)) {
+                getLiveSites(countryIds).mapNotNull { site -> site.detail?.toTechniqueEntity() }
+            } else {
+                countryIds.chunked(SQLITE_IN_CLAUSE_BATCH_SIZE).flatMap { chunk ->
+                    queryLocalDatabaseForCountry(siteCountry, emptyList<TechniqueEntity>()) {
+                        getTechniqueDetailsByIds(chunk)
+                    }
                 }
             }
-            .associateBy { it.idAnfr }
+        }.associateBy { it.idAnfr }
     }
 
     suspend fun getTechniqueSummariesByIds(idAnfrs: List<String>): Map<String, TechniqueEntity> {
         val distinctIds = idAnfrs.filter { it.isNotBlank() }.distinct()
         if (distinctIds.isEmpty()) return emptyMap()
 
-        if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_SITE_DETAIL)) {
-            return getLiveSites(distinctIds)
-                .mapNotNull { site -> site.detail?.toTechniqueEntity() }
-                .associateBy { it.idAnfr }
-        }
-
-        return distinctIds.chunked(SQLITE_IN_CLAUSE_BATCH_SIZE)
-            .flatMap { chunk ->
-                queryLocalDatabase(emptyList<TechniqueEntity>()) {
-                    getTechniqueSummariesByIds(chunk)
+        return distinctIds.groupBy { countryForSiteId(it) }.flatMap { (siteCountry, countryIds) ->
+            if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_SITE_DETAIL, siteCountry)) {
+                getLiveSites(countryIds).mapNotNull { site -> site.detail?.toTechniqueEntity() }
+            } else {
+                countryIds.chunked(SQLITE_IN_CLAUSE_BATCH_SIZE).flatMap { chunk ->
+                    queryLocalDatabaseForCountry(siteCountry, emptyList<TechniqueEntity>()) {
+                        getTechniqueSummariesByIds(chunk)
+                    }
                 }
             }
-            .associateBy { it.idAnfr }
+        }.associateBy { it.idAnfr }
     }
 
     suspend fun getPhysiqueDetailsByIds(idAnfrs: List<String>): Map<String, List<PhysiqueEntity>> {
         val distinctIds = idAnfrs.filter { it.isNotBlank() }.distinct()
         if (distinctIds.isEmpty()) return emptyMap()
 
-        if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_SITE_DETAIL)) {
-            return getLiveSites(distinctIds)
-                .flatMap { site -> site.supports.mapNotNull { it.toPhysiqueEntity() } }
-                .groupBy { it.idAnfr }
-        }
-
-        return distinctIds.chunked(SQLITE_IN_CLAUSE_BATCH_SIZE)
-            .flatMap { chunk ->
-                queryLocalDatabase(emptyList<PhysiqueEntity>()) {
-                    getPhysiqueDetailsByIds(chunk)
+        return distinctIds.groupBy { countryForSiteId(it) }.flatMap { (siteCountry, countryIds) ->
+            if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_SITE_DETAIL, siteCountry)) {
+                getLiveSites(countryIds).flatMap { site -> site.supports.mapNotNull { it.toPhysiqueEntity() } }
+            } else {
+                countryIds.chunked(SQLITE_IN_CLAUSE_BATCH_SIZE).flatMap { chunk ->
+                    queryLocalDatabaseForCountry(siteCountry, emptyList<PhysiqueEntity>()) {
+                        getPhysiqueDetailsByIds(chunk)
+                    }
                 }
             }
-            .groupBy { it.idAnfr }
+        }.groupBy { it.idAnfr }
     }
 
     suspend fun getPhysiqueSummariesByIds(idAnfrs: List<String>): Map<String, List<PhysiqueEntity>> {
         val distinctIds = idAnfrs.filter { it.isNotBlank() }.distinct()
         if (distinctIds.isEmpty()) return emptyMap()
 
-        if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_SITE_DETAIL)) {
-            return getLiveSites(distinctIds)
-                .flatMap { site -> site.supports.mapNotNull { it.toPhysiqueEntity() } }
-                .groupBy { it.idAnfr }
-        }
-
-        return distinctIds.chunked(SQLITE_IN_CLAUSE_BATCH_SIZE)
-            .flatMap { chunk ->
-                queryLocalDatabase(emptyList<PhysiqueEntity>()) {
-                    getPhysiqueSummariesByIds(chunk)
+        return distinctIds.groupBy { countryForSiteId(it) }.flatMap { (siteCountry, countryIds) ->
+            if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_SITE_DETAIL, siteCountry)) {
+                getLiveSites(countryIds).flatMap { site -> site.supports.mapNotNull { it.toPhysiqueEntity() } }
+            } else {
+                countryIds.chunked(SQLITE_IN_CLAUSE_BATCH_SIZE).flatMap { chunk ->
+                    queryLocalDatabaseForCountry(siteCountry, emptyList<PhysiqueEntity>()) {
+                        getPhysiqueSummariesByIds(chunk)
+                    }
                 }
             }
-            .groupBy { it.idAnfr }
+        }.groupBy { it.idAnfr }
     }
 
     suspend fun getFaisceauxDetails(idAnfr: String): List<FaisceauxEntity> {
         if (isLocalAnfrIdHidden(idAnfr)) return emptyList()
-        return queryLocalDatabase(emptyList()) {
+        return queryLocalDatabaseForCountry(countryForSiteId(idAnfr), emptyList()) {
             getFaisceauxDetails(idAnfr)
         }
     }
 
     suspend fun getPhysiqueByAnfr(idAnfr: String): List<PhysiqueEntity> {
-        if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_SITE_DETAIL)) {
+        val siteCountry = countryForSiteId(idAnfr)
+        if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_SITE_DETAIL, siteCountry)) {
             val site = getLiveSite(idAnfr)
             if (isLiveSiteHidden(site)) return emptyList()
             return site?.supports?.mapNotNull { it.toPhysiqueEntity() }.orEmpty()
         }
 
         if (isLocalAnfrIdHidden(idAnfr)) return emptyList()
-        return queryLocalDatabase(emptyList()) {
+        val local = queryLocalDatabaseForCountry(siteCountry, emptyList()) {
             getPhysiqueByAnfr(idAnfr)
         }
+        if (local.isNotEmpty()) return local
+        if (RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.LIVE_API_FR_SITE_DETAIL)) {
+            val site = getLiveSite(idAnfr)
+            if (isLiveSiteHidden(site)) return emptyList()
+            return site?.supports?.mapNotNull { it.toPhysiqueEntity() }.orEmpty()
+        }
+        return emptyList()
     }
 
     suspend fun getTechniqueByAnfr(idAnfr: String): List<TechniqueEntity> {
-        if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_SITE_DETAIL)) {
+        val siteCountry = countryForSiteId(idAnfr)
+        if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_SITE_DETAIL, siteCountry)) {
             val site = getLiveSite(idAnfr)
             if (isLiveSiteHidden(site)) return emptyList()
             return listOfNotNull(site?.detail?.toTechniqueEntity())
         }
 
         if (isLocalAnfrIdHidden(idAnfr)) return emptyList()
-        return queryLocalDatabase(emptyList()) {
+        val local = queryLocalDatabaseForCountry(siteCountry, emptyList()) {
             getTechniqueByAnfr(idAnfr)
         }
+        if (local.isNotEmpty()) return local
+        if (RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.LIVE_API_FR_SITE_DETAIL)) {
+            val site = getLiveSite(idAnfr)
+            if (isLiveSiteHidden(site)) return emptyList()
+            return listOfNotNull(site?.detail?.toTechniqueEntity())
+        }
+        return emptyList()
     }
 
     /**
@@ -1660,17 +1784,18 @@ class AnfrRepository(
     suspend fun getFavoriteScopeSiteRows(scopeId: String): List<FavoriteScopeSiteRow> {
         val normalized = scopeId.trim()
         if (normalized.isBlank()) return emptyList()
-        return queryLocalDatabase(emptyList()) {
+        return queryLocalDatabaseForCountry(countryForSiteId(normalized), emptyList()) {
             getFavoriteScopeSiteRows(normalized)
         }
     }
 
     suspend fun searchAntennasById(query: String): List<LocalisationEntity> {
-        if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_SITE_DETAIL)) {
+        val siteCountry = countryForSiteId(query)
+        if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_SITE_DETAIL, siteCountry)) {
             return getAntennasByExactId(query)
         }
 
-        val results = queryLocalDatabase(emptyList()) {
+        val results = queryLocalDatabaseForCountry(siteCountry, emptyList()) {
             searchAntennasById(query)
         }
         return hideHiddenSites(enrichRadioBandMasksFromDetails(results, 0))
@@ -1691,17 +1816,27 @@ class AnfrRepository(
     }
 
     suspend fun getAntennasByExactId(exactId: String): List<LocalisationEntity> {
-        if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_SITE_DETAIL)) {
+        val siteCountry = countryForSiteId(exactId)
+        if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_SITE_DETAIL, siteCountry)) {
             return hideHiddenSites(getLiveSite(exactId)
                 ?.matches
                 ?.mapNotNull { it.toLocalisationEntity() }
                 .orEmpty())
         }
 
-        val results = queryLocalDatabase(emptyList()) {
+        val results = queryLocalDatabaseForCountry(siteCountry, emptyList()) {
             getAntennasByExactId(exactId)
         }
-        return hideHiddenSites(enrichRadioBandMasksFromDetails(results))
+        if (results.isNotEmpty()) {
+            return hideHiddenSites(enrichRadioBandMasksFromDetails(results))
+        }
+        if (RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.LIVE_API_FR_SITE_DETAIL)) {
+            return hideHiddenSites(getLiveSite(exactId)
+                ?.matches
+                ?.mapNotNull { it.toLocalisationEntity() }
+                .orEmpty())
+        }
+        return emptyList()
     }
 
     /**
@@ -1716,19 +1851,17 @@ class AnfrRepository(
         val distinctIds = idAnfrs.filter { it.isNotBlank() }.distinct()
         if (distinctIds.isEmpty()) return emptyMap()
 
-        if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_SITE_DETAIL)) {
-            return getLiveSites(distinctIds)
-                .flatMap { site -> site.matches.mapNotNull { it.toLocalisationEntity() } }
-                .groupBy { it.idAnfr }
-        }
-
-        return distinctIds
-            .flatMap { id ->
-                queryLocalDatabase(emptyList<LocalisationEntity>()) {
-                    getAntennasByExactId(id)
+        return distinctIds.groupBy { countryForSiteId(it) }.flatMap { (siteCountry, countryIds) ->
+            if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_SITE_DETAIL, siteCountry)) {
+                getLiveSites(countryIds).flatMap { site -> site.matches.mapNotNull { it.toLocalisationEntity() } }
+            } else {
+                countryIds.flatMap { id ->
+                    queryLocalDatabaseForCountry(siteCountry, emptyList<LocalisationEntity>()) {
+                        getAntennasByExactId(id)
+                    }
                 }
             }
-            .groupBy { it.idAnfr }
+        }.groupBy { it.idAnfr }
     }
 
     suspend fun enrichRadioBandMasksFromDetails(
@@ -1876,9 +2009,70 @@ class AnfrRepository(
         return buildActiveSupportRadioCounts(rows)
     }
 
-    suspend fun getCurrentRadioStatsByOperator(operatorNames: List<String>): List<RadioStatRow> {
+    private fun isCountryDbAvailableLocally(country: fr.geotower.data.db.DatabaseCountry): Boolean {
+        val dbFile = context.getDatabasePath(country.dbFileName)
+        return dbFile.isFile && dbFile.length() > 0L &&
+            fr.geotower.data.db.GeoTowerDatabaseValidator.validateDatabaseFile(
+                dbFile,
+                checkIntegrity = false,
+                expectedCountryCode = country.code
+            ).isValid
+    }
+
+    private fun readRadioStatsFromCountryDb(
+        country: fr.geotower.data.db.DatabaseCountry,
+        operatorNames: List<String>
+    ): List<RadioStatRow> {
+        val dbFile = context.getDatabasePath(country.dbFileName)
+        if (!dbFile.isFile || operatorNames.isEmpty()) return emptyList()
+        return runCatching {
+            android.database.sqlite.SQLiteDatabase.openDatabase(
+                dbFile.absolutePath,
+                null,
+                android.database.sqlite.SQLiteDatabase.OPEN_READONLY
+            ).use { db ->
+                val placeholders = operatorNames.joinToString(",") { "?" }
+                val sql = """
+                    SELECT category, item_key, MAX(label), SUM(total_count), SUM(active_count)
+                    FROM radio_stat_current
+                    WHERE UPPER(operator_name) IN ($placeholders)
+                    GROUP BY category, item_key
+                """.trimIndent()
+                db.rawQuery(sql, operatorNames.map { it.uppercase(Locale.ROOT) }.toTypedArray()).use { cursor ->
+                    buildList {
+                        while (cursor.moveToNext()) {
+                            add(
+                                RadioStatRow(
+                                    category = cursor.getString(0),
+                                    itemKey = cursor.getString(1),
+                                    label = if (cursor.isNull(2)) null else cursor.getString(2),
+                                    totalCount = cursor.getInt(3),
+                                    activeCount = cursor.getInt(4)
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        }.getOrDefault(emptyList())
+    }
+
+    suspend fun getCurrentRadioStatsByOperator(
+        operatorNames: List<String>,
+        country: fr.geotower.data.db.DatabaseCountry? = null
+    ): List<RadioStatRow> {
         val normalizedNames = normalizeOperatorNames(operatorNames)
         if (normalizedNames.isEmpty()) return emptyList()
+
+        if (country != null && country != fr.geotower.data.db.DatabaseCountryStore.activeCountryState.value) {
+            return withContext(Dispatchers.IO) {
+                if (isCountryDbAvailableLocally(country)) {
+                    readRadioStatsFromCountryDb(country, normalizedNames)
+                } else {
+                    getLiveCurrentRadioStatsByOperator(normalizedNames, country.code.lowercase(Locale.ROOT))
+                }
+            }
+        }
 
         if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_STATS)) {
             return getLiveCurrentRadioStatsByOperator(normalizedNames)
@@ -1902,9 +2096,11 @@ class AnfrRepository(
         }
     }
 
-    private suspend fun getLiveDepartmentStats(): List<DepartmentStatRow> {
+    private suspend fun getLiveDepartmentStats(
+        countryCode: String = liveCountryCode()
+    ): List<DepartmentStatRow> {
         return try {
-            val response = LiveSitesClient.api.getDepartmentStats()
+            val response = LiveSitesClient.api.getDepartmentStats(countryCode)
             if (!response.isSuccessful) {
                 AppLogger.w(TAG_DB, "Live department stats failed: ${response.code()}")
                 emptyList()
@@ -1919,9 +2115,12 @@ class AnfrRepository(
         }
     }
 
-    private suspend fun getLiveDepartmentOperatorTechStats(deptCode: String): List<DepartmentOperatorTechRow> {
+    private suspend fun getLiveDepartmentOperatorTechStats(
+        deptCode: String,
+        countryCode: String = liveCountryCode()
+    ): List<DepartmentOperatorTechRow> {
         return try {
-            val response = LiveSitesClient.api.getDepartmentOperatorTechStats(deptCode)
+            val response = LiveSitesClient.api.getDepartmentOperatorTechStats(countryCode, deptCode)
             if (!response.isSuccessful) {
                 AppLogger.w(TAG_DB, "Live department operator stats failed: ${response.code()}")
                 emptyList()
@@ -1943,7 +2142,120 @@ class AnfrRepository(
      * d'une base générée sur l'appareil, qui crée les tables mais ne les remplit pas, comme d'une
      * base téléchargée avant cette fonctionnalité. L'écran affiche alors « indisponible ».
      */
-    suspend fun getDepartmentStats(): List<DepartmentStatRow> {
+    private fun readDepartmentStatsFromCountryDb(
+        country: fr.geotower.data.db.DatabaseCountry
+    ): List<DepartmentStatRow> {
+        val dbFile = context.getDatabasePath(country.dbFileName)
+        if (!dbFile.isFile) return emptyList()
+        return runCatching {
+            android.database.sqlite.SQLiteDatabase.openDatabase(
+                dbFile.absolutePath,
+                null,
+                android.database.sqlite.SQLiteDatabase.OPEN_READONLY
+            ).use { db ->
+                val sql = """
+                    SELECT dept_code, dept_name, area_km2, population, population_year,
+                        supports, supports_active, stations, stations_active,
+                        antennas, antennas_active, antennas_fh,
+                        stations_per_support, antennas_per_station,
+                        supports_per_km2, stations_per_km2, antennas_per_km2,
+                        supports_per_1k_hab, stations_per_1k_hab, antennas_per_1k_hab,
+                        hab_per_support, hab_per_station, hab_per_antenna
+                    FROM dept_stat_current
+                    ORDER BY dept_code
+                """.trimIndent()
+                db.rawQuery(sql, null).use { c ->
+                    buildList {
+                        while (c.moveToNext()) {
+                            add(
+                                DepartmentStatRow(
+                                    deptCode = c.getString(0),
+                                    deptName = if (c.isNull(1)) null else c.getString(1),
+                                    areaKm2 = if (c.isNull(2)) null else c.getDouble(2),
+                                    population = if (c.isNull(3)) null else c.getInt(3),
+                                    populationYear = if (c.isNull(4)) null else c.getString(4),
+                                    supports = c.getInt(5),
+                                    supportsActive = c.getInt(6),
+                                    stations = c.getInt(7),
+                                    stationsActive = c.getInt(8),
+                                    antennas = c.getInt(9),
+                                    antennasActive = c.getInt(10),
+                                    antennasFh = c.getInt(11),
+                                    stationsPerSupport = if (c.isNull(12)) null else c.getDouble(12),
+                                    antennasPerStation = if (c.isNull(13)) null else c.getDouble(13),
+                                    supportsPerKm2 = if (c.isNull(14)) null else c.getDouble(14),
+                                    stationsPerKm2 = if (c.isNull(15)) null else c.getDouble(15),
+                                    antennasPerKm2 = if (c.isNull(16)) null else c.getDouble(16),
+                                    supportsPer1kHab = if (c.isNull(17)) null else c.getDouble(17),
+                                    stationsPer1kHab = if (c.isNull(18)) null else c.getDouble(18),
+                                    antennasPer1kHab = if (c.isNull(19)) null else c.getDouble(19),
+                                    habPerSupport = if (c.isNull(20)) null else c.getDouble(20),
+                                    habPerStation = if (c.isNull(21)) null else c.getDouble(21),
+                                    habPerAntenna = if (c.isNull(22)) null else c.getDouble(22)
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        }.getOrDefault(emptyList())
+    }
+
+    private fun readDepartmentOperatorTechFromCountryDb(
+        country: fr.geotower.data.db.DatabaseCountry,
+        deptCode: String
+    ): List<DepartmentOperatorTechRow> {
+        val dbFile = context.getDatabasePath(country.dbFileName)
+        if (!dbFile.isFile) return emptyList()
+        return runCatching {
+            android.database.sqlite.SQLiteDatabase.openDatabase(
+                dbFile.absolutePath,
+                null,
+                android.database.sqlite.SQLiteDatabase.OPEN_READONLY
+            ).use { db ->
+                val sql = """
+                    SELECT dept_code, operator_name, tech,
+                        supports, supports_active, stations, stations_active, antennas, antennas_active
+                    FROM dept_stat_operator_tech
+                    WHERE dept_code = ?
+                    ORDER BY operator_name, tech
+                """.trimIndent()
+                db.rawQuery(sql, arrayOf(deptCode)).use { c ->
+                    buildList {
+                        while (c.moveToNext()) {
+                            add(
+                                DepartmentOperatorTechRow(
+                                    deptCode = c.getString(0),
+                                    operatorName = c.getString(1),
+                                    tech = c.getString(2),
+                                    supports = c.getInt(3),
+                                    supportsActive = c.getInt(4),
+                                    stations = c.getInt(5),
+                                    stationsActive = c.getInt(6),
+                                    antennas = c.getInt(7),
+                                    antennasActive = c.getInt(8)
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        }.getOrDefault(emptyList())
+    }
+
+    suspend fun getDepartmentStats(
+        country: fr.geotower.data.db.DatabaseCountry? = null
+    ): List<DepartmentStatRow> {
+        if (country != null && country != fr.geotower.data.db.DatabaseCountryStore.activeCountryState.value) {
+            return withContext(Dispatchers.IO) {
+                if (isCountryDbAvailableLocally(country)) {
+                    readDepartmentStatsFromCountryDb(country)
+                } else {
+                    getLiveDepartmentStats(country.code.lowercase(Locale.ROOT))
+                }
+            }
+        }
+
         if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_STATS)) {
             return getLiveDepartmentStats()
         }
@@ -1967,9 +2279,22 @@ class AnfrRepository(
         }
     }
 
-    suspend fun getDepartmentOperatorTechStats(deptCode: String): List<DepartmentOperatorTechRow> {
+    suspend fun getDepartmentOperatorTechStats(
+        deptCode: String,
+        country: fr.geotower.data.db.DatabaseCountry? = null
+    ): List<DepartmentOperatorTechRow> {
         val normalizedCode = deptCode.trim().uppercase(Locale.ROOT)
         if (normalizedCode.isEmpty()) return emptyList()
+
+        if (country != null && country != fr.geotower.data.db.DatabaseCountryStore.activeCountryState.value) {
+            return withContext(Dispatchers.IO) {
+                if (isCountryDbAvailableLocally(country)) {
+                    readDepartmentOperatorTechFromCountryDb(country, normalizedCode)
+                } else {
+                    getLiveDepartmentOperatorTechStats(normalizedCode, country.code.lowercase(Locale.ROOT))
+                }
+            }
+        }
 
         if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_STATS)) {
             return getLiveDepartmentOperatorTechStats(normalizedCode)
@@ -2097,7 +2422,7 @@ class AnfrRepository(
         liveLimit: Int = 10_000
     ): FhLinksLoadResult {
         var hasLocalTable = false
-        val localLinks = queryLocalDatabase(emptyList()) {
+        val localLinks = queryLocalDatabaseForCountry(fr.geotower.data.db.DatabaseCountry.FR, emptyList()) {
             hasLocalTable = countRaw(
                 SimpleSQLiteQuery(
                     "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'fh_link'"
@@ -2487,6 +2812,14 @@ class AnfrRepository(
         val sites: List<SiteHsEntity>,
     )
 
+    private fun activeLiveCoverageBounds(): List<LiveCoverageBounds> {
+        return if (liveCountryCode() == "ca") {
+            liveCanadaCoverageBounds
+        } else {
+            liveCoverageBounds
+        }
+    }
+
     companion object {
         const val TAG_DB = "GeoTowerDb"
         const val TAG_MAP = "GeoTowerMap"
@@ -2537,6 +2870,10 @@ class AnfrRepository(
         const val LIVE_BBOX_MAX_PARALLEL_REQUESTS = 8
         const val LIVE_BBOX_MAX_SUBDIVISION_DEPTH = 4
         const val LIVE_BBOX_MIN_TILE_DEGREES = 0.2
+
+        private val liveCanadaCoverageBounds = listOf(
+            LiveCoverageBounds(minLat = 41.5, maxLat = 83.5, minLon = -141.5, maxLon = -52.0)
+        )
 
         private val liveCoverageBounds = listOf(
             LiveCoverageBounds(minLat = 41.0, maxLat = 51.6, minLon = -5.8, maxLon = 10.1),

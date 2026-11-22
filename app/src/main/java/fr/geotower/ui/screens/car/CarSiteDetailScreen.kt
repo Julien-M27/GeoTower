@@ -43,8 +43,13 @@ class CarSiteDetailScreen(
             )
             .build()
 
+        val titleRes = if (site.idAnfr.startsWith("CA-", ignoreCase = true)) {
+            R.string.site_isde_title
+        } else {
+            R.string.site_anfr_title
+        }
         PaneTemplate.Builder(pane)
-            .setTitle(carContext.getString(R.string.site_anfr_title, site.idAnfr))
+            .setTitle(carContext.getString(titleRes, site.idAnfr))
             .setHeaderAction(Action.BACK)
             .build()
     }

@@ -1,4 +1,4 @@
-﻿<resources>
+<resources>
     <string name="antenna_map_widget_label">Mappa antenne vicine</string>
     <string name="antenna_widget_label">Antenne vicine</string>
     <string name="common_logo">Logo</string>
@@ -3518,6 +3518,7 @@
     <string name="appstrings_release_v2129_summary_fh_map_rendering_optimization">Ottimizzazione della fluidità della mappa dei collegamenti FH tramite rendering a lotti e livello di dettaglio adattivo allo zoom</string>
     <string name="appstrings_release_v2130_summary_fh_map_world_bounds_and_min_zoom">Limitazione dello zoom minimo e dei confini geografici sulla mappa dei collegamenti a microonde (FH)</string>
     <string name="appstrings_release_v2131_summary_fh_filters_export_and_wear_improvements">Filtri per distanza ed esportazione sulla mappa FH, avvisi bussola/IGN, paginazione del registro di rete e miglioramenti Wear OS</string>
+    <string name="appstrings_release_v2132_summary_canada_support_and_watch_sync">Supporto completo per il Canada (database ISED, 14 operatori, bande, Android Auto) e failover API su Wear OS/Garmin</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registro richieste di rete</string>
@@ -3669,7 +3670,7 @@
     <string name="fh_map_empty_area">Nessun ponte radio in questa zona</string>
     <string name="fh_map_distance_5_20km">5–20 km</string>
     <string name="appstrings_compass_calibration_needed">Bassa precisione bussola: calibra muovendo a forma di 8</string>
-    <string name="fh_map_title">Mappa ponti radio</string>
+    <string name="fh_map_title">Mappa ponti radio (Francia)</string>
     <string name="appstrings_coverage_compute_error">Errore nel calcolo della copertura teorica</string>
     <string name="fh_map_distance_all">Tutte le lunghezze</string>
     <string name="fh_map_export">Esporta ponti radio</string>
@@ -3680,4 +3681,53 @@
     <string name="fh_map_filter_operators">Scegli operatori ponti radio</string>
     <string name="fh_map_subtitle_counts">%1$s / %2$s tratte • %3$d/%4$d operatori</string>
     <string name="network_log_load_more">Carica altri</string>
+    <string name="country_db_source_online">Online</string>
+    <string name="country_db_source_local">Locale</string>
+    <string name="country_db_source_status_online">%1$s: database online</string>
+    <string name="country_db_source_status_local">%1$s: database locale</string>
+    <string name="appstrings_date_singular">Data</string>
+    <string name="appstrings_identifier_singular">Identificatore</string>
+    <string name="appstrings_declared_sites_label">Siti dichiarati</string>
+    <string name="country_name_ca">Canada</string>
+    <string name="appstrings_ca_ised_station_number_label">Numero stazione ISED</string>
+    <string name="site_isde_title">Sito ISED %1$s</string>
+    <string name="car_technical_ids_isde">Identificativi ISED</string>
+    <string name="about_source_ca_ised_title">Antenne mobili (Canada — ISED)</string>
+    <string name="about_source_ca_ised_desc">Dati tecnici e frequenze delle stazioni cellulari pubblicati da Innovation, Science and Economic Development Canada (ISED).</string>
+    <string name="about_source_ca_tafl_label">Dati TAFL (Site Data Extract)</string>
+    <string name="fh_map_no_table_hint">Scarica o aggiorna il database della Francia per visualizzare i ponti radio.</string>
+    <string name="fh_map_live_zoom_title">Database live attivo</string>
+    <string name="fh_map_live_zoom_desc">È in uso il database online (Live). Esegui lo zoom per visualizzare i ponti radio.</string>
+    <string name="fh_map_empty_area_hint">Riduci lo zoom o sposta la mappa per visualizzare i ponti radio.</string>
+    <string name="database_viewer_info_mobile_ca">File: geotower_ca.db. È il database principale dei siti mobili di ISED Canada. localisation contiene ogni sito e le sue coordinate; technique contiene stato di servizio, date e dettagli delle frequenze; support, antenne e ca_ised_site_details descrivono supporti fisici, pannelli radio e parametri settoriali TAFL. metadata e source_versions indicano versione e fonti dei dati. radio_stat_* e dept_stat_* contengono statistiche calcolate; room_master_table conserva l’identità dello schema Room.</string>
+    <string name="local_mode_canada_note">Per il Canada (ISED), il database viene preparato solo lato server (il file sorgente è troppo grande per l’elaborazione su mobile) e non esiste un feed guasti.</string>
+    <string name="country_db_chip_fr">Francia (ANFR)</string>
+    <string name="country_db_chip_ca">Canada (ISED)</string>
+    <string name="site_comparator_section_azimuths">Azimut</string>
+    <string name="site_comparator_section_dates_ised">Data ISED</string>
+    <string name="site_comparator_section_dates_mixed">Date ANFR / ISED</string>
+    <string name="throughput_ca_warning_details_unavailable">Dettagli settoriali ISED non disponibili per questo sito: larghezze di banda e potenze stimate.</string>
+    <string name="throughput_ca_assumption_tafl">Dati radio ISED/TAFL reali: larghezza di banda per portante, EIRP, altezza, MIMO TX/RX e rapporto TDD.</string>
+    <string name="throughput_ca_assumption_link_budget">Bilancio di collegamento 3GPP TR 38.901 (UMa) basato su EIRP reale, frequenza, altezza e diagramma d’antenna.</string>
+    <string name="throughput_ca_source_summary">ISED (TAFL) per frequenze, larghezze di banda, MIMO ed EIRP reali; 3GPP TR 38.901 / TS 38.306 per il modello radio.</string>
+    <string name="ca_ised_card_title">Dettagli tecnici ISED (Canada)</string>
+    <string name="ca_ised_record_id">Codice sito operatore</string>
+    <string name="ca_ised_licence_area">Area di licenza</string>
+    <string name="ca_ised_province">Provincia</string>
+    <string name="ca_ised_site_type">Installazione</string>
+    <string name="ca_ised_site_type_outdoor">Esterno (O)</string>
+    <string name="ca_ised_site_type_indoor">Interno (I)</string>
+    <string name="ca_ised_account">Account ISED</string>
+    <string name="ca_ised_import">Importazione ISED</string>
+    <string name="ca_ised_sectors_title">Settori e parametri RF (%1$d)</string>
+    <string name="ca_ised_collapse">Comprimi</string>
+    <string name="ca_ised_show_all_sectors">Mostra tutti i %1$d settori</string>
+    <string name="ca_ised_azimuth">Azimut</string>
+    <string name="ca_ised_height">Altezza</string>
+    <string name="ca_ised_tilt">Inclinazione</string>
+    <string name="ca_ised_beamwidth">Apertura</string>
+    <string name="ca_ised_eirp">EIRP</string>
+    <string name="ca_ised_type">Tipo</string>
+    <string name="ca_ised_antenna">Antenna</string>
+    <string name="ca_ised_radio">Radio</string>
 </resources>

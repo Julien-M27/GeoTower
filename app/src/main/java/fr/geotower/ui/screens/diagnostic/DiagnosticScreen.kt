@@ -543,6 +543,7 @@ fun DiagnosticScreen(navController: NavController) {
                         Text(stringResource(R.string.network_log_view_requests))
                     }
 
+                    val networkLogShareTitle = stringResource(R.string.network_log_share)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp)),
@@ -552,7 +553,7 @@ fun DiagnosticScreen(navController: NavController) {
                             onClick = {
                                 val ok = fr.geotower.data.netlog.NetworkLogStore.shareLog(
                                     context,
-                                    context.getString(R.string.network_log_share)
+                                    networkLogShareTitle
                                 )
                                 if (!ok) {
                                     Toast.makeText(context, R.string.network_log_empty, Toast.LENGTH_SHORT).show()
@@ -1194,10 +1195,25 @@ private fun buildAntennaDatabaseItem(
     liveFallbackEnabled: Boolean,
     localBuild: LocalDbBuildStatus
 ): DiagnosticItem {
-    val dbFile = context.getDatabasePath(GeoTowerDatabaseValidator.DB_NAME)
-    val status = GeoTowerDatabaseValidator.getInstalledDatabaseStatus(context)
-    val version = GeoTowerDatabaseValidator.getInstalledDatabaseVersion(context)
-    val sidecars = databaseSidecars(context, GeoTowerDatabaseValidator.DB_NAME)
+    val activeCountry = fr.geotower.data.db.DatabaseCountryStore.getActive(context)
+    val frFile = context.getDatabasePath(fr.geotower.data.db.DatabaseCountry.FR.dbFileName)
+    val caFile = context.getDatabasePath(fr.geotower.data.db.DatabaseCountry.CA.dbFileName)
+    val frStatus = GeoTowerDatabaseValidator.getInstalledDatabaseStatus(context, country = fr.geotower.data.db.DatabaseCountry.FR)
+    val caStatus = GeoTowerDatabaseValidator.getInstalledDatabaseStatus(context, country = fr.geotower.data.db.DatabaseCountry.CA)
+    val frVersion = GeoTowerDatabaseValidator.getInstalledDatabaseVersion(context, fr.geotower.data.db.DatabaseCountry.FR)
+    val caVersion = GeoTowerDatabaseValidator.getInstalledDatabaseVersion(context, fr.geotower.data.db.DatabaseCountry.CA)
+
+    val primaryCountry = when {
+        activeCountry == fr.geotower.data.db.DatabaseCountry.CA && caStatus.state == GeoTowerDatabaseValidator.LocalDatabaseState.VALID ->
+            fr.geotower.data.db.DatabaseCountry.CA
+        frStatus.state == GeoTowerDatabaseValidator.LocalDatabaseState.VALID -> fr.geotower.data.db.DatabaseCountry.FR
+        caStatus.state == GeoTowerDatabaseValidator.LocalDatabaseState.VALID -> fr.geotower.data.db.DatabaseCountry.CA
+        else -> activeCountry
+    }
+    val status = if (primaryCountry == fr.geotower.data.db.DatabaseCountry.CA) caStatus else frStatus
+    val version = if (primaryCountry == fr.geotower.data.db.DatabaseCountry.CA) caVersion else frVersion
+    val sidecars = databaseSidecars(context, fr.geotower.data.db.DatabaseCountry.FR.dbFileName) +
+        databaseSidecars(context, fr.geotower.data.db.DatabaseCountry.CA.dbFileName)
     val downloadArtifact = sidecars.firstOrNull { it.name.endsWith(".download") && it.length() > 0L }
     // Base en cours de generation sur l'appareil : ce n'est pas une anomalie, juste une attente.
     val generating = localBuild.mobileRunning &&
@@ -1226,12 +1242,20 @@ private fun buildAntennaDatabaseItem(
     val details = buildList {
         add(
             context.getString(
-                if (dbFile.isFile) R.string.appstrings_diagnostic_detail_file_present else R.string.appstrings_diagnostic_detail_file_missing,
-                GeoTowerDatabaseValidator.DB_NAME
+                if (frFile.isFile) R.string.appstrings_diagnostic_detail_file_present else R.string.appstrings_diagnostic_detail_file_missing,
+                fr.geotower.data.db.DatabaseCountry.FR.dbFileName
             )
         )
-        add(context.getString(R.string.appstrings_diagnostic_detail_size, formatBytes(context, dbFile.lengthOrZero())))
-        add(context.getString(R.string.appstrings_diagnostic_detail_version, version ?: context.getString(R.string.appstrings_diagnostic_value_unknown)))
+        add(context.getString(R.string.appstrings_diagnostic_detail_size, formatBytes(context, frFile.lengthOrZero())))
+        add(context.getString(R.string.appstrings_diagnostic_detail_version, frVersion ?: context.getString(R.string.appstrings_diagnostic_value_unknown)))
+        add(
+            context.getString(
+                if (caFile.isFile) R.string.appstrings_diagnostic_detail_file_present else R.string.appstrings_diagnostic_detail_file_missing,
+                fr.geotower.data.db.DatabaseCountry.CA.dbFileName
+            )
+        )
+        add(context.getString(R.string.appstrings_diagnostic_detail_size, formatBytes(context, caFile.lengthOrZero())))
+        add(context.getString(R.string.appstrings_diagnostic_detail_version, caVersion ?: context.getString(R.string.appstrings_diagnostic_value_unknown)))
         add(context.getString(R.string.appstrings_diagnostic_detail_schema, GeoTowerDatabaseValidator.EXPECTED_SCHEMA_VERSION))
         status.reason?.let { add(context.getString(R.string.appstrings_diagnostic_detail_reason, it)) }
         if (sidecars.isNotEmpty()) {
@@ -1438,6 +1462,7 @@ private fun buildStorageItem(context: Context): DiagnosticItem {
     val appInfo = context.applicationInfo
     val appSize = calculateApkFilesSize(appInfo?.sourceDir, appInfo?.splitSourceDirs)
     val antennaDb = context.getDatabasePath(GeoTowerDatabaseValidator.DB_NAME)
+    val caAntennaDb = context.getDatabasePath(fr.geotower.data.db.DatabaseCountry.CA.dbFileName)
     val radioDb = context.getDatabasePath(RadioDatabaseValidator.DB_NAME)
     val enbDb = context.getDatabasePath(fr.geotower.data.db.EnbDatabaseValidator.DB_NAME)
     // Copies des pannes : celle du serveur et celle produite sur l'appareil, jamais les deux en usage.
@@ -1453,11 +1478,12 @@ private fun buildStorageItem(context: Context): DiagnosticItem {
         val stat = StatFs(context.filesDir.path)
         stat.availableBytes
     }.getOrDefault(0L)
-    val knownSize = appSize + antennaDb.lengthOrZero() + radioDb.lengthOrZero() + enbDb.lengthOrZero() +
+    val totalMobileDbSize = antennaDb.lengthOrZero() + caAntennaDb.lengthOrZero()
+    val knownSize = appSize + totalMobileDbSize + radioDb.lengthOrZero() + enbDb.lengthOrZero() +
         outagesSize + mapsSize + cacheSize
     val details = listOf(
         context.getString(R.string.appstrings_diagnostic_detail_storage_app_size, formatBytes(context, appSize)),
-        context.getString(R.string.appstrings_diagnostic_detail_storage_db_antennas, formatBytes(context, antennaDb.lengthOrZero())),
+        context.getString(R.string.appstrings_diagnostic_detail_storage_db_antennas, formatBytes(context, totalMobileDbSize)),
         context.getString(R.string.appstrings_diagnostic_detail_storage_db_radio, formatBytes(context, radioDb.lengthOrZero())),
         context.getString(R.string.appstrings_diagnostic_detail_storage_db_enb, formatBytes(context, enbDb.lengthOrZero())),
         context.getString(R.string.appstrings_diagnostic_detail_storage_outages, formatBytes(context, outagesSize)),

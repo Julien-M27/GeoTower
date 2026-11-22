@@ -1,6 +1,7 @@
 package fr.geotower.ui.screens.changes
 
 import android.content.Context
+import android.net.Uri
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -46,6 +47,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.navigation.NavController
 import fr.geotower.data.api.RetrofitClient
+import fr.geotower.data.db.DatabaseCountry
+import fr.geotower.data.db.DatabaseCountryStore
 import fr.geotower.data.models.ChangeMapPoint
 import fr.geotower.data.models.ChangeType
 import fr.geotower.data.models.ChangesWeekItem
@@ -324,9 +327,9 @@ fun ChangesMapScreen(
     Scaffold(
         containerColor = bgColor,
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
-    ) { _ ->
+    ) { innerPadding ->
         Box(
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize().padding(innerPadding)
         ) {
             // Vue Carte OSMDroid pleine page
             AndroidView(
@@ -912,10 +915,19 @@ fun ChangesMapScreen(
                             savedZoom = map.zoomLevelDouble
                         }
                         savedSelectedSupportId = supId
+                        // La carte des changements affiche uniquement les évolutions ANFR (France) :
+                        // si la base Canada est active, basculer sur la base France avant d'ouvrir la fiche.
+                        if (DatabaseCountryStore.getActive(context) != DatabaseCountry.FR) {
+                            DatabaseCountryStore.setActive(context, DatabaseCountry.FR)
+                        }
+                        prefs.edit()
+                            .putFloat("clicked_lat", pt.latitude.toFloat())
+                            .putFloat("clicked_lon", pt.longitude.toFloat())
+                            .apply()
                         if (onOpenSupportDetail != null) {
                             onOpenSupportDetail.invoke(supId)
                         } else {
-                            navController.navigate("support_detail/$supId")
+                            navController.navigate("support_detail/${Uri.encode(supId)}")
                         }
                     }
                 )

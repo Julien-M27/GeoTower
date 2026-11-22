@@ -28,7 +28,14 @@ class CarSiteTechnicalDetailScreen(
             detailRow(R.string.car_technical_supports, formatSupports()),
             detailRow(R.string.car_technical_radio, site.azimuths),
             detailRow(R.string.car_technical_status, site.statuses),
-            detailRow(R.string.car_technical_ids, site.anfrIds.ifEmpty { listOf(site.idAnfr) }),
+            detailRow(
+                if (site.idAnfr.startsWith("CA-", ignoreCase = true)) {
+                    R.string.car_technical_ids_isde
+                } else {
+                    R.string.car_technical_ids
+                },
+                site.anfrIds.ifEmpty { listOf(site.idAnfr) }
+            ),
             detailRow(R.string.car_technical_frequencies, site.frequencyDetails),
             detailRow(R.string.car_technical_flags, formatFlags())
         )

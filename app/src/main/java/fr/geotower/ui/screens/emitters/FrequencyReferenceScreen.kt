@@ -81,6 +81,7 @@ const val FREQUENCY_REFERENCE_ROUTE = "frequency_reference"
 
 private enum class FrequencyReferenceScope {
     FRANCE,
+    CANADA,
     INTERNATIONAL
 }
 
@@ -259,6 +260,48 @@ internal object FrequencyReferenceCatalog {
         tdd(FrequencyReferenceTechnology.NR_5G, "n78 · 3500 MHz", "3490–3800 MHz")
     )
 
+    val canada: List<FrequencyReferenceBand> = listOf(
+        fdd(FrequencyReferenceTechnology.GSM_2G, "GSM 850", "824–849 MHz", "869–894 MHz"),
+        fdd(FrequencyReferenceTechnology.GSM_2G, "PCS 1900", "1850–1910 MHz", "1930–1990 MHz"),
+
+        fdd(FrequencyReferenceTechnology.UMTS_3G, "B5 · 850 MHz", "824–849 MHz", "869–894 MHz"),
+        fdd(FrequencyReferenceTechnology.UMTS_3G, "B2 · 1900 MHz (PCS)", "1850–1910 MHz", "1930–1990 MHz"),
+        fdd(FrequencyReferenceTechnology.UMTS_3G, "B4 · 2100 MHz (AWS)", "1710–1755 MHz", "2110–2155 MHz"),
+
+        fdd(FrequencyReferenceTechnology.LTE_4G, "B71 · 600 MHz", "663–698 MHz", "617–652 MHz"),
+        fdd(FrequencyReferenceTechnology.LTE_4G, "B12 · 700 MHz", "699–716 MHz", "729–746 MHz"),
+        fdd(FrequencyReferenceTechnology.LTE_4G, "B13 · 700 MHz", "777–787 MHz", "746–756 MHz"),
+        fdd(FrequencyReferenceTechnology.LTE_4G, "B17 · 700 MHz", "704–716 MHz", "734–746 MHz"),
+        sdl(FrequencyReferenceTechnology.LTE_4G, "B29 · 700 MHz", "717–728 MHz"),
+        fdd(FrequencyReferenceTechnology.LTE_4G, "B5 · 850 MHz", "824–849 MHz", "869–894 MHz"),
+        fdd(FrequencyReferenceTechnology.LTE_4G, "B26 · 850 MHz", "814–849 MHz", "859–894 MHz"),
+        fdd(FrequencyReferenceTechnology.LTE_4G, "B2 · 1900 MHz (PCS)", "1850–1910 MHz", "1930–1990 MHz"),
+        fdd(FrequencyReferenceTechnology.LTE_4G, "B25 · 1900 MHz (PCS)", "1850–1915 MHz", "1930–1995 MHz"),
+        fdd(FrequencyReferenceTechnology.LTE_4G, "B4 · 2100 MHz (AWS)", "1710–1755 MHz", "2110–2155 MHz"),
+        fdd(FrequencyReferenceTechnology.LTE_4G, "B66 · 2100 MHz (AWS-3)", "1710–1780 MHz", "2110–2200 MHz"),
+        fdd(FrequencyReferenceTechnology.LTE_4G, "B30 · 2300 MHz (WCS)", "2305–2315 MHz", "2350–2360 MHz"),
+        fdd(FrequencyReferenceTechnology.LTE_4G, "B7 · 2600 MHz (BRS)", "2500–2570 MHz", "2620–2690 MHz"),
+        tdd(FrequencyReferenceTechnology.LTE_4G, "B38 · 2600 MHz (BRS TDD)", "2570–2620 MHz"),
+        tdd(FrequencyReferenceTechnology.LTE_4G, "B41 · 2500 MHz (BRS)", "2496–2690 MHz"),
+        tdd(FrequencyReferenceTechnology.LTE_4G, "B42/B43 · 3500 MHz", "3400–3800 MHz"),
+
+        fdd(FrequencyReferenceTechnology.NR_5G, "n71 · 600 MHz", "663–698 MHz", "617–652 MHz"),
+        fdd(FrequencyReferenceTechnology.NR_5G, "n12 · 700 MHz", "699–716 MHz", "729–746 MHz"),
+        sdl(FrequencyReferenceTechnology.NR_5G, "n29 · 700 MHz (SDL)", "717–728 MHz"),
+        fdd(FrequencyReferenceTechnology.NR_5G, "n5 · 850 MHz", "824–849 MHz", "869–894 MHz"),
+        fdd(FrequencyReferenceTechnology.NR_5G, "n2 · 1900 MHz (PCS)", "1850–1910 MHz", "1930–1990 MHz"),
+        fdd(FrequencyReferenceTechnology.NR_5G, "n25 · 1900 MHz (PCS)", "1850–1915 MHz", "1930–1995 MHz"),
+        fdd(FrequencyReferenceTechnology.NR_5G, "n70 · 2000 MHz (AWS-4)", "1695–1710 MHz", "1995–2020 MHz"),
+        fdd(FrequencyReferenceTechnology.NR_5G, "n66 · 2100 MHz (AWS)", "1710–1780 MHz", "2110–2200 MHz"),
+        fdd(FrequencyReferenceTechnology.NR_5G, "n7 · 2600 MHz (BRS)", "2500–2570 MHz", "2620–2690 MHz"),
+        tdd(FrequencyReferenceTechnology.NR_5G, "n41 · 2500 MHz (BRS)", "2496–2690 MHz"),
+        tdd(FrequencyReferenceTechnology.NR_5G, "n78 · 3500 MHz", "3450–3650 MHz"),
+        tdd(FrequencyReferenceTechnology.NR_5G, "n77 · 3800 MHz", "3650–3980 MHz"),
+        tdd(FrequencyReferenceTechnology.NR_5G, "n258 · 26 GHz (mmWave)", "24.25–27.50 GHz"),
+        tdd(FrequencyReferenceTechnology.NR_5G, "n261 · 28 GHz (mmWave)", "27.50–28.35 GHz"),
+        tdd(FrequencyReferenceTechnology.NR_5G, "n260 · 38 GHz (mmWave)", "37.00–40.00 GHz")
+    )
+
     /** Bandes 3GPP supplémentaires couramment utilisées hors de France. */
     val international: List<FrequencyReferenceBand> = franceMetropolitan + listOf(
         fdd(FrequencyReferenceTechnology.GSM_2G, "GSM 450", "450.4–457.6 MHz", "460.4–467.6 MHz"),
@@ -373,9 +416,15 @@ fun FrequencyReferenceScreen(navController: NavController) {
     }
     var showSettingsSheet by rememberSaveable { mutableStateOf(false) }
     val settingsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val scope = if (selectedTab == 0) FrequencyReferenceScope.FRANCE else FrequencyReferenceScope.INTERNATIONAL
+    val isCanadaActive = fr.geotower.data.db.DatabaseCountryStore.activeCountryState.value == fr.geotower.data.db.DatabaseCountry.CA
+    val scope = if (selectedTab == 0) {
+        if (isCanadaActive) FrequencyReferenceScope.CANADA else FrequencyReferenceScope.FRANCE
+    } else {
+        FrequencyReferenceScope.INTERNATIONAL
+    }
     val allBands = when (scope) {
         FrequencyReferenceScope.FRANCE -> FrequencyReferenceCatalog.franceMetropolitan
+        FrequencyReferenceScope.CANADA -> FrequencyReferenceCatalog.canada
         FrequencyReferenceScope.INTERNATIONAL -> FrequencyReferenceCatalog.international
     }
     val bands = remember(allBands, searchQuery, sortOrder) {
@@ -478,7 +527,12 @@ fun FrequencyReferenceScreen(navController: NavController) {
                     FilterChip(
                         selected = selectedTab == 0,
                         onClick = { selectedTab = 0 },
-                        label = { Text(stringResource(R.string.appstrings_frequency_reference_france_tab)) },
+                        label = {
+                            Text(
+                                if (isCanadaActive) "Canada"
+                                else stringResource(R.string.appstrings_frequency_reference_france_tab)
+                            )
+                        },
                         modifier = Modifier.weight(1f)
                     )
                     FilterChip(
@@ -533,13 +587,18 @@ fun FrequencyReferenceScreen(navController: NavController) {
                 )
 
                 Text(
-                    text = stringResource(
-                        if (scope == FrequencyReferenceScope.FRANCE) {
-                            R.string.appstrings_frequency_reference_france_heading
-                        } else {
-                            R.string.appstrings_frequency_reference_international_heading
-                        }
-                    ),
+                    text = when (scope) {
+                        FrequencyReferenceScope.FRANCE ->
+                            stringResource(R.string.appstrings_frequency_reference_france_heading)
+                        FrequencyReferenceScope.CANADA ->
+                            if (androidx.compose.ui.platform.LocalConfiguration.current.locales[0]?.language.equals("fr", ignoreCase = true)) {
+                                "Bandes de fréquences au Canada"
+                            } else {
+                                "Frequency bands in Canada"
+                            }
+                        FrequencyReferenceScope.INTERNATIONAL ->
+                            stringResource(R.string.appstrings_frequency_reference_international_heading)
+                    },
                     color = MaterialTheme.colorScheme.onSurface,
                     style = sizing.textStyle(MaterialTheme.typography.titleMedium),
                     fontWeight = FontWeight.Bold

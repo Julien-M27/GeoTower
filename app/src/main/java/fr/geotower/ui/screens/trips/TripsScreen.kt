@@ -119,6 +119,7 @@ fun TripsScreen(
     onFollowTrip: (String) -> Unit
 ) {
     val context = LocalContext.current
+    val resources = androidx.compose.ui.platform.LocalResources.current
     val configuration = LocalConfiguration.current
     val uiStyle = LocalGeoTowerUiStyle.current
     val sizing = uiStyle.sizing
@@ -167,9 +168,9 @@ fun TripsScreen(
             reloadTick++
             val touched = result.added + result.refreshed
             val message = if (touched == 0) {
-                context.getString(R.string.trips_import_nothing)
+                resources.getString(R.string.trips_import_nothing)
             } else {
-                context.resources.getQuantityString(R.plurals.trips_import_result, touched, touched)
+                resources.getQuantityString(R.plurals.trips_import_result, touched, touched)
             }
             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
         }.onFailure {

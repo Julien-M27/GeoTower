@@ -18,7 +18,8 @@ data class DownloadManifest(
     val database: DownloadManifestDatabase?,
     val radioDatabase: DownloadManifestDatabase?,
     val enbDatabase: DownloadManifestDatabase?,
-    val maps: List<OfflineMapDto>
+    val maps: List<OfflineMapDto>,
+    val caDatabase: DownloadManifestDatabase? = null
 )
 
 data class EnbOperatorVersion(
@@ -40,6 +41,7 @@ data class DownloadManifestDatabase(
     val sourceDate: String? = null,
     val dateAnfr: String? = null,
     val quarterlyVersion: String? = null,
+    val zipVersion: String? = null,
     val rowCount: Int? = null,
     val operators: List<EnbOperatorVersion> = emptyList()
 )
@@ -86,7 +88,8 @@ object DownloadManifestVerifier {
                 ?.takeIf { it.isJsonArray }
                 ?.asJsonArray
                 ?.mapNotNull { it.asJsonObjectOrNull()?.toOfflineMap() }
-                .orEmpty()
+                .orEmpty(),
+            caDatabase = payload.get("ca_db").asJsonObjectOrNull()?.toDatabase()
         )
     }
 
@@ -141,8 +144,11 @@ object DownloadManifestVerifier {
             countryCode = stringOrBlank("country_code").uppercase(Locale.ROOT),
             version = stringOrBlank("version").takeIf { it.isNotBlank() },
             sourceDate = stringOrBlank("source_date").takeIf { it.isNotBlank() },
-            dateAnfr = stringOrBlank("date_anfr").takeIf { it.isNotBlank() } ?: stringOrBlank("source_date").takeIf { it.isNotBlank() },
+            dateAnfr = stringOrBlank("date_anfr").takeIf { it.isNotBlank() }
+                ?: stringOrBlank("date_ised").takeIf { it.isNotBlank() }
+                ?: stringOrBlank("source_date").takeIf { it.isNotBlank() },
             quarterlyVersion = stringOrBlank("quarterly_version").takeIf { it.isNotBlank() },
+            zipVersion = stringOrBlank("zip_version").takeIf { it.isNotBlank() },
             rowCount = intOrNull("row_count"),
             operators = operatorsList
         )

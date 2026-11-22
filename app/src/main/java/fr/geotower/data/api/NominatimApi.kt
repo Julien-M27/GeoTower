@@ -28,6 +28,7 @@ data class NominatimGeoPoint(
 object GeoTowerDataCoverage {
     private val supportedCountryCodes = setOf(
         "FR",
+        "CA",
         "GP",
         "MQ",
         "GF",

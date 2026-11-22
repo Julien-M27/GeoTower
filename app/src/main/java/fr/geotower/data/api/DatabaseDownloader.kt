@@ -8,6 +8,8 @@ import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.db.DatabaseStorageCleanup
 import fr.geotower.data.db.AppDatabase
 import fr.geotower.data.db.DatabaseArtifactIdentity
+import fr.geotower.data.db.DatabaseCountry
+import fr.geotower.data.db.DatabaseCountryStore
 import fr.geotower.data.db.DatabaseVersionPolicy
 import fr.geotower.data.db.GeoTowerDatabaseIndexes
 import fr.geotower.data.db.GeoTowerDatabaseValidator
@@ -50,12 +52,12 @@ object DatabaseDownloader {
         val identity: DatabaseArtifactIdentity get() = DatabaseArtifactIdentity(version, sha256)
     }
 
-    fun getDatabaseSize(): Double {
+    fun getDatabaseSize(country: DatabaseCountry = DatabaseCountryStore.getActive()): Double {
         if (!RemoteFeatureFlags.isDatabaseUpdateCheckAllowed(DatabaseTarget.MOBILE)) {
             return 0.0
         }
         return try {
-            val sizeBytes = readVerifiedDatabaseInfo()?.value?.sizeBytes ?: 0L
+            val sizeBytes = readVerifiedDatabaseInfo(country)?.value?.sizeBytes ?: 0L
             if (sizeBytes > 0L) sizeBytes / (1024.0 * 1024.0) else 0.0
         } catch (e: Exception) {
             0.0
@@ -66,13 +68,16 @@ object DatabaseDownloader {
         return getLatestDatabaseUpdateInfo()?.version
     }
 
-    suspend fun getLatestDatabaseUpdateInfo(forceRefresh: Boolean = false): UpdateInfo? {
+    suspend fun getLatestDatabaseUpdateInfo(
+        forceRefresh: Boolean = false,
+        country: DatabaseCountry = DatabaseCountryStore.getActive()
+    ): UpdateInfo? {
         if (!RemoteFeatureFlags.isDatabaseUpdateCheckAllowed(DatabaseTarget.MOBILE)) {
             return null
         }
         return withContext(Dispatchers.IO) {
             try {
-                DownloadManifestRepository.getPreferredMobileDatabase(forceRefresh)?.value?.let { database ->
+                DownloadManifestRepository.getPreferredMobileDatabase(forceRefresh, country)?.value?.let { database ->
                     UpdateInfo(version = database.version, sha256 = database.sha256)
                 }
             } catch (e: Exception) {
@@ -89,11 +94,12 @@ object DatabaseDownloader {
     fun isInstalledDatabaseCurrent(
         context: Context,
         remote: UpdateInfo?,
-        localVersion: String?
+        localVersion: String?,
+        country: DatabaseCountry = DatabaseCountryStore.getActive(context)
     ): Boolean {
         remote ?: return false
-        val databaseFile = context.getDatabasePath(DB_NAME)
-        if (InstalledDatabaseArtifactIdentity.matchesInstalledMobile(context, databaseFile, remote.identity)) {
+        val databaseFile = context.getDatabasePath(country.dbFileName)
+        if (InstalledDatabaseArtifactIdentity.matchesInstalledMobile(context, databaseFile, remote.identity, country)) {
             return true
         }
         return DatabaseVersionPolicy.isLocalCurrentOrNewer(remote.version, localVersion)
@@ -102,10 +108,15 @@ object DatabaseDownloader {
     fun isRemoteDatabaseUpdateAvailable(
         context: Context,
         remote: UpdateInfo?,
-        localVersion: String?
-    ): Boolean = remote != null && !isInstalledDatabaseCurrent(context, remote, localVersion)
+        localVersion: String?,
+        country: DatabaseCountry = DatabaseCountryStore.getActive(context)
+    ): Boolean = remote != null && !isInstalledDatabaseCurrent(context, remote, localVersion, country)
 
-    suspend fun downloadUpdate(context: Context, onProgress: suspend (Int) -> Unit): Boolean {
+    suspend fun downloadUpdate(
+        context: Context,
+        country: DatabaseCountry = GeoTowerDatabaseValidator.activeCountry(context),
+        onProgress: suspend (Int) -> Unit
+    ): Boolean {
         if (!RemoteFeatureFlags.isDatabaseDownloadAllowed(DatabaseTarget.MOBILE)) {
             return false
         }
@@ -117,9 +128,10 @@ object DatabaseDownloader {
             return false
         }
         return withContext(Dispatchers.IO) {
-            val served = readVerifiedDatabaseInfo()
+            val dbName = country.dbFileName
+            val served = DownloadManifestRepository.getPreferredMobileDatabase(forceRefresh = false, country = country)
             if (served == null) {
-                AppLogger.w(TAG, "Remote database is unavailable or incompatible")
+                AppLogger.w(TAG, "Remote database (${country.code}) is unavailable or incompatible")
                 return@withContext false
             }
             val remoteInfo = served.value
@@ -132,12 +144,14 @@ object DatabaseDownloader {
             val maxAllowedBytes = maxAllowedDatabaseDownloadBytes(expectedSizeBytes)
                 ?: return@withContext false
 
-            GeoTowerDatabaseValidator.deleteObsoleteDatabases(context)
-            val dbFile = context.getDatabasePath(DB_NAME)
+            if (country == DatabaseCountry.FR) {
+                GeoTowerDatabaseValidator.deleteObsoleteDatabases(context)
+            }
+            val dbFile = context.getDatabasePath(dbName)
             dbFile.parentFile?.mkdirs()
 
-            val tempFile = context.getDatabasePath("$DB_NAME.download")
-            val backupFile = context.getDatabasePath("$DB_NAME.backup")
+            val tempFile = context.getDatabasePath("$dbName.download")
+            val backupFile = context.getDatabasePath("$dbName.backup")
 
             try {
                 if (tempFile.exists()) tempFile.delete()
@@ -202,7 +216,10 @@ object DatabaseDownloader {
                     }
                 }
 
-                val validation = GeoTowerDatabaseValidator.validateDatabaseFile(tempFile)
+                val validation = GeoTowerDatabaseValidator.validateDatabaseFile(
+                    tempFile,
+                    expectedCountryCode = country.code
+                )
                 if (!validation.isValid) {
                     AppLogger.w(TAG, "Downloaded database validation failed: ${validation.reason}")
                     tempFile.delete()
@@ -221,16 +238,19 @@ object DatabaseDownloader {
                 // Dispatchers.IO ici) afin que la prochaine ouverture Room n'ait rien à reconstruire.
                 GeoTowerDatabaseIndexes.applyToFile(dbFile)
 
-                GeoTowerDatabaseValidator.clearInstalledDatabaseInvalid(context)
-                updateCachedDatabaseState(GeoTowerDatabaseValidator.LocalDatabaseState.VALID)
+                GeoTowerDatabaseValidator.clearInstalledDatabaseInvalid(context, country)
+                if (country == DatabaseCountryStore.getActive(context)) {
+                    updateCachedDatabaseState(GeoTowerDatabaseValidator.LocalDatabaseState.VALID)
+                }
                 // A enregistrer apres les index : ils modifient le fichier SQLite et donc son
                 // empreinte de presence. L'identite reste celle du manifeste verifie.
                 InstalledDatabaseArtifactIdentity.recordMobileServerDownload(
                     context,
                     dbFile,
-                    DatabaseArtifactIdentity(remoteInfo.version, remoteInfo.sha256)
+                    DatabaseArtifactIdentity(remoteInfo.version, remoteInfo.sha256),
+                    country
                 )
-                DatabaseStorageCleanup.clearTransientArtifacts(context, DB_NAME)
+                DatabaseStorageCleanup.clearTransientArtifacts(context, dbName)
                 true
             } catch (e: CancellationException) {
                 if (tempFile.exists()) tempFile.delete()
@@ -240,7 +260,7 @@ object DatabaseDownloader {
                 if (tempFile.exists()) tempFile.delete()
                 false
             } finally {
-                DatabaseStorageCleanup.clearDownloadArtifacts(context, DB_NAME)
+                DatabaseStorageCleanup.clearDownloadArtifacts(context, dbName)
             }
         }
     }
@@ -273,15 +293,19 @@ object DatabaseDownloader {
             }
 
             GeoTowerDatabaseIndexes.applyToFile(dbFile)
-            GeoTowerDatabaseValidator.clearInstalledDatabaseInvalid(context)
-            updateCachedDatabaseState(GeoTowerDatabaseValidator.LocalDatabaseState.VALID)
-            InstalledDatabaseArtifactIdentity.clearMobile(context)
+            GeoTowerDatabaseValidator.clearInstalledDatabaseInvalid(context, DatabaseCountry.FR)
+            if (DatabaseCountryStore.getActive(context) == DatabaseCountry.FR) {
+                updateCachedDatabaseState(GeoTowerDatabaseValidator.LocalDatabaseState.VALID)
+            }
+            InstalledDatabaseArtifactIdentity.clearMobile(context, DatabaseCountry.FR)
             DatabaseStorageCleanup.clearTransientArtifacts(context, DB_NAME)
             true
         }
 
-    private fun readVerifiedDatabaseInfo(): ServedFrom<DownloadManifestDatabase>? {
-        return DownloadManifestRepository.getPreferredMobileDatabaseSync()
+    private fun readVerifiedDatabaseInfo(
+        country: DatabaseCountry = DatabaseCountryStore.getActive()
+    ): ServedFrom<DownloadManifestDatabase>? {
+        return DownloadManifestRepository.getPreferredMobileDatabaseSync(country = country)
     }
 
     private fun readVerifiedDatabaseInfoFrom(server: ApiServer): ServedFrom<DownloadManifestDatabase>? {
@@ -369,14 +393,21 @@ object DatabaseDownloader {
         }
     }
 
-    internal fun isOfficialDatabaseDownloadUrl(url: String): Boolean {
+    internal fun isOfficialDatabaseDownloadUrl(
+        url: String,
+        expectedCountry: DatabaseCountry = DatabaseCountryStore.getActive()
+    ): Boolean {
         val uri = runCatching { URI(url) }.getOrNull() ?: return false
+        val expectedPath = when (expectedCountry) {
+            DatabaseCountry.CA -> "/api/v2/download/ca_db"
+            DatabaseCountry.FR -> "/api/v2/download/db"
+        }
         // Le miroir sert son propre manifeste, avec ses propres URLs : les deux hôtes officiels
         // sont acceptés (la signature du manifeste reste, elle, la garantie de fond).
         return uri.scheme.equals("https", ignoreCase = true) &&
             uri.userInfo == null &&
             ApiEndpoints.isOfficialApiHost(uri.host) &&
-            uri.path == "/api/v2/download/db"
+            uri.path == expectedPath
     }
 
     internal fun isValidRemoteDatabaseInfo(json: org.json.JSONObject): Boolean {
@@ -394,9 +425,10 @@ object DatabaseDownloader {
         sizeBytes: Long,
         sha256: String,
         schemaVersion: Int?,
-        countryCode: String?
+        countryCode: String?,
+        expectedCountry: DatabaseCountry = DatabaseCountryStore.getActive()
     ): Boolean {
-        if (filename != DB_NAME) return false
+        if (filename != expectedCountry.dbFileName) return false
 
         if (maxAllowedDatabaseDownloadBytes(sizeBytes) == null || !isValidSha256(sha256)) {
             return false
@@ -409,7 +441,7 @@ object DatabaseDownloader {
         if (
             countryCode != null &&
             !countryCode.equals(
-                GeoTowerDatabaseValidator.EXPECTED_COUNTRY_CODE,
+                expectedCountry.code,
                 ignoreCase = true
             )
         ) {

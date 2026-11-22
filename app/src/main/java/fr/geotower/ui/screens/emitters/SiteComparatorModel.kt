@@ -67,14 +67,14 @@ fun buildComparableSiteSummary(
         order = order
     )
     val bandLabels = if (parsedBands.isNotEmpty()) {
-        sortBandLabels(parsedBands.map { "${it.gen}G ${it.value}" }.distinct(), order)
+        sortBandLabels(parsedBands.map { formatComparatorBandLabel(it.gen, it.value) }.distinct(), order)
     } else {
         formatBandTokensFromMask(localisation.bandMask, order)
     }
 
     val techRank = techRankMap(order)
     val technologies = if (parsedBands.isNotEmpty()) {
-        parsedBands.map { "${it.gen}G" }.distinct().sortedBy { techRank[it] ?: 99 }
+        parsedBands.map { techLabelForGen(it.gen) }.distinct().sortedBy { techRank[it] ?: 99 }
     } else {
         val fromTech = technique?.technologies
             ?.split(",", " ", ";", "/")
@@ -156,8 +156,14 @@ fun formatBandTokensFromMask(
         .map { it.trim() }
         .filter { it.isNotEmpty() }
         .map { token ->
-            val match = Regex("^([2345]G)(\\d+)$").matchEntire(token)
-            if (match != null) "${match.groupValues[1]} ${match.groupValues[2]}" else token
+            val match = Regex("^([2345])G(\\d+)$").matchEntire(token)
+            if (match != null) {
+                val gen = match.groupValues[1].toIntOrNull() ?: 0
+                val value = match.groupValues[2].toIntOrNull() ?: 0
+                formatComparatorBandLabel(gen, value)
+            } else {
+                token
+            }
         }
     return sortBandLabels(rawTokens, order)
 }
@@ -184,6 +190,16 @@ fun sortBandLabels(
     }
 }
 
+private fun techLabelForGen(gen: Int): String = if (gen == 0) "FH" else "${gen}G"
+
+private fun formatComparatorFreqUnit(value: Int): String =
+    if (value >= 10_000 && value % 1000 == 0) "${value / 1000} GHz" else "$value MHz"
+
+private fun formatComparatorBandLabel(gen: Int, value: Int): String {
+    val tech = techLabelForGen(gen)
+    return if (value > 0) "$tech ${formatComparatorFreqUnit(value)}" else tech
+}
+
 private fun techRankMap(order: TechFrequencyOrder): Map<String, Int> = when (order) {
     TechFrequencyOrder.DESCENDING -> mapOf("5G" to 0, "4G" to 1, "3G" to 2, "2G" to 3, "FH" to 4)
     TechFrequencyOrder.ASCENDING -> mapOf("2G" to 0, "3G" to 1, "4G" to 2, "5G" to 3, "FH" to 4)
@@ -191,9 +207,14 @@ private fun techRankMap(order: TechFrequencyOrder): Map<String, Int> = when (ord
 
 private fun parseBandLabel(label: String): Pair<String, Int> {
     val trimmed = label.trim().uppercase(Locale.ROOT)
-    val match = Regex("^([2345]G)\\s*(\\d+)$").matchEntire(trimmed)
+    val match = Regex("^(FH|[2345]G)\\s*(\\d+)(?:\\s*(GHZ|MHZ))?.*$").matchEntire(trimmed)
     return if (match != null) {
-        match.groupValues[1] to (match.groupValues[2].toIntOrNull() ?: 0)
+        val rawValue = match.groupValues[2].toIntOrNull() ?: 0
+        val unit = match.groupValues[3]
+        val mhzValue = if (unit == "GHZ") rawValue * 1000 else rawValue
+        match.groupValues[1] to mhzValue
+    } else if (trimmed.startsWith("FH")) {
+        "FH" to 0
     } else {
         trimmed to 0
     }

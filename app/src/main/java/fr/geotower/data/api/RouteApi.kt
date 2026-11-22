@@ -54,6 +54,7 @@ data class RouteManeuver(
  */
 object RouteApi {
     private const val ROUTE_URL = "https://data.geopf.fr/navigation/itineraire"
+    private const val OSRM_BASE_URL = "https://router.project-osrm.org/route/v1"
     private const val RESOURCE = "bdtopo-osrm"
 
     /** Réseau routier : sens uniques respectés, chemins et sentiers exclus. */
@@ -105,6 +106,9 @@ object RouteApi {
         profile: String,
         optimization: String = OPTIMIZATION_FASTEST
     ): RoutePathResult {
+        if (isInCanadaBounds(fromLatitude, fromLongitude) || isInCanadaBounds(toLatitude, toLongitude)) {
+            return getOsrmRoute(fromLatitude, fromLongitude, toLatitude, toLongitude, profile)
+        }
         if (!RemoteFeatureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.ROUTING_IGN)) {
             error("Routing provider disabled")
         }
@@ -133,9 +137,9 @@ object RouteApi {
             val route = parseRoutePath(body)
             // Hors couverture BD TOPO, le service ne renvoie PAS d'erreur : il rabat les deux points
             // sur le réseau le plus proche, quitte à répondre un tracé à des centaines de kilomètres
-            // (un point à Berlin ressort près de la frontière alsacienne). On le refuse ici.
+            // (un point à Berlin ressort près de la frontière alsacienne). On bascule alors sur OSRM.
             if (!isRouteAnchoredOnRequest(route, fromLatitude, fromLongitude, toLatitude, toLongitude)) {
-                error("Route snapped outside the requested area")
+                return@use getOsrmRoute(fromLatitude, fromLongitude, toLatitude, toLongitude, profile)
             }
             route
         }
@@ -178,12 +182,15 @@ object RouteApi {
         profile: String,
         optimization: String = OPTIMIZATION_FASTEST
     ): List<RoutePortionResult> {
-        if (!RemoteFeatureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.ROUTING_IGN)) {
-            error("Routing provider disabled")
-        }
         if (points.size < 2) error("A route needs at least two points")
         if (points.size > MAX_POINTS_PER_ROUTE_REQUEST) {
             error("Too many points: ${points.size} > $MAX_POINTS_PER_ROUTE_REQUEST")
+        }
+        if (points.any { isInCanadaBounds(it[0], it[1]) }) {
+            return getOsrmRoutePortions(points, profile)
+        }
+        if (!RemoteFeatureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.ROUTING_IGN)) {
+            error("Routing provider disabled")
         }
 
         val builder = ROUTE_URL.toHttpUrl().newBuilder()
@@ -220,11 +227,73 @@ object RouteApi {
             // Même piège que dans getRoute, mais à vérifier portion par portion : une seule étape
             // hors couverture suffit à faire répondre un tracé absurde, et les extrémités du trajet
             // complet, elles, resteraient parfaitement ancrées.
+            val snappedOutside = portions.indices.any { index ->
+                val from = points[index]
+                val to = points[index + 1]
+                !isPathAnchoredOnRequest(portions[index].points, from[0], from[1], to[0], to[1])
+            }
+            if (snappedOutside) {
+                return@use getOsrmRoutePortions(points, profile)
+            }
+            portions
+        }
+    }
+
+    private fun isInCanadaBounds(latitude: Double, longitude: Double): Boolean =
+        fr.geotower.data.db.DatabaseCountry.forCoordinates(latitude, longitude) == fr.geotower.data.db.DatabaseCountry.CA
+
+    private fun osrmProfileFor(profile: String): String =
+        if (profile == PROFILE_PEDESTRIAN) "foot" else "driving"
+
+    private fun getOsrmRoute(
+        fromLatitude: Double,
+        fromLongitude: Double,
+        toLatitude: Double,
+        toLongitude: Double,
+        profile: String
+    ): RoutePathResult {
+        val coords = "${formatCoordinate(fromLongitude)},${formatCoordinate(fromLatitude)};" +
+            "${formatCoordinate(toLongitude)},${formatCoordinate(toLatitude)}"
+        val url = "$OSRM_BASE_URL/${osrmProfileFor(profile)}/$coords".toHttpUrl().newBuilder()
+            .addQueryParameter("overview", "full")
+            .addQueryParameter("geometries", "geojson")
+            .addQueryParameter("steps", "false")
+            .build()
+        val request = Request.Builder().url(url).get().build()
+        return RetrofitClient.currentClient.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) error("OSRM HTTP ${response.code}")
+            val body = response.body?.string() ?: error("Empty OSRM response")
+            val route = parseOsrmRoutePath(body)
+            if (!isRouteAnchoredOnRequest(route, fromLatitude, fromLongitude, toLatitude, toLongitude)) {
+                error("OSRM route snapped outside the requested area")
+            }
+            route
+        }
+    }
+
+    private fun getOsrmRoutePortions(
+        points: List<DoubleArray>,
+        profile: String
+    ): List<RoutePortionResult> {
+        val coords = points.joinToString(";") { formatPoint(it) }
+        val url = "$OSRM_BASE_URL/${osrmProfileFor(profile)}/$coords".toHttpUrl().newBuilder()
+            .addQueryParameter("overview", "full")
+            .addQueryParameter("geometries", "geojson")
+            .addQueryParameter("steps", "true")
+            .build()
+        val request = Request.Builder().url(url).get().build()
+        return RetrofitClient.currentClient.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) error("OSRM HTTP ${response.code}")
+            val body = response.body?.string() ?: error("Empty OSRM response")
+            val portions = parseOsrmRoutePortions(body)
+            if (portions.size != points.size - 1) {
+                error("Expected ${points.size - 1} OSRM portions, got ${portions.size}")
+            }
             portions.forEachIndexed { index, portion ->
                 val from = points[index]
                 val to = points[index + 1]
                 if (!isPathAnchoredOnRequest(portion.points, from[0], from[1], to[0], to[1])) {
-                    error("Portion $index snapped outside the requested area")
+                    error("OSRM portion $index snapped outside the requested area")
                 }
             }
             portions
@@ -312,6 +381,76 @@ internal fun parseRoutePortions(json: String): List<RoutePortionResult> {
         )
     }
     return results
+}
+
+internal fun parseOsrmRoutePath(json: String): RoutePathResult {
+    val root = JsonParser.parseString(json).asRouteObjectOrNull() ?: error("No OSRM data")
+    val route = root.get("routes")?.takeIf { it.isJsonArray }?.asJsonArray
+        ?.firstOrNull()?.asRouteObjectOrNull()
+        ?: error("No OSRM route")
+    val coordinates = route.get("geometry").asRouteObjectOrNull()
+        ?.get("coordinates")?.takeIf { it.isJsonArray }?.asJsonArray
+        ?: error("No OSRM geometry")
+
+    val points = ArrayList<DoubleArray>(coordinates.size())
+    for (index in 0 until coordinates.size()) {
+        val pair = coordinates[index].takeIf { it.isJsonArray }?.asJsonArray ?: continue
+        if (pair.size() < 2) continue
+        val longitude = runCatching { pair[0].asDouble }.getOrNull() ?: continue
+        val latitude = runCatching { pair[1].asDouble }.getOrNull() ?: continue
+        points += doubleArrayOf(latitude, longitude)
+    }
+    if (points.size < 2) error("No OSRM geometry")
+
+    val announced = route.get("distance").asRouteDoubleOrNull()
+    val distance = if (announced != null && announced > 0.0) announced else routeLengthMeters(points)
+    return RoutePathResult(points = points, distanceMeters = distance)
+}
+
+internal fun parseOsrmRoutePortions(json: String): List<RoutePortionResult> {
+    val root = JsonParser.parseString(json).asRouteObjectOrNull() ?: error("No OSRM data")
+    val route = root.get("routes")?.takeIf { it.isJsonArray }?.asJsonArray
+        ?.firstOrNull()?.asRouteObjectOrNull()
+        ?: error("No OSRM route")
+    val legs = route.get("legs")?.takeIf { it.isJsonArray }?.asJsonArray
+        ?: error("No OSRM legs")
+
+    val results = ArrayList<RoutePortionResult>(legs.size())
+    for (index in 0 until legs.size()) {
+        val leg = legs[index].asRouteObjectOrNull() ?: error("Malformed OSRM leg $index")
+        val steps = leg.get("steps")?.takeIf { it.isJsonArray }?.asJsonArray
+            ?: error("OSRM leg $index has no steps")
+
+        val points = ArrayList<DoubleArray>()
+        val maneuvers = ArrayList<RouteManeuver>()
+        for (stepIndex in 0 until steps.size()) {
+            val step = steps[stepIndex].asRouteObjectOrNull() ?: continue
+            appendStepGeometry(step, points)
+            parseOsrmManeuver(step)?.let { maneuvers += it }
+        }
+        if (points.size < 2) error("OSRM leg $index has no geometry")
+
+        val announced = leg.get("distance").asRouteDoubleOrNull()
+        results += RoutePortionResult(
+            points = points,
+            distanceMeters = if (announced != null && announced > 0.0) announced else routeLengthMeters(points),
+            durationSeconds = leg.get("duration").asRouteDoubleOrNull() ?: 0.0,
+            maneuvers = maneuvers
+        )
+    }
+    return results
+}
+
+private fun parseOsrmManeuver(step: JsonObject): RouteManeuver? {
+    val maneuver = step.get("maneuver").asRouteObjectOrNull() ?: return null
+    val type = maneuver.get("type").asRouteStringOrNull() ?: return null
+    return RouteManeuver(
+        type = type,
+        modifier = maneuver.get("modifier").asRouteStringOrNull(),
+        roadName = step.get("name").asRouteStringOrNull(),
+        distanceMeters = step.get("distance").asRouteDoubleOrNull() ?: 0.0,
+        durationSeconds = step.get("duration").asRouteDoubleOrNull() ?: 0.0
+    )
 }
 
 /**

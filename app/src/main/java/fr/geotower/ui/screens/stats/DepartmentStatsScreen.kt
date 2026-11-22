@@ -118,6 +118,7 @@ private const val ITEM_ALL = "ALL"
  * résultat au niveau process pour que l'aller-retour liste → fiche → liste soit instantané.
  */
 private object DepartmentStatsCache {
+    var country: fr.geotower.data.db.DatabaseCountry? = null
     var departments: List<DepartmentStatRow>? = null
     val matrixByDept = mutableMapOf<String, List<DepartmentOperatorTechRow>>()
 }
@@ -194,10 +195,15 @@ private fun operatorSortIndex(rawName: String, defaultOperatorKey: String?): Int
 
 /** Accès aux stats départementales depuis l'écran Statistiques. */
 @Composable
-fun DepartmentStatsEntryCard(bgColor: Color, onClick: () -> Unit) {
+fun DepartmentStatsEntryCard(
+    bgColor: Color,
+    isCanada: Boolean = false,
+    onClick: () -> Unit
+) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
     val safeClick = rememberSafeClick()
     val shape = if (AppConfig.useOneUiDesign) RoundedCornerShape(24.dp) else RoundedCornerShape(12.dp)
+    val isFr = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]?.language.equals("fr", ignoreCase = true)
 
     Surface(
         onClick = { safeClick("stats_departments_entry") { onClick() } },
@@ -222,12 +228,20 @@ fun DepartmentStatsEntryCard(bgColor: Color, onClick: () -> Unit) {
             Spacer(modifier = Modifier.width(sizing.spacing(12.dp)))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = stringResource(R.string.department_stats_entry_title),
+                    text = if (isCanada) {
+                        if (isFr) "Par province / territoire" else "By province / territory"
+                    } else {
+                        stringResource(R.string.department_stats_entry_title)
+                    },
                     style = sizing.textStyle(MaterialTheme.typography.titleSmall),
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
-                    text = stringResource(R.string.department_stats_entry_description),
+                    text = if (isCanada) {
+                        if (isFr) "Supports, stations et densités par province ou territoire" else "Supports, stations and density by province or territory"
+                    } else {
+                        stringResource(R.string.department_stats_entry_description)
+                    },
                     style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -273,8 +287,11 @@ fun DepartmentStatsScreen(navController: NavController, repository: AnfrReposito
     val cardColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
     val cardShape = if (AppConfig.useOneUiDesign) RoundedCornerShape(24.dp) else RoundedCornerShape(12.dp)
 
-    var departments by remember { mutableStateOf(DepartmentStatsCache.departments ?: emptyList()) }
-    var isLoading by remember { mutableStateOf(DepartmentStatsCache.departments == null) }
+    val selectedCountry by StatsCountryStore.selectedCountry
+    val isCanadaStats = selectedCountry == fr.geotower.data.db.DatabaseCountry.CA
+    val cachedDepartments = if (DepartmentStatsCache.country == selectedCountry) DepartmentStatsCache.departments else null
+    var departments by remember(selectedCountry) { mutableStateOf(cachedDepartments ?: emptyList()) }
+    var isLoading by remember(selectedCountry) { mutableStateOf(cachedDepartments == null) }
     var isRefreshing by remember { mutableStateOf(false) }
     var refreshTrigger by remember { mutableIntStateOf(0) }
     var currentDeptCode by remember { mutableStateOf<String?>(null) }
@@ -282,8 +299,13 @@ fun DepartmentStatsScreen(navController: NavController, repository: AnfrReposito
 
     BackHandler(enabled = !safeBackNavigation.isLocked) { safeBackNavigation.navigateBack() }
 
-    LaunchedEffect(appContext, refreshTrigger) {
-        val loaded = repository.getDepartmentStats()
+    LaunchedEffect(appContext, refreshTrigger, selectedCountry) {
+        if (DepartmentStatsCache.country != selectedCountry) {
+            DepartmentStatsCache.country = selectedCountry
+            DepartmentStatsCache.departments = null
+            DepartmentStatsCache.matrixByDept.clear()
+        }
+        val loaded = repository.getDepartmentStats(selectedCountry)
         DepartmentStatsCache.departments = loaded
         departments = loaded
         isLoading = false
@@ -292,8 +314,12 @@ fun DepartmentStatsScreen(navController: NavController, repository: AnfrReposito
         // rafraichissement explicite, pour ne pas reveiller le GPS a chaque ouverture. Le centre
         // de la carte reste en repli : hors de France ou avec une fausse position figee dans le
         // fournisseur, mieux vaut le dernier endroit regarde que plus rien du tout.
-        currentDeptCode = currentPoints(appContext, prefs, allowFreshFix = refreshTrigger > 0)
-            .firstNotNullOfOrNull { (lat, lon) -> repository.getDepartmentCodeNear(lat, lon) }
+        currentDeptCode = if (isCanadaStats) {
+            null
+        } else {
+            currentPoints(appContext, prefs, allowFreshFix = refreshTrigger > 0)
+                .firstNotNullOfOrNull { (lat, lon) -> repository.getDepartmentCodeNear(lat, lon) }
+        }
         isRefreshing = false
     }
 
@@ -315,7 +341,15 @@ fun DepartmentStatsScreen(navController: NavController, repository: AnfrReposito
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             GeoTowerBackTopBar(
-                title = stringResource(R.string.department_stats_title),
+                title = if (isCanadaStats) {
+                    if (androidx.compose.ui.platform.LocalConfiguration.current.locales[0]?.language.equals("fr", ignoreCase = true)) {
+                        "Par province / territoire"
+                    } else {
+                        "By province / territory"
+                    }
+                } else {
+                    stringResource(R.string.department_stats_title)
+                },
                 onBack = { safeBackNavigation.navigateBack() },
                 backgroundColor = pageColor,
                 backEnabled = !safeBackNavigation.isLocked,
@@ -590,29 +624,51 @@ fun DepartmentStatDetailScreen(
     val cardColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
     val cardShape = if (AppConfig.useOneUiDesign) RoundedCornerShape(24.dp) else RoundedCornerShape(12.dp)
 
-    var department by remember { mutableStateOf(DepartmentStatsCache.departments?.firstOrNull { it.deptCode == deptCode }) }
-    var matrix by remember { mutableStateOf(DepartmentStatsCache.matrixByDept[deptCode] ?: emptyList()) }
-    var isLoading by remember { mutableStateOf(department == null || matrix.isEmpty()) }
+    val selectedCountry by StatsCountryStore.selectedCountry
+    var department by remember(selectedCountry) {
+        mutableStateOf(
+            if (DepartmentStatsCache.country == selectedCountry) {
+                DepartmentStatsCache.departments?.firstOrNull { it.deptCode == deptCode }
+            } else {
+                null
+            }
+        )
+    }
+    var matrix by remember(selectedCountry) {
+        mutableStateOf(
+            if (DepartmentStatsCache.country == selectedCountry) {
+                DepartmentStatsCache.matrixByDept[deptCode] ?: emptyList()
+            } else {
+                emptyList()
+            }
+        )
+    }
+    var isLoading by remember(selectedCountry) { mutableStateOf(department == null || matrix.isEmpty()) }
     var isRefreshing by remember { mutableStateOf(false) }
     var refreshTrigger by remember { mutableIntStateOf(0) }
     var showActiveOnly by rememberSaveable { mutableStateOf(false) }
 
     BackHandler(enabled = !safeBackNavigation.isLocked) { safeBackNavigation.navigateBack() }
 
-    LaunchedEffect(deptCode, refreshTrigger) {
+    LaunchedEffect(deptCode, refreshTrigger, selectedCountry) {
         // Au rafraichissement, on relit tout : la base a pu changer depuis l'ouverture de la fiche.
         val forced = refreshTrigger > 0
+        if (DepartmentStatsCache.country != selectedCountry) {
+            DepartmentStatsCache.country = selectedCountry
+            DepartmentStatsCache.departments = null
+            DepartmentStatsCache.matrixByDept.clear()
+        }
         if (department == null || forced) {
             val loaded = if (forced) {
-                repository.getDepartmentStats().also { DepartmentStatsCache.departments = it }
+                repository.getDepartmentStats(selectedCountry).also { DepartmentStatsCache.departments = it }
             } else {
-                DepartmentStatsCache.departments ?: repository.getDepartmentStats().also {
+                DepartmentStatsCache.departments ?: repository.getDepartmentStats(selectedCountry).also {
                     DepartmentStatsCache.departments = it
                 }
             }
             department = loaded.firstOrNull { it.deptCode == deptCode }
         }
-        val rows = repository.getDepartmentOperatorTechStats(deptCode)
+        val rows = repository.getDepartmentOperatorTechStats(deptCode, selectedCountry)
         if (rows.isNotEmpty()) {
             DepartmentStatsCache.matrixByDept[deptCode] = rows
             matrix = rows

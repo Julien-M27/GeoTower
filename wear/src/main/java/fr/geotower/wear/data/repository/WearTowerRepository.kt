@@ -29,6 +29,11 @@ class WearTowerRepository(context: Context) {
     val language: StateFlow<fr.geotower.wear.data.model.WearLanguage> = preferences.language
     val distanceUnit: StateFlow<fr.geotower.wear.data.model.DistanceUnit> = preferences.distanceUnit
     val techOrder: StateFlow<fr.geotower.wear.data.model.TechOrder> = preferences.techOrder
+    val apiServer: StateFlow<fr.geotower.wear.data.model.WearApiServer> = preferences.apiServer
+
+    init {
+        WearWebApiClient.currentServer = preferences.apiServer.value
+    }
 
     private val _towers = MutableStateFlow<List<WearTower>>(emptyList())
     val towers: StateFlow<List<WearTower>> = _towers.asStateFlow()
@@ -71,6 +76,11 @@ class WearTowerRepository(context: Context) {
         preferences.setDataSourceMode(mode)
     }
 
+    fun setApiServer(server: fr.geotower.wear.data.model.WearApiServer) {
+        WearWebApiClient.currentServer = server
+        preferences.setApiServer(server)
+    }
+
     fun setGpsRefreshInterval(interval: fr.geotower.wear.data.model.GpsRefreshInterval) {
         preferences.setGpsRefreshInterval(interval)
     }
@@ -91,9 +101,16 @@ class WearTowerRepository(context: Context) {
         preferences.setTechOrder(order)
     }
 
-    suspend fun loadTowers(latitude: Double, longitude: Double) = withContext(Dispatchers.IO) {
+    suspend fun loadTowers(
+        latitude: Double,
+        longitude: Double,
+        clearExisting: Boolean = false
+    ) = withContext(Dispatchers.IO) {
         _isLoading.value = true
         _errorMessage.value = null
+        if (clearExisting) {
+            _towers.value = emptyList()
+        }
 
         val currentMode = preferences.dataSourceMode.value
         Log.i(TAG, "Chargement des antennes pour lat=$latitude, lon=$longitude en mode $currentMode")
@@ -112,6 +129,8 @@ class WearTowerRepository(context: Context) {
                             Log.d(TAG, "Mode AUTO : smartphone n'a pas renvoyé d'antennes, bascule sur API Web...")
                             WearWebApiClient.fetchNearbyTowers(lat = latitude, lon = longitude)
                         }
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e
                     } catch (e: Exception) {
                         Log.w(TAG, "Mode AUTO : échec smartphone (${e.message}), bascule sur API Web...", e)
                         WearWebApiClient.fetchNearbyTowers(lat = latitude, lon = longitude)
@@ -133,6 +152,8 @@ class WearTowerRepository(context: Context) {
             if (results.isEmpty()) {
                 _errorMessage.value = "Aucune antenne dans un rayon de 5 km"
             }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.e(TAG, "Erreur lors du chargement des sites", e)
             _towers.value = emptyList()

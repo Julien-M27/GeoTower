@@ -319,10 +319,14 @@ fun SharedMiniMapCard(
                         map.tileProvider = MapTileProviderBasic(context)
                     }
 
-                    // ⚠️ ATTENTION : on utilise "effectiveProvider" ici !
-                    val newSource = when (effectiveProvider) {
-                        1 -> if (ignStyle == 2) MapUtils.EsriSource.SATELLITE else MapUtils.OSM_Source
-                        3 -> org.osmdroid.tileprovider.tilesource.TileSourceFactory.OpenTopo
+                    val useCanadaOsmFallback = effectiveProvider == 0 && (
+                        centerLon < -40.0 ||
+                            fr.geotower.data.db.DatabaseCountryStore.activeCountryState.value == fr.geotower.data.db.DatabaseCountry.CA
+                        )
+                    val newSource = when {
+                        useCanadaOsmFallback -> if (ignStyle == 2) MapUtils.EsriSource.SATELLITE else MapUtils.OSM_Source
+                        effectiveProvider == 1 -> if (ignStyle == 2) MapUtils.EsriSource.SATELLITE else MapUtils.OSM_Source
+                        effectiveProvider == 3 -> org.osmdroid.tileprovider.tilesource.TileSourceFactory.OpenTopo
                         else -> if (ignStyle == 2) MapUtils.IgnSource.SATELLITE else MapUtils.IgnSource.PLAN_IGN
                     }
                     if (map.tileProvider.tileSource.name() != newSource.name()) {

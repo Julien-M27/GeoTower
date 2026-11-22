@@ -62,7 +62,12 @@ fun ShareThroughputCalculatorBlock(
     maxIncludedBands: Int = Int.MAX_VALUE,
     modifier: Modifier = Modifier
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val sizing = LocalGeoTowerUiSizing.current
+    val isCanadaSite = remember(info.idAnfr) { info.idAnfr.startsWith("CA-", ignoreCase = true) }
+    val caDetails = remember(info.idAnfr, isCanadaSite) {
+        if (isCanadaSite) fr.geotower.data.CaIsedSiteDetailsRepository.loadForSite(context, info.idAnfr) else null
+    }
     val txtUnknown = stringResource(R.string.appstrings_unknown)
     val txtAzimuthNotSpecified = stringResource(R.string.appstrings_azimuth_not_specified)
     val rawFrequencies = technique?.detailsFrequences?.takeIf { it.isNotBlank() } ?: info.frequences
@@ -85,7 +90,11 @@ fun ShareThroughputCalculatorBlock(
     }
     val result = remember(
         parsedBands,
+        info.idAnfr,
         info.operateur,
+        info.latitude,
+        info.longitude,
+        caDetails,
         include4G,
         include5G,
         includePlanned,
@@ -101,7 +110,11 @@ fun ShareThroughputCalculatorBlock(
             includePlanned = includePlanned,
             enabledBandKeys = enabledBandKeys,
             supportHeightMeters = physique?.hauteur,
-            receiverHeightMeters = receiverHeightMeters
+            receiverHeightMeters = receiverHeightMeters,
+            isCanadaSite = isCanadaSite,
+            siteLatitude = info.latitude,
+            siteLongitude = info.longitude,
+            caDetails = caDetails
         )
     }
 
@@ -310,8 +323,68 @@ private fun calculateShareThroughput(
     includePlanned: Boolean,
     enabledBandKeys: Set<String>,
     supportHeightMeters: Double?,
-    receiverHeightMeters: Double
+    receiverHeightMeters: Double,
+    isCanadaSite: Boolean = false,
+    siteLatitude: Double = 0.0,
+    siteLongitude: Double = 0.0,
+    caDetails: fr.geotower.data.CaIsedSiteDetails? = null
 ): ShareThroughputResult {
+    if (isCanadaSite) {
+        val profiles = fr.geotower.radio.CaIsedThroughputModel.buildCanadianBandProfiles(
+            bands = bands,
+            caDetails = caDetails,
+            fallbackSupportHeightM = supportHeightMeters,
+            siteLat = siteLatitude,
+            siteLon = siteLongitude,
+            selectedLat = null,
+            selectedLon = null
+        )
+        val calculatedBands = profiles.map { profile ->
+            val band = profile.band
+            val key = profile.bandKey
+            val isPlanned = isPlannedThroughputBand(band)
+            val generationAllowed = (band.gen == 4 && include4G) || (band.gen == 5 && include5G)
+            val bandAllowed = enabledBandKeys.contains(key)
+            val isIncluded = generationAllowed && bandAllowed && (includePlanned || !isPlanned)
+            val excludedReason = when {
+                !generationAllowed -> if (band.gen == 5) ThroughputTextKey.THROUGHPUT_REASON_5G_DISABLED else ThroughputTextKey.THROUGHPUT_REASON_4G_DISABLED
+                !bandAllowed -> ThroughputTextKey.THROUGHPUT_REASON_BAND_EXCLUDED
+                isPlanned && !includePlanned -> ThroughputTextKey.THROUGHPUT_REASON_PLANNED_BAND
+                else -> null
+            }
+            val estimate = fr.geotower.radio.CaIsedThroughputModel.estimateBandThroughput(
+                profile = profile,
+                throughputProfile = ThroughputProfiles.prudent,
+                bandOverride = null,
+                siteLat = siteLatitude,
+                siteLon = siteLongitude,
+                selectedLat = null,
+                selectedLon = null,
+                receiverHeightMeters = receiverHeightMeters,
+                isCustomPreset = false
+            )
+            ShareThroughputBandResult(
+                key = key,
+                label = throughputBandLabel(band),
+                generation = band.gen,
+                modulationLabel = throughputModulationLabel(
+                    estimate.dlModulationOrder,
+                    estimate.ulModulationOrder,
+                    estimate.dlMimoLayers,
+                    estimate.ulMimoLayers
+                ),
+                bandwidthMHz = profile.bandwidthMHz,
+                coneDistance = estimate.coneDistance,
+                azimuths = profile.azimuths,
+                downMbps = estimate.dlMbps,
+                upMbps = estimate.ulMbps,
+                isIncluded = isIncluded,
+                excludedReason = excludedReason
+            )
+        }
+        return ShareThroughputResult(bands = calculatedBands)
+    }
+
     val operator = MobileOperator.fromLabel(operatorName)
     val engineProfile = ThroughputProfiles.prudent
     val engineResult = if (operator != null) {

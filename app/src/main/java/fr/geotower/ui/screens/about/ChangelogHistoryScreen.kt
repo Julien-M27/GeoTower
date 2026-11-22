@@ -104,6 +104,7 @@ private enum class ChangelogCategoryFilter {
 @Composable
 fun ChangelogHistoryScreen(navController: NavController) {
     val context = LocalContext.current
+    val resources = androidx.compose.ui.platform.LocalResources.current
     val uiStyle = LocalGeoTowerUiStyle.current
     val sizing = uiStyle.sizing
     val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = "about")
@@ -158,7 +159,7 @@ fun ChangelogHistoryScreen(navController: NavController) {
                     val summaryMatch = milestone.summary.lowercase().contains(query)
                     val directItemsMatch = milestone.directItems.any { it.lowercase().contains(query) }
                     val resItemsMatch = milestone.itemResIds.any { resId ->
-                        context.getString(resId).lowercase().contains(query)
+                        resources.getString(resId).lowercase().contains(query)
                     }
                     versionMatch || summaryMatch || directItemsMatch || resItemsMatch
                 }

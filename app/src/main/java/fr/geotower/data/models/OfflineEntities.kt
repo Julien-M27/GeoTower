@@ -29,8 +29,18 @@ object RadioFilterMasks {
     const val BAND_5G_3500 = 1 shl 12
     const val BAND_5G_26000 = 1 shl 13
     const val BAND_FH = 1 shl 14
+    const val BAND_3G_1900 = 1 shl 15
+    const val BAND_4G_600 = 1 shl 16
+    const val BAND_4G_2300 = 1 shl 17
+    const val BAND_4G_3500 = 1 shl 18
+    const val BAND_5G_600 = 1 shl 19
+    const val BAND_5G_850 = 1 shl 20
     const val BAND_5G_1400 = 1 shl 21
     const val BAND_5G_4200 = 1 shl 22
+    const val BAND_5G_1900 = 1 shl 23
+    const val BAND_5G_2000 = 1 shl 24
+    const val BAND_5G_2600 = 1 shl 25
+    const val BAND_5G_3800 = 1 shl 26
 
     fun bandMaskToFilterString(mask: Int): String {
         if (mask == 0) return ""
@@ -38,17 +48,27 @@ object RadioFilterMasks {
             if (mask has BAND_2G_900) add("2G900")
             if (mask has BAND_2G_1800) add("2G1800")
             if (mask has BAND_3G_900) add("3G900")
+            if (mask has BAND_3G_1900) add("3G1900")
             if (mask has BAND_3G_2100) add("3G2100")
+            if (mask has BAND_4G_600) add("4G600")
             if (mask has BAND_4G_700) add("4G700")
             if (mask has BAND_4G_800) add("4G800")
             if (mask has BAND_4G_900) add("4G900")
             if (mask has BAND_4G_1800) add("4G1800")
             if (mask has BAND_4G_2100) add("4G2100")
+            if (mask has BAND_4G_2300) add("4G2300")
             if (mask has BAND_4G_2600) add("4G2600")
+            if (mask has BAND_4G_3500) add("4G3500")
+            if (mask has BAND_5G_600) add("5G600")
             if (mask has BAND_5G_700) add("5G700")
+            if (mask has BAND_5G_850) add("5G850")
             if (mask has BAND_5G_1400) add("5G1400")
+            if (mask has BAND_5G_1900) add("5G1900")
+            if (mask has BAND_5G_2000) add("5G2000")
             if (mask has BAND_5G_2100) add("5G2100")
+            if (mask has BAND_5G_2600) add("5G2600")
             if (mask has BAND_5G_3500) add("5G3500")
+            if (mask has BAND_5G_3800) add("5G3800")
             if (mask has BAND_5G_4200) add("5G4200")
             if (mask has BAND_5G_26000) add("5G26000")
             if (mask has BAND_FH) add("FH")

@@ -54,7 +54,7 @@ fun OutageLocalControls(modifier: Modifier = Modifier) {
     val frequencySteps = remember {
         (OutageLocalConfig.MIN_FREQUENCY_HOURS..OutageLocalConfig.MAX_FREQUENCY_HOURS).toList()
     }
-    val frequencyLabels = frequencySteps.map { context.getString(R.string.outage_source_frequency_unit, it) }
+    val frequencyLabels = frequencySteps.map { androidx.compose.ui.res.stringResource(R.string.outage_source_frequency_unit, it) }
 
     Column(
         modifier = modifier.fillMaxWidth(),

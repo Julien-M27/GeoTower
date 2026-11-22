@@ -76,6 +76,7 @@ import kotlinx.coroutines.withContext
 @Composable
 fun DatabaseViewerScreen(navController: NavController) {
     val context = androidx.compose.ui.platform.LocalContext.current
+    val resources = androidx.compose.ui.platform.LocalResources.current
     val uiStyle = LocalGeoTowerUiStyle.current
     val sizing = uiStyle.sizing
     val safeBack = rememberSafeBackNavigation(navController, fallbackRoute = "settings")
@@ -125,12 +126,12 @@ fun DatabaseViewerScreen(navController: NavController) {
             tables = emptyList()
             errorMessage = if (error is DatabaseNotAvailableException) {
                 if (selectedDatabase.isOutages) {
-                    context.getString(R.string.database_viewer_missing_outages)
+                    resources.getString(R.string.database_viewer_missing_outages)
                 } else {
-                    context.getString(R.string.database_viewer_missing_database)
+                    resources.getString(R.string.database_viewer_missing_database)
                 }
             } else {
-                context.getString(R.string.database_viewer_read_error)
+                resources.getString(R.string.database_viewer_read_error)
             }
         }
         isLoadingTables = false
@@ -150,7 +151,7 @@ fun DatabaseViewerScreen(navController: NavController) {
             throw cancelled
         } catch (_: Exception) {
             tablePage = null
-            errorMessage = context.getString(R.string.database_viewer_read_error)
+            errorMessage = resources.getString(R.string.database_viewer_read_error)
         }
         isLoadingPage = false
     }
@@ -364,6 +365,7 @@ private fun DatabaseChoiceMenu(
 @Composable
 private fun databaseLabel(database: InspectableDatabase): String = when (database) {
     InspectableDatabase.MOBILE -> stringResource(R.string.database_viewer_mobile)
+    InspectableDatabase.MOBILE_CA -> "${stringResource(R.string.database_viewer_mobile)} (${stringResource(R.string.country_name_ca)})"
     InspectableDatabase.RADIO -> stringResource(R.string.database_viewer_radio)
     InspectableDatabase.ENB -> stringResource(R.string.database_viewer_enb)
     InspectableDatabase.OUTAGES_OPERATORS -> stringResource(R.string.database_viewer_outages_operators)

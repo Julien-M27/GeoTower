@@ -3,6 +3,8 @@ package fr.geotower.data.api
 import android.content.Context
 import com.google.gson.Gson
 import fr.geotower.data.config.RemoteFeatureFlags
+import fr.geotower.data.db.DatabaseCountry
+import fr.geotower.data.db.DatabaseCountryStore
 import fr.geotower.data.db.GeoTowerDatabaseValidator
 import fr.geotower.data.models.LiveDbStatusDto
 import fr.geotower.utils.AppConfig
@@ -58,7 +60,7 @@ object LiveDatabaseStatus {
      */
     private const val CACHE_TTL_MS = 10 * 60 * 1000L
 
-    private val serverCache = ConcurrentHashMap<ApiServer, Pair<LiveDatabaseDataset, Long>>()
+    private val serverCache = ConcurrentHashMap<Pair<ApiServer, DatabaseCountry>, Pair<LiveDatabaseDataset, Long>>()
 
     private val gson = Gson()
 
@@ -78,37 +80,47 @@ object LiveDatabaseStatus {
      * L'état validé au démarrage sert de réponse quand il est connu ; sinon on retombe sur le
      * fichier, ce qui touche le disque (à appeler hors du thread principal).
      */
-    fun isInUse(context: Context): Boolean {
+    fun isInUse(
+        context: Context,
+        country: DatabaseCountry = DatabaseCountryStore.activeCountryState.value
+    ): Boolean {
         if (!canQueryLiveDatabaseMetadata()) return false
 
-        val knownState = AppConfig.localDatabaseState.value
-        if (knownState != null) {
-            return knownState != GeoTowerDatabaseValidator.LocalDatabaseState.VALID
-        }
-
-        return GeoTowerDatabaseValidator
-            .getInstalledDatabaseFileStatus(context)
-            .state != GeoTowerDatabaseValidator.LocalDatabaseState.VALID
+        val dbFile = context.getDatabasePath(country.dbFileName)
+        if (!dbFile.exists()) return true
+        return !GeoTowerDatabaseValidator
+            .validateDatabaseFile(
+                dbFile,
+                checkIntegrity = false,
+                expectedCountryCode = country.code
+            )
+            .isValid
     }
 
     /**
      * Métadonnées de la base en ligne pour un serveur précis, ou `null` si l'API live n'est pas
      * disponible / le serveur n'a pas répondu.
      */
-    suspend fun datasetForServer(server: ApiServer, forceRefresh: Boolean = false): LiveDatabaseDataset? =
+    suspend fun datasetForServer(
+        server: ApiServer,
+        forceRefresh: Boolean = false,
+        country: DatabaseCountry = DatabaseCountry.FR
+    ): LiveDatabaseDataset? =
         withContext(Dispatchers.IO) {
             if (!canQueryLiveDatabaseMetadata()) return@withContext null
 
+            val cacheKey = server to country
             val now = System.currentTimeMillis()
             if (!forceRefresh) {
-                val cachedEntry = serverCache[server]
+                val cachedEntry = serverCache[cacheKey]
                 if (cachedEntry != null && now - cachedEntry.second < CACHE_TTL_MS) {
                     return@withContext cachedEntry.first
                 }
             }
 
             try {
-                val url = "https://${server.host}/api/v2/live/fr/status"
+                val countryPath = if (country == DatabaseCountry.CA) "ca" else "fr"
+                val url = "https://${server.host}/api/v2/live/$countryPath/status"
                 val request = Request.Builder()
                     .url(url)
                     .cacheControl(CacheControl.FORCE_NETWORK)
@@ -118,7 +130,7 @@ object LiveDatabaseStatus {
 
                 statusClient.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) {
-                        AppLogger.w(TAG, "Live database status for ${server.host} responded ${response.code}")
+                        AppLogger.w(TAG, "Live database status for ${server.host} ($countryPath) responded ${response.code}")
                         return@withContext null
                     }
                     val body = response.body?.string() ?: return@withContext null
@@ -133,7 +145,7 @@ object LiveDatabaseStatus {
                         stationCount = dto.rowCount,
                         host = server.host
                     )
-                    serverCache[server] = dataset to System.currentTimeMillis()
+                    serverCache[cacheKey] = dataset to System.currentTimeMillis()
                     dataset
                 }
             } catch (e: CancellationException) {
@@ -152,7 +164,7 @@ object LiveDatabaseStatus {
      */
     suspend fun dataset(forceRefresh: Boolean = false): LiveDatabaseDataset? {
         val activeServer = ApiEndpoints.active()
-        return datasetForServer(activeServer, forceRefresh)
+        return datasetForServer(activeServer, forceRefresh, DatabaseCountryStore.activeCountryState.value)
     }
 
     private fun canQueryLiveDatabaseMetadata(): Boolean =

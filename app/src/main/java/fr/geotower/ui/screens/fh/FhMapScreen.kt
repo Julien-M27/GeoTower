@@ -135,6 +135,7 @@ fun FhMapScreen(
     repository: AnfrRepository
 ) {
     val context = LocalContext.current
+    val resources = androidx.compose.ui.platform.LocalResources.current
     val uriHandler = LocalUriHandler.current
     val sizing = LocalGeoTowerUiStyle.current.sizing
     val scope = rememberCoroutineScope()
@@ -243,7 +244,7 @@ fun FhMapScreen(
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
-            errorMessage = e.localizedMessage ?: context.getString(R.string.appstrings_error)
+            errorMessage = e.localizedMessage ?: resources.getString(R.string.appstrings_error)
         } finally {
             isLoading = false
         }
@@ -286,7 +287,7 @@ fun FhMapScreen(
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
-            errorMessage = e.localizedMessage ?: context.getString(R.string.appstrings_error)
+            errorMessage = e.localizedMessage ?: resources.getString(R.string.appstrings_error)
         } finally {
             isLoading = false
         }
@@ -344,8 +345,8 @@ fun FhMapScreen(
     Scaffold(
         containerColor = bgColor,
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
-    ) { _ ->
-        Box(modifier = Modifier.fillMaxSize()) {
+    ) { innerPadding ->
+        Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
                 factory = { ctx ->
@@ -682,20 +683,27 @@ fun FhMapScreen(
                             text = when {
                                 errorMessage != null -> errorMessage!!
                                 !hasFhTable -> stringResource(R.string.fh_map_no_table)
+                                isViewportScoped -> stringResource(R.string.fh_map_live_zoom_title)
                                 else -> stringResource(R.string.fh_map_empty_area)
                             },
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = if (!hasFhTable) {
-                                "Mettez à jour la base de données locale ou activez l'API Live pour afficher les faisceaux hertziens."
-                            } else {
-                                "Dézoomez ou déplacez la carte pour afficher les traits FH."
+                            text = when {
+                                !hasFhTable -> stringResource(R.string.fh_map_no_table_hint)
+                                isViewportScoped -> stringResource(R.string.fh_map_live_zoom_desc)
+                                else -> stringResource(R.string.fh_map_empty_area_hint)
                             },
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                        if (!hasFhTable) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Button(onClick = { navController.navigate("settings?section=db_mobile_fr") }) {
+                                Text(text = stringResource(R.string.database_download_antennas))
+                            }
+                        }
                     }
                 }
             }
@@ -873,8 +881,9 @@ fun FhMapScreen(
             // Fiche du trait FH sélectionné
             selectedLink?.let { prepared ->
                 val link = prepared.link
+                val currentLocale = androidx.compose.ui.platform.LocalConfiguration.current.locales[0] ?: Locale.ROOT
                 val distText = if (link.distanceM >= 1000) {
-                    String.format(Locale.getDefault(), "%.2f km", link.distanceM / 1000.0)
+                    String.format(currentLocale, "%.2f km", link.distanceM / 1000.0)
                 } else {
                     "${link.distanceM} m"
                 }

@@ -4,11 +4,18 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -54,6 +61,7 @@ fun MapSupportWrapperScreen(
     plannedTripMode: String? = null,
     focusLat: Double? = null,
     focusLon: Double? = null,
+    compareSlot: String? = null,
     onOpenSimpleModeMenu: (() -> Unit)? = null
 ) {
     val splitDisplay = splitDisplayEnabled()
@@ -99,9 +107,12 @@ fun MapSupportWrapperScreen(
                 plannedTripMode = plannedTripMode,
                 focusLat = focusLat,
                 focusLon = focusLon,
+                compareSlot = compareSlot,
                 onOpenSimpleModeMenu = onOpenSimpleModeMenu,
                 onSupportClick = { supportId, operatorKey, _, _ ->
-                    if (splitDisplay) {
+                    if (!compareSlot.isNullOrBlank()) {
+                        false
+                    } else if (splitDisplay) {
                         selectedSupportId = supportId
                         selectedSupportOperatorKey = operatorKey
                         selectedSiteId = null
@@ -117,53 +128,62 @@ fun MapSupportWrapperScreen(
         AnimatedSplitPane(visible = isSplitActive) {
             val supportId = selectedSupportId ?: return@AnimatedSplitPane
             val siteId = selectedSiteId
-            when {
-                siteId != null && selectedSidePane == SiteDetailSidePane.ElevationProfile -> ElevationProfilePane(
-                    navController = navController,
-                    repository = repository,
-                    antennaId = siteId,
-                    onClose = { selectedSidePane = null }
-                )
-                siteId != null && selectedSidePane == SiteDetailSidePane.ThroughputCalculator -> ThroughputCalculatorPane(
-                    navController = navController,
-                    repository = repository,
-                    antennaId = siteId,
-                    onClose = { selectedSidePane = null }
-                )
-                siteId != null && selectedSidePane == SiteDetailSidePane.TheoreticalCoverage -> TheoreticalCoveragePane(
-                    navController = navController,
-                    repository = repository,
-                    antennaId = siteId,
-                    onClose = { selectedSidePane = null }
-                )
-                siteId != null -> SiteDetailPane(
-                    navController = navController,
-                    repository = repository,
-                    antennaId = siteId,
-                    applyMapFilters = true,
-                    onClose = {
-                        selectedSiteId = null
-                        selectedSidePane = null
-                    },
-                    onOpenElevation = { selectedSidePane = SiteDetailSidePane.ElevationProfile },
-                    onOpenThroughput = { selectedSidePane = SiteDetailSidePane.ThroughputCalculator },
-                    onOpenCoverage = { selectedSidePane = SiteDetailSidePane.TheoreticalCoverage }
-                )
-                else -> SupportSiteWrapperScreen(
-                    navController = navController,
-                    repository = repository,
-                    radioRepository = radioRepository,
-                    supportId = supportId,
-                    highlightedOperatorKey = selectedSupportOperatorKey,
-                    applyMapFilters = true,
-                    photoDraftId = photoDraftId,
-                    isSplitScreen = true,
-                    onCloseSplitScreen = { closeSupportSelection() },
-                    onOpenAntennaInHost = { antennaId ->
-                        selectedSiteId = antennaId
-                        selectedSidePane = null
-                    }
-                )
+            val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+            val alignedTopPadding = (statusBarTop - 8.dp).coerceAtLeast(44.dp)
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background)
+                    .padding(top = alignedTopPadding)
+            ) {
+                when {
+                    siteId != null && selectedSidePane == SiteDetailSidePane.ElevationProfile -> ElevationProfilePane(
+                        navController = navController,
+                        repository = repository,
+                        antennaId = siteId,
+                        onClose = { selectedSidePane = null }
+                    )
+                    siteId != null && selectedSidePane == SiteDetailSidePane.ThroughputCalculator -> ThroughputCalculatorPane(
+                        navController = navController,
+                        repository = repository,
+                        antennaId = siteId,
+                        onClose = { selectedSidePane = null }
+                    )
+                    siteId != null && selectedSidePane == SiteDetailSidePane.TheoreticalCoverage -> TheoreticalCoveragePane(
+                        navController = navController,
+                        repository = repository,
+                        antennaId = siteId,
+                        onClose = { selectedSidePane = null }
+                    )
+                    siteId != null -> SiteDetailPane(
+                        navController = navController,
+                        repository = repository,
+                        antennaId = siteId,
+                        applyMapFilters = true,
+                        onClose = {
+                            selectedSiteId = null
+                            selectedSidePane = null
+                        },
+                        onOpenElevation = { selectedSidePane = SiteDetailSidePane.ElevationProfile },
+                        onOpenThroughput = { selectedSidePane = SiteDetailSidePane.ThroughputCalculator },
+                        onOpenCoverage = { selectedSidePane = SiteDetailSidePane.TheoreticalCoverage }
+                    )
+                    else -> SupportSiteWrapperScreen(
+                        navController = navController,
+                        repository = repository,
+                        radioRepository = radioRepository,
+                        supportId = supportId,
+                        highlightedOperatorKey = selectedSupportOperatorKey,
+                        applyMapFilters = true,
+                        photoDraftId = photoDraftId,
+                        isSplitScreen = true,
+                        onCloseSplitScreen = { closeSupportSelection() },
+                        onOpenAntennaInHost = { antennaId ->
+                            selectedSiteId = antennaId
+                            selectedSidePane = null
+                        }
+                    )
+                }
             }
         }
     }

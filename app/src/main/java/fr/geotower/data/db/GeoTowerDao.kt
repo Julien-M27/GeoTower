@@ -1669,14 +1669,20 @@ interface GeoTowerDao {
            OR (UPPER(:query) LIKE '%4G%' AND (l.tech_mask & 4) != 0)
            OR (UPPER(:query) LIKE '%5G%' AND (l.tech_mask & 8) != 0)
            OR (UPPER(:query) LIKE '%FH%' AND (l.tech_mask & 16) != 0)
+           OR (UPPER(:query) LIKE '%600%' AND (l.band_mask & 589824) != 0)
            OR (UPPER(:query) LIKE '%700%' AND (l.band_mask & 1040) != 0)
            OR (UPPER(:query) LIKE '%800%' AND (l.band_mask & 32) != 0)
+           OR (UPPER(:query) LIKE '%850%' AND (l.band_mask & 1048576) != 0)
            OR (UPPER(:query) LIKE '%900%' AND (l.band_mask & 69) != 0)
            OR (UPPER(:query) LIKE '%1400%' AND (l.band_mask & 2097152) != 0)
            OR (UPPER(:query) LIKE '%1800%' AND (l.band_mask & 130) != 0)
+           OR (UPPER(:query) LIKE '%1900%' AND (l.band_mask & 8421376) != 0)
+           OR (UPPER(:query) LIKE '%2000%' AND (l.band_mask & 16777216) != 0)
            OR (UPPER(:query) LIKE '%2100%' AND (l.band_mask & 2312) != 0)
-           OR (UPPER(:query) LIKE '%2600%' AND (l.band_mask & 512) != 0)
-           OR (UPPER(:query) LIKE '%3500%' AND (l.band_mask & 4096) != 0)
+           OR (UPPER(:query) LIKE '%2300%' AND (l.band_mask & 131072) != 0)
+           OR (UPPER(:query) LIKE '%2600%' AND (l.band_mask & 33554944) != 0)
+           OR (UPPER(:query) LIKE '%3500%' AND (l.band_mask & 266240) != 0)
+           OR (UPPER(:query) LIKE '%3800%' AND (l.band_mask & 67108864) != 0)
            OR (UPPER(:query) LIKE '%4200%' AND (l.band_mask & 4194304) != 0)
            OR ((UPPER(:query) LIKE '%26000%' OR UPPER(:query) LIKE '%26GHZ%' OR UPPER(:query) LIKE '%26 GHZ%') AND (l.band_mask & 8192) != 0)
            OR EXISTS (
@@ -1885,7 +1891,7 @@ interface GeoTowerDao {
             CAST(SUM(total_count) AS INTEGER) AS total_count,
             CAST(SUM(active_count) AS INTEGER) AS active_count
         FROM radio_stat_current
-        WHERE operator_name IN (:operatorNames)
+        WHERE UPPER(operator_name) IN (:operatorNames)
         GROUP BY category, item_key
     """)
     suspend fun getCurrentRadioStatsByOperator(operatorNames: List<String>): List<RadioStatRow>

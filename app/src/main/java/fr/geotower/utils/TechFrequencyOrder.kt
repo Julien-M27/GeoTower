@@ -28,18 +28,18 @@ object TechFrequencyOrderHelper {
     }
 
     fun frequenciesOrder5G(order: TechFrequencyOrder): List<String> = when (order) {
-        TechFrequencyOrder.DESCENDING -> listOf("26000", "4200", "3500", "2100", "1400", "700")
-        TechFrequencyOrder.ASCENDING -> listOf("700", "1400", "2100", "3500", "4200", "26000")
+        TechFrequencyOrder.DESCENDING -> listOf("26000", "4200", "3800", "3500", "2600", "2100", "2000", "1900", "1400", "850", "700", "600")
+        TechFrequencyOrder.ASCENDING -> listOf("600", "700", "850", "1400", "1900", "2000", "2100", "2600", "3500", "3800", "4200", "26000")
     }
 
     fun frequenciesOrder4G(order: TechFrequencyOrder): List<String> = when (order) {
-        TechFrequencyOrder.DESCENDING -> listOf("2600", "2100", "1800", "900", "800", "700")
-        TechFrequencyOrder.ASCENDING -> listOf("700", "800", "900", "1800", "2100", "2600")
+        TechFrequencyOrder.DESCENDING -> listOf("3500", "2600", "2300", "2100", "1800", "900", "800", "700", "600")
+        TechFrequencyOrder.ASCENDING -> listOf("600", "700", "800", "900", "1800", "2100", "2300", "2600", "3500")
     }
 
     fun frequenciesOrder3G(order: TechFrequencyOrder): List<String> = when (order) {
-        TechFrequencyOrder.DESCENDING -> listOf("2100", "900")
-        TechFrequencyOrder.ASCENDING -> listOf("900", "2100")
+        TechFrequencyOrder.DESCENDING -> listOf("2100", "1900", "900")
+        TechFrequencyOrder.ASCENDING -> listOf("900", "1900", "2100")
     }
 
     fun frequenciesOrder2G(order: TechFrequencyOrder): List<String> = when (order) {

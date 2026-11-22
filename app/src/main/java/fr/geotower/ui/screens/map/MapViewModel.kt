@@ -665,7 +665,22 @@ class MapViewModel(
         val selectedOperatorKeys = AppConfig.selectedSignalQuestCoverageOperatorKeys.value
             .filter { it in AppConfig.signalQuestCoverageOperatorKeys }
             .toSet()
-        val bounds = clippedMetropolitanCoverageBounds(latNorth, lonEast, latSouth, lonWest)
+        val isCanada = fr.geotower.data.db.DatabaseCountryStore.activeCountryState.value ==
+            fr.geotower.data.db.DatabaseCountry.CA
+        val bounds = if (isCanada) {
+            if (latNorth > latSouth && lonEast > lonWest) {
+                SignalQuestCoverageBounds(
+                    north = latNorth.coerceIn(-90.0, 90.0),
+                    east = lonEast.coerceIn(-180.0, 180.0),
+                    south = latSouth.coerceIn(-90.0, 90.0),
+                    west = lonWest.coerceIn(-180.0, 180.0)
+                )
+            } else {
+                null
+            }
+        } else {
+            clippedMetropolitanCoverageBounds(latNorth, lonEast, latSouth, lonWest)
+        }
 
         if (
             !AppConfig.showSignalQuestCoveragePoints.value ||
@@ -677,7 +692,9 @@ class MapViewModel(
             return
         }
 
+        val market = if (isCanada) "CA" else "FR"
         val requestKey = listOf(
+            market,
             selectedOperatorKeys.sorted().joinToString(","),
             bounds.north,
             bounds.east,
@@ -697,7 +714,7 @@ class MapViewModel(
                 selectedOperatorKeys.sorted().forEach { operatorKey ->
                     val operatorParam = SignalQuestOperators.operatorParamForKey(operatorKey) ?: return@forEach
                     val response = SignalQuestClient.api.getCoveragePoints(
-                        market = "FR",
+                        market = market,
                         operator = operatorParam,
                         north = bounds.north,
                         south = bounds.south,

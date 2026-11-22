@@ -106,10 +106,10 @@ private fun normalizeAzimuth(rawValue: String?): Int? {
 }
 
 private fun mobileFrequencyValuesForGeneration(gen: Int): Set<Int> = when (gen) {
-    5 -> setOf(700, 1400, 2100, 3500, 4200, 26000)
-    4 -> setOf(700, 800, 900, 1800, 2100, 2600)
-    3 -> setOf(900, 2100)
-    2 -> setOf(900, 1800)
+    5 -> setOf(600, 700, 850, 1400, 1900, 2000, 2100, 2600, 3500, 3800, 4200, 26000)
+    4 -> setOf(600, 700, 800, 850, 900, 1800, 1900, 2100, 2300, 2600, 3500)
+    3 -> setOf(850, 900, 1900, 2100)
+    2 -> setOf(850, 900, 1800, 1900)
     else -> emptySet()
 }
 
@@ -138,28 +138,43 @@ private fun frequencyValuesForRange(gen: Int, start: Double?, end: Double?): Set
     if (start == null || end == null) return emptySet()
     return when (gen) {
         5 -> buildSet {
+            if (frequencyRangeOverlaps(start, end, 600.0, 699.0)) add(600)
             if (frequencyRangeOverlaps(start, end, 700.0, 790.0)) add(700)
+            if (frequencyRangeOverlaps(start, end, 824.0, 894.0)) add(850)
             if (frequencyRangeOverlaps(start, end, 1427.0, 1518.0)) add(1400)
-            if (frequencyRangeOverlaps(start, end, 1920.0, 2170.0)) add(2100)
-            if (frequencyRangeOverlaps(start, end, 3300.0, 3800.0)) add(3500)
-            if (frequencyRangeOverlaps(start, end, 3800.1, 4200.0)) add(4200)
+            if (frequencyRangeOverlaps(start, end, 1850.0, 1919.0)) add(1900)
+            if (frequencyRangeOverlaps(start, end, 2000.0, 2020.0)) add(2000)
+            if (frequencyRangeOverlaps(start, end, 1920.0, 2180.0)) add(2100)
+            if (frequencyRangeOverlaps(start, end, 2500.0, 2690.0)) add(2600)
+            if (frequencyRangeOverlaps(start, end, 3300.0, 3700.0)) add(3500)
+            if (frequencyRangeOverlaps(start, end, 3700.1, 3980.0)) add(3800)
+            if (frequencyRangeOverlaps(start, end, 3980.1, 4200.0)) add(4200)
             if (frequencyRangeOverlaps(start, end, 24000.0, 27500.0)) add(26000)
         }
         4 -> buildSet {
+            if (frequencyRangeOverlaps(start, end, 600.0, 699.0)) add(600)
             if (frequencyRangeOverlaps(start, end, 700.0, 790.0)) add(700)
             if (frequencyRangeOverlaps(start, end, 791.0, 862.0)) add(800)
+            if (frequencyRangeOverlaps(start, end, 824.0, 894.0)) add(850)
             if (frequencyRangeOverlaps(start, end, 880.0, 960.0)) add(900)
             if (frequencyRangeOverlaps(start, end, 1710.0, 1880.0)) add(1800)
+            if (frequencyRangeOverlaps(start, end, 1850.0, 1919.0)) add(1900)
             if (frequencyRangeOverlaps(start, end, 1920.0, 2170.0)) add(2100)
+            if (frequencyRangeOverlaps(start, end, 2300.0, 2400.0)) add(2300)
             if (frequencyRangeOverlaps(start, end, 2500.0, 2690.0)) add(2600)
+            if (frequencyRangeOverlaps(start, end, 3400.0, 3700.0)) add(3500)
         }
         3 -> buildSet {
+            if (frequencyRangeOverlaps(start, end, 824.0, 894.0)) add(850)
             if (frequencyRangeOverlaps(start, end, 880.0, 960.0)) add(900)
+            if (frequencyRangeOverlaps(start, end, 1850.0, 1919.0)) add(1900)
             if (frequencyRangeOverlaps(start, end, 1920.0, 2170.0)) add(2100)
         }
         2 -> buildSet {
+            if (frequencyRangeOverlaps(start, end, 824.0, 894.0)) add(850)
             if (frequencyRangeOverlaps(start, end, 880.0, 960.0)) add(900)
             if (frequencyRangeOverlaps(start, end, 1710.0, 1880.0)) add(1800)
+            if (frequencyRangeOverlaps(start, end, 1850.0, 1990.0)) add(1900)
         }
         else -> emptySet()
     }

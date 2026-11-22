@@ -176,6 +176,12 @@ fun LocalModeLevelControls(
         }
 
         Text(
+            text = stringResource(R.string.local_mode_canada_note),
+            style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        Text(
             text = stringResource(R.string.local_mode_maps_note),
             style = sizing.textStyle(MaterialTheme.typography.bodySmall),
             color = MaterialTheme.colorScheme.onSurfaceVariant,

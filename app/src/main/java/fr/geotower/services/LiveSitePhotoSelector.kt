@@ -76,6 +76,7 @@ internal object LiveSitePhotoSelector {
 
         for (source in sources) {
             val sourcePhotos = sourcePhotos(
+                context = context,
                 sourceId = source.id,
                 siteId = normalizedSiteId,
                 operator = operator,
@@ -170,13 +171,14 @@ internal object LiveSitePhotoSelector {
     }
 
     private suspend fun sourcePhotos(
+        context: Context,
         sourceId: String,
         siteId: String,
         operator: String,
         favoriteIds: Set<String>
     ): List<SourcePhoto> {
         return when (sourceId) {
-            CommunityDataPreferences.SOURCE_SIGNALQUEST -> signalQuestPhotos(siteId, operator, favoriteIds)
+            CommunityDataPreferences.SOURCE_SIGNALQUEST -> signalQuestPhotos(context, siteId, operator, favoriteIds)
             // CellularFR masqué — voir CellularFrApi.ENABLED
             CommunityDataPreferences.SOURCE_CELLULARFR -> cellularFrPhotos(siteId)
             else -> emptyList()
@@ -184,15 +186,22 @@ internal object LiveSitePhotoSelector {
     }
 
     private suspend fun signalQuestPhotos(
+        context: Context,
         siteId: String,
         operator: String,
         favoriteIds: Set<String>
     ): List<SourcePhoto> {
+        val resolvedSiteId = if (siteId.startsWith("CA-", ignoreCase = true)) {
+            fr.geotower.data.CaIsedSiteDetailsRepository.loadForSite(context, siteId)
+                ?.recordId?.takeIf { it.isNotBlank() } ?: siteId
+        } else {
+            siteId
+        }
         val signalQuestOperator = SignalQuestOperators.operatorParamFor(operator)
 
         val response = withTimeoutOrNull(SIGNALQUEST_PHOTOS_TIMEOUT_MS) {
             SignalQuestClient.api.getSitePhotos(
-                siteId = siteId,
+                siteId = resolvedSiteId,
                 operator = null,
                 limit = if (favoriteIds.isEmpty()) DEFAULT_QUERY_LIMIT else FAVORITE_QUERY_LIMIT
             )

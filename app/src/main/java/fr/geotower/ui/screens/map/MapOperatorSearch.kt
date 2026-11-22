@@ -129,7 +129,16 @@ internal fun parseOperatorSearchKeys(query: String): List<String> {
     return matchSingleOperatorTokenKeys(cleanQuery)
 }
 
+private fun activeCountryOperatorSpecs(): List<OperatorColorSpec> {
+    return if (fr.geotower.data.db.DatabaseCountryStore.activeCountryState.value == fr.geotower.data.db.DatabaseCountry.CA) {
+        OperatorColors.canada
+    } else {
+        OperatorColors.metro + OperatorColors.overseas
+    }
+}
+
 internal fun suggestOperatorsForExplicitQuery(query: String): List<OperatorColorSpec> {
+    val countrySpecs = activeCountryOperatorSpecs()
     val cleanQuery = extractExplicitOperatorQuery(query) ?: return emptyList()
     if (cleanQuery.isBlank() || cleanQuery == "*") return OperatorColors.all
 
@@ -145,22 +154,25 @@ internal fun suggestOperatorsForExplicitQuery(query: String): List<OperatorColor
         }
         val lastToken = cleanQuery.split(operatorSearchSplitRegex).lastOrNull()?.trim().orEmpty()
         if (lastToken.isBlank()) return OperatorColors.all
-        return suggestOperatorsForSingleToken(lastToken)
+        return suggestOperatorsForSingleToken(lastToken, countrySpecs)
     }
 
-    return suggestOperatorsForSingleToken(cleanQuery)
+    return suggestOperatorsForSingleToken(cleanQuery, countrySpecs)
 }
 
-private fun suggestOperatorsForSingleToken(token: String): List<OperatorColorSpec> {
+private fun suggestOperatorsForSingleToken(
+    token: String,
+    countrySpecs: List<OperatorColorSpec> = activeCountryOperatorSpecs()
+): List<OperatorColorSpec> {
     val normalizedToken = normalizeOperatorSearchToken(token)
-    if (normalizedToken.isBlank()) return OperatorColors.all
+    if (normalizedToken.isBlank()) return countrySpecs
 
     val exact = mutableListOf<OperatorColorSpec>()
     val prefix = mutableListOf<OperatorColorSpec>()
     val wordPrefix = mutableListOf<OperatorColorSpec>()
     val contains = mutableListOf<OperatorColorSpec>()
 
-    OperatorColors.all.forEach { spec ->
+    countrySpecs.forEach { spec ->
         val terms = operatorSearchTermsByKey[spec.key].orEmpty()
         when {
             terms.any { it == normalizedToken } -> exact += spec
@@ -184,7 +196,7 @@ internal fun matchOperatorSuggestions(query: String, exactOnly: Boolean): List<O
     val normalizedQuery = normalizeOperatorSearchToken(query)
     if (normalizedQuery.length < 2) return emptyList()
 
-    return OperatorColors.all.filter { spec ->
+    return activeCountryOperatorSpecs().filter { spec ->
         operatorSearchTermsByKey[spec.key].orEmpty().any { alias ->
             if (exactOnly) alias == normalizedQuery else alias.startsWith(normalizedQuery)
         }

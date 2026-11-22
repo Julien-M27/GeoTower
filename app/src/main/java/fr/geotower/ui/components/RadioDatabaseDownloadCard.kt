@@ -196,7 +196,7 @@ fun RadioDatabaseDownloadCard(
                 }
                 Spacer(modifier = Modifier.width(textStartPadding))
                 Text(
-                    text = stringResource(R.string.appstrings_radio_data_title),
+                    text = "${stringResource(R.string.appstrings_radio_data_title)} (France)",
                     fontWeight = FontWeight.Bold,
                     style = sizing.textStyle(MaterialTheme.typography.titleMedium),
                     textAlign = TextAlign.Start

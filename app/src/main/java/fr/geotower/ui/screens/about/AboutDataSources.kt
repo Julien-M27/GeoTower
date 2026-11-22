@@ -102,6 +102,31 @@ fun aboutSourceGroups(): List<AboutSourceGroup> {
             )
         )
 
+        // 1b. Jeu de données public canadien (ISDE / ISED — TAFL).
+        val isFrenchLocale = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]?.language.equals("fr", ignoreCase = true)
+        val taflUrl = if (isFrenchLocale) {
+            "https://ised-isde.canada.ca/site/spectrum-management-telecommunications/fr/licences/donnees-sur-les-frequences-de-repartition-technique-tafl"
+        } else {
+            "https://ised-isde.canada.ca/site/spectrum-management-telecommunications/en/licences/technical-and-administrative-frequency-list-tafl-data"
+        }
+        add(
+            AboutSourceGroup(
+                title = stringResource(R.string.about_source_ca_ised_title),
+                description = stringResource(R.string.about_source_ca_ised_desc),
+                links = listOf(
+                    AboutSourceLink(
+                        label = stringResource(R.string.about_source_ca_tafl_label),
+                        host = "ised-isde.canada.ca",
+                        url = taflUrl
+                    ),
+                    AboutSourceLink(
+                        host = "sms-sgs.ic.gc.ca",
+                        url = "https://sms-sgs.ic.gc.ca/eic/site/sms-sgs-prod.nsf/eng/h_00010.html"
+                    )
+                )
+            )
+        )
+
         // 2. Référentiel communes / départements (population, superficie).
         add(
             AboutSourceGroup(

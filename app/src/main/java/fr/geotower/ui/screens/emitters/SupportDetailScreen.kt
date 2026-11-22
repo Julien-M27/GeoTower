@@ -215,6 +215,7 @@ fun SupportDetailScreen(
     var antennas by remember { mutableStateOf<List<LocalisationEntity>>(emptyList()) }
     var physique by remember { mutableStateOf<PhysiqueEntity?>(null) }
     var techniquesMap by remember { mutableStateOf<Map<String, TechniqueEntity>>(emptyMap()) }
+    var caRecordIdsByAnfr by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var radioSupportMarkers by remember { mutableStateOf<List<RadioMapMarker>>(emptyList()) }
     var hsDataMap by remember { mutableStateOf<Map<String, fr.geotower.data.models.SiteHsEntity>>(emptyMap()) } // 🚨 NOUVEAU
     var communityPhotos by remember { mutableStateOf<List<CommunityPhoto>>(emptyList()) }
@@ -313,7 +314,7 @@ fun SupportDetailScreen(
                     }
                     .orEmpty()
 
-                val coordinateAntennas = if (lat != 0.0 && lon != 0.0) {
+                val coordinateAntennas = if (selectedSite != null && lat != 0.0 && lon != 0.0) {
                     repository.getAntennasInBox(
                         latNorth = lat + 0.0005,
                         lonEast = lon + 0.0005,
@@ -379,6 +380,14 @@ fun SupportDetailScreen(
                     radioSupportMarkers = radioRepository.getMarkersForSupport(siteId)
                 }
                 techniquesMap = techMap
+                caRecordIdsByAnfr = sortedAntennas
+                    .filter { it.idAnfr.startsWith("CA-", ignoreCase = true) }
+                    .mapNotNull { ant ->
+                        fr.geotower.data.CaIsedSiteDetailsRepository.loadForSite(context, ant.idAnfr)
+                            ?.recordId?.takeIf { it.isNotBlank() }
+                            ?.let { ant.idAnfr to it }
+                    }
+                    .toMap()
             } // Fin du bloc IO Base de données
         } catch (e: Exception) {
             AppLogger.w(TAG_SUPPORT_DETAIL, "Support details request failed", e)
@@ -641,7 +650,17 @@ fun SupportDetailScreen(
     // par opérateur dans la même file unique : seul le premier tourne, les suivants attendent en
     // BLOCKED. On retient donc tout ce qui n'est pas terminé (ENQUEUED/RUNNING/BLOCKED), sinon les
     // opérateurs de la file repasseraient sélectionnables alors que leurs photos partent déjà.
-    val uploadSiteTagId = physique?.idSupport?.takeIf { it.isNotBlank() } ?: siteId
+    val isCanadaSupport = remember(antennas, siteId) {
+        siteId.startsWith("CA-", ignoreCase = true) ||
+            antennas.any { it.idAnfr.startsWith("CA-", ignoreCase = true) }
+    }
+    val uploadSiteTagId = if (isCanadaSupport) {
+        caRecordIdsByAnfr.values.firstOrNull()
+            ?: physique?.idSupport?.takeIf { it.isNotBlank() }
+            ?: siteId
+    } else {
+        physique?.idSupport?.takeIf { it.isNotBlank() } ?: siteId
+    }
     val activeUploadWorkInfos by remember(uploadSiteTagId) {
         WorkManager.getInstance(context).getWorkInfosByTagFlow("sq_upload_$uploadSiteTagId")
     }.collectAsState(initial = emptyList())
@@ -765,7 +784,14 @@ fun SupportDetailScreen(
             .filterNot { it.uploadOperator in uploadingOperatorParams }
         val firstOperator = selectedOperators.firstOrNull() ?: return
         val targetAntenna = firstOperator.antenna
-        val supportUploadId = physique?.idSupport?.takeIf { it.isNotBlank() } ?: siteId
+        val defaultUploadId = physique?.idSupport?.takeIf { it.isNotBlank() } ?: siteId
+        val supportUploadId = if (targetAntenna.idAnfr.startsWith("CA-", ignoreCase = true)) {
+            caRecordIdsByAnfr[targetAntenna.idAnfr]
+                ?: caRecordIdsByAnfr.values.firstOrNull()
+                ?: defaultUploadId
+        } else {
+            defaultUploadId
+        }
         // Chaque cible part avec SES azimuts : sur un pylone mutualise, deux operateurs n'ont pas les
         // memes, et l'ecran de confirmation les dessine tous. Deux operateurs locaux peuvent viser la
         // meme cible SignalQuest (SRR et SFR...) : une seule cible, mais tous leurs azimuts.
@@ -1212,6 +1238,13 @@ fun SupportDetailScreen(
                                 // 🚨 CORRECTION : On retire "&& communityPhotos.isNotEmpty()"
                                 if (showPhotos && canUseSupportPhotos) {
                                     Box(modifier = Modifier.padding(horizontal = sizing.spacing(16.dp))) {
+                                        val sqSupportSiteId = if (isCanadaSupport) {
+                                            caRecordIdsByAnfr.values.firstOrNull()
+                                                ?: physique?.idSupport
+                                                ?: mainInfo.idAnfr
+                                        } else {
+                                            physique?.idSupport ?: mainInfo.idAnfr
+                                        }
                                         CommunityPhotosSectionShared(
                                             photos = communityPhotos,
                                             operatorName = null,
@@ -1225,10 +1258,10 @@ fun SupportDetailScreen(
                                             } else {
                                                 null
                                             },
-                                            favoriteScopeId = physique?.idSupport ?: mainInfo.idAnfr,
+                                            favoriteScopeId = sqSupportSiteId,
                                             favoriteSelectionEnabled = true,
                                             // Même identifiant que celui ayant servi à charger les photos.
-                                            signalQuestSiteId = physique?.idSupport ?: mainInfo.idAnfr
+                                            signalQuestSiteId = sqSupportSiteId
                                         )
                                     }
                                 }
@@ -1630,26 +1663,46 @@ private suspend fun loadSupportCommunityPhotos(
 
             if (hasSignalQuestPhotos) {
                 try {
-                    val response = fr.geotower.data.api.SignalQuestClient.api.getSitePhotos(
-                        siteId = supportId
-                    )
-                    if (response.isSuccessful) {
-                        response.body()?.data?.forEach { photo ->
-                            val photoOperatorKey = OperatorColors.keyFor(photo.operator)
-                            val photoOperatorLabel = OperatorColors.specForKey(photoOperatorKey)?.label
-                            photosTemp.add(
-                                CommunityPhoto(
-                                    url = photo.imageUrl,
-                                    communityName = "Signal Quest",
-                                    author = photo.authorName,
-                                    date = photo.uploadedAt,
-                                    exifMetadata = photo.publicMetadata,
-                                    sourceId = CommunityDataPreferences.SOURCE_SIGNALQUEST,
-                                    stableId = photo.id ?: photo.imageUrl,
-                                    operatorKey = photoOperatorKey,
-                                    operatorLabel = photoOperatorLabel ?: photo.operator
-                                )
-                            )
+                    val isCanada = supportId.startsWith("CA-", ignoreCase = true) ||
+                        antennas.any { it.idAnfr.startsWith("CA-", ignoreCase = true) }
+                    val signalQuestSiteIds = if (isCanada) {
+                        antennas
+                            .filter { it.idAnfr.startsWith("CA-", ignoreCase = true) }
+                            .mapNotNull { ant ->
+                                fr.geotower.data.CaIsedSiteDetailsRepository.loadForSite(context, ant.idAnfr)
+                                    ?.recordId?.takeIf { it.isNotBlank() }
+                            }
+                            .distinct()
+                            .ifEmpty { listOf(supportId) }
+                    } else {
+                        listOf(supportId)
+                    }
+                    val seenPhotoIds = mutableSetOf<String>()
+                    signalQuestSiteIds.forEach { sqSiteId ->
+                        val response = fr.geotower.data.api.SignalQuestClient.api.getSitePhotos(
+                            siteId = sqSiteId
+                        )
+                        if (response.isSuccessful) {
+                            response.body()?.data?.forEach { photo ->
+                                val stableId = photo.id ?: photo.imageUrl
+                                if (seenPhotoIds.add(stableId)) {
+                                    val photoOperatorKey = OperatorColors.keyFor(photo.operator)
+                                    val photoOperatorLabel = OperatorColors.specForKey(photoOperatorKey)?.label
+                                    photosTemp.add(
+                                        CommunityPhoto(
+                                            url = photo.imageUrl,
+                                            communityName = "Signal Quest",
+                                            author = photo.authorName,
+                                            date = photo.uploadedAt,
+                                            exifMetadata = photo.publicMetadata,
+                                            sourceId = CommunityDataPreferences.SOURCE_SIGNALQUEST,
+                                            stableId = stableId,
+                                            operatorKey = photoOperatorKey,
+                                            operatorLabel = photoOperatorLabel ?: photo.operator
+                                        )
+                                    )
+                                }
+                            }
                         }
                     }
                 } catch (e: Exception) { AppLogger.w(TAG_SUPPORT_DETAIL, "SignalQuest photos request failed", e) }
@@ -1976,7 +2029,9 @@ private fun RadioOnlySupportDetailsSection(
             )
             InfoLine(label = txtSupportHeight, value = marker.supportHeightSummary ?: txtNotSpecified)
             InfoLine(label = "$txtSupportNature : ", value = marker.supportNatureSummary ?: txtNotSpecified)
-            InfoLine(label = "$txtOwner : ", value = marker.supportOwnerSummary ?: txtNotSpecified)
+            if (!marker.supportId.startsWith("CA-") && !marker.stationId.startsWith("CA-")) {
+                InfoLine(label = "$txtOwner : ", value = marker.supportOwnerSummary ?: txtNotSpecified)
+            }
             InfoLine(label = txtDistanceLabel, value = "$distanceText $txtFromMyPosition")
             InfoLine(label = txtBearingLabel, value = bearingStr)
         }

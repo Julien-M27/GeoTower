@@ -65,7 +65,7 @@ object WidgetUpdateScheduler {
         context: Context,
         receiver: Class<*> = AntennaWidgetReceiver::class.java
     ): Boolean {
-        if (!canPinWidget(context)) return false
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || !canPinWidget(context)) return false
         val appContext = context.applicationContext
         val provider = ComponentName(appContext, receiver)
         return runCatching {

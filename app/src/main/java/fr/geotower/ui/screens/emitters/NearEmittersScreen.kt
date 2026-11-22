@@ -463,11 +463,58 @@ fun NearEmittersScreen(
         onDispose { locationManager.removeUpdates(locationListener) }
     }
 
+    val activeCountry by fr.geotower.data.db.DatabaseCountryStore.activeCountryState
+    var manualCountry by remember { mutableStateOf<fr.geotower.data.db.DatabaseCountry?>(null) }
+    var lastLoadedCountry by remember { mutableStateOf(activeCountry) }
+    var isNearbyUsingOnlineDb by remember { mutableStateOf(false) }
+    var nearbySwitchCheckTrigger by remember { mutableIntStateOf(0) }
+    var showNearbySwitchToast by remember { mutableStateOf(false) }
+
+    LaunchedEffect(activeCountry) {
+        if (activeCountry != lastLoadedCountry) {
+            lastLoadedCountry = activeCountry
+            sites = emptyList()
+            remoteSearchSites = emptyList()
+            hasMoreNearbySites = false
+            isRefreshing = false
+            isLoading = true
+        }
+    }
+
     // --- 1 & 2. CHARGEMENT ET TRAITEMENT (Fusionnés pour un chargement fluide) ---
     LaunchedEffect(userLocation) {
         val location = userLocation ?: return@LaunchedEffect
         if (shouldRefreshNearbySearchCenter(searchCenter, location)) {
             searchCenter = Location(location)
+        }
+    }
+
+    LaunchedEffect(searchCenter, manualCountry) {
+        val loc = searchCenter ?: return@LaunchedEffect
+        val targetCountry = manualCountry
+            ?: fr.geotower.data.db.DatabaseCountry.forCoordinates(loc.latitude, loc.longitude)
+        if (targetCountry != activeCountry) {
+            fr.geotower.data.db.DatabaseCountryStore.setActive(context, targetCountry)
+            refreshTrigger++
+        }
+    }
+
+    val resources = androidx.compose.ui.platform.LocalResources.current
+    LaunchedEffect(activeCountry, nearbySwitchCheckTrigger) {
+        val online = withContext(Dispatchers.IO) {
+            fr.geotower.data.api.LiveDatabaseStatus.isInUse(context, activeCountry)
+        }
+        isNearbyUsingOnlineDb = online
+        if (showNearbySwitchToast) {
+            showNearbySwitchToast = false
+            android.widget.Toast.makeText(
+                context,
+                resources.getString(
+                    if (online) R.string.country_db_source_status_online else R.string.country_db_source_status_local,
+                    activeCountry.code
+                ),
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
         }
     }
 
@@ -698,7 +745,12 @@ fun NearEmittersScreen(
                         // On interroge Google/OSM seulement si c'est un code postal ou si ça contient des lettres (ville/rue)
                         if (!hasCityAreaSearch && (isPostalCode || searchValue.any { it.isLetter() })) {
                             val geocoder = android.location.Geocoder(context, java.util.Locale.getDefault())
-                            val geoQuery = if (isPostalCode) "$searchValue France" else searchValue
+                            val countrySuffix = if (fr.geotower.data.db.DatabaseCountryStore.getActive(context) == fr.geotower.data.db.DatabaseCountry.CA) {
+                                "Canada"
+                            } else {
+                                "France"
+                            }
+                            val geoQuery = if (isPostalCode) "$searchValue $countrySuffix" else searchValue
 
                             @Suppress("DEPRECATION")
                             val addresses = geocoder.getFromLocationName(geoQuery, 1)
@@ -715,8 +767,10 @@ fun NearEmittersScreen(
                     if (hasOperatorSearch) {
                         val matchedOperatorKeys = parseOperatorSearchKeys("op:$searchValue").toSet()
                         if (matchedOperatorKeys.isNotEmpty()) {
-                            val refLat = referenceLocation?.latitude ?: 46.603354
-                            val refLon = referenceLocation?.longitude ?: 1.888334
+                            val defaultLat = if (activeCountry == fr.geotower.data.db.DatabaseCountry.CA) 56.1304 else 46.603354
+                            val defaultLon = if (activeCountry == fr.geotower.data.db.DatabaseCountry.CA) -106.3468 else 1.888334
+                            val refLat = referenceLocation?.latitude ?: defaultLat
+                            val refLon = referenceLocation?.longitude ?: defaultLon
                             globalAntennas.addAll(
                                 repository.getNearestByOperatorKeys(
                                     lat = refLat,
@@ -970,25 +1024,71 @@ fun NearEmittersScreen(
                                     )
                                 }
 
-                                if (!isLoading && filteredSites.isNotEmpty()) {
+                                if (!isLoading) {
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .padding(start = sizing.spacing(32.dp), end = sizing.spacing(8.dp), top = sizing.spacing(8.dp)),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text(
-                                            text = pluralStringResource(R.plurals.sites_found, filteredSites.size, filteredSites.size),
-                                            style = sizing.textStyle(MaterialTheme.typography.labelMedium),
-                                            color = MaterialTheme.colorScheme.secondary
-                                        )
-                                        Spacer(modifier = Modifier.weight(1f))
-                                        IconButton(onClick = { safeClick { showNearbyFrequencyFiltersSheet = true } }) {
-                                            Icon(
-                                                Icons.Default.FilterList,
-                                                contentDescription = stringResource(R.string.appstrings_filter),
-                                                tint = MaterialTheme.colorScheme.onSurface
+                                        if (filteredSites.isNotEmpty()) {
+                                            Text(
+                                                text = pluralStringResource(R.plurals.sites_found, filteredSites.size, filteredSites.size),
+                                                style = sizing.textStyle(MaterialTheme.typography.labelMedium),
+                                                color = MaterialTheme.colorScheme.secondary
                                             )
+                                            Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
+                                        }
+                                        androidx.compose.material3.Surface(
+                                            onClick = {
+                                                safeClick("nearby_country_switch") {
+                                                    manualCountry = when (manualCountry) {
+                                                        null -> fr.geotower.data.db.DatabaseCountry.FR
+                                                        fr.geotower.data.db.DatabaseCountry.FR -> fr.geotower.data.db.DatabaseCountry.CA
+                                                        fr.geotower.data.db.DatabaseCountry.CA -> null
+                                                    }
+                                                    showNearbySwitchToast = true
+                                                    nearbySwitchCheckTrigger++
+                                                    manualCountry?.let { chosen ->
+                                                        if (chosen != activeCountry) {
+                                                            fr.geotower.data.db.DatabaseCountryStore.setActive(context, chosen)
+                                                            refreshTrigger++
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            shape = CircleShape,
+                                            color = if (isNearbyUsingOnlineDb) {
+                                                MaterialTheme.colorScheme.tertiaryContainer
+                                            } else {
+                                                MaterialTheme.colorScheme.secondaryContainer
+                                            }
+                                        ) {
+                                            val countryPrefix = if (manualCountry == null) "Auto·${activeCountry.code}" else activeCountry.code
+                                            val sourceLabel = stringResource(
+                                                if (isNearbyUsingOnlineDb) R.string.country_db_source_online else R.string.country_db_source_local
+                                            )
+                                            Text(
+                                                text = "$countryPrefix · $sourceLabel",
+                                                style = MaterialTheme.typography.labelMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (isNearbyUsingOnlineDb) {
+                                                    MaterialTheme.colorScheme.onTertiaryContainer
+                                                } else {
+                                                    MaterialTheme.colorScheme.onSecondaryContainer
+                                                },
+                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.weight(1f))
+                                        if (filteredSites.isNotEmpty()) {
+                                            IconButton(onClick = { safeClick { showNearbyFrequencyFiltersSheet = true } }) {
+                                                Icon(
+                                                    Icons.Default.FilterList,
+                                                    contentDescription = stringResource(R.string.appstrings_filter),
+                                                    tint = MaterialTheme.colorScheme.onSurface
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -1090,7 +1190,9 @@ fun NearEmittersScreen(
                                                         onSupportClick(site, searchedOperatorKey)
                                                     } else {
                                                         val highlightedOperatorParam = searchedOperatorKey?.let { "?operator=$it" }.orEmpty()
-                                                        val supportId = site.idSupport?.takeIf { it.isNotBlank() } ?: site.id.toString()
+                                                        val supportId = site.idSupport?.takeIf { it.isNotBlank() }
+                                                            ?: site.anfrIds.firstOrNull()?.takeIf { it.isNotBlank() }
+                                                            ?: site.id.toString()
                                                         navController.navigate("support_detail/${Uri.encode(supportId)}$highlightedOperatorParam")
                                                     }
                                                 }
@@ -1248,24 +1350,39 @@ private fun NearbyFrequencyFilterSheet(
                     show2G = it
                     prefs.edit().putBoolean("show_techno_2g", it).apply()
                 }
-                SelectableButton("FH", showFH, Modifier.weight(1f)) {
-                    showFH = it
-                    prefs.edit().putBoolean("show_techno_fh", it).apply()
+                if (fr.geotower.data.db.DatabaseCountryStore.activeCountryState.value != fr.geotower.data.db.DatabaseCountry.CA) {
+                    SelectableButton("FH", showFH, Modifier.weight(1f)) {
+                        showFH = it
+                        prefs.edit().putBoolean("show_techno_fh", it).apply()
+                    }
                 }
             }
 
             Spacer(modifier = Modifier.height(sizing.spacing(28.dp)))
             SectionTitle(stringResource(R.string.appstrings_frequencies_title))
-
+            val isCanadaActive = fr.geotower.data.db.DatabaseCountryStore.activeCountryState.value == fr.geotower.data.db.DatabaseCountry.CA
             androidx.compose.animation.AnimatedVisibility(visible = show5G) {
                 Column {
                     FreqRow("5G") {
-                        FilterToggleButton("700 MHz", "f5g_700", AppConfig.f5G_700, prefs)
-                        FilterToggleButton("1400 MHz (exp)", "f5g_1400", AppConfig.f5G_1400, prefs)
-                        FilterToggleButton("2100 MHz", "f5g_2100", AppConfig.f5G_2100, prefs)
-                        FilterToggleButton("3500 MHz", "f5g_3500", AppConfig.f5G_3500, prefs)
-                        FilterToggleButton("4200 MHz (exp)", "f5g_4200", AppConfig.f5G_4200, prefs)
-                        FilterToggleButton("26 GHz (exp)", "f5g_26000", AppConfig.f5G_26000, prefs)
+                        if (isCanadaActive) {
+                            FilterToggleButton("600 MHz", "f5g_600", AppConfig.f5G_600, prefs)
+                            FilterToggleButton("700 MHz", "f5g_700", AppConfig.f5G_700, prefs)
+                            FilterToggleButton("850 MHz", "f5g_850", AppConfig.f5G_850, prefs)
+                            FilterToggleButton("1900 MHz (PCS)", "f5g_1900", AppConfig.f5G_1900, prefs)
+                            FilterToggleButton("2000 MHz (AWS-4)", "f5g_2000", AppConfig.f5G_2000, prefs)
+                            FilterToggleButton("2100 MHz (AWS)", "f5g_2100", AppConfig.f5G_2100, prefs)
+                            FilterToggleButton("2600 MHz (BRS)", "f5g_2600", AppConfig.f5G_2600, prefs)
+                            FilterToggleButton("3500 MHz", "f5g_3500", AppConfig.f5G_3500, prefs)
+                            FilterToggleButton("3800 MHz", "f5g_3800", AppConfig.f5G_3800, prefs)
+                            FilterToggleButton("26/28/38 GHz", "f5g_26000", AppConfig.f5G_26000, prefs)
+                        } else {
+                            FilterToggleButton("700 MHz", "f5g_700", AppConfig.f5G_700, prefs)
+                            FilterToggleButton("1400 MHz (exp)", "f5g_1400", AppConfig.f5G_1400, prefs)
+                            FilterToggleButton("2100 MHz", "f5g_2100", AppConfig.f5G_2100, prefs)
+                            FilterToggleButton("3500 MHz", "f5g_3500", AppConfig.f5G_3500, prefs)
+                            FilterToggleButton("4200 MHz (exp)", "f5g_4200", AppConfig.f5G_4200, prefs)
+                            FilterToggleButton("26 GHz (exp)", "f5g_26000", AppConfig.f5G_26000, prefs)
+                        }
                     }
                 }
             }
@@ -1273,12 +1390,23 @@ private fun NearbyFrequencyFilterSheet(
             androidx.compose.animation.AnimatedVisibility(visible = show4G) {
                 Column {
                     FreqRow("4G") {
-                        FilterToggleButton("700 MHz", "f4g_700", AppConfig.f4G_700, prefs)
-                        FilterToggleButton("800 MHz", "f4g_800", AppConfig.f4G_800, prefs)
-                        FilterToggleButton("900 MHz", "f4g_900", AppConfig.f4G_900, prefs)
-                        FilterToggleButton("1800 MHz", "f4g_1800", AppConfig.f4G_1800, prefs)
-                        FilterToggleButton("2100 MHz", "f4g_2100", AppConfig.f4G_2100, prefs)
-                        FilterToggleButton("2600 MHz", "f4g_2600", AppConfig.f4G_2600, prefs)
+                        if (isCanadaActive) {
+                            FilterToggleButton("600 MHz", "f4g_600", AppConfig.f4G_600, prefs)
+                            FilterToggleButton("700 MHz", "f4g_700", AppConfig.f4G_700, prefs)
+                            FilterToggleButton("850 MHz", "f4g_800", AppConfig.f4G_800, prefs)
+                            FilterToggleButton("1900 MHz (PCS)", "f4g_1800", AppConfig.f4G_1800, prefs)
+                            FilterToggleButton("2100 MHz (AWS)", "f4g_2100", AppConfig.f4G_2100, prefs)
+                            FilterToggleButton("2300 MHz (WCS)", "f4g_2300", AppConfig.f4G_2300, prefs)
+                            FilterToggleButton("2600 MHz (BRS)", "f4g_2600", AppConfig.f4G_2600, prefs)
+                            FilterToggleButton("3500 MHz", "f4g_3500", AppConfig.f4G_3500, prefs)
+                        } else {
+                            FilterToggleButton("700 MHz", "f4g_700", AppConfig.f4G_700, prefs)
+                            FilterToggleButton("800 MHz", "f4g_800", AppConfig.f4G_800, prefs)
+                            FilterToggleButton("900 MHz", "f4g_900", AppConfig.f4G_900, prefs)
+                            FilterToggleButton("1800 MHz", "f4g_1800", AppConfig.f4G_1800, prefs)
+                            FilterToggleButton("2100 MHz", "f4g_2100", AppConfig.f4G_2100, prefs)
+                            FilterToggleButton("2600 MHz", "f4g_2600", AppConfig.f4G_2600, prefs)
+                        }
                     }
                 }
             }
@@ -1286,8 +1414,14 @@ private fun NearbyFrequencyFilterSheet(
             androidx.compose.animation.AnimatedVisibility(visible = show3G) {
                 Column {
                     FreqRow("3G") {
-                        FilterToggleButton("900 MHz", "f3g_900", AppConfig.f3G_900, prefs)
-                        FilterToggleButton("2100 MHz", "f3g_2100", AppConfig.f3G_2100, prefs)
+                        if (isCanadaActive) {
+                            FilterToggleButton("850 MHz", "f3g_900", AppConfig.f3G_900, prefs)
+                            FilterToggleButton("1900 MHz (PCS)", "f3g_1900", AppConfig.f3G_1900, prefs)
+                            FilterToggleButton("2100 MHz (AWS)", "f3g_2100", AppConfig.f3G_2100, prefs)
+                        } else {
+                            FilterToggleButton("900 MHz", "f3g_900", AppConfig.f3G_900, prefs)
+                            FilterToggleButton("2100 MHz", "f3g_2100", AppConfig.f3G_2100, prefs)
+                        }
                     }
                 }
             }
@@ -1295,8 +1429,13 @@ private fun NearbyFrequencyFilterSheet(
             androidx.compose.animation.AnimatedVisibility(visible = show2G) {
                 Column {
                     FreqRow("2G") {
-                        FilterToggleButton("900 MHz", "f2g_900", AppConfig.f2G_900, prefs)
-                        FilterToggleButton("1800 MHz", "f2g_1800", AppConfig.f2G_1800, prefs)
+                        if (isCanadaActive) {
+                            FilterToggleButton("850 MHz", "f2g_900", AppConfig.f2G_900, prefs)
+                            FilterToggleButton("1900 MHz (PCS)", "f2g_1800", AppConfig.f2G_1800, prefs)
+                        } else {
+                            FilterToggleButton("900 MHz", "f2g_900", AppConfig.f2G_900, prefs)
+                            FilterToggleButton("1800 MHz", "f2g_1800", AppConfig.f2G_1800, prefs)
+                        }
                     }
                 }
             }
@@ -1887,7 +2026,7 @@ private suspend fun mapAntennasToUiSites(
         ).filterNotNull().joinToString(" ")
 
         UiSite(
-            id = main.idAnfr.toLongOrNull() ?: 0L,
+            id = main.idAnfr.toLongOrNull() ?: main.idAnfr.hashCode().toLong(),
             idSupport = supportIds.firstOrNull(),
             distance = dist.toInt(),
             address = addressParts.title,
@@ -2247,8 +2386,10 @@ private fun normalizeNearbySearchCompact(value: String): String {
     return withoutAccents.replace(Regex("[^a-z0-9]"), "")
 }
 
+private val NEARBY_POSTAL_CODE_REGEX = Regex("""\b(?:\d{5}|[A-Za-z]\d[A-Za-z][ -]?\d[A-Za-z]\d)\b""")
+
 private fun extractNearbyPostalCode(fullAddress: String): String? {
-    return Regex("""\b\d{5}\b""").find(fullAddress)?.value
+    return NEARBY_POSTAL_CODE_REGEX.find(fullAddress)?.value?.uppercase(Locale.ROOT)
 }
 
 private fun extractNearbyCity(fullAddress: String): String? {
@@ -2257,7 +2398,7 @@ private fun extractNearbyCity(fullAddress: String): String? {
         .lastOrNull { it.any(Char::isLetter) }
         ?: return null
     return candidate
-        .replace(Regex("""\b\d{5}\b"""), "")
+        .replace(NEARBY_POSTAL_CODE_REGEX, "")
         .trim(' ', ',', '-', ';')
         .takeIf { it.isNotBlank() }
 }

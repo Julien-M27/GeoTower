@@ -135,9 +135,13 @@ fun MapDownloadCard(
 
     // Catalogue embarqué dans l'app : affichage instantané, aucune requête serveur (voir
     // OfflineMapCatalog). Le drapeau distant OFFLINE_MAPS_CATALOG reste un interrupteur d'arrêt.
-    val catalog = remember(canLoadCatalog) {
+    var selectedMapCountry by remember {
+        mutableStateOf(fr.geotower.data.db.DatabaseCountryStore.activeCountryState.value)
+    }
+
+    val catalog = remember(canLoadCatalog, selectedMapCountry) {
         if (canLoadCatalog) {
-            OfflineMapCatalog.entries.filter { OfflineMapDownloadValidator.isValidCatalogEntry(it) }
+            OfflineMapCatalog.entriesFor(selectedMapCountry).filter { OfflineMapDownloadValidator.isValidCatalogEntry(it) }
         } else {
             emptyList()
         }
@@ -266,7 +270,30 @@ fun MapDownloadCard(
                 exit = fadeOut() + shrinkVertically()
             ) {
                 Column {
-                    Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
+                    Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = sizing.spacing(8.dp)),
+                        horizontalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))
+                    ) {
+                        fr.geotower.data.db.DatabaseCountry.entries.forEach { countryOption ->
+                            androidx.compose.material3.FilterChip(
+                                selected = selectedMapCountry == countryOption,
+                                onClick = { selectedMapCountry = countryOption },
+                                label = {
+                                    Text(
+                                        text = when (countryOption) {
+                                            fr.geotower.data.db.DatabaseCountry.FR -> "France"
+                                            fr.geotower.data.db.DatabaseCountry.CA -> "Canada"
+                                        },
+                                        maxLines = 1
+                                    )
+                                },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
 
                 catalog.forEachIndexed { index, map ->
                     val displayName = mapDisplayName(map)

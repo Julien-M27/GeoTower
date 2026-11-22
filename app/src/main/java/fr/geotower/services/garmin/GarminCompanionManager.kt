@@ -289,11 +289,7 @@ object GarminCompanionManager {
             // Récepteur direct BroadcastReceiver pour garantir la réception même si le SDK filtre
             try {
                 val filter = IntentFilter("com.garmin.android.connectiq.INCOMING_MESSAGE")
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    appCtx.registerReceiver(rawBroadcastReceiver, filter, Context.RECEIVER_EXPORTED)
-                } else {
-                    appCtx.registerReceiver(rawBroadcastReceiver, filter)
-                }
+                ContextCompat.registerReceiver(appCtx, rawBroadcastReceiver, filter, ContextCompat.RECEIVER_EXPORTED)
                 log("GarminBridge", "Récepteur broadcast direct enregistré")
             } catch (e: Exception) {
                 log("GarminBridge", "Erreur enregistrement récepteur direct", e)
@@ -528,13 +524,18 @@ object GarminCompanionManager {
                 val height = physiques.mapNotNull { it.hauteur }.filter { it > 0.0 }.maxOrNull()?.roundToInt() ?: 0
 
                 val fullAddress = techniques.firstOrNull { !it.adresse.isNullOrBlank() }?.adresse?.trim() ?: ""
-                val locationName = main.codeInsee?.let { "Insee $it" } ?: ""
+                val isCanadaSite = main.idAnfr.startsWith("CA-", ignoreCase = true)
+                val locationName = if (isCanadaSite) {
+                    main.codeInsee?.trim().orEmpty()
+                } else {
+                    main.codeInsee?.let { "Insee $it" } ?: ""
+                }
 
                 val ops = buildGarminOperators(group, techniques, physiques)
                 if (ops.isEmpty()) continue
 
                 val siteMap = HashMap<String, Any>()
-                siteMap["id"] = main.idAnfr.toIntOrNull() ?: 0
+                siteMap["id"] = main.idAnfr.toIntOrNull() ?: main.idAnfr.hashCode()
                 siteMap["d"] = distMeters
                 siteMap["az"] = bearingDeg
                 siteMap["lat"] = main.latitude
@@ -631,7 +632,35 @@ object GarminCompanionManager {
                 fr.geotower.utils.OperatorColors.PMT_VODAFONE_KEY -> 18
                 fr.geotower.utils.OperatorColors.VITI_KEY -> 19
                 fr.geotower.utils.OperatorColors.SPT_KEY -> 20
+                fr.geotower.utils.OperatorColors.ROGERS_KEY -> 21
+                fr.geotower.utils.OperatorColors.BELL_KEY -> 22
+                fr.geotower.utils.OperatorColors.TELUS_KEY -> 23
+                fr.geotower.utils.OperatorColors.VIDEOTRON_KEY -> 24
+                fr.geotower.utils.OperatorColors.FREEDOM_MOBILE_KEY -> 25
+                fr.geotower.utils.OperatorColors.SASKTEL_KEY -> 26
+                fr.geotower.utils.OperatorColors.XPLORE_KEY -> 27
+                fr.geotower.utils.OperatorColors.EASTLINK_KEY -> 28
+                fr.geotower.utils.OperatorColors.TBAYTEL_KEY -> 29
+                fr.geotower.utils.OperatorColors.SSI_MICRO_KEY -> 30
+                fr.geotower.utils.OperatorColors.ECOTEL_KEY -> 31
+                fr.geotower.utils.OperatorColors.COGECO_KEY -> 32
+                fr.geotower.utils.OperatorColors.SOGETEL_KEY -> 33
+                fr.geotower.utils.OperatorColors.ICE_WIRELESS_KEY -> 34
                 else -> when {
+                    rawOp.contains("ROGERS") -> 21
+                    rawOp.contains("BELL") -> 22
+                    rawOp.contains("TELUS") -> 23
+                    rawOp.contains("VIDEOTRON") || rawOp.contains("VIDÉOTRON") -> 24
+                    rawOp.contains("FREEDOM") -> 25
+                    rawOp.contains("SASKTEL") -> 26
+                    rawOp.contains("XPLORE") -> 27
+                    rawOp.contains("EASTLINK") -> 28
+                    rawOp.contains("TBAYTEL") -> 29
+                    rawOp.contains("SSI") -> 30
+                    rawOp.contains("ECOTEL") -> 31
+                    rawOp.contains("COGECO") -> 32
+                    rawOp.contains("SOGETEL") -> 33
+                    rawOp.contains("ICE") -> 34
                     rawOp.contains("FREE CARAIB") || rawOp.contains("FREE CARAÏB") -> 6
                     rawOp.contains("ORANGE") -> 1
                     rawOp.contains("SFR") -> 2
@@ -694,11 +723,19 @@ object GarminCompanionManager {
     private fun getGarminSupportCode(physiques: List<PhysiqueEntity>): Int {
         for (p in physiques) {
             val s = p.natureSupport?.lowercase(Locale.ROOT) ?: continue
-            if (s.contains("pylone") || s.contains("pylône") || s.contains("mât") || s.contains("mat")) return 1
-            if (s.contains("chateau d'eau") || s.contains("château d'eau") || s.contains("reservoir") || s.contains("réservoir")) return 2
-            if (s.contains("terrasse") || s.contains("toit") || s.contains("immeuble") || s.contains("batiment") || s.contains("bâtiment")) return 3
-            if (s.contains("clocher") || s.contains("eglise") || s.contains("église") || s.contains("cathedrale") || s.contains("cathédrale")) return 4
-            if (s.contains("eolienne") || s.contains("éolienne")) return 5
+            if (s.contains("pylone") || s.contains("pylône") || s.contains("mât") || s.contains("mat") ||
+                s.contains("tower") || s.contains("monopole") || s.contains("lattice") || s.contains("mast") || s.contains("pole")
+            ) return 1
+            if (s.contains("chateau d'eau") || s.contains("château d'eau") || s.contains("reservoir") || s.contains("réservoir") ||
+                s.contains("water tank")
+            ) return 2
+            if (s.contains("terrasse") || s.contains("toit") || s.contains("immeuble") || s.contains("batiment") || s.contains("bâtiment") ||
+                s.contains("rooftop") || s.contains("roof") || s.contains("building") || s.contains("indoor")
+            ) return 3
+            if (s.contains("clocher") || s.contains("eglise") || s.contains("église") || s.contains("cathedrale") || s.contains("cathédrale") ||
+                s.contains("church") || s.contains("steeple")
+            ) return 4
+            if (s.contains("eolienne") || s.contains("éolienne") || s.contains("wind turbine")) return 5
         }
         return 1
     }

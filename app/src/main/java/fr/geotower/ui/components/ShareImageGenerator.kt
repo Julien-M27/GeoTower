@@ -107,6 +107,7 @@ import fr.geotower.utils.parseAndSortFrequencies
 import fr.geotower.utils.radioBandCode
 import fr.geotower.utils.radioTechnologyFrequencyLabel
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -221,6 +222,7 @@ private suspend fun loadSharePhotoBitmaps(photos: List<CommunityPhoto>): List<Bi
  * relevé. Les opérateurs dont la source communautaire est coupée sont ignorés.
  */
 private suspend fun loadBestSpeedtestsForReport(
+    context: Context,
     antennas: List<LocalisationEntity>,
     prefs: android.content.SharedPreferences,
     supportId: String?
@@ -243,11 +245,20 @@ private suspend fun loadBestSpeedtestsForReport(
             .map { antenna ->
                 async {
                     val best = try {
+                        val isCaSite = antenna.idAnfr.startsWith("CA-", ignoreCase = true)
+                        val caRecordId = if (isCaSite) {
+                            withContext(Dispatchers.IO) {
+                                fr.geotower.data.CaIsedSiteDetailsRepository.loadForSite(context, antenna.idAnfr)
+                            }?.recordId?.takeIf { it.isNotBlank() }
+                        } else {
+                            null
+                        }
                         fetchBestSignalQuestSpeedtest(
                             operator = antenna.operateur,
-                            supportId = supportId,
-                            anfrCode = antenna.idAnfr,
-                            metric = metric
+                            supportId = caRecordId ?: supportId,
+                            anfrCode = caRecordId ?: antenna.idAnfr,
+                            metric = metric,
+                            market = if (isCaSite) "CA" else "FR"
                         )
                     } catch (e: CancellationException) {
                         // Ne jamais avaler l'annulation : c'est elle qui arme le délai côté appelant.
@@ -470,7 +481,7 @@ private fun isOnlyElevationProfileSelected(
     }
 }
 
-private fun shareElevationProfileBitmapOnly(
+private suspend fun shareElevationProfileBitmapOnly(
     context: Context,
     info: LocalisationEntity,
     bitmap: Bitmap,
@@ -478,10 +489,13 @@ private fun shareElevationProfileBitmapOnly(
     destination: ShareImageDestination = ShareImageDestination.Share,
     txtCopiedToClipboard: String = ""
 ) {
-    val imagesDir = File(context.cacheDir, "images")
-    imagesDir.mkdirs()
-    val file = File(imagesDir, "Geotower_site_${info.idAnfr}_profil_altimetrique.png")
-    FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+    val file = withContext(Dispatchers.IO) {
+        val imagesDir = File(context.cacheDir, "images")
+        imagesDir.mkdirs()
+        val outFile = File(imagesDir, "Geotower_site_${info.idAnfr}_profil_altimetrique.png")
+        FileOutputStream(outFile).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        outFile
+    }
     val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
     shareOrCopyImageUris(
         context = context,
@@ -1197,18 +1211,28 @@ private fun shareRadioCapture(
                 }
 
                 val file = File(cachePath, "${filePrefix}_$safeId.png")
-                FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                CoroutineScope(Dispatchers.Main).launch {
+                    try {
+                        withContext(Dispatchers.IO) {
+                            FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                        }
 
-                val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-                shareOrCopyImageUris(
-                    context = context,
-                    uris = listOf(uri),
-                    label = "Capture",
-                    chooserTitle = txtShareSiteVia,
-                    destination = destination,
-                    copiedMessage = txtCopiedToClipboard
-                )
-                onComplete?.invoke()
+                        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                        shareOrCopyImageUris(
+                            context = context,
+                            uris = listOf(uri),
+                            label = "Capture",
+                            chooserTitle = txtShareSiteVia,
+                            destination = destination,
+                            copiedMessage = txtCopiedToClipboard
+                        )
+                        onComplete?.invoke()
+                    } catch (e: Exception) {
+                        AppLogger.w(TAG_SHARE_IMAGE, "Radio share capture failed", e)
+                        Toast.makeText(context, txtInitError, Toast.LENGTH_SHORT).show()
+                        onComplete?.invoke()
+                    }
+                }
             } catch (e: Exception) {
                 AppLogger.w(TAG_SHARE_IMAGE, "Radio share capture failed", e)
                 Toast.makeText(context, txtInitError, Toast.LENGTH_SHORT).show()
@@ -2537,34 +2561,47 @@ private fun GeoTowerPdfAntennaReportContent(
                         cardBgColor = cardBgColor,
                         modifier = Modifier.fillMaxWidth()
                     ) {
+                        val isCanadaSite = info.idAnfr.startsWith("CA-", ignoreCase = true)
                         val nature = physique?.natureSupport?.takeIf { it.isNotBlank() } ?: txtNotSpecified
                         val supportHeight = physique?.hauteur?.let { formatSharePanelHeightMeters(it) } ?: txtNotSpecified
-                        val proprietaire = physique?.proprietaire?.takeIf { it.isNotBlank() }
-                            ?: stringResource(R.string.appstrings_unknown)
-                        val exploitant = physique?.exploitant?.takeIf { it.isNotBlank() } ?: txtNotSpecified
                         GeoTowerPdfInfoLine(txtSupportNature, nature, textMutedColor)
                         GeoTowerPdfInfoLine(txtSupportHeight, supportHeight, textMutedColor)
-                        GeoTowerPdfInfoLine(txtOwner, proprietaire, textMutedColor)
-                        GeoTowerPdfInfoLine(txtExploitant, exploitant, textMutedColor)
+                        if (!isCanadaSite) {
+                            val proprietaire = physique?.proprietaire?.takeIf { it.isNotBlank() }
+                                ?: stringResource(R.string.appstrings_unknown)
+                            val exploitant = physique?.exploitant?.takeIf { it.isNotBlank() } ?: txtNotSpecified
+                            GeoTowerPdfInfoLine(txtOwner, proprietaire, textMutedColor)
+                            GeoTowerPdfInfoLine(txtExploitant, exploitant, textMutedColor)
+                        } else {
+                            physique?.exploitant?.takeIf { it.isNotBlank() }?.let { exploitant ->
+                                GeoTowerPdfInfoLine(txtExploitant, exploitant, textMutedColor)
+                            }
+                        }
                     }
                 }
 
                 if (incIds && hasBlock("ids")) {
+                    val isCanadaSite = info.idAnfr.startsWith("CA-", ignoreCase = true)
                     GeoTowerPdfCard(
                         title = txtIdentifiers,
                         icon = Icons.Default.Tag,
                         cardBgColor = cardBgColor,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        val idSupportValue = physique?.idSupport?.takeIf { it.isNotBlank() } ?: txtNotSpecified
-                        val arcepNidtValue = info.arcepNidt?.takeIf { it.isNotBlank() } ?: txtNotSpecified
-                        GeoTowerPdfInfoLine(txtIdSupportLabel, idSupportValue, textMutedColor)
-                        GeoTowerPdfInfoLine(txtAnfrStationNumber, info.idAnfr, textMutedColor)
-                        GeoTowerPdfInfoLine(stringResource(arcepIdentifierLabelResId(info.operateur)), arcepNidtValue, textMutedColor)
+                        if (isCanadaSite) {
+                            GeoTowerPdfInfoLine(stringResource(R.string.appstrings_ca_ised_station_number_label), info.idAnfr, textMutedColor)
+                        } else {
+                            val idSupportValue = physique?.idSupport?.takeIf { it.isNotBlank() } ?: txtNotSpecified
+                            val arcepNidtValue = info.arcepNidt?.takeIf { it.isNotBlank() } ?: txtNotSpecified
+                            GeoTowerPdfInfoLine(txtIdSupportLabel, idSupportValue, textMutedColor)
+                            GeoTowerPdfInfoLine(txtAnfrStationNumber, info.idAnfr, textMutedColor)
+                            GeoTowerPdfInfoLine(stringResource(arcepIdentifierLabelResId(info.operateur)), arcepNidtValue, textMutedColor)
+                        }
                     }
                 }
 
                 if (incDates && hasBlock("dates")) {
+                    val isCanadaSite = info.idAnfr.startsWith("CA-", ignoreCase = true)
                     GeoTowerPdfCard(
                         title = txtDates,
                         icon = Icons.Default.DateRange,
@@ -2572,14 +2609,18 @@ private fun GeoTowerPdfAntennaReportContent(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         val dateImpStr = technique?.dateImplantation?.takeIf { it.isNotBlank() }
-                            ?.let { formatDateToFrench(it) } ?: "-"
+                            ?.let { formatDateToFrench(it) }
                         val dateSerStr = technique?.dateService?.takeIf { it.isNotBlank() }
-                            ?.let { formatDateToFrench(it) } ?: "-"
+                            ?.let { formatDateToFrench(it) }
                         val dateModStr = technique?.dateModif?.takeIf { it.isNotBlank() }
                             ?.let { formatDateToFrench(it) } ?: "-"
-                        GeoTowerPdfInfoLine(txtimplementation, dateImpStr, textMutedColor)
+                        if (!isCanadaSite || dateImpStr != null) {
+                            GeoTowerPdfInfoLine(txtimplementation, dateImpStr ?: "-", textMutedColor)
+                        }
                         GeoTowerPdfInfoLine(txtLastModification, dateModStr, textMutedColor)
-                        GeoTowerPdfInfoLine(stringResource(R.string.appstrings_activated_on), dateSerStr, textMutedColor)
+                        if (!isCanadaSite || dateSerStr != null) {
+                            GeoTowerPdfInfoLine(stringResource(R.string.appstrings_activated_on), dateSerStr ?: "-", textMutedColor)
+                        }
                     }
                 }
 
@@ -3510,7 +3551,7 @@ private fun GeoTowerPdfFooter(
     txtGeneratedBy: String
 ) {
     val generatedAt = remember { Date() }
-    val locale = Locale.getDefault()
+    val locale = androidx.compose.ui.platform.LocalConfiguration.current.locales[0] ?: Locale.ROOT
     val generatedDate = remember(generatedAt, locale) {
         SimpleDateFormat("d MMMM yyyy", locale).format(generatedAt)
     }
@@ -4362,27 +4403,37 @@ fun shareFullAntennaCapture(
                                                             alpha = 0.5f
                                                         )
                                                     )
+                                                    val isCanadaSite = info.idAnfr.startsWith("CA-", ignoreCase = true)
                                                     val nature =
                                                         physique?.natureSupport?.takeIf { it.isNotBlank() }
-                                                            ?: txtNotSpecified
-                                                    val proprietaire =
-                                                        physique?.proprietaire?.takeIf { it.isNotBlank() }
-                                                            ?: stringResource(R.string.appstrings_unknown)
-                                                    val exploitant =
-                                                        physique?.exploitant?.takeIf { it.isNotBlank() }
                                                             ?: txtNotSpecified
                                                     Text(
                                                         "$txtSupportNature : $nature",
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                                     )
-                                                    Text(
-                                                        "$txtOwner : $proprietaire",
-                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                    )
-                                                    Text(
-                                                        "$txtExploitant : $exploitant",
-                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                    )
+                                                    if (!isCanadaSite) {
+                                                        val proprietaire =
+                                                            physique?.proprietaire?.takeIf { it.isNotBlank() }
+                                                                ?: stringResource(R.string.appstrings_unknown)
+                                                        val exploitant =
+                                                            physique?.exploitant?.takeIf { it.isNotBlank() }
+                                                                ?: txtNotSpecified
+                                                        Text(
+                                                            "$txtOwner : $proprietaire",
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                        Text(
+                                                            "$txtExploitant : $exploitant",
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                    } else {
+                                                        physique?.exploitant?.takeIf { it.isNotBlank() }?.let { exploitant ->
+                                                            Text(
+                                                                "$txtExploitant : $exploitant",
+                                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                            )
+                                                        }
+                                                    }
                                                 }
                                             }
                                         }
@@ -4427,24 +4478,32 @@ fun shareFullAntennaCapture(
                                                             alpha = 0.5f
                                                         )
                                                     )
-                                                    val idSupportValue =
-                                                        physique?.idSupport?.takeIf { it.isNotBlank() }
-                                                            ?: txtNotSpecified
-                                                    Text(
-                                                        "$txtIdSupportLabel $idSupportValue",
-                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                    )
-                                                    Text(
-                                                        "$txtAnfrStationNumber ${info.idAnfr}",
-                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                    )
-                                                    val arcepNidtValue =
-                                                        info.arcepNidt?.takeIf { it.isNotBlank() }
-                                                            ?: txtNotSpecified
-                                                    Text(
-                                                        "${stringResource(arcepIdentifierLabelResId(info.operateur))}$arcepNidtValue",
-                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                    )
+                                                    val isCanadaSite = info.idAnfr.startsWith("CA-", ignoreCase = true)
+                                                    if (isCanadaSite) {
+                                                        Text(
+                                                            "${stringResource(R.string.appstrings_ca_ised_station_number_label)} : ${info.idAnfr}",
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                    } else {
+                                                        val idSupportValue =
+                                                            physique?.idSupport?.takeIf { it.isNotBlank() }
+                                                                ?: txtNotSpecified
+                                                        Text(
+                                                            "$txtIdSupportLabel $idSupportValue",
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                        Text(
+                                                            "$txtAnfrStationNumber ${info.idAnfr}",
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                        val arcepNidtValue =
+                                                            info.arcepNidt?.takeIf { it.isNotBlank() }
+                                                                ?: txtNotSpecified
+                                                        Text(
+                                                            "${stringResource(arcepIdentifierLabelResId(info.operateur))}$arcepNidtValue",
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                    }
                                                 }
                                             }
                                         }
@@ -4477,24 +4536,29 @@ fun shareFullAntennaCapture(
                                                             alpha = 0.5f
                                                         )
                                                     )
+                                                    val isCanadaSite = info.idAnfr.startsWith("CA-", ignoreCase = true)
                                                     val dateImpStr =
                                                         technique?.dateImplantation?.takeIf { it.isNotBlank() }
-                                                            ?.let { formatDateToFrench(it) } ?: "-"
+                                                            ?.let { formatDateToFrench(it) }
                                                     val dateSerStr =
                                                         technique?.dateService?.takeIf { it.isNotBlank() }
-                                                            ?.let { formatDateToFrench(it) } ?: "-"
+                                                            ?.let { formatDateToFrench(it) }
                                                     val dateModStr =
                                                         technique?.dateModif?.takeIf { it.isNotBlank() }
                                                             ?.let { formatDateToFrench(it) } ?: "-"
 
-                                                    Text(
-                                                        "$txtimplementation $dateImpStr",
-                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                    )
-                                                    Text(
-                                                        "$txtActivatedOn $dateSerStr",
-                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                    )
+                                                    if (!isCanadaSite || dateImpStr != null) {
+                                                        Text(
+                                                            "$txtimplementation ${dateImpStr ?: "-"}",
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                    }
+                                                    if (!isCanadaSite || dateSerStr != null) {
+                                                        Text(
+                                                            "$txtActivatedOn ${dateSerStr ?: "-"}",
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                    }
                                                     if (dateModStr != "-") {
                                                         Text(
                                                             "$txtLastModification $dateModStr",
@@ -4946,24 +5010,32 @@ fun shareFullAntennaCapture(
                                                     alpha = 0.5f
                                                 )
                                             )
-                                            val idSupportValue =
-                                                physique?.idSupport?.takeIf { it.isNotBlank() }
-                                                    ?: txtNotSpecified
-                                            Text(
-                                                "$txtIdSupportLabel $idSupportValue",
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                            Text(
-                                                "$txtAnfrStationNumber ${info.idAnfr}",
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                            val arcepNidtValue =
-                                                info.arcepNidt?.takeIf { it.isNotBlank() }
-                                                    ?: txtNotSpecified
-                                            Text(
-                                                "${stringResource(arcepIdentifierLabelResId(info.operateur))}$arcepNidtValue",
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
+                                            val isCanadaSite = info.idAnfr.startsWith("CA-", ignoreCase = true)
+                                            if (isCanadaSite) {
+                                                Text(
+                                                    "${stringResource(R.string.appstrings_ca_ised_station_number_label)} : ${info.idAnfr}",
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            } else {
+                                                val idSupportValue =
+                                                    physique?.idSupport?.takeIf { it.isNotBlank() }
+                                                        ?: txtNotSpecified
+                                                Text(
+                                                    "$txtIdSupportLabel $idSupportValue",
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                                Text(
+                                                    "$txtAnfrStationNumber ${info.idAnfr}",
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                                val arcepNidtValue =
+                                                    info.arcepNidt?.takeIf { it.isNotBlank() }
+                                                        ?: txtNotSpecified
+                                                Text(
+                                                    "${stringResource(arcepIdentifierLabelResId(info.operateur))}$arcepNidtValue",
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -5244,12 +5316,17 @@ fun shareFullSiteCapture(
                                                     HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
                                                     // ✅ ON UTILISE LES VRAIES DONNÉES DU PYLÔNE
+                                                    val isCanadaSite = mainInfo.idAnfr.startsWith("CA-", ignoreCase = true)
                                                     val technique = techniquesMap[mainInfo.idAnfr]
                                                     val fullAddress = technique?.adresse?.takeIf { it.isNotBlank() } ?: stringResource(R.string.appstrings_not_specified)
                                                     val nature = physique?.natureSupport?.takeIf { it.isNotBlank() } ?: txtNotSpecified
                                                     val proprietaire = physique?.proprietaire?.takeIf { it.isNotBlank() } ?: stringResource(R.string.appstrings_unknown)
                                                     val hauteur = formatShareHeightMeters(physique?.hauteur)
-                                                    val idSupportValue = physique?.idSupport?.takeIf { it.isNotBlank() } ?: txtNotSpecified
+                                                    val idSupportValue = if (isCanadaSite) {
+                                                        mainInfo.idAnfr
+                                                    } else {
+                                                        physique?.idSupport?.takeIf { it.isNotBlank() } ?: txtNotSpecified
+                                                    }
 
                                                     Text(buildAnnotatedString { withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)) { append("$txtIdNumber ") }; withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) { append(idSupportValue) } }, fontSize = 14.sp)
                                                     Spacer(modifier = Modifier.height(4.dp))
@@ -5258,8 +5335,10 @@ fun shareFullSiteCapture(
                                                     Text(buildAnnotatedString { withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)) { append("$txtGpsLabel ") }; withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) { append(String.format(Locale.US, "%.5f, %.5f", mainInfo.latitude, mainInfo.longitude)) } }, fontSize = 14.sp)
                                                     Spacer(modifier = Modifier.height(4.dp))
                                                     Text(buildAnnotatedString { withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)) { append("$txtSupportNature : ") }; withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) { append(nature) } }, fontSize = 14.sp)
-                                                    Spacer(modifier = Modifier.height(4.dp))
-                                                    Text(buildAnnotatedString { withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)) { append("$txtOwner : ") }; withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) { append(proprietaire) } }, fontSize = 14.sp)
+                                                    if (!isCanadaSite) {
+                                                        Spacer(modifier = Modifier.height(4.dp))
+                                                        Text(buildAnnotatedString { withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)) { append("$txtOwner : ") }; withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) { append(proprietaire) } }, fontSize = 14.sp)
+                                                    }
                                                     Spacer(modifier = Modifier.height(4.dp))
                                                     Text(buildAnnotatedString { withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)) { append("$txtSupportHeight ") }; withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) { append(hauteur) } }, fontSize = 14.sp)
 
@@ -5797,16 +5876,27 @@ private fun exportGeoTowerPdfPages(
                     }
                     // Spool immédiat : une seule page plein format vit en mémoire à la fois.
                     val pageFile = File(spoolDir, "page_${"%03d".format(pageFiles.size + 1)}.png")
-                    FileOutputStream(pageFile).use { page.compress(Bitmap.CompressFormat.PNG, 100, it) }
-                    page.recycle()
-                    pageFiles.add(pageFile)
+                    if (composeView.parent != null) rootView.removeView(composeView)
+                    CoroutineScope(Dispatchers.Main).launch {
+                        try {
+                            withContext(Dispatchers.IO) {
+                                FileOutputStream(pageFile).use { page.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                            }
+                            pageFiles.add(pageFile)
+                        } catch (e: Exception) {
+                            AppLogger.w(TAG_SHARE_IMAGE, "Report PDF page capture failed", e)
+                        } finally {
+                            page.recycle()
+                            renderPageAt(index + 1)
+                        }
+                    }
+                    return@postDelayed
                 }
             } catch (e: Exception) {
                 AppLogger.w(TAG_SHARE_IMAGE, "Report PDF page capture failed", e)
-            } finally {
-                if (composeView.parent != null) rootView.removeView(composeView)
-                renderPageAt(index + 1)
             }
+            if (composeView.parent != null) rootView.removeView(composeView)
+            renderPageAt(index + 1)
         }, 450)
     }
 
@@ -6179,15 +6269,20 @@ fun AntennaShareMenu(
             currentView.postDelayed({
                 try {
                     if (shareOnlyElevationProfile && elevationProfileBitmap != null) {
-                        shareElevationProfileBitmapOnly(
-                            context = context,
-                            info = info,
-                            bitmap = elevationProfileBitmap,
-                            txtShareSiteVia = txtShareSiteVia,
-                            destination = destination,
-                            txtCopiedToClipboard = txtPhotoCopiedToClipboard
-                        )
-                        isGeneratingShare = false
+                        CoroutineScope(Dispatchers.Main).launch {
+                            try {
+                                shareElevationProfileBitmapOnly(
+                                    context = context,
+                                    info = info,
+                                    bitmap = elevationProfileBitmap,
+                                    txtShareSiteVia = txtShareSiteVia,
+                                    destination = destination,
+                                    txtCopiedToClipboard = txtPhotoCopiedToClipboard
+                                )
+                            } finally {
+                                isGeneratingShare = false
+                            }
+                        }
                     } else {
                         val mapBmp = if (incMap) { globalMapRef?.let { map -> try { val bmp = Bitmap.createBitmap(map.width, map.height, Bitmap.Config.ARGB_8888); map.draw(Canvas(bmp)); bmp } catch (e: Exception) { null } } } else null
                         shareFullAntennaCapture(
@@ -6616,6 +6711,7 @@ fun SupportShareMenu(
             val speedtestByStation = if (incReportSpeedtest) {
                 withTimeoutOrNull(REPORT_SPEEDTEST_TIMEOUT_MS) {
                     loadBestSpeedtestsForReport(
+                        context = context,
                         antennas = antennas,
                         prefs = prefs,
                         supportId = physique?.idSupport
@@ -7121,18 +7217,28 @@ fun shareThroughputCapture(
                 cachePath.mkdirs()
                 val safeId = info.idAnfr.replace(Regex("[^A-Za-z0-9._-]"), "_")
                 val file = File(cachePath, "Geotower_throughput_$safeId.png")
-                FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                CoroutineScope(Dispatchers.Main).launch {
+                    try {
+                        withContext(Dispatchers.IO) {
+                            FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                        }
 
-                val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-                shareOrCopyImageUris(
-                    context = context,
-                    uris = listOf(uri),
-                    label = "Capture",
-                    chooserTitle = txtShareSiteVia,
-                    destination = destination,
-                    copiedMessage = txtCopiedToClipboard
-                )
-                onComplete?.invoke()
+                        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                        shareOrCopyImageUris(
+                            context = context,
+                            uris = listOf(uri),
+                            label = "Capture",
+                            chooserTitle = txtShareSiteVia,
+                            destination = destination,
+                            copiedMessage = txtCopiedToClipboard
+                        )
+                        onComplete?.invoke()
+                    } catch (e: Exception) {
+                        AppLogger.w(TAG_SHARE_IMAGE, "Throughput share capture failed", e)
+                        Toast.makeText(context, txtInitError, Toast.LENGTH_SHORT).show()
+                        onComplete?.invoke()
+                    }
+                }
             } catch (e: Exception) {
                 AppLogger.w(TAG_SHARE_IMAGE, "Throughput share capture failed", e)
                 Toast.makeText(context, txtInitError, Toast.LENGTH_SHORT).show()

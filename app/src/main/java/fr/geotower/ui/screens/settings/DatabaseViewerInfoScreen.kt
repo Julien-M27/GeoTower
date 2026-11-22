@@ -73,7 +73,8 @@ fun DatabaseViewerInfoScreen(navController: NavController) {
     var isLoadingTables by remember { mutableStateOf(false) }
     var isLoadingColumns by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    val language = context.resources.configuration.locales[0]?.language.orEmpty()
+    val resources = androidx.compose.ui.platform.LocalResources.current
+    val language = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]?.language.orEmpty()
 
     BackHandler(enabled = !safeBack.isLocked) { safeBack.navigateBack() }
 
@@ -91,12 +92,12 @@ fun DatabaseViewerInfoScreen(navController: NavController) {
             tables = discoveredTables
             selectedTable = discoveredTables.firstOrNull()
             if (discoveredTables.isEmpty()) {
-                errorMessage = context.getString(R.string.database_viewer_info_no_tables)
+                errorMessage = resources.getString(R.string.database_viewer_info_no_tables)
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
-            errorMessage = context.getString(
+            errorMessage = resources.getString(
                 if (error is DatabaseNotAvailableException) {
                     if (selectedDatabase.isOutages) R.string.database_viewer_missing_outages
                     else R.string.database_viewer_missing_database
@@ -120,7 +121,7 @@ fun DatabaseViewerInfoScreen(navController: NavController) {
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {
-            errorMessage = context.getString(R.string.database_viewer_read_error)
+            errorMessage = resources.getString(R.string.database_viewer_read_error)
         }
         isLoadingColumns = false
     }
@@ -168,18 +169,18 @@ fun DatabaseViewerInfoScreen(navController: NavController) {
             )
 
             DatabaseInfoCard(
-                title = stringResource(
-                    when (selectedDatabase) {
-                        InspectableDatabase.MOBILE -> R.string.database_viewer_mobile
-                        InspectableDatabase.RADIO -> R.string.database_viewer_radio
-                        InspectableDatabase.ENB -> R.string.database_viewer_enb
-                        InspectableDatabase.OUTAGES_OPERATORS -> R.string.database_viewer_outages_operators
-                        InspectableDatabase.OUTAGES_DAILY -> R.string.database_viewer_outages_daily
-                    },
-                ),
+                title = when (selectedDatabase) {
+                    InspectableDatabase.MOBILE -> stringResource(R.string.database_viewer_mobile)
+                    InspectableDatabase.MOBILE_CA -> "${stringResource(R.string.database_viewer_mobile)} (${stringResource(R.string.country_name_ca)})"
+                    InspectableDatabase.RADIO -> stringResource(R.string.database_viewer_radio)
+                    InspectableDatabase.ENB -> stringResource(R.string.database_viewer_enb)
+                    InspectableDatabase.OUTAGES_OPERATORS -> stringResource(R.string.database_viewer_outages_operators)
+                    InspectableDatabase.OUTAGES_DAILY -> stringResource(R.string.database_viewer_outages_daily)
+                },
                 body = stringResource(
                     when (selectedDatabase) {
                         InspectableDatabase.MOBILE -> R.string.database_viewer_info_mobile
+                        InspectableDatabase.MOBILE_CA -> R.string.database_viewer_info_mobile_ca
                         InspectableDatabase.RADIO -> R.string.database_viewer_info_radio
                         InspectableDatabase.ENB -> R.string.database_viewer_info_enb
                         InspectableDatabase.OUTAGES_OPERATORS -> R.string.database_viewer_info_outages_operators
@@ -289,6 +290,7 @@ private fun DatabaseChoiceMenu(
 @Composable
 private fun databaseLabel(database: InspectableDatabase): String = when (database) {
     InspectableDatabase.MOBILE -> stringResource(R.string.database_viewer_mobile)
+    InspectableDatabase.MOBILE_CA -> "${stringResource(R.string.database_viewer_mobile)} (${stringResource(R.string.country_name_ca)})"
     InspectableDatabase.RADIO -> stringResource(R.string.database_viewer_radio)
     InspectableDatabase.ENB -> stringResource(R.string.database_viewer_enb)
     InspectableDatabase.OUTAGES_OPERATORS -> stringResource(R.string.database_viewer_outages_operators)

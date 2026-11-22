@@ -78,6 +78,7 @@ import fr.geotower.utils.LocalizedDateLabels
 @Composable
 fun BackupScreen(navController: NavController) {
     val context = LocalContext.current
+    val resources = androidx.compose.ui.platform.LocalResources.current
     val uiStyle = LocalGeoTowerUiStyle.current
     val sizing = uiStyle.sizing
     val scrollState = rememberScrollState()
@@ -130,7 +131,7 @@ fun BackupScreen(navController: NavController) {
             importPreview = preview
             importSections = preview.sections.filter { it.hasChanges }.map { it.section }.toSet()
         }.onFailure {
-            importError = context.getString(R.string.backup_import_failed)
+            importError = resources.getString(R.string.backup_import_failed)
         }
     }
 
@@ -242,7 +243,7 @@ fun BackupScreen(navController: NavController) {
                                     context = context,
                                     json = json,
                                     fileName = AppBackupManager.suggestedFileName(),
-                                    chooserTitle = context.getString(R.string.backup_title)
+                                    chooserTitle = resources.getString(R.string.backup_title)
                                 )
                             }.onFailure {
                                 Toast.makeText(context, R.string.backup_export_failed, Toast.LENGTH_SHORT).show()

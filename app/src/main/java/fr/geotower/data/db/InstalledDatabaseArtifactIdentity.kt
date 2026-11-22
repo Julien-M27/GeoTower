@@ -18,52 +18,69 @@ object InstalledDatabaseArtifactIdentity {
     private const val MOBILE_LENGTH_KEY = "installed_mobile_db_length"
     private const val MOBILE_MODIFIED_AT_KEY = "installed_mobile_db_modified_at"
 
+    private fun versionKey(country: DatabaseCountry): String =
+        if (country == DatabaseCountry.FR) MOBILE_VERSION_KEY else "${MOBILE_VERSION_KEY}_${country.code}"
+
+    private fun sha256Key(country: DatabaseCountry): String =
+        if (country == DatabaseCountry.FR) MOBILE_SHA256_KEY else "${MOBILE_SHA256_KEY}_${country.code}"
+
+    private fun lengthKey(country: DatabaseCountry): String =
+        if (country == DatabaseCountry.FR) MOBILE_LENGTH_KEY else "${MOBILE_LENGTH_KEY}_${country.code}"
+
+    private fun modifiedAtKey(country: DatabaseCountry): String =
+        if (country == DatabaseCountry.FR) MOBILE_MODIFIED_AT_KEY else "${MOBILE_MODIFIED_AT_KEY}_${country.code}"
+
     fun recordMobileServerDownload(
         context: Context,
         databaseFile: File,
-        identity: DatabaseArtifactIdentity
+        identity: DatabaseArtifactIdentity,
+        country: DatabaseCountry = DatabaseCountryStore.getActive(context)
     ) {
         val snapshot = databaseFile.snapshotOrNull() ?: run {
-            clearMobile(context)
+            clearMobile(context, country)
             return
         }
         prefs(context).edit()
-            .putString(MOBILE_VERSION_KEY, DatabaseVersionPolicy.normalizedVersion(identity.version))
-            .putString(MOBILE_SHA256_KEY, identity.sha256?.trim()?.lowercase())
-            .putLong(MOBILE_LENGTH_KEY, snapshot.length)
-            .putLong(MOBILE_MODIFIED_AT_KEY, snapshot.modifiedAt)
+            .putString(versionKey(country), DatabaseVersionPolicy.normalizedVersion(identity.version))
+            .putString(sha256Key(country), identity.sha256?.trim()?.lowercase())
+            .putLong(lengthKey(country), snapshot.length)
+            .putLong(modifiedAtKey(country), snapshot.modifiedAt)
             .apply()
     }
 
     fun matchesInstalledMobile(
         context: Context,
         databaseFile: File,
-        proposed: DatabaseArtifactIdentity
+        proposed: DatabaseArtifactIdentity,
+        country: DatabaseCountry = DatabaseCountryStore.getActive(context)
     ): Boolean {
         val prefs = prefs(context)
         val snapshot = databaseFile.snapshotOrNull() ?: return false
         if (
-            prefs.getLong(MOBILE_LENGTH_KEY, -1L) != snapshot.length ||
-            prefs.getLong(MOBILE_MODIFIED_AT_KEY, -1L) != snapshot.modifiedAt
+            prefs.getLong(lengthKey(country), -1L) != snapshot.length ||
+            prefs.getLong(modifiedAtKey(country), -1L) != snapshot.modifiedAt
         ) {
-            clearMobile(context)
+            clearMobile(context, country)
             return false
         }
 
         val installed = DatabaseArtifactIdentity(
-            version = prefs.getString(MOBILE_VERSION_KEY, null),
-            sha256 = prefs.getString(MOBILE_SHA256_KEY, null)
+            version = prefs.getString(versionKey(country), null),
+            sha256 = prefs.getString(sha256Key(country), null)
         )
         if (installed.version.isNullOrBlank() && installed.sha256.isNullOrBlank()) return false
         return DatabaseArtifactIdentityPolicy.matches(proposed, installed)
     }
 
-    fun clearMobile(context: Context) {
+    fun clearMobile(
+        context: Context,
+        country: DatabaseCountry = DatabaseCountryStore.getActive(context)
+    ) {
         prefs(context).edit()
-            .remove(MOBILE_VERSION_KEY)
-            .remove(MOBILE_SHA256_KEY)
-            .remove(MOBILE_LENGTH_KEY)
-            .remove(MOBILE_MODIFIED_AT_KEY)
+            .remove(versionKey(country))
+            .remove(sha256Key(country))
+            .remove(lengthKey(country))
+            .remove(modifiedAtKey(country))
             .apply()
     }
 

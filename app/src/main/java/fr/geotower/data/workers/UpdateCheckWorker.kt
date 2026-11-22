@@ -27,6 +27,7 @@ class UpdateCheckWorker(private val context: Context, params: WorkerParameters) 
     private companion object {
         const val UPDATE_ALERTS_CHANNEL_ID = "update_alerts_channel"
         const val PREF_LAST_NOTIFIED_MOBILE_VERSION = "last_notified_db_version"
+        const val PREF_LAST_NOTIFIED_CA_MOBILE_VERSION = "last_notified_ca_db_version"
         const val PREF_LAST_NOTIFIED_RADIO_VERSION = "last_notified_radio_db_version"
         const val PREF_LAST_NOTIFIED_ENB_VERSION = "last_notified_enb_db_version"
     }
@@ -58,15 +59,27 @@ class UpdateCheckWorker(private val context: Context, params: WorkerParameters) 
             return Result.success()
         }
 
-        // Une indisponibilite du manifeste rend aussi les autres bases illisibles : on conserve le
-        // retry historique pour ne pas repousser toute la verification au lendemain.
-        val remote = DatabaseDownloader.getLatestDatabaseUpdateInfo() ?: return Result.retry()
-        if (remote.version.isNullOrBlank() && remote.sha256.isBlank()) {
-            UpdateCheckScheduler.scheduleNextAfterSuccessfulRun(context)
-            return Result.success()
+        val remoteFr = DatabaseDownloader.getLatestDatabaseUpdateInfo(country = fr.geotower.data.db.DatabaseCountry.FR)
+        val frDbFile = context.getDatabasePath(fr.geotower.data.db.DatabaseCountry.FR.dbFileName)
+        if (remoteFr != null &&
+            !(remoteFr.version.isNullOrBlank() && remoteFr.sha256.isBlank()) &&
+            frDbFile.isFile && frDbFile.length() > 0L
+        ) {
+            checkMobileUpdate(prefs, remoteFr)
         }
-
-        checkMobileUpdate(prefs, remote)
+        val caDbFile = context.getDatabasePath(fr.geotower.data.db.DatabaseCountry.CA.dbFileName)
+        val hasCaDb = caDbFile.isFile && caDbFile.length() > 0L
+        val remoteCa = if (hasCaDb) {
+            DatabaseDownloader.getLatestDatabaseUpdateInfo(country = fr.geotower.data.db.DatabaseCountry.CA)
+        } else {
+            null
+        }
+        if (remoteCa != null) {
+            checkCaMobileUpdate(prefs, remoteCa)
+        }
+        if (remoteFr == null && (!hasCaDb || remoteCa == null)) {
+            return Result.retry()
+        }
         checkRadioUpdate(prefs)
         checkEnbUpdate(prefs)
 
@@ -78,17 +91,18 @@ class UpdateCheckWorker(private val context: Context, params: WorkerParameters) 
         prefs: android.content.SharedPreferences,
         remote: DatabaseDownloader.UpdateInfo
     ) {
-        val localFileStatus = GeoTowerDatabaseValidator.getInstalledDatabaseFileStatus(context)
+        val fr = fr.geotower.data.db.DatabaseCountry.FR
+        val localFileStatus = GeoTowerDatabaseValidator.getInstalledDatabaseFileStatus(context, fr)
         val localVersion = if (localFileStatus.state != GeoTowerDatabaseValidator.LocalDatabaseState.MISSING) {
-            GeoTowerDatabaseValidator.getInstalledDatabaseVersion(context)
+            GeoTowerDatabaseValidator.getInstalledDatabaseVersion(context, fr)
         } else {
             null
         }
         if (localFileStatus.state != GeoTowerDatabaseValidator.LocalDatabaseState.MISSING) {
-            GeoTowerDatabaseValidator.getInstalledDatabaseStatus(context)
+            GeoTowerDatabaseValidator.getInstalledDatabaseStatus(context, country = fr)
         }
 
-        if (!DatabaseDownloader.isRemoteDatabaseUpdateAvailable(context, remote, localVersion)) {
+        if (!DatabaseDownloader.isRemoteDatabaseUpdateAvailable(context, remote, localVersion, fr)) {
             prefs.edit().putString(PREF_LAST_NOTIFIED_MOBILE_VERSION, remote.notificationIdentity()).apply()
             return
         }
@@ -103,12 +117,45 @@ class UpdateCheckWorker(private val context: Context, params: WorkerParameters) 
             val rebuild = LocalDbRebuildOffer.forMobile(context)
             showNotification(
                 type = NotificationHistoryStore.TYPE_DB_MOBILE,
-                section = if (rebuild) "db_local_build" else "db_mobile",
+                section = if (rebuild) "db_local_build" else "db_mobile_fr",
                 notificationId = DownloadNotificationCenter.DB_UPDATE_AVAILABLE_NOTIFICATION_ID,
                 rebuild = rebuild
             )
             // On sauvegarde qu'on l'a prévenu pour cette version
             prefs.edit().putString(PREF_LAST_NOTIFIED_MOBILE_VERSION, remote.notificationIdentity()).apply()
+        }
+    }
+
+    private fun checkCaMobileUpdate(
+        prefs: android.content.SharedPreferences,
+        remote: DatabaseDownloader.UpdateInfo
+    ) {
+        val ca = fr.geotower.data.db.DatabaseCountry.CA
+        val localFileStatus = GeoTowerDatabaseValidator.getInstalledDatabaseFileStatus(context, ca)
+        val localVersion = if (localFileStatus.state != GeoTowerDatabaseValidator.LocalDatabaseState.MISSING) {
+            GeoTowerDatabaseValidator.getInstalledDatabaseVersion(context, ca)
+        } else {
+            null
+        }
+        if (localFileStatus.state != GeoTowerDatabaseValidator.LocalDatabaseState.MISSING) {
+            GeoTowerDatabaseValidator.getInstalledDatabaseStatus(context, country = ca)
+        }
+
+        if (!DatabaseDownloader.isRemoteDatabaseUpdateAvailable(context, remote, localVersion, ca)) {
+            prefs.edit().putString(PREF_LAST_NOTIFIED_CA_MOBILE_VERSION, remote.notificationIdentity()).apply()
+            return
+        }
+
+        val lastNotified = prefs.getString(PREF_LAST_NOTIFIED_CA_MOBILE_VERSION, "")
+        if (shouldNotifyMobile(remote, localVersion, lastNotified)) {
+            showNotification(
+                type = NotificationHistoryStore.TYPE_DB_MOBILE,
+                section = "db_mobile_ca",
+                notificationId = DownloadNotificationCenter.CA_DB_UPDATE_AVAILABLE_NOTIFICATION_ID,
+                rebuild = false,
+                databaseNameOverride = "${context.getString(R.string.notification_history_type_db_mobile)} (Canada)"
+            )
+            prefs.edit().putString(PREF_LAST_NOTIFIED_CA_MOBILE_VERSION, remote.notificationIdentity()).apply()
         }
     }
 
@@ -188,9 +235,10 @@ class UpdateCheckWorker(private val context: Context, params: WorkerParameters) 
         type: String,
         section: String,
         notificationId: Int,
-        rebuild: Boolean = false
+        rebuild: Boolean = false,
+        databaseNameOverride: String? = null
     ) {
-        val databaseName = context.getString(databaseNameResource(type))
+        val databaseName = databaseNameOverride ?: context.getString(databaseNameResource(type))
         // Consigné avant le garde-fou : l'appelant note de toute façon la version comme annoncée,
         // donc sans cette ligne une mise à jour signalée notifications coupées ne laisserait
         // aucune trace nulle part.

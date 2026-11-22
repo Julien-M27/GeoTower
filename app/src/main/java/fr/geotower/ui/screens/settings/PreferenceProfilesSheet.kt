@@ -118,6 +118,7 @@ fun PreferenceProfilesSheet(
     val isOledMode by AppConfig.isOledMode
     val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
     val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
+    val resources = androidx.compose.ui.platform.LocalResources.current
     val scrollState = rememberScrollState()
 
     var profiles by remember { mutableStateOf(PreferenceProfileManager.profiles(context)) }
@@ -148,7 +149,7 @@ fun PreferenceProfilesSheet(
                     .map { PreferenceProfileImportConflict(imported, it) }
                 importPreview = PreferenceProfileImportPreview(listOf(imported), conflicts)
             } else {
-                importError = context.getString(R.string.preference_profiles_import_failed)
+                importError = resources.getString(R.string.preference_profiles_import_failed)
             }
         }
     }
@@ -189,10 +190,10 @@ fun PreferenceProfilesSheet(
             }.onSuccess { preview ->
                 importPreview = preview
             }.onFailure {
-                importError = context.getString(R.string.preference_profiles_import_failed)
+                importError = resources.getString(R.string.preference_profiles_import_failed)
             }
         }.onFailure {
-            importError = context.getString(R.string.preference_profiles_import_failed)
+            importError = resources.getString(R.string.preference_profiles_import_failed)
         }
     }
 
@@ -212,7 +213,7 @@ fun PreferenceProfilesSheet(
                 .map { PreferenceProfileImportConflict(imported, it) }
             importPreview = PreferenceProfileImportPreview(listOf(imported), conflicts)
         } else {
-            importError = context.getString(R.string.preference_profiles_import_qr_image_error)
+            importError = resources.getString(R.string.preference_profiles_import_qr_image_error)
         }
         runCatching { context.contentResolver.delete(uri, null, null) }
     }
@@ -227,7 +228,7 @@ fun PreferenceProfilesSheet(
                 .map { PreferenceProfileImportConflict(imported, it) }
             importPreview = PreferenceProfileImportPreview(listOf(imported), conflicts)
         } else {
-            importError = context.getString(R.string.preference_profiles_import_qr_image_error)
+            importError = resources.getString(R.string.preference_profiles_import_qr_image_error)
         }
     }
 
@@ -497,7 +498,7 @@ fun PreferenceProfilesSheet(
                 refreshProfiles()
                 Toast.makeText(
                     context,
-                    context.getString(
+                    resources.getString(
                         R.string.preference_profiles_import_success,
                         result.addedCount,
                         result.replacedCount

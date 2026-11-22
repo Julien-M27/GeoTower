@@ -120,9 +120,9 @@ class SiteComparatorModelTest {
             RadioFilterMasks.BAND_5G_3500
 
         val desc = formatBandTokensFromMask(mask, TechFrequencyOrder.DESCENDING)
-        assertEquals(listOf("5G 3500", "4G 2600", "4G 800", "2G 900"), desc)
+        assertEquals(listOf("5G 3500 MHz", "4G 2600 MHz", "4G 800 MHz", "2G 900 MHz"), desc)
 
         val asc = formatBandTokensFromMask(mask, TechFrequencyOrder.ASCENDING)
-        assertEquals(listOf("2G 900", "4G 800", "4G 2600", "5G 3500"), asc)
+        assertEquals(listOf("2G 900 MHz", "4G 800 MHz", "4G 2600 MHz", "5G 3500 MHz"), asc)
     }
 }

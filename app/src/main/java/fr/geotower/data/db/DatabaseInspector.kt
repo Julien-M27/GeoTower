@@ -24,6 +24,7 @@ enum class InspectableDatabase(
     val fileName: String,
 ) {
     MOBILE(GeoTowerDatabaseValidator.DB_NAME),
+    MOBILE_CA(DatabaseCountry.CA.dbFileName),
     RADIO(RadioDatabaseValidator.DB_NAME),
     ENB(EnbDatabaseValidator.DB_NAME),
     OUTAGES_OPERATORS(ServerOutageCache.fileFor(OutageSourceMode.OPERATORS)),

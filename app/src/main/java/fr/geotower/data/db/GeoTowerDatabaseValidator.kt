@@ -10,6 +10,10 @@ object GeoTowerDatabaseValidator {
     const val EXPECTED_COUNTRY_CODE = "FR"
     const val EXPECTED_SCHEMA_VERSION = 8
 
+    fun activeCountry(context: Context): DatabaseCountry = DatabaseCountryStore.getActive(context)
+
+    fun activeDbName(context: Context): String = activeCountry(context).dbFileName
+
     private const val LEGACY_DB_NAME = "geotower.db"
     private const val PREFS_NAME = "GeoTowerPrefs"
     private const val PREF_INVALID_REASON = "geotower_db_invalid_reason"
@@ -31,20 +35,34 @@ object GeoTowerDatabaseValidator {
         val reason: String? = null
     )
 
-    fun getInstalledDatabaseFileStatus(context: Context): LocalDatabaseStatus {
-        migrateLegacyDatabaseIfCurrentMissing(context)
-        val dbFile = context.getDatabasePath(DB_NAME)
+    fun getInstalledDatabaseFileStatus(
+        context: Context,
+        country: DatabaseCountry = activeCountry(context)
+    ): LocalDatabaseStatus {
+        val dbName = country.dbFileName
+        if (dbName == DB_NAME) {
+            migrateLegacyDatabaseIfCurrentMissing(context)
+        }
+        val dbFile = context.getDatabasePath(dbName)
         if (!dbFile.isFile || dbFile.length() <= 0L) {
-            clearInstalledDatabaseInvalid(context)
+            if (country == activeCountry(context)) {
+                clearInstalledDatabaseInvalid(context)
+            }
             return LocalDatabaseStatus(LocalDatabaseState.MISSING)
         }
 
         return LocalDatabaseStatus(LocalDatabaseState.VALID)
     }
 
-    fun getInstalledDatabaseVersion(context: Context): String? {
-        migrateLegacyDatabaseIfCurrentMissing(context)
-        val dbFile = context.getDatabasePath(DB_NAME)
+    fun getInstalledDatabaseVersion(
+        context: Context,
+        country: DatabaseCountry = activeCountry(context)
+    ): String? {
+        val dbName = country.dbFileName
+        if (dbName == DB_NAME) {
+            migrateLegacyDatabaseIfCurrentMissing(context)
+        }
+        val dbFile = context.getDatabasePath(dbName)
         if (!dbFile.isFile || dbFile.length() <= 0L) return null
         return readDatabaseVersion(dbFile)
     }
@@ -163,7 +181,7 @@ object GeoTowerDatabaseValidator {
         )
     )
 
-    private val criticalNonEmptyTables = listOf(
+    private val criticalNonEmptyTablesFr = listOf(
         "localisation",
         "technique",
         "support",
@@ -173,6 +191,15 @@ object GeoTowerDatabaseValidator {
         "ref_systeme",
         "ref_statut",
         "radio_stat_current"
+    )
+
+    private val criticalNonEmptyTablesCa = listOf(
+        "localisation",
+        "technique",
+        "support",
+        "metadata",
+        "ref_operateur",
+        "ref_statut"
     )
 
     private val expectedAffinities = mapOf(
@@ -274,22 +301,40 @@ object GeoTowerDatabaseValidator {
         "radio_stat_weekly" to listOf("week_key", "operator_name", "category", "item_key", "total_count", "active_count")
     )
 
-    fun getInstalledDatabaseStatus(context: Context, checkIntegrity: Boolean = false): LocalDatabaseStatus {
-        migrateLegacyDatabaseIfCurrentMissing(context)
-        val dbFile = context.getDatabasePath(DB_NAME)
+    fun getInstalledDatabaseStatus(
+        context: Context,
+        checkIntegrity: Boolean = false,
+        country: DatabaseCountry = activeCountry(context)
+    ): LocalDatabaseStatus {
+        if (country == DatabaseCountry.FR) {
+            migrateLegacyDatabaseIfCurrentMissing(context)
+        }
+        val dbFile = context.getDatabasePath(country.dbFileName)
         if (!dbFile.isFile || dbFile.length() <= 0L) {
-            clearInstalledDatabaseInvalid(context)
+            if (country == activeCountry(context)) {
+                clearInstalledDatabaseInvalid(context, country)
+            }
             return LocalDatabaseStatus(LocalDatabaseState.MISSING)
         }
 
-        val validation = validateDatabaseFile(dbFile, checkIntegrity = checkIntegrity)
+        val validation = validateDatabaseFile(
+            dbFile,
+            checkIntegrity = checkIntegrity,
+            expectedCountryCode = country.code
+        )
         return if (validation.isValid) {
-            deleteObsoleteDatabaseArtifacts(context)
-            clearInstalledDatabaseInvalid(context)
+            if (country == DatabaseCountry.FR) {
+                deleteObsoleteDatabaseArtifacts(context)
+            }
+            if (country == activeCountry(context)) {
+                clearInstalledDatabaseInvalid(context, country)
+            }
             LocalDatabaseStatus(LocalDatabaseState.VALID)
         } else {
             val reason = validation.reason ?: "Schema local incompatible"
-            markInstalledDatabaseInvalid(context, reason)
+            if (country == activeCountry(context)) {
+                markInstalledDatabaseInvalid(context, reason, country)
+            }
             LocalDatabaseStatus(LocalDatabaseState.INVALID, reason)
         }
     }
@@ -304,7 +349,11 @@ object GeoTowerDatabaseValidator {
         deleteObsoleteDatabaseArtifacts(context)
     }
 
-    fun validateDatabaseFile(file: File, checkIntegrity: Boolean = true): ValidationResult {
+    fun validateDatabaseFile(
+        file: File,
+        checkIntegrity: Boolean = true,
+        expectedCountryCode: String = EXPECTED_COUNTRY_CODE
+    ): ValidationResult {
         if (!file.isFile || file.length() <= 0L) {
             return ValidationResult(false, "Fichier de base absent ou vide")
         }
@@ -312,7 +361,7 @@ object GeoTowerDatabaseValidator {
         var db: SQLiteDatabase? = null
         return try {
             db = SQLiteDatabase.openDatabase(file.absolutePath, null, SQLiteDatabase.OPEN_READONLY)
-            validateOpenDatabase(db, checkIntegrity = checkIntegrity)
+            validateOpenDatabase(db, checkIntegrity = checkIntegrity, expectedCountryCode = expectedCountryCode)
         } catch (e: android.database.sqlite.SQLiteDatabaseLockedException) {
             ValidationResult(true)
         } catch (e: Exception) {
@@ -322,21 +371,35 @@ object GeoTowerDatabaseValidator {
         }
     }
 
-    fun markInstalledDatabaseInvalid(context: Context, reason: String) {
+    private fun invalidReasonKey(country: DatabaseCountry): String =
+        if (country == DatabaseCountry.FR) PREF_INVALID_REASON else "${PREF_INVALID_REASON}_${country.code}"
+
+    fun markInstalledDatabaseInvalid(
+        context: Context,
+        reason: String,
+        country: DatabaseCountry = activeCountry(context)
+    ) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
-            .putString(PREF_INVALID_REASON, reason)
+            .putString(invalidReasonKey(country), reason)
             .apply()
     }
 
-    fun clearInstalledDatabaseInvalid(context: Context) {
+    fun clearInstalledDatabaseInvalid(
+        context: Context,
+        country: DatabaseCountry = activeCountry(context)
+    ) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
-            .remove(PREF_INVALID_REASON)
+            .remove(invalidReasonKey(country))
             .apply()
     }
 
-    private fun validateOpenDatabase(db: SQLiteDatabase, checkIntegrity: Boolean = true): ValidationResult {
+    private fun validateOpenDatabase(
+        db: SQLiteDatabase,
+        checkIntegrity: Boolean = true,
+        expectedCountryCode: String = EXPECTED_COUNTRY_CODE
+    ): ValidationResult {
         if (checkIntegrity && !runIntegrityCheck(db)) {
             return ValidationResult(false, "PRAGMA integrity_check a echoue")
         }
@@ -402,18 +465,26 @@ object GeoTowerDatabaseValidator {
             }
         }
 
-        criticalNonEmptyTables.forEach { tableName ->
+        val nonEmptyTables = if (expectedCountryCode.equals(DatabaseCountry.CA.code, ignoreCase = true)) {
+            criticalNonEmptyTablesCa
+        } else {
+            criticalNonEmptyTablesFr
+        }
+        nonEmptyTables.forEach { tableName ->
             if (tableRowCount(db, tableName) <= 0L) {
                 return ValidationResult(false, "Table vide: $tableName")
             }
         }
 
-        validateMetadata(db)?.let { return it }
+        validateMetadata(db, expectedCountryCode)?.let { return it }
 
         return ValidationResult(true)
     }
 
-    private fun validateMetadata(db: SQLiteDatabase): ValidationResult? {
+    private fun validateMetadata(
+        db: SQLiteDatabase,
+        expectedCountryCode: String = EXPECTED_COUNTRY_CODE
+    ): ValidationResult? {
         val cursor = db.rawQuery(
             "SELECT schema_version, country_code FROM metadata LIMIT 1",
             null
@@ -428,7 +499,7 @@ object GeoTowerDatabaseValidator {
                     schemaVersion != EXPECTED_SCHEMA_VERSION -> {
                         ValidationResult(false, "Schema DB incompatible: $schemaVersion")
                     }
-                    countryCode != EXPECTED_COUNTRY_CODE -> {
+                    countryCode != expectedCountryCode.uppercase(Locale.US) -> {
                         ValidationResult(false, "Pays DB incompatible: $countryCode")
                     }
                     else -> null

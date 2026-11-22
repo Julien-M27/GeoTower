@@ -50,12 +50,17 @@ data class ApiServerDbVersionInfo(
     val server: ApiServer,
     val mobileDbVersion: String? = null,
     val mobileSizeBytes: Long? = null,
+    val caDbVersion: String? = null,
+    val caSizeBytes: Long? = null,
+    val caSourceDate: String? = null,
+    val caSourceZip: String? = null,
     val radioDbVersion: String? = null,
     val radioSizeBytes: Long? = null,
     val enbDbVersion: String? = null,
     val enbSizeBytes: Long? = null,
     val enbRowCount: Int? = null,
     val liveDbVersion: String? = null,
+    val caLiveDbVersion: String? = null,
     val liveGeneratedAt: String? = null,
     val liveStationCount: Int? = null,
     val anfrWeeklyDate: String? = null,
@@ -80,13 +85,20 @@ suspend fun fetchApiServerDbVersionInfo(
     }
 
     val liveStatus = try {
-        LiveDatabaseStatus.datasetForServer(server, forceRefresh)
+        LiveDatabaseStatus.datasetForServer(server, forceRefresh, fr.geotower.data.db.DatabaseCountry.FR)
+    } catch (_: Exception) {
+        null
+    }
+
+    val caLiveStatus = try {
+        LiveDatabaseStatus.datasetForServer(server, forceRefresh, fr.geotower.data.db.DatabaseCountry.CA)
     } catch (_: Exception) {
         null
     }
 
     val isUnreachable = manifest == null && liveStatus == null
     val mobileDb = manifest?.database
+    val caDb = manifest?.caDatabase
     val radioDb = manifest?.radioDatabase
     val enbDb = manifest?.enbDatabase
 
@@ -94,12 +106,17 @@ suspend fun fetchApiServerDbVersionInfo(
         server = server,
         mobileDbVersion = mobileDb?.version,
         mobileSizeBytes = mobileDb?.sizeBytes,
+        caDbVersion = caDb?.version,
+        caSizeBytes = caDb?.sizeBytes,
+        caSourceDate = caDb?.dateAnfr,
+        caSourceZip = caDb?.zipVersion ?: if (caDb != null) "Site_Data_Extract_FX.zip" else null,
         radioDbVersion = radioDb?.version,
         radioSizeBytes = radioDb?.sizeBytes,
         enbDbVersion = enbDb?.version,
         enbSizeBytes = enbDb?.sizeBytes,
         enbRowCount = enbDb?.rowCount ?: enbDb?.operators?.sumOf { it.rowCount }?.takeIf { it > 0 },
         liveDbVersion = liveStatus?.offlineDbVersion,
+        caLiveDbVersion = caLiveStatus?.offlineDbVersion,
         liveGeneratedAt = liveStatus?.generatedAt,
         liveStationCount = liveStatus?.stationCount,
         anfrWeeklyDate = liveStatus?.dateMajAnfr ?: mobileDb?.dateAnfr,
@@ -265,24 +282,34 @@ private fun ApiServersDatabaseVersionsTable(
                 categoryTitle = stringResource(R.string.appstrings_version_table_category_versions),
                 rows = listOf(
                     TableRowData(
-                        label = stringResource(R.string.appstrings_version_mobile_db_short),
+                        label = "Base mobile (France)",
                         primaryValue = formatVersion(primaryVersions.mobileDbVersion, primaryVersions.unreachable, primaryVersions.isLoading),
                         mirrorValue = formatVersion(mirrorVersions.mobileDbVersion, mirrorVersions.unreachable, mirrorVersions.isLoading)
                     ),
                     TableRowData(
-                        label = stringResource(R.string.appstrings_version_radio_db_short),
+                        label = "Base mobile (Canada)",
+                        primaryValue = formatVersion(primaryVersions.caDbVersion, primaryVersions.unreachable, primaryVersions.isLoading),
+                        mirrorValue = formatVersion(mirrorVersions.caDbVersion, mirrorVersions.unreachable, mirrorVersions.isLoading)
+                    ),
+                    TableRowData(
+                        label = "Base radio (France)",
                         primaryValue = formatVersion(primaryVersions.radioDbVersion, primaryVersions.unreachable, primaryVersions.isLoading),
                         mirrorValue = formatVersion(mirrorVersions.radioDbVersion, mirrorVersions.unreachable, mirrorVersions.isLoading)
                     ),
                     TableRowData(
-                        label = stringResource(R.string.appstrings_version_enb_db_short),
+                        label = "Base eNB (France)",
                         primaryValue = formatVersion(primaryVersions.enbDbVersion, primaryVersions.unreachable, primaryVersions.isLoading),
                         mirrorValue = formatVersion(mirrorVersions.enbDbVersion, mirrorVersions.unreachable, mirrorVersions.isLoading)
                     ),
                     TableRowData(
-                        label = stringResource(R.string.appstrings_version_live_db_short),
+                        label = "Base en ligne (France)",
                         primaryValue = formatVersion(primaryVersions.liveDbVersion, primaryVersions.unreachable, primaryVersions.isLoading),
                         mirrorValue = formatVersion(mirrorVersions.liveDbVersion, mirrorVersions.unreachable, mirrorVersions.isLoading)
+                    ),
+                    TableRowData(
+                        label = "Base en ligne (Canada)",
+                        primaryValue = formatVersion(primaryVersions.caLiveDbVersion, primaryVersions.unreachable, primaryVersions.isLoading),
+                        mirrorValue = formatVersion(mirrorVersions.caLiveDbVersion, mirrorVersions.unreachable, mirrorVersions.isLoading)
                     )
                 )
             )
@@ -294,17 +321,22 @@ private fun ApiServersDatabaseVersionsTable(
                 categoryTitle = stringResource(R.string.appstrings_version_table_category_sources),
                 rows = listOf(
                     TableRowData(
-                        label = stringResource(R.string.appstrings_version_anfr_weekly_short),
+                        label = "Données hebdomadaires (France)",
                         primaryValue = formatDate(primaryVersions.anfrWeeklyDate, primaryVersions.unreachable, primaryVersions.isLoading),
                         mirrorValue = formatDate(mirrorVersions.anfrWeeklyDate, mirrorVersions.unreachable, mirrorVersions.isLoading)
                     ),
                     TableRowData(
-                        label = stringResource(R.string.appstrings_version_monthly_label).replace("\n", " "),
+                        label = "Données mensuelles (France)",
                         primaryValue = formatMonthly(primaryVersions.anfrMonthlyVersion, primaryVersions.unreachable, primaryVersions.isLoading),
                         mirrorValue = formatMonthly(mirrorVersions.anfrMonthlyVersion, mirrorVersions.unreachable, mirrorVersions.isLoading)
                     ),
                     TableRowData(
-                        label = stringResource(R.string.appstrings_version_quarterly_label).replace("\n", " "),
+                        label = "Données mensuelles (Canada)",
+                        primaryValue = formatMonthly(primaryVersions.caSourceZip ?: primaryVersions.caSourceDate, primaryVersions.unreachable, primaryVersions.isLoading),
+                        mirrorValue = formatMonthly(mirrorVersions.caSourceZip ?: mirrorVersions.caSourceDate, mirrorVersions.unreachable, mirrorVersions.isLoading)
+                    ),
+                    TableRowData(
+                        label = "Données trimestrielles (France)",
                         primaryValue = formatQuarterly(primaryVersions.arcepQuarterlyVersion, primaryVersions.unreachable, primaryVersions.isLoading),
                         mirrorValue = formatQuarterly(mirrorVersions.arcepQuarterlyVersion, mirrorVersions.unreachable, mirrorVersions.isLoading)
                     )
@@ -318,17 +350,22 @@ private fun ApiServersDatabaseVersionsTable(
                 categoryTitle = stringResource(R.string.appstrings_version_table_category_sizes),
                 rows = listOf(
                     TableRowData(
-                        label = stringResource(R.string.appstrings_version_table_size_mobile),
+                        label = "Base mobile (France)",
                         primaryValue = formatSize(primaryVersions.mobileSizeBytes, primaryVersions.unreachable, primaryVersions.isLoading),
                         mirrorValue = formatSize(mirrorVersions.mobileSizeBytes, mirrorVersions.unreachable, mirrorVersions.isLoading)
                     ),
                     TableRowData(
-                        label = stringResource(R.string.appstrings_version_table_size_radio),
+                        label = "Base mobile (Canada)",
+                        primaryValue = formatSize(primaryVersions.caSizeBytes, primaryVersions.unreachable, primaryVersions.isLoading),
+                        mirrorValue = formatSize(mirrorVersions.caSizeBytes, mirrorVersions.unreachable, mirrorVersions.isLoading)
+                    ),
+                    TableRowData(
+                        label = "Base radio (France)",
                         primaryValue = formatSize(primaryVersions.radioSizeBytes, primaryVersions.unreachable, primaryVersions.isLoading),
                         mirrorValue = formatSize(mirrorVersions.radioSizeBytes, mirrorVersions.unreachable, mirrorVersions.isLoading)
                     ),
                     TableRowData(
-                        label = stringResource(R.string.appstrings_version_table_size_enb),
+                        label = "Base eNB (France)",
                         primaryValue = formatSize(primaryVersions.enbSizeBytes, primaryVersions.unreachable, primaryVersions.isLoading),
                         mirrorValue = formatSize(mirrorVersions.enbSizeBytes, mirrorVersions.unreachable, mirrorVersions.isLoading)
                     )
@@ -339,7 +376,7 @@ private fun ApiServersDatabaseVersionsTable(
         // 4. Volumes & Publication
         add(
             TableGroupData(
-                categoryTitle = stringResource(R.string.appstrings_version_table_category_stats),
+                categoryTitle = "${stringResource(R.string.appstrings_version_table_category_stats)} (France)",
                 rows = listOf(
                     TableRowData(
                         label = stringResource(R.string.appstrings_version_table_live_stations),
@@ -365,7 +402,7 @@ private fun ApiServersDatabaseVersionsTable(
         if (hasEnbOps) {
             add(
                 TableGroupData(
-                    categoryTitle = stringResource(R.string.appstrings_version_table_category_enb_operators),
+                    categoryTitle = "${stringResource(R.string.appstrings_version_table_category_enb_operators)} (France)",
                     rows = listOf(
                         TableRowData(
                             label = stringResource(R.string.appstrings_operator_orange),

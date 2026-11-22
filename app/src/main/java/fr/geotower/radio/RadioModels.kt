@@ -6,7 +6,8 @@ const val THROUGHPUT_CALCULATION_VERSION = "FR_RADIO_THROUGHPUT_V1"
 
 enum class CountryScope {
     FR_METRO,
-    OUTRE_MER
+    OUTRE_MER,
+    CANADA
 }
 
 enum class MobileOperator(
@@ -33,7 +34,21 @@ enum class MobileOperator(
     ONATI("ONATi (Vini)", "#00A3E0", listOf("ONATI", "ONATI VINI", "VINI")),
     PMT_VODAFONE("PMT/Vodafone", "#E60000", listOf("PMT/VODAFONE", "PMT", "VODAFONE")),
     VITI("Ora (Vini)", "#005B2F", listOf("ORA", "ORA VINI", "VITI", "VITI SAS")),
-    SPT("SPT", "#00806A", listOf("SPT"));
+    SPT("SPT", "#00806A", listOf("SPT")),
+    ROGERS("Rogers", "#EE2722", listOf("ROGERS", "ROGERS COMMUNICATIONS", "ROGERS WIRELESS")),
+    BELL("Bell", "#00549A", listOf("BELL", "BELL MOBILITY", "BELL CANADA", "BELL MTS", "BELL ALIANT")),
+    TELUS("Telus", "#4B286D", listOf("TELUS", "TELUS MOBILITY", "TELUS COMMUNICATIONS")),
+    VIDEOTRON("Videotron", "#FFD200", listOf("VIDEOTRON", "VIDÉOTRON", "VIDEOTRON LTEE")),
+    FREEDOM("Freedom Mobile", "#EE6B1E", listOf("FREEDOM", "FREEDOM MOBILE")),
+    SASKTEL("SaskTel", "#00698C", listOf("SASKTEL")),
+    EASTLINK("Eastlink", "#00AEEF", listOf("EASTLINK")),
+    TBAYTEL("Tbaytel", "#0072CE", listOf("TBAYTEL")),
+    ICE_WIRELESS("Ice Wireless", "#1E88E5", listOf("ICE WIRELESS")),
+    COGECO("Cogeco", "#0082C8", listOf("COGECO")),
+    XPLORE("Xplore", "#FF6600", listOf("XPLORE", "XPLORNET")),
+    SOGETEL("Sogetel", "#2E7D32", listOf("SOGETEL")),
+    ECOTEL("Ecotel", "#5C6BC0", listOf("ECOTEL")),
+    SSI_MICRO("SSI Micro", "#546E7A", listOf("SSI MICRO", "SSIMICRO"));
 
     companion object {
         fun fromLabel(raw: String?): MobileOperator? {
@@ -74,6 +89,7 @@ enum class DataSource {
     ANFR,
     CARTORADIO,
     ARCEP,
+    ISDE,
     LOCAL,
     PROFILE_ASSUMPTION
 }

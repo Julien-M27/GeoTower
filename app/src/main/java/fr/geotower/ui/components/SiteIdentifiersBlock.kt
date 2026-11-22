@@ -40,7 +40,10 @@ fun SiteIdentifiersBlock(
     val sizing = LocalGeoTowerUiStyle.current.sizing
     val context = LocalContext.current
 
-    val txtIdentifiers = stringResource(R.string.appstrings_identifiers)
+    val isCanadaSite = info.idAnfr.startsWith("CA-")
+    val txtIdentifiers = stringResource(
+        if (isCanadaSite) R.string.appstrings_identifier_singular else R.string.appstrings_identifiers
+    )
     val txtIdSupportLabel = stringResource(R.string.appstrings_id_support_label)
     val txtAnfrStationNumber = stringResource(R.string.appstrings_anfr_station_number)
     val txtArcepIdentifierLabel = stringResource(arcepIdentifierLabelResId(info.operateur))
@@ -58,37 +61,45 @@ fun SiteIdentifiersBlock(
             }
             HorizontalDivider(modifier = Modifier.padding(vertical = sizing.spacing(12.dp)), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
-            val idSupportValue = idSupport ?: txtNotSpecified // ✅ ON UTILISE LE VRAI ID SUPPORT
-            InfoLine(
-                label = txtIdSupportLabel,
-                value = idSupportValue,
-                onCopy = {
-                    if (idSupportValue != txtNotSpecified) {
-                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        clipboard.setPrimaryClip(ClipData.newPlainText(txtIdSupportCopy, idSupportValue))
-                        ShareHistoryStore.recordFieldCopy(
-                            context = context,
-                            field = ShareHistoryStore.FIELD_ID_SUPPORT,
-                            value = idSupportValue,
-                            stationId = info.idAnfr,
-                            supportId = idSupport,
-                            latitude = info.latitude,
-                            longitude = info.longitude
-                        )
-                        Toast.makeText(context, txtIdCopied, Toast.LENGTH_SHORT).show()
-                    } else {
-                        Toast.makeText(context, txtIdUnavailable, Toast.LENGTH_SHORT).show()
+            if (!isCanadaSite) {
+                val idSupportValue = idSupport ?: txtNotSpecified // ✅ ON UTILISE LE VRAI ID SUPPORT
+                InfoLine(
+                    label = txtIdSupportLabel,
+                    value = idSupportValue,
+                    onCopy = {
+                        if (idSupportValue != txtNotSpecified) {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            clipboard.setPrimaryClip(ClipData.newPlainText(txtIdSupportCopy, idSupportValue))
+                            ShareHistoryStore.recordFieldCopy(
+                                context = context,
+                                field = ShareHistoryStore.FIELD_ID_SUPPORT,
+                                value = idSupportValue,
+                                stationId = info.idAnfr,
+                                supportId = idSupport,
+                                latitude = info.latitude,
+                                longitude = info.longitude
+                            )
+                            Toast.makeText(context, txtIdCopied, Toast.LENGTH_SHORT).show()
+                        } else {
+                            Toast.makeText(context, txtIdUnavailable, Toast.LENGTH_SHORT).show()
+                        }
                     }
-                }
-            )
+                )
 
-            Spacer(modifier = Modifier.height(sizing.spacing(4.dp)))
+                Spacer(modifier = Modifier.height(sizing.spacing(4.dp)))
+            }
 
-            val anfrLabelClean = txtAnfrStationNumber.replace(" : ", "")
+            val stationNumberLabel = if (isCanadaSite) {
+                val caCode = if (androidx.compose.ui.platform.LocalConfiguration.current.locales[0]?.language.equals("fr", ignoreCase = true)) "ISDE" else "ISED"
+                txtAnfrStationNumber.replace("ANFR", caCode, ignoreCase = true)
+            } else {
+                txtAnfrStationNumber
+            }
+            val anfrLabelClean = stationNumberLabel.replace(" : ", "")
             val idAnfrValue = info.idAnfr.takeIf { it.isNotBlank() } ?: txtNotSpecified // ✅ ON RÉCUPÈRE L'ID ANFR
 
             InfoLine(
-                label = txtAnfrStationNumber,
+                label = stationNumberLabel,
                 value = idAnfrValue, // ✅ ON UTILISE L'ID ANFR ICI
                 onCopy = {
                     if (idAnfrValue != txtNotSpecified) {
@@ -110,31 +121,33 @@ fun SiteIdentifiersBlock(
                 }
             )
 
-            Spacer(modifier = Modifier.height(sizing.spacing(4.dp)))
+            if (!isCanadaSite) {
+                Spacer(modifier = Modifier.height(sizing.spacing(4.dp)))
 
-            val arcepNidtValue = info.arcepNidt?.takeIf { it.isNotBlank() } ?: txtNotSpecified
-            InfoLine(
-                label = txtArcepIdentifierLabel,
-                value = arcepNidtValue,
-                onCopy = {
-                    if (arcepNidtValue != txtNotSpecified) {
-                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        clipboard.setPrimaryClip(ClipData.newPlainText(txtArcepIdentifierLabel.substringBefore(":").trim(), arcepNidtValue))
-                        ShareHistoryStore.recordFieldCopy(
-                            context = context,
-                            field = ShareHistoryStore.FIELD_ARCEP,
-                            value = arcepNidtValue,
-                            stationId = info.idAnfr,
-                            supportId = idSupport,
-                            latitude = info.latitude,
-                            longitude = info.longitude
-                        )
-                        Toast.makeText(context, txtIdCopied, Toast.LENGTH_SHORT).show()
-                    } else {
-                        Toast.makeText(context, txtIdUnavailable, Toast.LENGTH_SHORT).show()
+                val arcepNidtValue = info.arcepNidt?.takeIf { it.isNotBlank() } ?: txtNotSpecified
+                InfoLine(
+                    label = txtArcepIdentifierLabel,
+                    value = arcepNidtValue,
+                    onCopy = {
+                        if (arcepNidtValue != txtNotSpecified) {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            clipboard.setPrimaryClip(ClipData.newPlainText(txtArcepIdentifierLabel.substringBefore(":").trim(), arcepNidtValue))
+                            ShareHistoryStore.recordFieldCopy(
+                                context = context,
+                                field = ShareHistoryStore.FIELD_ARCEP,
+                                value = arcepNidtValue,
+                                stationId = info.idAnfr,
+                                supportId = idSupport,
+                                latitude = info.latitude,
+                                longitude = info.longitude
+                            )
+                            Toast.makeText(context, txtIdCopied, Toast.LENGTH_SHORT).show()
+                        } else {
+                            Toast.makeText(context, txtIdUnavailable, Toast.LENGTH_SHORT).show()
+                        }
                     }
-                }
-            )
+                )
+            }
         }
     }
 }

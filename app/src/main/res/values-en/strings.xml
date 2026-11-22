@@ -1,4 +1,4 @@
-﻿<resources>
+<resources>
     <string name="antenna_widget_label">Nearby antennas</string>
     <string name="antenna_map_widget_label">Nearby antenna map</string>
     <string name="common_logo">Logo</string>
@@ -3518,6 +3518,7 @@
     <string name="appstrings_release_v2129_summary_fh_map_rendering_optimization">Fluidity optimization for the microwave links (FH) map using batched rendering and adaptive zoom detail</string>
     <string name="appstrings_release_v2130_summary_fh_map_world_bounds_and_min_zoom">Minimum zoom and world map bounds enforcement on the microwave links (FH) map</string>
     <string name="appstrings_release_v2131_summary_fh_filters_export_and_wear_improvements">Distance filters and export on the FH map, compass/IGN alerts, network log pagination, and Wear OS enhancements</string>
+    <string name="appstrings_release_v2132_summary_canada_support_and_watch_sync">Full Canada support (ISED databases, 14 operators, bands, Android Auto) and Wear OS/Garmin API failover</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Network requests log</string>
@@ -3669,7 +3670,7 @@
     <string name="fh_map_empty_area">No microwave links in this area</string>
     <string name="fh_map_distance_5_20km">5–20 km</string>
     <string name="appstrings_compass_calibration_needed">Low compass accuracy: calibrate by moving in a figure-8</string>
-    <string name="fh_map_title">Microwave links map</string>
+    <string name="fh_map_title">Microwave links map (France)</string>
     <string name="appstrings_coverage_compute_error">Error computing theoretical coverage</string>
     <string name="fh_map_distance_all">All lengths</string>
     <string name="fh_map_export">Export microwave links</string>
@@ -3680,4 +3681,53 @@
     <string name="fh_map_filter_operators">Filter microwave operators</string>
     <string name="fh_map_subtitle_counts">%1$s / %2$s links • %3$d/%4$d operators</string>
     <string name="network_log_load_more">Load more</string>
+    <string name="country_db_source_online">Online</string>
+    <string name="country_db_source_local">Local</string>
+    <string name="country_db_source_status_online">%1$s: online database</string>
+    <string name="country_db_source_status_local">%1$s: local database</string>
+    <string name="appstrings_date_singular">Date</string>
+    <string name="appstrings_identifier_singular">Identifier</string>
+    <string name="appstrings_declared_sites_label">Declared sites</string>
+    <string name="country_name_ca">Canada</string>
+    <string name="appstrings_ca_ised_station_number_label">ISED station number</string>
+    <string name="site_isde_title">ISED site %1$s</string>
+    <string name="car_technical_ids_isde">ISED identifiers</string>
+    <string name="about_source_ca_ised_title">Mobile antennas (Canada — ISED)</string>
+    <string name="about_source_ca_ised_desc">Technical data and frequencies of cellular stations published by Innovation, Science and Economic Development Canada (ISED).</string>
+    <string name="about_source_ca_tafl_label">TAFL Data (Site Data Extract)</string>
+    <string name="fh_map_no_table_hint">Download or update the France database to display microwave links.</string>
+    <string name="fh_map_live_zoom_title">Live database active</string>
+    <string name="fh_map_live_zoom_desc">The live online database is being used. Zoom in to display microwave links.</string>
+    <string name="fh_map_empty_area_hint">Zoom out or pan the map to display microwave links.</string>
+    <string name="database_viewer_info_mobile_ca">File: geotower_ca.db. This is the main ISED Canada mobile sites database. localisation contains each site and its coordinates; technique contains service status, dates, and frequency details; support, antenne, and ca_ised_site_details describe physical supports, radio panels, and TAFL sector parameters. metadata and source_versions indicate the data version and sources. radio_stat_* and dept_stat_* store computed statistics; room_master_table keeps the Room schema identity.</string>
+    <string name="local_mode_canada_note">For Canada (ISED), the database is only prepared server-side (the source file is too large for on-device processing) and there is no outage feed.</string>
+    <string name="country_db_chip_fr">France (ANFR)</string>
+    <string name="country_db_chip_ca">Canada (ISED)</string>
+    <string name="site_comparator_section_azimuths">Azimuths</string>
+    <string name="site_comparator_section_dates_ised">ISED date</string>
+    <string name="site_comparator_section_dates_mixed">ANFR / ISED dates</string>
+    <string name="throughput_ca_warning_details_unavailable">ISED sector details unavailable for this site: bandwidths and transmit powers are estimated.</string>
+    <string name="throughput_ca_assumption_tafl">Real ISED/TAFL radio data: per-carrier bandwidth, EIRP, height, MIMO TX/RX, and TDD ratio.</string>
+    <string name="throughput_ca_assumption_link_budget">3GPP TR 38.901 (UMa) link budget based on real EIRP, frequency, height, and antenna pattern.</string>
+    <string name="throughput_ca_source_summary">ISED (TAFL) for real frequencies, bandwidths, MIMO, and EIRP; 3GPP TR 38.901 / TS 38.306 for the radio model.</string>
+    <string name="ca_ised_card_title">ISED Technical Details (Canada)</string>
+    <string name="ca_ised_record_id">Operator site code</string>
+    <string name="ca_ised_licence_area">Licence area</string>
+    <string name="ca_ised_province">Province</string>
+    <string name="ca_ised_site_type">Deployment</string>
+    <string name="ca_ised_site_type_outdoor">Outdoor (O)</string>
+    <string name="ca_ised_site_type_indoor">Indoor (I)</string>
+    <string name="ca_ised_account">ISED account</string>
+    <string name="ca_ised_import">ISED import</string>
+    <string name="ca_ised_sectors_title">Sectors &amp; RF parameters (%1$d)</string>
+    <string name="ca_ised_collapse">Collapse</string>
+    <string name="ca_ised_show_all_sectors">Show all %1$d sectors</string>
+    <string name="ca_ised_azimuth">Azimuth</string>
+    <string name="ca_ised_height">Height</string>
+    <string name="ca_ised_tilt">Tilt</string>
+    <string name="ca_ised_beamwidth">Beamwidth</string>
+    <string name="ca_ised_eirp">EIRP</string>
+    <string name="ca_ised_type">Type</string>
+    <string name="ca_ised_antenna">Antenna</string>
+    <string name="ca_ised_radio">Radio</string>
 </resources>

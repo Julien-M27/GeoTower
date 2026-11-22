@@ -3799,7 +3799,8 @@ fun SiteSettingsSheet(
     highlightBlockId: String? = null,
     // Les sections opérateur du mode simplifié réutilisent cette feuille avec leur propre titre :
     // ce sont les mêmes blocs, mais réglés séparément (cf. EmbeddedSiteBlocksSettingsSheet).
-    title: String? = null
+    title: String? = null,
+    isCanadaSite: Boolean = fr.geotower.data.db.DatabaseCountryStore.activeCountryState.value == fr.geotower.data.db.DatabaseCountry.CA
 ) {
     ReorderableBlockSettingsSheet(
         title = title ?: stringResource(R.string.appstrings_page_site_settings),
@@ -3815,20 +3816,20 @@ fun SiteSettingsSheet(
                 onOpenPhotosSettings()
             }),
             ConfigurableBlock("ids", { stringResource(R.string.appstrings_site_ids_option) }, showIds, onIdsChange),
-            ConfigurableBlock("network_ids", { stringResource(R.string.appstrings_site_network_ids_option) }, showNetworkIds, onNetworkIdsChange),
+            ConfigurableBlock("network_ids", { stringResource(R.string.appstrings_site_network_ids_option) }, showNetworkIds, onNetworkIdsChange, isAvailable = !isCanadaSite),
             ConfigurableBlock("open_map", { stringResource(R.string.appstrings_site_open_map_option) }, showOpenMap, onOpenMapChange),
-            ConfigurableBlock("elevation_profile", { stringResource(R.string.appstrings_site_elevation_profile_option) }, showElevationProfile, onElevationProfileChange),
+            ConfigurableBlock("elevation_profile", { stringResource(R.string.appstrings_site_elevation_profile_option) }, showElevationProfile, onElevationProfileChange, isAvailable = !isCanadaSite),
             ConfigurableBlock("throughput_calculator", { stringResource(R.string.appstrings_site_throughput_calculator_option) }, showThroughputCalculator, onThroughputCalculatorChange),
-            ConfigurableBlock("theoretical_coverage", { stringResource(R.string.appstrings_coverage_button) }, showTheoreticalCoverage, onTheoreticalCoverageChange),
+            ConfigurableBlock("theoretical_coverage", { stringResource(R.string.appstrings_coverage_button) }, showTheoreticalCoverage, onTheoreticalCoverageChange, isAvailable = !isCanadaSite),
             ConfigurableBlock("nav", { stringResource(R.string.appstrings_site_nav_option) }, showNav, onNavChange),
             ConfigurableBlock("share", { stringResource(R.string.appstrings_site_share_option) }, showShare, onShareChange),
             ConfigurableBlock("dates", { stringResource(R.string.appstrings_site_dates_option) }, showDates, onDatesChange),
             ConfigurableBlock("address", { stringResource(R.string.appstrings_site_address_option) }, showAddress, onAddressChange),
-            ConfigurableBlock("status", { stringResource(R.string.appstrings_show_status_option) }, showStatus, onStatusChange, onSettingsClick = {
+            ConfigurableBlock("status", { stringResource(R.string.appstrings_show_status_option) }, showStatus, onStatusChange, isAvailable = !isCanadaSite, onSettingsClick = {
                 onDismiss()
                 onOpenStatusSettings()
             }),
-            ConfigurableBlock("speedtest", { stringResource(R.string.appstrings_show_speedtest_label) }, showSpeedtest, onSpeedtestChange, onSettingsClick = {
+            ConfigurableBlock("speedtest", { stringResource(R.string.appstrings_show_speedtest_label) }, showSpeedtest, onSpeedtestChange, isAvailable = !isCanadaSite, onSettingsClick = {
                 onDismiss()
                 onOpenSpeedtestSettings()
             }),
@@ -3836,7 +3837,7 @@ fun SiteSettingsSheet(
                 onDismiss()
                 onOpenFrequencies()
             }),
-            ConfigurableBlock("links", { stringResource(R.string.appstrings_site_links_option) }, showLinks, onLinksChange)
+            ConfigurableBlock("links", { stringResource(R.string.appstrings_site_links_option) }, showLinks, onLinksChange, isAvailable = !isCanadaSite)
         ),
         onOrderChange = onOrderChange,
         onReset = {
@@ -4316,7 +4317,7 @@ private fun statsSettingsBlockTitle(blockId: String): String {
 @Composable
 private fun statsDisplayModeTitle(mode: StatsDisplayMode): String {
     return when (mode) {
-        StatsDisplayMode.Sites -> stringResource(R.string.appstrings_sites_label)
+        StatsDisplayMode.Sites -> stringResource(R.string.appstrings_declared_sites_label)
         StatsDisplayMode.Active -> stringResource(R.string.appstrings_active_sites_label)
         StatsDisplayMode.Both -> stringResource(R.string.appstrings_active_declared_sites_label)
     }
@@ -4851,8 +4852,12 @@ private fun StatsFrequencySettingsContent(
 @Composable
 fun SiteFreqFiltersSheet(
     onDismiss: () -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    isCanadaSite: Boolean = fr.geotower.data.db.DatabaseCountryStore.activeCountryState.value == fr.geotower.data.db.DatabaseCountry.CA,
+    allowCountrySwitch: Boolean = false
 ) {
+    var selectedCanada by remember(isCanadaSite) { mutableStateOf(isCanadaSite) }
+    val effectiveIsCanada = if (allowCountrySwitch) selectedCanada else isCanadaSite
     val context = LocalContext.current
     val prefs = context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
     val switchColor = MaterialTheme.colorScheme.primary
@@ -4887,17 +4892,30 @@ fun SiteFreqFiltersSheet(
         ).count { it }
     }
     fun getTotalActiveFrequenciesCount(): Int {
-        return listOf(
-            AppConfig.siteF5G_4200.value, AppConfig.siteF5G_3500.value, AppConfig.siteF5G_2100.value, AppConfig.siteF5G_1400.value, AppConfig.siteF5G_700.value,
-            AppConfig.siteF4G_2600.value, AppConfig.siteF4G_2100.value, AppConfig.siteF4G_1800.value,
-            AppConfig.siteF4G_900.value, AppConfig.siteF4G_800.value, AppConfig.siteF4G_700.value,
-            AppConfig.siteF3G_2100.value, AppConfig.siteF3G_900.value,
-            AppConfig.siteF2G_1800.value, AppConfig.siteF2G_900.value
-        ).count { it }
+        return if (effectiveIsCanada) {
+            listOf(
+                AppConfig.siteF5G_26000.value, AppConfig.siteF5G_3800.value, AppConfig.siteF5G_3500.value,
+                AppConfig.siteF5G_2600.value, AppConfig.siteF5G_2100.value, AppConfig.siteF5G_2000.value,
+                AppConfig.siteF5G_1900.value, AppConfig.siteF5G_850.value, AppConfig.siteF5G_700.value, AppConfig.siteF5G_600.value,
+                AppConfig.siteF4G_3500.value, AppConfig.siteF4G_2600.value, AppConfig.siteF4G_2300.value,
+                AppConfig.siteF4G_2100.value, AppConfig.siteF4G_1800.value, AppConfig.siteF4G_800.value,
+                AppConfig.siteF4G_700.value, AppConfig.siteF4G_600.value,
+                AppConfig.siteF3G_2100.value, AppConfig.siteF3G_1900.value, AppConfig.siteF3G_900.value,
+                AppConfig.siteF2G_1800.value, AppConfig.siteF2G_900.value
+            ).count { it }
+        } else {
+            listOf(
+                AppConfig.siteF5G_4200.value, AppConfig.siteF5G_3500.value, AppConfig.siteF5G_2100.value, AppConfig.siteF5G_1400.value, AppConfig.siteF5G_700.value,
+                AppConfig.siteF4G_2600.value, AppConfig.siteF4G_2100.value, AppConfig.siteF4G_1800.value,
+                AppConfig.siteF4G_900.value, AppConfig.siteF4G_800.value, AppConfig.siteF4G_700.value,
+                AppConfig.siteF3G_2100.value, AppConfig.siteF3G_900.value,
+                AppConfig.siteF2G_1800.value, AppConfig.siteF2G_900.value
+            ).count { it }
+        }
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = MaterialTheme.colorScheme.surface) {
-    val sizing = LocalGeoTowerUiSizing.current
+        val sizing = LocalGeoTowerUiSizing.current
         BackHandler(onBack = onBack)
         Column(
             modifier = Modifier
@@ -4924,34 +4942,58 @@ fun SiteFreqFiltersSheet(
                 Spacer(Modifier.width(sizing.spacing(48.dp)))
             }
 
-            // ✅ NOUVEAU : BOUTON AFFICHAGE EN GRILLE
-            Card(
-                modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(16.dp)),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-            ) {
+            if (allowCountrySwitch) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(sizing.spacing(16.dp)),
-                    verticalAlignment = Alignment.CenterVertically
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = sizing.spacing(12.dp)),
+                    horizontalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))
                 ) {
-                    Icon(Icons.Default.GridView, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(sizing.component(20.dp)))
-                    Spacer(Modifier.width(sizing.spacing(12.dp)))
-                    Text(
-                        text = stringResource(R.string.appstrings_freq_grid_display_option),
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.weight(1f),
-                        fontSize = sizing.text(16.sp)
+                    FilterChip(
+                        selected = !selectedCanada,
+                        onClick = { selectedCanada = false },
+                        label = { Text("France", maxLines = 1) },
+                        modifier = Modifier.weight(1f)
                     )
+                    FilterChip(
+                        selected = selectedCanada,
+                        onClick = { selectedCanada = true },
+                        label = { Text("Canada", maxLines = 1) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
 
-                    val onGridChange = { newValue: Boolean ->
-                        saveBool("site_freq_grid_display", AppConfig.siteFreqGridDisplay, newValue)
+            // ✅ NOUVEAU : BOUTON AFFICHAGE EN GRILLE (uniquement hors Canada, où le tableau est unique)
+            if (!effectiveIsCanada) {
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(16.dp)),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(sizing.spacing(16.dp)),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.GridView, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(sizing.component(20.dp)))
+                        Spacer(Modifier.width(sizing.spacing(12.dp)))
+                        Text(
+                            text = stringResource(R.string.appstrings_freq_grid_display_option),
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.weight(1f),
+                            fontSize = sizing.text(16.sp)
+                        )
+
+                        val onGridChange = { newValue: Boolean ->
+                            saveBool("site_freq_grid_display", AppConfig.siteFreqGridDisplay, newValue)
+                        }
+
+                        fr.geotower.ui.components.GeoTowerSwitch(
+                            checked = AppConfig.siteFreqGridDisplay.value,
+                            onCheckedChange = onGridChange,
+                            useOneUi = useOneUi,
+                            checkedColor = switchColor
+                        )
                     }
-
-                    fr.geotower.ui.components.GeoTowerSwitch(
-                        checked = AppConfig.siteFreqGridDisplay.value,
-                        onCheckedChange = onGridChange,
-                        useOneUi = useOneUi,
-                        checkedColor = switchColor
-                    )
                 }
             }
 
@@ -4987,14 +5029,66 @@ fun SiteFreqFiltersSheet(
             }
 
             AppConfig.siteTechnoOrder.value.forEach { technoId ->
+                if (effectiveIsCanada && technoId == "FH") return@forEach
                 key(technoId) {
                     val isTechnoDragged = technoDragState.isDragged(technoId)
                     val technoDragOffset = technoDragState.offsetFor(technoId)
-                    val technoData = when(technoId) {
-                        "5G" -> Triple("5G (NR)", AppConfig.siteShowTechno5G, "site_show_techno_5g") to (listOf("26000" to AppConfig.siteF5G_26000, "4200" to AppConfig.siteF5G_4200, "3500" to AppConfig.siteF5G_3500, "2100" to AppConfig.siteF5G_2100, "1400" to AppConfig.siteF5G_1400, "700" to AppConfig.siteF5G_700) to AppConfig.siteFreqOrder5G)
-                        "4G" -> Triple("4G (LTE)", AppConfig.siteShowTechno4G, "site_show_techno_4g") to (listOf("2600" to AppConfig.siteF4G_2600, "2100" to AppConfig.siteF4G_2100, "1800" to AppConfig.siteF4G_1800, "900" to AppConfig.siteF4G_900, "800" to AppConfig.siteF4G_800, "700" to AppConfig.siteF4G_700) to AppConfig.siteFreqOrder4G)
-                        "3G" -> Triple("3G (UMTS)", AppConfig.siteShowTechno3G, "site_show_techno_3g") to (listOf("2100" to AppConfig.siteF3G_2100, "900" to AppConfig.siteF3G_900) to AppConfig.siteFreqOrder3G)
-                        "2G" -> Triple("2G (GSM)", AppConfig.siteShowTechno2G, "site_show_techno_2g") to (listOf("1800" to AppConfig.siteF2G_1800, "900" to AppConfig.siteF2G_900) to AppConfig.siteFreqOrder2G)
+                    val technoData = when (technoId) {
+                        "5G" -> Triple("5G (NR)", AppConfig.siteShowTechno5G, "site_show_techno_5g") to (
+                            if (effectiveIsCanada) {
+                                listOf(
+                                    "26000" to AppConfig.siteF5G_26000,
+                                    "3800" to AppConfig.siteF5G_3800,
+                                    "3500" to AppConfig.siteF5G_3500,
+                                    "2600" to AppConfig.siteF5G_2600,
+                                    "2100" to AppConfig.siteF5G_2100,
+                                    "2000" to AppConfig.siteF5G_2000,
+                                    "1900" to AppConfig.siteF5G_1900,
+                                    "850" to AppConfig.siteF5G_850,
+                                    "700" to AppConfig.siteF5G_700,
+                                    "600" to AppConfig.siteF5G_600
+                                )
+                            } else {
+                                listOf("26000" to AppConfig.siteF5G_26000, "4200" to AppConfig.siteF5G_4200, "3500" to AppConfig.siteF5G_3500, "2100" to AppConfig.siteF5G_2100, "1400" to AppConfig.siteF5G_1400, "700" to AppConfig.siteF5G_700)
+                            } to AppConfig.siteFreqOrder5G
+                        )
+                        "4G" -> Triple("4G (LTE)", AppConfig.siteShowTechno4G, "site_show_techno_4g") to (
+                            if (effectiveIsCanada) {
+                                listOf(
+                                    "3500" to AppConfig.siteF4G_3500,
+                                    "2600" to AppConfig.siteF4G_2600,
+                                    "2300" to AppConfig.siteF4G_2300,
+                                    "2100" to AppConfig.siteF4G_2100,
+                                    "1900" to AppConfig.siteF4G_1800,
+                                    "850" to AppConfig.siteF4G_800,
+                                    "700" to AppConfig.siteF4G_700,
+                                    "600" to AppConfig.siteF4G_600
+                                )
+                            } else {
+                                listOf("2600" to AppConfig.siteF4G_2600, "2100" to AppConfig.siteF4G_2100, "1800" to AppConfig.siteF4G_1800, "900" to AppConfig.siteF4G_900, "800" to AppConfig.siteF4G_800, "700" to AppConfig.siteF4G_700)
+                            } to AppConfig.siteFreqOrder4G
+                        )
+                        "3G" -> Triple("3G (UMTS)", AppConfig.siteShowTechno3G, "site_show_techno_3g") to (
+                            if (effectiveIsCanada) {
+                                listOf(
+                                    "2100" to AppConfig.siteF3G_2100,
+                                    "1900" to AppConfig.siteF3G_1900,
+                                    "850" to AppConfig.siteF3G_900
+                                )
+                            } else {
+                                listOf("2100" to AppConfig.siteF3G_2100, "900" to AppConfig.siteF3G_900)
+                            } to AppConfig.siteFreqOrder3G
+                        )
+                        "2G" -> Triple("2G (GSM)", AppConfig.siteShowTechno2G, "site_show_techno_2g") to (
+                            if (effectiveIsCanada) {
+                                listOf(
+                                    "1900" to AppConfig.siteF2G_1800,
+                                    "850" to AppConfig.siteF2G_900
+                                )
+                            } else {
+                                listOf("1800" to AppConfig.siteF2G_1800, "900" to AppConfig.siteF2G_900)
+                            } to AppConfig.siteFreqOrder2G
+                        )
                         else -> Triple("FH", AppConfig.siteShowTechnoFH, "site_show_techno_fh") to (emptyList<Pair<String, MutableState<Boolean>>>() to emptyFreqOrderState)
                     }
 
@@ -5047,22 +5141,36 @@ fun SiteFreqFiltersSheet(
                             AnimatedVisibility(visible = technoState.value && freqList.isNotEmpty()) {
                                 Column(modifier = Modifier.padding(top = sizing.spacing(8.dp))) {
                                     HorizontalDivider(modifier = Modifier.padding(vertical = sizing.spacing(8.dp)), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                                    val displayedFreqOrder = remember(freqOrder.value, freqList) {
+                                        val allowed = freqList.map { it.first }.toSet()
+                                        val ordered = freqOrder.value.filter { it in allowed }
+                                        val missing = freqList.map { it.first }.filterNot { it in ordered }
+                                        ordered + missing
+                                    }
                                     val freqDragState = rememberReorderableDragState(
-                                        items = freqOrder.value,
+                                        items = displayedFreqOrder,
                                         itemHeight = sizing.component(48.dp),
                                         onOrderChange = { newOrder ->
                                             freqOrder.value = newOrder
                                             prefs.edit().putString("site_freq_${technoId.lowercase()}_order", newOrder.joinToString(",")).apply()
                                         }
                                     )
-                                    freqOrder.value.forEach { freqLabel ->
+                                    displayedFreqOrder.forEach { freqLabel ->
                                         key(freqLabel) {
                                             val freqStatePair = freqList.find { it.first == freqLabel }
                                             if (freqStatePair != null) {
                                                 val freqState = freqStatePair.second
                                                 val isFreqDragged = freqDragState.isDragged(freqLabel)
                                                 val freqDragOffset = freqDragState.offsetFor(freqLabel)
-                                                val freqPrefKey = "site_f${technoId.lowercase()}_${freqLabel}"
+                                                val mappedKeySuffix = when {
+                                                    effectiveIsCanada && technoId == "4G" && freqLabel == "1900" -> "1800"
+                                                    effectiveIsCanada && technoId == "4G" && freqLabel == "850" -> "800"
+                                                    effectiveIsCanada && technoId == "3G" && freqLabel == "850" -> "900"
+                                                    effectiveIsCanada && technoId == "2G" && freqLabel == "1900" -> "1800"
+                                                    effectiveIsCanada && technoId == "2G" && freqLabel == "850" -> "900"
+                                                    else -> freqLabel
+                                                }
+                                                val freqPrefKey = "site_f${technoId.lowercase()}_${mappedKeySuffix}"
                                                 Row(
                                                     verticalAlignment = Alignment.CenterVertically,
                                                     modifier = Modifier.fillMaxWidth().zIndex(if (isFreqDragged) 1f else 0f)
@@ -5072,7 +5180,19 @@ fun SiteFreqFiltersSheet(
                                                         .padding(vertical = sizing.spacing(4.dp), horizontal = sizing.spacing(4.dp))
                                                 ) {
                                                     Icon(Icons.Default.DragHandle, null, modifier = Modifier.size(sizing.component(20.dp)), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.7f))
-                                                    val displayFreqLabel = freqLabel.toIntOrNull()?.let(::radioFrequencyLabel) ?: "$freqLabel MHz"
+                                                    val displayFreqLabel = if (effectiveIsCanada) {
+                                                        when (freqLabel) {
+                                                            "26000" -> "26/28/38 GHz"
+                                                            "2600" -> "2600 MHz (BRS)"
+                                                            "2300" -> "2300 MHz (WCS)"
+                                                            "2100" -> "2100 MHz (AWS)"
+                                                            "2000" -> "2000 MHz (AWS-4)"
+                                                            "1900" -> "1900 MHz (PCS)"
+                                                            else -> "$freqLabel MHz"
+                                                        }
+                                                    } else {
+                                                        freqLabel.toIntOrNull()?.let(::radioFrequencyLabel) ?: "$freqLabel MHz"
+                                                    }
                                                     Text(displayFreqLabel, modifier = Modifier.weight(1f).padding(start = sizing.spacing(12.dp)), style = sizing.textStyle(MaterialTheme.typography.bodyMedium), fontWeight = if(isFreqDragged) FontWeight.Bold else FontWeight.Normal)
                                                     val onFreqChange = { newValue: Boolean ->
                                                         if (!newValue && getTotalActiveFrequenciesCount() <= 1) {
@@ -5199,18 +5319,28 @@ fun SiteFreqFiltersSheet(
                     saveBool("site_show_techno_2g", AppConfig.siteShowTechno2G, true)
                     saveBool("site_show_techno_fh", AppConfig.siteShowTechnoFH, true)
                     saveBool("site_f5g_3500", AppConfig.siteF5G_3500, true)
+                    saveBool("site_f5g_3800", AppConfig.siteF5G_3800, true)
                     saveBool("site_f5g_4200", AppConfig.siteF5G_4200, true)
+                    saveBool("site_f5g_2600", AppConfig.siteF5G_2600, true)
                     saveBool("site_f5g_2100", AppConfig.siteF5G_2100, true)
+                    saveBool("site_f5g_2000", AppConfig.siteF5G_2000, true)
+                    saveBool("site_f5g_1900", AppConfig.siteF5G_1900, true)
                     saveBool("site_f5g_1400", AppConfig.siteF5G_1400, true)
+                    saveBool("site_f5g_850", AppConfig.siteF5G_850, true)
                     saveBool("site_f5g_700", AppConfig.siteF5G_700, true)
+                    saveBool("site_f5g_600", AppConfig.siteF5G_600, true)
                     saveBool("site_f5g_26000", AppConfig.siteF5G_26000, true)
+                    saveBool("site_f4g_3500", AppConfig.siteF4G_3500, true)
                     saveBool("site_f4g_2600", AppConfig.siteF4G_2600, true)
+                    saveBool("site_f4g_2300", AppConfig.siteF4G_2300, true)
                     saveBool("site_f4g_2100", AppConfig.siteF4G_2100, true)
                     saveBool("site_f4g_1800", AppConfig.siteF4G_1800, true)
                     saveBool("site_f4g_900", AppConfig.siteF4G_900, true)
                     saveBool("site_f4g_800", AppConfig.siteF4G_800, true)
                     saveBool("site_f4g_700", AppConfig.siteF4G_700, true)
+                    saveBool("site_f4g_600", AppConfig.siteF4G_600, true)
                     saveBool("site_f3g_2100", AppConfig.siteF3G_2100, true)
+                    saveBool("site_f3g_1900", AppConfig.siteF3G_1900, true)
                     saveBool("site_f3g_900", AppConfig.siteF3G_900, true)
                     saveBool("site_f2g_1800", AppConfig.siteF2G_1800, true)
                     saveBool("site_f2g_900", AppConfig.siteF2G_900, true)
