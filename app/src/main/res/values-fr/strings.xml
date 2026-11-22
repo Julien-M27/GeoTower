@@ -3523,6 +3523,7 @@
     <string name="appstrings_release_v2132_summary_canada_support_and_watch_sync">Support complet du Canada (bases ISED, 14 opérateurs, fréquences, Android Auto) et bascule API sur Wear OS/Garmin</string>
     <string name="appstrings_release_v2133_summary_canada_nearby_country_and_detail_fix">Prise en compte du pays sélectionné dans À proximité et fiabilisation du chargement des fiches sites Canada (ISED)</string>
     <string name="appstrings_release_v2134_summary_canada_ised_release_fix">Correction de l\'affichage des fiches détaillées Canada (ISED) en version Release</string>
+    <string name="appstrings_release_v2135_summary_support_detail_coordinate_fallback">Fiabilisation de l\'ouverture des fiches de support par repli sur les coordonnées du site</string>
 
     <!-- Journal des requêtes réseau -->
     <string name="network_log_title">Journal des requêtes réseau</string>

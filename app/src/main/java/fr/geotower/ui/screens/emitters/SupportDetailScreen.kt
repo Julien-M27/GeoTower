@@ -274,7 +274,21 @@ fun SupportDetailScreen(
                 val savedLat = prefs.getFloat("clicked_lat", 0f).toDouble()
                 val savedLon = prefs.getFloat("clicked_lon", 0f).toDouble()
 
-                val initialSearch = repository.getAntennasByExactId(siteId)
+                val initialSearch = repository.getAntennasByExactId(siteId).ifEmpty {
+                    if (savedLat != 0.0 && savedLon != 0.0) {
+                        repository.getAntennasInBox(
+                            latNorth = savedLat + 0.0005,
+                            lonEast = savedLon + 0.0005,
+                            latSouth = savedLat - 0.0005,
+                            lonWest = savedLon - 0.0005
+                        ).filter {
+                            kotlin.math.abs(it.latitude - savedLat) < 0.0003 &&
+                                kotlin.math.abs(it.longitude - savedLon) < 0.0003
+                        }
+                    } else {
+                        emptyList()
+                    }
+                }
 
                 var lat = savedLat
                 var lon = savedLon
