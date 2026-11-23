@@ -1677,6 +1677,7 @@ fun MapScreen(
     val oldestServiceDate by viewModel.oldestServiceDate.collectAsState()
     val radioMarkers by viewModel.radioMarkers.collectAsState()
     val signalQuestCoveragePoints by viewModel.signalQuestCoveragePoints.collectAsState()
+    val isSignalQuestCoverageLoading by viewModel.isSignalQuestCoverageLoading.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val sitesHs by viewModel.sitesHs.collectAsState()
     val cityStatsTechniques by viewModel.cityStatsTechniques.collectAsState()
@@ -2965,9 +2966,30 @@ fun MapScreen(
     }
 
     fun cancelSharedPhotoSelection() {
-        pendingSharedPhotoDraftId?.let { SignalQuestUploadDraftStore.discard(it) }
+        pendingSharedPhotoDraftId?.let { draftId ->
+            SignalQuestUploadDraftStore.discard(draftId)
+            MapFilterDefaults.endSharedPhotoSession(draftId, prefs)
+        }
         restoreOperatorSearchSelection()
         safeBackNavigation.navigateBack()
+    }
+
+    LaunchedEffect(isSharedPhotoSelectionMode, pendingSharedPhotoDraftId) {
+        val draftId = pendingSharedPhotoDraftId ?: return@LaunchedEffect
+        if (isSharedPhotoSelectionMode) {
+            MapFilterDefaults.beginSharedPhotoSession(draftId, prefs)
+        } else {
+            MapFilterDefaults.endSharedPhotoSession(draftId, prefs)
+        }
+    }
+
+    DisposableEffect(pendingSharedPhotoDraftId) {
+        onDispose {
+            val draftId = pendingSharedPhotoDraftId ?: return@onDispose
+            if (SignalQuestUploadDraftStore.peek(draftId).isEmpty()) {
+                MapFilterDefaults.endSharedPhotoSession(draftId, prefs)
+            }
+        }
     }
 
     // ✅ CORRECTION : Gère le geste "Retour" physique du téléphone
@@ -6901,7 +6923,7 @@ fun MapScreen(
             }
         } ?: false
         val hideCompassForToolbox = showToolbox && isToolboxExpanded &&
-            toolboxCoversCompass && !isPlannerMode
+            toolboxCoversCompass && !isPlannerMode && !isSharedPhotoSelectionMode && !isComparatorSelectionMode
 
         val measureHintTopPadding by animateDpAsState(
             targetValue = if (isSearchActive && !toolboxExpandsLeft) {
@@ -7158,6 +7180,7 @@ fun MapScreen(
         // de la colonne d'infos, pour détecter en paysage un vrai chevauchement.
         var shareButtonBottomPx by remember { mutableFloatStateOf(0f) }
         var infoColumnTopPx by remember { mutableFloatStateOf(0f) }
+        var legendPillTopPx by remember { mutableFloatStateOf(0f) }
         // Place naturelle du tiroir de mesure et emprise du bloc « total + supprimer les tracés » :
         // de quoi faire descendre le tiroir sous ce bloc quand il lui passe devant (cf. plus bas).
         var measureDrawerAnchorTopPx by remember { mutableFloatStateOf(0f) }
@@ -7258,6 +7281,7 @@ fun MapScreen(
         var isMapUsingOnlineDb by remember { mutableStateOf(false) }
         var mapSwitchCheckTrigger by remember { mutableIntStateOf(0) }
         var showMapSwitchToast by remember { mutableStateOf(false) }
+        var isLegendExpanded by remember { mutableStateOf(false) }
 
         LaunchedEffect(currentLat, map3dLon, manualMapCountry) {
             val targetCountry = manualMapCountry ?: run {
@@ -7318,10 +7342,16 @@ fun MapScreen(
         // Bouton de bascule FR / CA en haut à gauche + Bouton de Partage juste en dessous (affiché
         // uniquement hors mode barre de navigation, car en mode barre le bouton partager remplace
         // directement le bouton retour dans l'en-tête).
-        val topLeftSwitchTopPadding = if (isComparatorSelectionMode) {
-            compassTopPadding + sizing.spacing(84.dp)
+        var sharedPhotoBannerHeightPx by remember { mutableIntStateOf(0) }
+        val sharedPhotoBannerOffset = if (sharedPhotoBannerHeightPx > 0) {
+            with(density) { sharedPhotoBannerHeightPx.toDp() } + sizing.spacing(12.dp)
         } else {
-            compassTopPadding
+            sizing.spacing(108.dp)
+        }
+        val topLeftSwitchTopPadding = when {
+            isSharedPhotoSelectionMode -> compassTopPadding + sharedPhotoBannerOffset
+            isComparatorSelectionMode -> compassTopPadding + sizing.spacing(84.dp)
+            else -> compassTopPadding
         }
         AnimatedVisibility(
             visible = !hideMapChrome || showFloatingShareButton,
@@ -7449,7 +7479,14 @@ fun MapScreen(
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(end = compassEndPadding, top = compassTopPadding)
+                    .padding(
+                        end = compassEndPadding,
+                        top = if (isSharedPhotoSelectionMode) {
+                            compassTopPadding + sharedPhotoBannerOffset
+                        } else {
+                            compassTopPadding
+                        }
+                    )
             ) {
                 Box(
                     modifier = Modifier
@@ -7929,7 +7966,8 @@ fun MapScreen(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .padding(start = sizing.spacing(16.dp), end = sizing.spacing(16.dp), top = sizing.spacing(112.dp))
-                    .fillMaxWidth(),
+                    .fillMaxWidth()
+                    .onGloballyPositioned { sharedPhotoBannerHeightPx = it.size.height },
                 shape = RoundedCornerShape(20.dp),
                 color = MaterialTheme.colorScheme.primaryContainer,
                 shadowElevation = 6.dp,
@@ -8047,7 +8085,7 @@ fun MapScreen(
                 }
             }
 
-            if (showToolbox && !isPlannerMode && !isComparatorSelectionMode) {
+            if (showToolbox && !isPlannerMode && !isComparatorSelectionMode && !isSharedPhotoSelectionMode) {
                 val toolboxContent: @Composable () -> Unit = {
                     Box(modifier = recordToolboxBounds) {
                         AntennaMapToolBox(
@@ -8680,6 +8718,101 @@ fun MapScreen(
             horizontalAlignment = Alignment.Start,
             verticalArrangement = Arrangement.spacedBy(sizing.spacing(4.dp))
         ) {
+            // Pilule de légende au-dessus du compteur de vitesse (descend si compteur/échelle/crédits sont masqués)
+            AnimatedVisibility(
+                visible = !hideMapChrome && !isComparatorSelectionMode,
+                enter = fadeIn(),
+                exit = fadeOut()
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.Start,
+                    verticalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))
+                ) {
+                    val legendMaxHeight = if (legendPillTopPx > 0f) {
+                        val legendPopupRightPx = with(density) {
+                            (sizing.spacing(16.dp) + sizing.component(244.dp)).toPx()
+                        }
+                        var topObstacleBottomPx = shareButtonBottomPx
+                        if (isMeasuringMode && !hideMapControlsForSuggestions) {
+                            if (measureDrawerAnchoredTop) {
+                                measureDrawerBoundsInRoot?.let { measureBounds ->
+                                    if (measureBounds.left < legendPopupRightPx &&
+                                        measureBounds.bottom < legendPillTopPx
+                                    ) {
+                                        topObstacleBottomPx = maxOf(topObstacleBottomPx, measureBounds.bottom)
+                                    }
+                                }
+                            }
+                            if (measureInfoBottomPx > 0f &&
+                                measureInfoLeftPx < legendPopupRightPx &&
+                                measureInfoBottomPx < legendPillTopPx
+                            ) {
+                                topObstacleBottomPx = maxOf(topObstacleBottomPx, measureInfoBottomPx)
+                            }
+                        }
+                        if (topObstacleBottomPx > 0f) {
+                            val availableDp = with(density) { (legendPillTopPx - topObstacleBottomPx).toDp() } -
+                                sizing.spacing(20.dp)
+                            availableDp.coerceIn(sizing.component(96.dp), sizing.component(360.dp))
+                        } else {
+                            sizing.component(360.dp)
+                        }
+                    } else {
+                        sizing.component(360.dp)
+                    }
+                    AnimatedVisibility(
+                        visible = isLegendExpanded,
+                        enter = fadeIn(animationSpec = tween(180)) +
+                            expandVertically(animationSpec = tween(220), expandFrom = Alignment.Bottom),
+                        exit = fadeOut(animationSpec = tween(150)) +
+                            shrinkVertically(animationSpec = tween(180), shrinkTowards = Alignment.Bottom)
+                    ) {
+                        MapLegendPopup(
+                            activeCountry = activeMapCountry,
+                            showSignalQuestCoverageRuler = canUseSignalQuestCoverage && AppConfig.showSignalQuestCoveragePoints.value,
+                            maxHeight = legendMaxHeight
+                        )
+                    }
+
+                    Surface(
+                        onClick = { safeClick("map_legend_toggle") { isLegendExpanded = !isLegendExpanded } },
+                        modifier = Modifier.onGloballyPositioned {
+                            legendPillTopPx = it.positionInRoot().y
+                        },
+                        shape = RoundedCornerShape(50),
+                        color = if (isLegendExpanded) {
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = AppConfig.floatingUiAlpha)
+                        } else {
+                            MaterialTheme.colorScheme.surface.copy(alpha = AppConfig.floatingUiAlpha)
+                        },
+                        shadowElevation = AppConfig.floatingUiShadowElevation(6.dp),
+                        border = BorderStroke(
+                            width = if (isLegendExpanded) 1.5.dp else 1.dp,
+                            color = if (isLegendExpanded) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                AppConfig.floatingUiBorderColor()
+                            }
+                        )
+                    ) {
+                        Text(
+                            text = stringResource(R.string.map_legend_title),
+                            style = sizing.textStyle(MaterialTheme.typography.labelLarge),
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (isLegendExpanded) {
+                                MaterialTheme.colorScheme.onPrimaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            },
+                            modifier = Modifier.padding(
+                                horizontal = sizing.spacing(14.dp),
+                                vertical = sizing.spacing(8.dp)
+                            )
+                        )
+                    }
+                }
+            }
+
             // Le compteur reste pendant le suivi : c'est une information de conduite, comme sur les
             // applis de guidage. Il ne disparaît qu'en consultation et en édition.
             if (AppConfig.showSpeedometer.value && (!isPlannerMode || tripMode == TRIP_MODE_FOLLOW)) {
@@ -8742,7 +8875,7 @@ fun MapScreen(
 
         // Barre de chargement animée collée tout en bas de l'écran, signalant la recherche des sites
         AnimatedVisibility(
-            visible = isLoading || isAdminAreaStatsLoading,
+            visible = isLoading || isAdminAreaStatsLoading || isSignalQuestCoverageLoading,
             enter = fadeIn(animationSpec = tween(180)) + expandVertically(
                 animationSpec = tween(180),
                 expandFrom = Alignment.Bottom
@@ -10973,6 +11106,173 @@ private fun coverageQualityLabelRes(signalStrength: Float): Int = when {
     signalStrength >= -105f -> R.string.appstrings_signalquest_coverage_quality_fair
     signalStrength >= -115f -> R.string.appstrings_signalquest_coverage_quality_poor
     else -> R.string.appstrings_signalquest_coverage_quality_bad
+}
+
+@Composable
+private fun MapLegendPopup(
+    activeCountry: fr.geotower.data.db.DatabaseCountry,
+    showSignalQuestCoverageRuler: Boolean,
+    maxHeight: androidx.compose.ui.unit.Dp
+) {
+    val sizing = LocalGeoTowerUiSizing.current
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = AppConfig.floatingUiAlpha),
+        shadowElevation = AppConfig.floatingUiShadowElevation(6.dp),
+        border = BorderStroke(1.dp, AppConfig.floatingUiBorderColor()),
+        modifier = Modifier
+            .width(sizing.component(244.dp))
+            .heightIn(max = maxHeight)
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(sizing.spacing(12.dp))
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = stringResource(R.string.map_legend_title),
+                    style = sizing.textStyle(MaterialTheme.typography.titleSmall),
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
+                ) {
+                    Text(
+                        text = "${activeCountry.code} · ${activeCountry.sourceLabel}",
+                        style = sizing.textStyle(MaterialTheme.typography.labelSmall),
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.padding(horizontal = sizing.spacing(6.dp), vertical = sizing.spacing(2.dp))
+                    )
+                }
+            }
+
+            if (showSignalQuestCoverageRuler) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+                Text(
+                    text = stringResource(R.string.map_legend_signalquest_title),
+                    style = sizing.textStyle(MaterialTheme.typography.labelMedium),
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(3.dp))) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(sizing.component(10.dp))
+                            .clip(RoundedCornerShape(5.dp))
+                    ) {
+                        Box(modifier = Modifier.weight(1f).fillMaxHeight().background(Color(0xFFE53935)))
+                        Box(modifier = Modifier.weight(1f).fillMaxHeight().background(Color(0xFFFB8C00)))
+                        Box(modifier = Modifier.weight(1f).fillMaxHeight().background(Color(0xFFFDD835)))
+                        Box(modifier = Modifier.weight(1f).fillMaxHeight().background(Color(0xFF66BB6A)))
+                        Box(modifier = Modifier.weight(1f).fillMaxHeight().background(Color(0xFF1B7F2E)))
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        listOf("-115", "-105", "-95", "-80").forEach { threshold ->
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Box(
+                                    modifier = Modifier
+                                        .width(1.dp)
+                                        .height(sizing.component(4.dp))
+                                        .background(MaterialTheme.colorScheme.onSurfaceVariant)
+                                )
+                                Text(
+                                    text = threshold,
+                                    style = sizing.textStyle(MaterialTheme.typography.labelSmall),
+                                    fontSize = sizing.text(9.sp),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = stringResource(R.string.appstrings_signalquest_coverage_quality_bad),
+                            style = sizing.textStyle(MaterialTheme.typography.labelSmall),
+                            fontSize = sizing.text(10.sp),
+                            color = Color(0xFFE53935),
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = stringResource(R.string.appstrings_signalquest_coverage_quality_excellent),
+                            style = sizing.textStyle(MaterialTheme.typography.labelSmall),
+                            fontSize = sizing.text(10.sp),
+                            color = Color(0xFF1B7F2E),
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+            Text(
+                text = stringResource(R.string.map_legend_operators_title),
+                style = sizing.textStyle(MaterialTheme.typography.labelMedium),
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            if (activeCountry == fr.geotower.data.db.DatabaseCountry.CA) {
+                MapLegendOperatorList(OperatorColors.canada)
+            } else {
+                Text(
+                    text = stringResource(R.string.map_legend_metro_section),
+                    style = sizing.textStyle(MaterialTheme.typography.labelSmall),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                MapLegendOperatorList(OperatorColors.metro)
+                Text(
+                    text = stringResource(R.string.map_legend_overseas_section),
+                    style = sizing.textStyle(MaterialTheme.typography.labelSmall),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = sizing.spacing(2.dp))
+                )
+                MapLegendOperatorList(OperatorColors.overseas)
+            }
+        }
+    }
+}
+
+@Composable
+private fun MapLegendOperatorList(operators: List<OperatorColorSpec>) {
+    val sizing = LocalGeoTowerUiSizing.current
+    Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(4.dp))) {
+        operators.forEach { spec ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(sizing.component(10.dp))
+                        .clip(CircleShape)
+                        .background(Color(spec.colorArgb))
+                )
+                Text(
+                    text = spec.label,
+                    style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
 }
 
 private fun formatCoverageTimestamp(raw: String?): String? {

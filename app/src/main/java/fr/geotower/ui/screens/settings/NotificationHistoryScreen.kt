@@ -186,6 +186,7 @@ fun NotificationHistoryScreen(
     var showClearDialog by rememberSaveable { mutableStateOf(false) }
     var historyItems by remember { mutableStateOf<List<NotificationHistoryEntry>>(emptyList()) }
     var selectedIds by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
+    var showDeleteSelectedDialog by remember { mutableStateOf(false) }
     // Filtre par type : seuls les types réellement présents sont proposés. Rien de coché = tout
     // affiché ; le filtre ne survit pas volontairement à la sortie de la page.
     var typeFilter by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
@@ -513,9 +514,7 @@ fun NotificationHistoryScreen(
                     Button(
                         onClick = {
                             safeClick("notification_history_delete_selected") {
-                                NotificationHistoryStore.removeEntries(appContext, selectedIds)
-                                selectedIds = emptyList()
-                                reloadHistory()
+                                showDeleteSelectedDialog = true
                             }
                         },
                         shape = CircleShape
@@ -569,6 +568,34 @@ fun NotificationHistoryScreen(
             sheetState = settingsSheetState,
             useOneUi = AppConfig.useOneUiDesign,
             bubbleColor = cardColor
+        )
+    }
+
+    if (showDeleteSelectedDialog && selectedIds.isNotEmpty()) {
+        val count = selectedIds.size
+        AlertDialog(
+            onDismissRequest = { showDeleteSelectedDialog = false },
+            title = { Text(stringResource(R.string.appstrings_delete)) },
+            text = { Text(pluralStringResource(R.plurals.history_delete_selected_confirm, count, count)) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        safeClick("notification_history_delete_selected_confirm") {
+                            NotificationHistoryStore.removeEntries(appContext, selectedIds)
+                            selectedIds = emptyList()
+                            showDeleteSelectedDialog = false
+                            reloadHistory()
+                        }
+                    }
+                ) {
+                    Text(stringResource(R.string.appstrings_delete))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteSelectedDialog = false }) {
+                    Text(stringResource(R.string.appstrings_cancel))
+                }
+            }
         )
     }
 

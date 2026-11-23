@@ -42,6 +42,7 @@ import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -305,21 +306,53 @@ fun HomeScreen(navController: NavController) {
                 // Le même écart que les cibles du glissé (voir HomeHelpCornerTargets) : le bouton
                 // atterrit exactement là où la pastille l'annonçait.
                 val helpButtonPadding = homeHelpCornerPadding(helpButtonPosition, sizing)
-                // Le bouton « Aides » se déplace aussi par appui long, entre ses quatre coins. Pas
-                // en côte à côte : cette disposition a son propre bouton d'aide, sous le titre.
+
+                val showSpeedtestButton = prefs.getBoolean("show_home_speedtests", true)
+                val speedtestButtonPosition by AppConfig.homeSpeedtestPosition
+                val speedtestButtonAlignment = homeHelpAlignment(speedtestButtonPosition)
+                val speedtestButtonPadding = homeHelpCornerPadding(speedtestButtonPosition, sizing)
+
+                var cornerSecondary by remember {
+                    mutableStateOf(prefs.getString("home_corner_secondary", "speedtests") ?: "speedtests")
+                }
+
                 val helpDragState = rememberHomeHelpDragState { corner ->
+                    if (showSpeedtestButton && corner == speedtestButtonPosition) {
+                        cornerSecondary = "help"
+                        prefs.edit().putString("home_corner_secondary", "help").apply()
+                    }
                     AppConfig.setHomeHelpPosition(prefs, corner)
                 }
+
+                val speedtestDragState = rememberHomeHelpDragState { corner ->
+                    if (showHelpButton && !isSideBySide && corner == helpButtonPosition) {
+                        cornerSecondary = "speedtests"
+                        prefs.edit().putString("home_corner_secondary", "speedtests").apply()
+                    }
+                    AppConfig.setHomeSpeedtestPosition(prefs, corner)
+                }
+
                 val canDragHelpButton = AppConfig.homeLongPressReorder.value && !isSideBySide
 
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .onGloballyPositioned { helpDragState.onContentPositioned(it) }
+                        .onGloballyPositioned {
+                            helpDragState.onContentPositioned(it)
+                            speedtestDragState.onContentPositioned(it)
+                        }
                 ) {
                     // Les quatre cibles en premier : elles se dessinent sous le reste de la page,
                     // donc sous le bouton qu'on déplace au-dessus d'elles.
-                    HomeHelpCornerTargets(helpDragState)
+                    HomeHelpCornerTargets(
+                        state = helpDragState,
+                        occupiedCorner = if (showSpeedtestButton) speedtestButtonPosition else null
+                    )
+                    HomeHelpCornerTargets(
+                        state = speedtestDragState,
+                        icon = Icons.Default.Speed,
+                        occupiedCorner = if (showHelpButton && !isSideBySide) helpButtonPosition else null
+                    )
 
                     // Deux états de défilement : côte à côte (paysage, tablettes, folds) ou smartphone portrait.
                     val menuScrollState = rememberScrollState()
@@ -467,7 +500,10 @@ fun HomeScreen(navController: NavController) {
                     // bas dès que l'accueil dépassait d'un cheveu la hauteur de l'écran.
                     // En mode côte à côte, seuls les coins du haut : cette disposition a déjà son bouton
                     // d'aide sous le titre, et son pied de page tient sur une ligne.
+                    val sameCorner = showHelpButton && !isSideBySide && showSpeedtestButton && helpButtonPosition == speedtestButtonPosition
+
                     if (showHelpButton && !(isSideBySide && isHelpButtonAtBottom)) {
+                        val helpOffset = if (sameCorner && cornerSecondary == "help") 72.dp else 0.dp
                         HomeHelpFab(
                             state = helpDragState,
                             draggable = canDragHelpButton,
@@ -477,7 +513,32 @@ fun HomeScreen(navController: NavController) {
                             modifier = Modifier
                                 .align(helpButtonAlignment)
                                 .padding(helpButtonPadding)
-                                .zIndex(2f)
+                                .padding(
+                                    bottom = if (helpButtonPosition.startsWith("bottom")) helpOffset else 0.dp,
+                                    top = if (helpButtonPosition.startsWith("top")) helpOffset else 0.dp
+                                )
+                                .zIndex(if (helpDragState.isDragging) 3f else 2f)
+                        )
+                    }
+
+                    if (showSpeedtestButton) {
+                        val speedtestOffset = if (sameCorner && cornerSecondary != "help") 72.dp else 0.dp
+                        HomeHelpFab(
+                            state = speedtestDragState,
+                            draggable = canDragHelpButton,
+                            containerColor = paleColor,
+                            contentColor = onPaleColor,
+                            onClick = { safeClick { navController.navigate("speedtests") { launchSingleTop = true } } },
+                            icon = Icons.Default.Speed,
+                            label = stringResource(R.string.speedtests_title),
+                            modifier = Modifier
+                                .align(speedtestButtonAlignment)
+                                .padding(speedtestButtonPadding)
+                                .padding(
+                                    bottom = if (speedtestButtonPosition.startsWith("bottom")) speedtestOffset else 0.dp,
+                                    top = if (speedtestButtonPosition.startsWith("top")) speedtestOffset else 0.dp
+                                )
+                                .zIndex(if (speedtestDragState.isDragging) 3f else 2f)
                         )
                     }
 

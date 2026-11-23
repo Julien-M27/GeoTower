@@ -3523,6 +3523,7 @@
     <string name="appstrings_release_v2134_summary_canada_ised_release_fix">Fixed Canadian (ISED) site details display in Release builds</string>
     <string name="appstrings_release_v2135_summary_support_detail_coordinate_fallback">More reliable support detail loading using site coordinates fallback</string>
     <string name="appstrings_release_v2136_summary_home_banner_canada_download">Accurate home banner label and navigation during Canadian database download</string>
+    <string name="appstrings_release_v2137_summary_speedtests_ocr_map_legend_and_batch_delete">New Speedtests log with OCR screenshot import, interactive map legend, and multi-select deletion in histories</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Network requests log</string>
@@ -3734,4 +3735,62 @@
     <string name="ca_ised_type">Type</string>
     <string name="ca_ised_antenna">Antenna</string>
     <string name="ca_ised_radio">Radio</string>
+    <string name="map_legend_title">Legend</string>
+    <string name="map_legend_operators_title">Operators</string>
+    <string name="map_legend_metro_section">Metropolitan France</string>
+    <string name="map_legend_overseas_section">Overseas</string>
+    <string name="map_legend_signalquest_title">SignalQuest coverage (dBm)</string>
+    <string name="backup_section_speedtests">Imported speedtests</string>
+    <string name="common_save">Save</string>
+    <string name="common_delete">Delete</string>
+    <string name="share_router_title">Share to GeoTower</string>
+    <plurals name="share_router_subtitle">
+        <item quantity="one">Choose where to send this image:</item>
+        <item quantity="other">Choose where to send these %d images:</item>
+    </plurals>
+    <string name="share_router_dest_site_photo_title">Site photo (SignalQuest)</string>
+    <string name="share_router_dest_site_photo_desc">Attach to a radio site on the map and upload to SignalQuest.</string>
+    <string name="share_router_dest_speedtest_title">Import into Speedtests</string>
+    <string name="share_router_dest_speedtest_desc">Save locally in your speedtests log with automatic OCR reading.</string>
+    <string name="speedtests_title">Speedtests</string>
+    <string name="speedtests_search_hint">Search operator, tech, location, note…</string>
+    <string name="speedtests_stats_toggle">Toggle statistics</string>
+    <string name="speedtests_import_action">Import speedtest images</string>
+    <string name="speedtests_empty_title">No speedtests imported yet</string>
+    <string name="speedtests_empty_desc">Tap + to import screenshots from nPerf, Speedtest, Fast.com, or share them directly to GeoTower.</string>
+    <string name="speedtests_no_filter_match">No speedtests match your filters.</string>
+    <string name="speedtests_no_metrics">No metrics entered</string>
+    <string name="speedtests_stat_avg_dl">Avg DL</string>
+    <string name="speedtests_stat_max_dl">Max DL</string>
+    <string name="speedtests_stat_avg_ul">Avg UL</string>
+    <string name="speedtests_stat_min_ping">Min Ping</string>
+    <string name="speedtests_detail_title">Speedtest details</string>
+    <string name="speedtests_not_found">Speedtest not found.</string>
+    <string name="speedtests_field_download">Download (Mbps)</string>
+    <string name="speedtests_field_upload">Upload (Mbps)</string>
+    <string name="speedtests_field_ping">Ping (ms)</string>
+    <string name="speedtests_field_jitter">Jitter (ms)</string>
+    <string name="speedtests_field_operator">Operator</string>
+    <string name="speedtests_field_band">Band (e.g. n78, B28)</string>
+    <string name="speedtests_field_cell_id">eNB / gNB / Cell ID</string>
+    <string name="speedtests_field_location">Location</string>
+    <string name="speedtests_use_current_location">Use current location</string>
+    <string name="speedtests_field_note">Note</string>
+    <string name="speedtests_delete_title">Delete speedtest?</string>
+    <string name="speedtests_delete_confirm">This entry and its imported screenshot will be permanently removed.</string>
+    <string name="speedtests_pick_on_map">Pick on map</string>
+    <string name="speedtests_confirm_location">Use this location</string>
+    <string name="speedtests_rerun_ocr">Re-run OCR</string>
+    <plurals name="speedtests_selected_count">
+        <item quantity="one">%d selected</item>
+        <item quantity="other">%d selected</item>
+    </plurals>
+    <plurals name="speedtests_delete_selected_confirm">
+        <item quantity="one">Delete this speedtest and its screenshot?</item>
+        <item quantity="other">Delete these %d speedtests and their screenshots?</item>
+    </plurals>
+    <plurals name="history_delete_selected_confirm">
+        <item quantity="one">Delete this selected item?</item>
+        <item quantity="other">Delete these %d selected items?</item>
+    </plurals>
 </resources>

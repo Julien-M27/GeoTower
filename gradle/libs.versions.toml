@@ -32,6 +32,7 @@ exifinterface = "1.4.2"
 garminConnectIq = "2.4.0"
 playServicesWearable = "19.0.0"
 wearCompose = "1.4.1"
+mlkitTextRecognition = "16.0.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -87,6 +88,7 @@ play-services-wearable = { group = "com.google.android.gms", name = "play-servic
 androidx-wear-compose-material = { group = "androidx.wear.compose", name = "compose-material", version.ref = "wearCompose" }
 androidx-wear-compose-foundation = { group = "androidx.wear.compose", name = "compose-foundation", version.ref = "wearCompose" }
 androidx-wear-compose-navigation = { group = "androidx.wear.compose", name = "compose-navigation", version.ref = "wearCompose" }
+mlkit-text-recognition = { group = "com.google.mlkit", name = "text-recognition", version.ref = "mlkitTextRecognition" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

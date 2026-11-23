@@ -27,10 +27,17 @@ data class ChangelogMilestone(
 object AppChangelogRepository {
     val milestones: List<ChangelogMilestone> = listOf(
         ChangelogMilestone(
-            versionName = "2.1.36",
+            versionName = "2.1.37",
             releaseDate = "2026-11-23",
             isCurrent = true,
+            isMajor = true,
             badge = MilestoneBadge.CURRENT,
+            summary = "Journal des Speedtests avec import OCR, légende de carte et suppression groupée des historiques",
+            itemResIds = listOf(R.string.appstrings_release_v2137_summary_speedtests_ocr_map_legend_and_batch_delete)
+        ),
+        ChangelogMilestone(
+            versionName = "2.1.36",
+            releaseDate = "2026-11-23",
             summary = "Identification et redirection exactes de la bannière d'accueil lors du téléchargement de la base Canada",
             itemResIds = listOf(R.string.appstrings_release_v2136_summary_home_banner_canada_download)
         ),
@@ -56,6 +63,7 @@ object AppChangelogRepository {
             versionName = "2.1.32",
             releaseDate = "2026-11-22",
             isMajor = true,
+            badge = MilestoneBadge.MAJOR,
             summary = "Support complet du Canada (bases ISED, 14 opérateurs, fréquences, Android Auto) et bascule API sur Wear OS/Garmin",
             itemResIds = listOf(R.string.appstrings_release_v2132_summary_canada_support_and_watch_sync)
         ),

@@ -1073,6 +1073,7 @@ fun HomeSettingsSheet(
     val prefs = context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
     var showLogo by remember { mutableStateOf(prefs.getBoolean("show_home_logo", true)) }
     var showHelpButton by remember { mutableStateOf(prefs.getBoolean("show_home_help", true)) }
+    var showSpeedtestButton by remember { mutableStateOf(prefs.getBoolean("show_home_speedtests", true)) }
     var showAboutLink by remember { mutableStateOf(HomePrefs.showAboutLink.read(prefs)) }
     var showTripsPage by remember { mutableStateOf(HomePrefs.showTripsPage.read(prefs)) }
     var showFhMapPage by remember { mutableStateOf(HomePrefs.showFhMapPage.read(prefs)) }
@@ -1080,9 +1081,11 @@ fun HomeSettingsSheet(
     val longPressReorder by AppConfig.homeLongPressReorder
     // Partagé avec l'accueil, qui déplace aussi ce bouton par appui long : l'un doit voir l'autre.
     val helpButtonPosition by AppConfig.homeHelpPosition
+    val speedtestButtonPosition by AppConfig.homeSpeedtestPosition
     var showLogoSettings by remember { mutableStateOf(false) }
     var logoSelectorResetKey by remember { mutableStateOf(0) }
     var showHelpPositionSettings by remember { mutableStateOf(false) }
+    var showSpeedtestPositionSettings by remember { mutableStateOf(false) }
     val safeClick = rememberSafeClick()
     val featureFlags by RemoteFeatureFlags.config
     val sizing = LocalGeoTowerUiStyle.current.sizing
@@ -1114,6 +1117,7 @@ fun HomeSettingsSheet(
             when {
                 showLogoSettings -> showLogoSettings = false
                 showHelpPositionSettings -> showHelpPositionSettings = false
+                showSpeedtestPositionSettings -> showSpeedtestPositionSettings = false
                 else -> onBack()
             }
         }
@@ -1167,6 +1171,25 @@ fun HomeSettingsSheet(
                     SettingsRadioItem(stringResource(R.string.appstrings_position_top_right), helpButtonPosition == "top_end", useOneUi, bubbleColor) { savePosition("top_end") }
                     SettingsRadioItem(stringResource(R.string.appstrings_position_bottom_left), helpButtonPosition == "bottom_start", useOneUi, bubbleColor) { savePosition("bottom_start") }
                     SettingsRadioItem(stringResource(R.string.appstrings_position_bottom_right), helpButtonPosition == "bottom_end", useOneUi, bubbleColor) { savePosition("bottom_end") }
+                }
+
+                Spacer(modifier = Modifier.height(sizing.spacing(32.dp)).navigationBarsPadding())
+            } else if (showSpeedtestPositionSettings) {
+                Row(modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(24.dp)), verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = { showSpeedtestPositionSettings = false }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
+                    Text(stringResource(R.string.speedtests_title), style = sizing.textStyle(MaterialTheme.typography.titleLarge), fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                    Spacer(Modifier.width(sizing.spacing(48.dp)))
+                }
+
+                Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))) {
+                    val savePosition = { position: String ->
+                        AppConfig.setHomeSpeedtestPosition(prefs, position)
+                    }
+
+                    SettingsRadioItem(stringResource(R.string.appstrings_position_top_left), speedtestButtonPosition == "top_start", useOneUi, bubbleColor) { savePosition("top_start") }
+                    SettingsRadioItem(stringResource(R.string.appstrings_position_top_right), speedtestButtonPosition == "top_end", useOneUi, bubbleColor) { savePosition("top_end") }
+                    SettingsRadioItem(stringResource(R.string.appstrings_position_bottom_left), speedtestButtonPosition == "bottom_start", useOneUi, bubbleColor) { savePosition("bottom_start") }
+                    SettingsRadioItem(stringResource(R.string.appstrings_position_bottom_right), speedtestButtonPosition == "bottom_end", useOneUi, bubbleColor) { savePosition("bottom_end") }
                 }
 
                 Spacer(modifier = Modifier.height(sizing.spacing(32.dp)).navigationBarsPadding())
@@ -1274,6 +1297,19 @@ fun HomeSettingsSheet(
                         bubbleColor = bubbleColor,
                         useOneUi = useOneUi
                     )
+                    ConfigurableSwitchCard(
+                        title = stringResource(R.string.speedtests_title),
+                        checked = showSpeedtestButton,
+                        onCheckedChange = {
+                            showSpeedtestButton = it
+                            prefs.edit().putBoolean("show_home_speedtests", it).apply()
+                        },
+                        onSettingsClick = { showSpeedtestPositionSettings = true },
+                        shape = shape,
+                        border = border,
+                        bubbleColor = bubbleColor,
+                        useOneUi = useOneUi
+                    )
                     SimpleSwitchCard(
                         title = stringResource(R.string.appstrings_home_quit_app),
                         showMapLocation = showQuitButton,
@@ -1302,17 +1338,20 @@ fun HomeSettingsSheet(
                 // Réinitialise le logo
                 showLogo = true
                 showHelpButton = true
+                showSpeedtestButton = true
                 showQuitButton = true
                 showFhMapPage = HomePrefs.showFhMapPage.defaultValue
                 showAboutLink = HomePrefs.showAboutLink.defaultValue
                 AppConfig.setHomeLongPressReorder(prefs, true)
                 AppConfig.setHomeHelpPosition(prefs, AppConfig.DEFAULT_HOME_HELP_POSITION)
+                AppConfig.setHomeSpeedtestPosition(prefs, AppConfig.DEFAULT_HOME_SPEEDTEST_POSITION)
                 AppConfig.setHomeShowQuitButton(prefs, true)
                 HomePrefs.showFhMapPage.write(prefs.edit(), HomePrefs.showFhMapPage.defaultValue).apply()
                 HomePrefs.showAboutLink.write(
                     prefs.edit()
                         .putBoolean("show_home_logo", true)
                         .putBoolean("show_home_help", true)
+                        .putBoolean("show_home_speedtests", true)
                         .putString("home_logo_choice", "app"),
                     HomePrefs.showAboutLink.defaultValue
                 ).apply()
@@ -1349,6 +1388,7 @@ fun MoreSettingsSheet(
     var showMap by remember { mutableStateOf(AppConfig.moreShowMap.value) }
     var showTrips by remember { mutableStateOf(AppConfig.moreShowTrips.value) }
     var showFhMap by remember { mutableStateOf(AppConfig.moreShowFhMap.value) }
+    var showSpeedtests by remember { mutableStateOf(AppConfig.moreShowSpeedtests.value) }
     var showStats by remember { mutableStateOf(AppConfig.moreShowStats.value) }
     var longPressReorder by remember { mutableStateOf(AppConfig.moreLongPressReorder.value) }
 
@@ -1517,6 +1557,14 @@ fun MoreSettingsSheet(
                                     },
                                     shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight
                                 )
+                                "speedtests" -> DraggableSwitchCard(
+                                    stringResource(R.string.speedtests_title), showSpeedtests,
+                                    {
+                                        showSpeedtests = it
+                                        AppConfig.setMoreShowSpeedtests(prefs, it)
+                                    },
+                                    shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight
+                                )
                                 "stats" -> DraggableSwitchCard(
                                     stringResource(R.string.bottom_nav_stats), showStats,
                                     {
@@ -1581,6 +1629,7 @@ fun MoreSettingsSheet(
                     showMap = true
                     showTrips = true
                     showFhMap = true
+                    showSpeedtests = true
                     showStats = true
                     longPressReorder = true
                     showQuitButton = true
@@ -1592,6 +1641,7 @@ fun MoreSettingsSheet(
                     AppConfig.setMoreShowMap(prefs, true)
                     AppConfig.setMoreShowTrips(prefs, true)
                     AppConfig.setMoreShowFhMap(prefs, true)
+                    AppConfig.setMoreShowSpeedtests(prefs, true)
                     AppConfig.setMoreShowStats(prefs, true)
                     AppConfig.setMoreLongPressReorder(prefs, true)
                     AppConfig.setHomeHelpPosition(prefs, AppConfig.DEFAULT_HOME_HELP_POSITION)
@@ -1833,6 +1883,7 @@ private fun getBottomNavTabInfo(id: String): BottomNavTabInfo = when (id) {
     "map" -> BottomNavTabInfo("map", R.string.bottom_nav_map, Icons.Default.Map)
     "trips" -> BottomNavTabInfo("trips", R.string.bottom_nav_trips, Icons.Default.Route)
     "fh_map" -> BottomNavTabInfo("fh_map", R.string.bottom_nav_fh_map, Icons.Default.Timeline)
+    "speedtests" -> BottomNavTabInfo("speedtests", R.string.speedtests_title, Icons.Default.Speed)
     "compass" -> BottomNavTabInfo("compass", R.string.nav_compass, Icons.Default.Explore)
     "stats" -> BottomNavTabInfo("stats", R.string.bottom_nav_stats, Icons.Default.BarChart)
     "settings" -> BottomNavTabInfo("settings", R.string.nav_settings, Icons.Default.Settings)

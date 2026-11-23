@@ -174,6 +174,7 @@ object AppConfig {
         "map",
         "trips",
         "fh_map",
+        "speedtests",
         "compass",
         "stats",
         "settings",
@@ -194,6 +195,7 @@ object AppConfig {
     const val PREF_MORE_SHOW_MAP = "more_show_map"
     const val PREF_MORE_SHOW_TRIPS = "more_show_trips"
     const val PREF_MORE_SHOW_FH_MAP = "more_show_fh_map"
+    const val PREF_MORE_SHOW_SPEEDTESTS = "more_show_speedtests"
     const val PREF_MORE_SHOW_STATS = "more_show_stats"
     const val PREF_MORE_LONG_PRESS_REORDER = "more_long_press_reorder"
 
@@ -205,6 +207,7 @@ object AppConfig {
     val moreShowMap = mutableStateOf(true)
     val moreShowTrips = mutableStateOf(true)
     val moreShowFhMap = mutableStateOf(true)
+    val moreShowSpeedtests = mutableStateOf(true)
     val moreShowStats = mutableStateOf(true)
     val moreLongPressReorder = mutableStateOf(true)
 
@@ -213,6 +216,7 @@ object AppConfig {
         "map",
         "trips",
         "fh_map",
+        "speedtests",
         "compass",
         "stats",
         "settings",
@@ -569,6 +573,10 @@ object AppConfig {
     const val PREF_HOME_HELP_POSITION = "home_help_position"
     const val DEFAULT_HOME_HELP_POSITION = "bottom_end"
     val homeHelpPosition = mutableStateOf(DEFAULT_HOME_HELP_POSITION)
+
+    const val PREF_HOME_SPEEDTEST_POSITION = "home_speedtest_position"
+    const val DEFAULT_HOME_SPEEDTEST_POSITION = "bottom_start"
+    val homeSpeedtestPosition = mutableStateOf(DEFAULT_HOME_SPEEDTEST_POSITION)
 
     val homeShowQuitButton = mutableStateOf(true)
 
@@ -1075,6 +1083,11 @@ object AppConfig {
         prefs.edit().putBoolean(PREF_MORE_SHOW_FH_MAP, enabled).apply()
     }
 
+    fun setMoreShowSpeedtests(prefs: SharedPreferences, enabled: Boolean) {
+        moreShowSpeedtests.value = enabled
+        prefs.edit().putBoolean(PREF_MORE_SHOW_SPEEDTESTS, enabled).apply()
+    }
+
     fun setMoreShowStats(prefs: SharedPreferences, enabled: Boolean) {
         moreShowStats.value = enabled
         prefs.edit().putBoolean(PREF_MORE_SHOW_STATS, enabled).apply()
@@ -1150,6 +1163,11 @@ object AppConfig {
         prefs.edit().putString(PREF_HOME_HELP_POSITION, position).apply()
     }
 
+    fun setHomeSpeedtestPosition(prefs: SharedPreferences, position: String) {
+        homeSpeedtestPosition.value = position
+        prefs.edit().putString(PREF_HOME_SPEEDTEST_POSITION, position).apply()
+    }
+
     fun setLogoMaterialWaves(prefs: SharedPreferences, enabled: Boolean) {
         isLogoMaterialWavesEnabled.value = enabled
         prefs.edit().putBoolean(PREF_LOGO_MATERIAL_WAVES, enabled).apply()
@@ -1218,6 +1236,7 @@ object AppConfig {
         moreShowMap.value = prefs.getBoolean(PREF_MORE_SHOW_MAP, true)
         moreShowTrips.value = prefs.getBoolean(PREF_MORE_SHOW_TRIPS, true)
         moreShowFhMap.value = prefs.getBoolean(PREF_MORE_SHOW_FH_MAP, true)
+        moreShowSpeedtests.value = prefs.getBoolean(PREF_MORE_SHOW_SPEEDTESTS, true)
         moreShowStats.value = prefs.getBoolean(PREF_MORE_SHOW_STATS, true)
         moreLongPressReorder.value = prefs.getBoolean(PREF_MORE_LONG_PRESS_REORDER, true)
 
@@ -1244,6 +1263,8 @@ object AppConfig {
         homeLongPressReorder.value = prefs.getBoolean(PREF_HOME_LONG_PRESS_REORDER, true)
         homeHelpPosition.value = prefs.getString(PREF_HOME_HELP_POSITION, DEFAULT_HOME_HELP_POSITION)
             ?: DEFAULT_HOME_HELP_POSITION
+        homeSpeedtestPosition.value = prefs.getString(PREF_HOME_SPEEDTEST_POSITION, DEFAULT_HOME_SPEEDTEST_POSITION)
+            ?: DEFAULT_HOME_SPEEDTEST_POSITION
 
         homeShowQuitButton.value = HomePrefs.showQuitButton.read(prefs)
 

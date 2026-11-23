@@ -15,6 +15,7 @@ object BackupSection {
     const val COUNTERS = "counters"
     const val SETTINGS_PROFILES = "settings_profiles"
     const val HIDDEN_SITES = "hidden_sites"
+    const val SPEEDTESTS = "speedtests"
 
     /** Ordre d'affichage dans l'écran de sauvegarde, et ordre d'application à l'import. */
     val ALL = listOf(
@@ -26,7 +27,8 @@ object BackupSection {
         PHOTO_FAVORITES,
         COUNTERS,
         SETTINGS_PROFILES,
-        HIDDEN_SITES
+        HIDDEN_SITES,
+        SPEEDTESTS
     )
 }
 

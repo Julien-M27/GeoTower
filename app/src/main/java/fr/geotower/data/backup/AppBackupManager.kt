@@ -12,12 +12,17 @@ import fr.geotower.data.hidden.HiddenSitesStore
 import fr.geotower.data.community.PhotoReportHistoryStore
 import fr.geotower.data.notifications.NotificationHistoryStore
 import fr.geotower.data.share.ShareHistoryStore
+import fr.geotower.data.speedtest.SpeedtestDatabase
+import fr.geotower.data.speedtest.SpeedtestEntryEntity
+import fr.geotower.data.speedtest.SpeedtestImageAnalyzer
 import fr.geotower.data.trip.TripPlanStore
 import fr.geotower.data.upload.ExternalPhotoUploadHistoryEntry
 import fr.geotower.data.upload.ExternalPhotoUploadHistoryStore
 import fr.geotower.utils.PreferenceProfileImportResolution
 import fr.geotower.utils.PreferenceProfileManager
 import fr.geotower.utils.PreferenceStores
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -78,7 +83,15 @@ object AppBackupManager {
             BackupSectionSize(BackupSection.PHOTO_FAVORITES, CommunityDataPreferences.favoritePhotoEntries(prefs).size),
             BackupSectionSize(BackupSection.COUNTERS, prefs.getInt(KEY_LIFETIME_UPLOADS, 0)),
             BackupSectionSize(BackupSection.SETTINGS_PROFILES, PreferenceProfileManager.profiles(context).size),
-            BackupSectionSize(BackupSection.HIDDEN_SITES, HiddenSitesStore.records(context).size)
+            BackupSectionSize(BackupSection.HIDDEN_SITES, HiddenSitesStore.records(context).size),
+            BackupSectionSize(
+                BackupSection.SPEEDTESTS,
+                runCatching {
+                    runBlocking(Dispatchers.IO) {
+                        SpeedtestDatabase.getDatabase(context).speedtestDao().getAllOnce().size
+                    }
+                }.getOrDefault(0)
+            )
         )
     }
 
@@ -164,6 +177,22 @@ object AppBackupManager {
             sectionsJson.put(
                 BackupSection.HIDDEN_SITES,
                 entriesSection(HiddenSitesStore.records(context).map(::hiddenSiteToJson))
+            )
+        }
+        if (BackupSection.SPEEDTESTS in sections) {
+            val speedtests = runBlocking(Dispatchers.IO) {
+                SpeedtestDatabase.getDatabase(context).speedtestDao().getAllOnce()
+            }
+            sectionsJson.put(
+                BackupSection.SPEEDTESTS,
+                entriesSection(
+                    speedtests.map { entry ->
+                        AppBackupCodec.speedtestToJson(
+                            entry = entry,
+                            imageBase64 = if (includeThumbnails) encodedSpeedtestImage(context, entry) else null
+                        )
+                    }
+                )
             )
         }
 
@@ -310,6 +339,13 @@ object AppBackupManager {
                     newCount = incoming.count { hiddenSiteIdentity(it) !in known }
                 )
             }
+            BackupSection.SPEEDTESTS -> {
+                val incoming = entries.mapNotNull(AppBackupCodec::speedtestFromJson).map { it.id }
+                val known = runBlocking(Dispatchers.IO) {
+                    SpeedtestDatabase.getDatabase(context).speedtestDao().getAllOnce()
+                }.mapTo(HashSet()) { it.id }
+                countByKey(section, incoming, known)
+            }
             else -> BackupSectionPreview(section, entries.size, 0)
         }
     }
@@ -378,6 +414,7 @@ object AppBackupManager {
                 section,
                 HiddenSitesStore.merge(context, entries.mapNotNull(::hiddenSiteFromJson))
             )
+            BackupSection.SPEEDTESTS -> BackupSectionOutcome(section, importSpeedtests(context, entries))
             else -> BackupSectionOutcome(section, 0)
         }
     }
@@ -495,6 +532,37 @@ object AppBackupManager {
     private fun encodedThumbnail(entry: ExternalPhotoUploadHistoryEntry): String? {
         val bytes = ExternalPhotoUploadHistoryStore.readThumbnailBytes(entry) ?: return null
         return Base64.encodeToString(bytes, Base64.NO_WRAP)
+    }
+
+    private fun encodedSpeedtestImage(context: Context, entry: SpeedtestEntryEntity): String? {
+        val file = SpeedtestImageAnalyzer.imageFile(context, entry.imageFileName)
+        if (!file.exists()) return null
+        return runCatching { Base64.encodeToString(file.readBytes(), Base64.NO_WRAP) }.getOrNull()
+    }
+
+    private fun importSpeedtests(context: Context, entries: List<JSONObject>): Int {
+        val dao = SpeedtestDatabase.getDatabase(context).speedtestDao()
+        val known = runBlocking(Dispatchers.IO) { dao.getAllOnce() }.mapTo(HashSet()) { it.id }
+        val toAdd = mutableListOf<SpeedtestEntryEntity>()
+        entries.forEach { json ->
+            val entry = AppBackupCodec.speedtestFromJson(json) ?: return@forEach
+            if (!known.add(entry.id)) return@forEach
+            val base64 = AppBackupCodec.speedtestImageBase64(json)
+            if (!base64.isNullOrBlank()) {
+                val targetFile = SpeedtestImageAnalyzer.imageFile(context, entry.imageFileName)
+                if (!targetFile.exists()) {
+                    runCatching {
+                        val bytes = Base64.decode(base64, Base64.DEFAULT)
+                        targetFile.writeBytes(bytes)
+                    }
+                }
+            }
+            toAdd.add(entry)
+        }
+        if (toAdd.isNotEmpty()) {
+            runBlocking(Dispatchers.IO) { dao.upsertAll(toAdd) }
+        }
+        return toAdd.size
     }
 
     private fun prefs(context: Context) = context.applicationContext

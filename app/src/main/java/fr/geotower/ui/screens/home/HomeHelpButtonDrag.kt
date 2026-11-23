@@ -26,6 +26,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerInputScope
@@ -166,9 +167,10 @@ fun HomeHelpFab(
     containerColor: Color,
     contentColor: Color,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    icon: ImageVector = Icons.AutoMirrored.Filled.Help,
+    label: String = stringResource(R.string.appstrings_home_help_settings)
 ) {
-    val label = stringResource(R.string.appstrings_home_help_settings)
 
     if (state == null || !draggable) {
         FloatingActionButton(
@@ -177,7 +179,7 @@ fun HomeHelpFab(
             contentColor = contentColor,
             modifier = modifier
         ) {
-            Icon(Icons.AutoMirrored.Filled.Help, contentDescription = label)
+            Icon(icon, contentDescription = label)
         }
         return
     }
@@ -201,7 +203,7 @@ fun HomeHelpFab(
                 alpha = if (lifted) DRAG_ALPHA else 1f
             }
         ) {
-            Icon(Icons.AutoMirrored.Filled.Help, contentDescription = label)
+            Icon(icon, contentDescription = label)
         }
     }
 }
@@ -230,7 +232,11 @@ private fun HomeHelpDragState.dragModifier(): Modifier {
  * reste, donc sous le bouton qu'on est en train de déplacer.
  */
 @Composable
-fun BoxScope.HomeHelpCornerTargets(state: HomeHelpDragState) {
+fun BoxScope.HomeHelpCornerTargets(
+    state: HomeHelpDragState,
+    icon: ImageVector = Icons.AutoMirrored.Filled.Help,
+    occupiedCorner: String? = null
+) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
     val visibility by animateFloatAsState(if (state.isDragging) 1f else 0f, label = "helpTargets")
     if (visibility <= 0.01f) return
@@ -242,11 +248,16 @@ fun BoxScope.HomeHelpCornerTargets(state: HomeHelpDragState) {
     homeHelpCorners.forEach { corner ->
         val hovered = state.hoveredCorner == corner
         val scale by animateFloatAsState(if (hovered) 1.15f else 1f, label = "helpTarget_$corner")
+        val stackOffset = if (occupiedCorner == corner) sizing.component(72.dp) else 0.dp
 
         Box(
             modifier = Modifier
                 .align(homeHelpAlignment(corner))
                 .padding(homeHelpCornerPadding(corner, sizing))
+                .padding(
+                    bottom = if (corner.startsWith("bottom")) stackOffset else 0.dp,
+                    top = if (corner.startsWith("top")) stackOffset else 0.dp
+                )
                 .graphicsLayer {
                     alpha = visibility
                     scaleX = scale
@@ -265,7 +276,7 @@ fun BoxScope.HomeHelpCornerTargets(state: HomeHelpDragState) {
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                imageVector = Icons.AutoMirrored.Filled.Help,
+                imageVector = icon,
                 contentDescription = null,
                 tint = if (hovered) activeColor else restingColor.copy(alpha = 0.45f),
                 modifier = Modifier.size(sizing.component(24.dp))

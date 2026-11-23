@@ -84,6 +84,37 @@ class MapFilterDefaultsTest {
 
         assertEquals(setOf(OperatorColors.ORANGE_KEY), ref.operatorKeys)
     }
+
+    @Test
+    fun sharedPhotoSessionClearsAndRestoresFilters() {
+        val prefs = FakePrefs()
+        AppConfig.showTechno2G.value = false
+        AppConfig.hideUndergroundSites.value = true
+        AppConfig.mobileTechnologyOnly.value = MobileTechnologyOnly.FIVE_G
+        AppConfig.selectedOperatorKeys.value = setOf(OperatorColors.ORANGE_KEY)
+
+        MapFilterDefaults.beginSharedPhotoSession("draft-1", prefs)
+
+        assertTrue(AppConfig.showTechno2G.value)
+        assertFalse(AppConfig.hideUndergroundSites.value)
+        assertEquals(MobileTechnologyOnly.NONE, AppConfig.mobileTechnologyOnly.value)
+        assertEquals(OperatorColors.defaultVisibleKeys, AppConfig.selectedOperatorKeys.value)
+
+        // Un second appel sur le même brouillon ne doit pas écraser la sauvegarde initiale.
+        AppConfig.showTechno4G.value = false
+        MapFilterDefaults.beginSharedPhotoSession("draft-1", prefs)
+        assertFalse(AppConfig.showTechno4G.value)
+
+        MapFilterDefaults.endSharedPhotoSession("draft-1", prefs)
+
+        assertFalse(AppConfig.showTechno2G.value)
+        assertTrue(AppConfig.showTechno4G.value)
+        assertTrue(AppConfig.hideUndergroundSites.value)
+        assertEquals(MobileTechnologyOnly.FIVE_G, AppConfig.mobileTechnologyOnly.value)
+        assertEquals(setOf(OperatorColors.ORANGE_KEY), AppConfig.selectedOperatorKeys.value)
+
+        MapFilterDefaults.resetToFactory(prefs)
+    }
 }
 
 /** SharedPreferences en mémoire minimal pour les tests (lecture seule ici). */

@@ -2,6 +2,7 @@ package fr.geotower.utils
 
 import android.content.SharedPreferences
 import androidx.compose.runtime.MutableState
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Snapshot des filtres carte « par défaut » choisis par l'utilisateur.
@@ -205,6 +206,85 @@ object MapFilterDefaults {
      */
     fun persistCurrentAsDefault(prefs: SharedPreferences) {
         captureFromCurrent(prefs)
+    }
+
+    private val sharedPhotoSavedReferences = ConcurrentHashMap<String, Reference>()
+
+    /** Capture l'état courant des filtres (AppConfig) sous forme de [Reference]. */
+    fun currentReference(): Reference = Reference(
+        operatorKeys = AppConfig.selectedOperatorKeys.value.toSet(),
+        frequency = FrequencyFilterSelection.fromMapConfig(),
+        showSitesInService = AppConfig.showSitesInService.value,
+        showSitesOutOfService = AppConfig.showSitesOutOfService.value,
+        showProjectSites = AppConfig.showProjectSites.value,
+        hideUndergroundSites = AppConfig.hideUndergroundSites.value,
+        showOnlyZbSites = AppConfig.showOnlyZbSites.value,
+        showRadioTv = AppConfig.showRadioTv.value,
+        showRadioBroadcast = AppConfig.showRadioBroadcast.value,
+        showRadioPrivateMobile = AppConfig.showRadioPrivateMobile.value,
+        showRadioFh = AppConfig.showRadioFh.value,
+        showRadioOther = AppConfig.showRadioOther.value,
+        showSignalQuestCoveragePoints = AppConfig.showSignalQuestCoveragePoints.value,
+        signalQuestCoverageOperatorKeys = AppConfig.selectedSignalQuestCoverageOperatorKeys.value.toSet()
+    )
+
+    /** Retourne la référence d'usine sans aucun filtre actif. */
+    fun factoryReference(): Reference = Reference(
+        operatorKeys = OperatorColors.defaultVisibleKeys,
+        frequency = FrequencyFilterSelection(
+            show2G = true,
+            show3G = true,
+            show4G = true,
+            show5G = true,
+            showFh = true,
+            f2G900 = true,
+            f2G1800 = true,
+            f3G900 = true,
+            f3G2100 = true,
+            f4G700 = true,
+            f4G800 = true,
+            f4G900 = true,
+            f4G1800 = true,
+            f4G2100 = true,
+            f4G2600 = true,
+            f5G700 = true,
+            f5G1400 = true,
+            f5G2100 = true,
+            f5G3500 = true,
+            f5G4200 = true,
+            f5G26000 = true,
+            mobileTechnologyOnly = MobileTechnologyOnly.NONE
+        ),
+        showSitesInService = true,
+        showSitesOutOfService = true,
+        showProjectSites = true,
+        hideUndergroundSites = false,
+        showOnlyZbSites = false,
+        showRadioTv = false,
+        showRadioBroadcast = false,
+        showRadioPrivateMobile = false,
+        showRadioFh = false,
+        showRadioOther = false,
+        showSignalQuestCoveragePoints = false,
+        signalQuestCoverageOperatorKeys = AppConfig.defaultSignalQuestCoverageOperatorKeys
+    )
+
+    /**
+     * Sauvegarde les filtres courants pour ce brouillon de photo partagée (une seule fois) et
+     * réinitialise temporairement la carte sans aucun filtre.
+     */
+    fun beginSharedPhotoSession(draftId: String, prefs: SharedPreferences) {
+        if (draftId.isBlank()) return
+        if (sharedPhotoSavedReferences.putIfAbsent(draftId, currentReference()) == null) {
+            applyReference(prefs, factoryReference())
+        }
+    }
+
+    /** Restaure les filtres précédemment sauvegardés à la fin de la session de photo partagée. */
+    fun endSharedPhotoSession(draftId: String, prefs: SharedPreferences) {
+        if (draftId.isBlank()) return
+        val saved = sharedPhotoSavedReferences.remove(draftId) ?: return
+        applyReference(prefs, saved)
     }
 
     /**

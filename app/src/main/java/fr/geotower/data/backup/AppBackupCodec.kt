@@ -3,6 +3,7 @@ package fr.geotower.data.backup
 import fr.geotower.data.community.PhotoReportHistoryEntry
 import fr.geotower.data.notifications.NotificationHistoryEntry
 import fr.geotower.data.share.ShareHistoryEntry
+import fr.geotower.data.speedtest.SpeedtestEntryEntity
 import fr.geotower.data.trip.TripLeg
 import fr.geotower.data.trip.TripManeuver
 import fr.geotower.data.trip.TripPlan
@@ -213,6 +214,58 @@ internal object AppBackupCodec {
             autoNamed = json.optBoolean("autoNamed")
         )
     }
+
+    // --- Speedtests ---------------------------------------------------------------------------
+
+    fun speedtestToJson(entry: SpeedtestEntryEntity, imageBase64: String?): JSONObject = JSONObject()
+        .put("id", entry.id)
+        .put("imageFileName", entry.imageFileName)
+        .put("testedAtMillis", entry.testedAtMillis)
+        .put("createdAtMillis", entry.createdAtMillis)
+        .putFinite("downloadMbps", entry.downloadMbps)
+        .putFinite("uploadMbps", entry.uploadMbps)
+        .putFinite("pingMs", entry.pingMs)
+        .putFinite("jitterMs", entry.jitterMs)
+        .putOrNull("operatorName", entry.operatorName)
+        .putOrNull("networkTech", entry.networkTech)
+        .putOrNull("band", entry.band)
+        .putOrNull("cellIdentifier", entry.cellIdentifier)
+        .putOrNull("locationLabel", entry.locationLabel)
+        .putFinite("latitude", entry.latitude)
+        .putFinite("longitude", entry.longitude)
+        .putOrNull("linkedSiteId", entry.linkedSiteId)
+        .putOrNull("note", entry.note)
+        .putOrNull("ocrRawText", entry.ocrRawText)
+        .putOrNull("imageBase64", imageBase64)
+
+    fun speedtestFromJson(json: JSONObject): SpeedtestEntryEntity? {
+        val id = json.stringOrNull("id") ?: return null
+        val imageFileName = json.stringOrNull("imageFileName") ?: return null
+        val testedAtMillis = json.longOrNull("testedAtMillis") ?: return null
+        val createdAtMillis = json.longOrNull("createdAtMillis") ?: testedAtMillis
+        return SpeedtestEntryEntity(
+            id = id,
+            imageFileName = imageFileName,
+            testedAtMillis = testedAtMillis,
+            createdAtMillis = createdAtMillis,
+            downloadMbps = json.doubleOrNull("downloadMbps"),
+            uploadMbps = json.doubleOrNull("uploadMbps"),
+            pingMs = json.doubleOrNull("pingMs"),
+            jitterMs = json.doubleOrNull("jitterMs"),
+            operatorName = json.stringOrNull("operatorName"),
+            networkTech = json.stringOrNull("networkTech"),
+            band = json.stringOrNull("band"),
+            cellIdentifier = json.stringOrNull("cellIdentifier"),
+            locationLabel = json.stringOrNull("locationLabel"),
+            latitude = json.doubleOrNull("latitude"),
+            longitude = json.doubleOrNull("longitude"),
+            linkedSiteId = json.stringOrNull("linkedSiteId"),
+            note = json.stringOrNull("note"),
+            ocrRawText = json.stringOrNull("ocrRawText")
+        )
+    }
+
+    fun speedtestImageBase64(json: JSONObject): String? = json.stringOrNull("imageBase64")
 
     private fun tripStepToJson(step: TripStep): JSONObject = JSONObject()
         .putFinite("latitude", step.latitude)

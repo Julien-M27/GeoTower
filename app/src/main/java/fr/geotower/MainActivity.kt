@@ -106,6 +106,9 @@ import fr.geotower.ui.screens.settings.HiddenSitesScreen
 import fr.geotower.ui.screens.settings.PhotosFavoritesScreen
 import fr.geotower.ui.screens.settings.NotificationHistoryScreen
 import fr.geotower.ui.screens.settings.ShareHistoryScreen
+import fr.geotower.ui.screens.share.ShareRouterScreen
+import fr.geotower.ui.screens.speedtests.SpeedtestDetailScreen
+import fr.geotower.ui.screens.speedtests.SpeedtestsScreen
 import fr.geotower.data.notifications.NotificationHistoryStore
 import fr.geotower.data.share.ShareHistoryStore
 import fr.geotower.ui.screens.coverage.TheoreticalCoverageScreen
@@ -421,7 +424,7 @@ class MainActivity : ComponentActivity() {
 
     private fun sharedPhotoMapRoute(intent: Intent?): String? {
         val draftId = sharedPhotoDraftId(intent) ?: return null
-        return "map?photoDraftId=${Uri.encode(draftId)}"
+        return "share_router?draftId=${Uri.encode(draftId)}"
     }
 
     private fun sharedPhotoDraftId(intent: Intent?): String? {
@@ -1619,6 +1622,77 @@ class MainActivity : ComponentActivity() {
                             }
 
                             // Aiguillage vers les journaux locaux (photos envoyées, signalements, partages, notifications).
+                            composable(
+                                route = "share_router?draftId={draftId}",
+                                arguments = listOf(
+                                    navArgument("draftId") {
+                                        type = NavType.StringType
+                                        nullable = true
+                                        defaultValue = null
+                                    }
+                                )
+                            ) { backStackEntry ->
+                                val draftId = backStackEntry.arguments?.getString("draftId").orEmpty()
+                                Box(modifier = Modifier.padding(screenPadding)) {
+                                    ShareRouterScreen(
+                                        draftId = draftId,
+                                        onSendToSitePhoto = { id ->
+                                            navController.navigate("map?photoDraftId=${Uri.encode(id)}") {
+                                                popUpTo("share_router?draftId={draftId}") { inclusive = true }
+                                            }
+                                        },
+                                        onImportedToSpeedtests = {
+                                            navController.navigate("speedtests") {
+                                                popUpTo("share_router?draftId={draftId}") { inclusive = true }
+                                            }
+                                        },
+                                        onCancel = {
+                                            if (navController.previousBackStackEntry != null) {
+                                                navController.popBackStack()
+                                            } else {
+                                                navController.navigate(savedStartupPage) {
+                                                    popUpTo("share_router?draftId={draftId}") { inclusive = true }
+                                                }
+                                            }
+                                        }
+                                    )
+                                }
+                            }
+
+                            composable("speedtests") {
+                                Box(modifier = Modifier.padding(screenPadding)) {
+                                    SpeedtestsScreen(
+                                        onBack = {
+                                            if (navController.previousBackStackEntry != null) {
+                                                navController.popBackStack()
+                                            } else {
+                                                navController.navigate(savedStartupPage) {
+                                                    popUpTo("speedtests") { inclusive = true }
+                                                }
+                                            }
+                                        },
+                                        onOpenEntry = { entryId ->
+                                            navController.navigate("speedtests/${Uri.encode(entryId)}") {
+                                                launchSingleTop = true
+                                            }
+                                        }
+                                    )
+                                }
+                            }
+
+                            composable(
+                                route = "speedtests/{entryId}",
+                                arguments = listOf(navArgument("entryId") { type = NavType.StringType })
+                            ) { backStackEntry ->
+                                val entryId = backStackEntry.arguments?.getString("entryId").orEmpty()
+                                Box(modifier = Modifier.padding(screenPadding)) {
+                                    SpeedtestDetailScreen(
+                                        entryId = entryId,
+                                        onBack = { navController.popBackStack() }
+                                    )
+                                }
+                            }
+
                             composable("histories") {
                                 Box(modifier = Modifier.padding(screenPadding)) {
                                     fr.geotower.ui.screens.settings.HistoriesScreen(

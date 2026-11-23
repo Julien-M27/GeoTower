@@ -124,6 +124,9 @@ class MapViewModel(
     private val _isLoading = MutableStateFlow(false)
     val isLoading = _isLoading.asStateFlow()
 
+    private val _isSignalQuestCoverageLoading = MutableStateFlow(false)
+    val isSignalQuestCoverageLoading = _isSignalQuestCoverageLoading.asStateFlow()
+
     // Date de mise en service la plus ancienne, pour borner le slider temporel de la carte.
     private val _oldestServiceDate = MutableStateFlow<String?>(null)
     val oldestServiceDate = _oldestServiceDate.asStateFlow()
@@ -705,7 +708,11 @@ class MapViewModel(
         lastSignalQuestCoverageRequestKey = requestKey
 
         signalQuestCoverageJob?.cancel()
-        signalQuestCoverageJob = viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+        _isSignalQuestCoverageLoading.value = true
+        val job = viewModelScope.launch(
+            context = kotlinx.coroutines.Dispatchers.IO,
+            start = kotlinx.coroutines.CoroutineStart.LAZY
+        ) {
             try {
                 val perOperatorLimit = ((SIGNALQUEST_COVERAGE_MAX_POINTS + selectedOperatorKeys.size - 1) /
                     selectedOperatorKeys.size).coerceAtLeast(1)
@@ -751,8 +758,14 @@ class MapViewModel(
             } catch (e: Exception) {
                 AppLogger.w(TAG, "SignalQuest coverage request failed", e)
                 _signalQuestCoveragePoints.value = emptyList()
+            } finally {
+                if (signalQuestCoverageJob === coroutineContext[Job]) {
+                    _isSignalQuestCoverageLoading.value = false
+                }
             }
         }
+        signalQuestCoverageJob = job
+        job.start()
     }
 
     fun clearSignalQuestCoveragePoints() {
@@ -760,6 +773,7 @@ class MapViewModel(
         signalQuestCoverageJob = null
         lastSignalQuestCoverageRequestKey = null
         _signalQuestCoveragePoints.value = emptyList()
+        _isSignalQuestCoverageLoading.value = false
     }
 
     private fun sitesHsAnfrIds(sitesHs: List<SiteHsEntity>): List<String> {
@@ -1255,6 +1269,7 @@ private fun SqCoveragePointData.toCoveragePoint(
     val latitude = pointCoordinates.lat ?: return null
     val longitude = pointCoordinates.lng ?: return null
     if (latitude !in bounds.south..bounds.north || longitude !in bounds.west..bounds.east) return null
+    if (signalStrength == 0f) return null
 
     val operatorKey = OperatorColors.keyFor(mobileOperator) ?: fallbackOperatorKey
     if (operatorKey !in selectedOperatorKeys) return null

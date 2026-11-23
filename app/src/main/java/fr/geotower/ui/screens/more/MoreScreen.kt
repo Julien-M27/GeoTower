@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Timeline
 import fr.geotower.ui.screens.fh.FH_MAP_ROUTE
 import androidx.compose.material3.MaterialTheme
@@ -154,6 +155,7 @@ fun MoreScreen(navController: NavController) {
     val showMap by AppConfig.moreShowMap
     val showTrips by AppConfig.moreShowTrips
     val showFhMap by AppConfig.moreShowFhMap
+    val showSpeedtests by AppConfig.moreShowSpeedtests
     val showStats by AppConfig.moreShowStats
     val reorderEnabled = AppConfig.moreLongPressReorder.value
 
@@ -234,6 +236,21 @@ fun MoreScreen(navController: NavController) {
                             useOneUi = uiStyle.useOneUi,
                             fillWidth = true,
                             onClick = { navController.navigate(FH_MAP_ROUTE) { launchSingleTop = true } }
+                        )
+                    })
+                }
+            }
+            "speedtests" -> {
+                if (showSpeedtests) {
+                    entries.add(MoreMenuEntry(pageId) {
+                        MenuButton(
+                            text = stringResource(R.string.speedtests_title),
+                            icon = Icons.Default.Speed,
+                            color = buttonBgColor,
+                            contentColor = MaterialTheme.colorScheme.onSurface,
+                            useOneUi = uiStyle.useOneUi,
+                            fillWidth = true,
+                            onClick = { navController.navigate("speedtests") { launchSingleTop = true } }
                         )
                     })
                 }

@@ -3525,6 +3525,7 @@
     <string name="appstrings_release_v2134_summary_canada_ised_release_fix">Correction de l\'affichage des fiches détaillées Canada (ISED) en version Release</string>
     <string name="appstrings_release_v2135_summary_support_detail_coordinate_fallback">Fiabilisation de l\'ouverture des fiches de support par repli sur les coordonnées du site</string>
     <string name="appstrings_release_v2136_summary_home_banner_canada_download">Libellé et redirection exacts de la bannière d\'accueil lors du téléchargement de la base Canada</string>
+    <string name="appstrings_release_v2137_summary_speedtests_ocr_map_legend_and_batch_delete">Nouveau journal de Speedtests avec import OCR de captures, légende sur la carte et suppression multiple dans les historiques</string>
 
     <!-- Journal des requêtes réseau -->
     <string name="network_log_title">Journal des requêtes réseau</string>
@@ -3736,4 +3737,62 @@
     <string name="ca_ised_type">Type</string>
     <string name="ca_ised_antenna">Antenne</string>
     <string name="ca_ised_radio">Radio</string>
+    <string name="map_legend_title">Légende</string>
+    <string name="map_legend_operators_title">Opérateurs</string>
+    <string name="map_legend_metro_section">France métropolitaine</string>
+    <string name="map_legend_overseas_section">Outre-mer</string>
+    <string name="map_legend_signalquest_title">Couverture SignalQuest (dBm)</string>
+    <string name="backup_section_speedtests">Speedtests importés</string>
+    <string name="common_save">Enregistrer</string>
+    <string name="common_delete">Supprimer</string>
+    <string name="share_router_title">Partager vers GeoTower</string>
+    <plurals name="share_router_subtitle">
+        <item quantity="one">Choisissez où envoyer cette image :</item>
+        <item quantity="other">Choisissez où envoyer ces %d images :</item>
+    </plurals>
+    <string name="share_router_dest_site_photo_title">Photo de site (SignalQuest)</string>
+    <string name="share_router_dest_site_photo_desc">Associer à un support sur la carte et envoyer vers SignalQuest.</string>
+    <string name="share_router_dest_speedtest_title">Importer dans les Speedtests</string>
+    <string name="share_router_dest_speedtest_desc">Enregistrer localement dans votre journal avec lecture OCR automatique.</string>
+    <string name="speedtests_title">Speedtests</string>
+    <string name="speedtests_search_hint">Rechercher opérateur, techno, lieu, note…</string>
+    <string name="speedtests_stats_toggle">Afficher les statistiques</string>
+    <string name="speedtests_import_action">Importer des captures de speedtest</string>
+    <string name="speedtests_empty_title">Aucun speedtest importé</string>
+    <string name="speedtests_empty_desc">Appuyez sur + pour importer des captures (nPerf, Speedtest, Fast.com…) ou partagez-les directement vers GeoTower.</string>
+    <string name="speedtests_no_filter_match">Aucun speedtest ne correspond aux filtres.</string>
+    <string name="speedtests_no_metrics">Aucune mesure renseignée</string>
+    <string name="speedtests_stat_avg_dl">Moy. DL</string>
+    <string name="speedtests_stat_max_dl">Max DL</string>
+    <string name="speedtests_stat_avg_ul">Moy. UL</string>
+    <string name="speedtests_stat_min_ping">Ping min</string>
+    <string name="speedtests_detail_title">Détails du speedtest</string>
+    <string name="speedtests_not_found">Speedtest introuvable.</string>
+    <string name="speedtests_field_download">Descendant (Mb/s)</string>
+    <string name="speedtests_field_upload">Montant (Mb/s)</string>
+    <string name="speedtests_field_ping">Ping (ms)</string>
+    <string name="speedtests_field_jitter">Gigue (ms)</string>
+    <string name="speedtests_field_operator">Opérateur</string>
+    <string name="speedtests_field_band">Bande (ex. n78, B28)</string>
+    <string name="speedtests_field_cell_id">eNB / gNB / Cell ID</string>
+    <string name="speedtests_field_location">Lieu</string>
+    <string name="speedtests_use_current_location">Utiliser ma position actuelle</string>
+    <string name="speedtests_field_note">Note</string>
+    <string name="speedtests_delete_title">Supprimer ce speedtest ?</string>
+    <string name="speedtests_delete_confirm">Cette entrée et sa capture importée seront définitivement supprimées.</string>
+    <string name="speedtests_pick_on_map">Placer sur la carte</string>
+    <string name="speedtests_confirm_location">Valider cette position</string>
+    <string name="speedtests_rerun_ocr">Relancer l\'OCR</string>
+    <plurals name="speedtests_selected_count">
+        <item quantity="one">%d sélectionné</item>
+        <item quantity="other">%d sélectionnés</item>
+    </plurals>
+    <plurals name="speedtests_delete_selected_confirm">
+        <item quantity="one">Supprimer ce speedtest et sa capture ?</item>
+        <item quantity="other">Supprimer ces %d speedtests et leurs captures ?</item>
+    </plurals>
+    <plurals name="history_delete_selected_confirm">
+        <item quantity="one">Supprimer cet élément sélectionné ?</item>
+        <item quantity="other">Supprimer ces %d éléments sélectionnés ?</item>
+    </plurals>
 </resources>

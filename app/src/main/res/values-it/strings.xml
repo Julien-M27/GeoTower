@@ -3523,6 +3523,7 @@
     <string name="appstrings_release_v2134_summary_canada_ised_release_fix">Risolto il problema di visualizzazione delle schede dettagliate del Canada (ISED) nella versione Release</string>
     <string name="appstrings_release_v2135_summary_support_detail_coordinate_fallback">Caricamento più affidabile delle schede di supporto tramite fallback sulle coordinate del sito</string>
     <string name="appstrings_release_v2136_summary_home_banner_canada_download">Etichetta e reindirizzamento corretti del banner iniziale durante il download del database del Canada</string>
+    <string name="appstrings_release_v2137_summary_speedtests_ocr_map_legend_and_batch_delete">Nuovo registro Speedtest con importazione OCR, legenda sulla mappa ed eliminazione multipla nelle cronologie</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registro richieste di rete</string>
@@ -3734,4 +3735,62 @@
     <string name="ca_ised_type">Tipo</string>
     <string name="ca_ised_antenna">Antenna</string>
     <string name="ca_ised_radio">Radio</string>
+    <string name="map_legend_title">Legenda</string>
+    <string name="map_legend_operators_title">Operatori</string>
+    <string name="map_legend_metro_section">Francia metropolitana</string>
+    <string name="map_legend_overseas_section">Oltremare</string>
+    <string name="map_legend_signalquest_title">Copertura SignalQuest (dBm)</string>
+    <string name="backup_section_speedtests">Speedtest importati</string>
+    <string name="common_save">Salva</string>
+    <string name="common_delete">Elimina</string>
+    <string name="share_router_title">Condividi su GeoTower</string>
+    <plurals name="share_router_subtitle">
+        <item quantity="one">Scegli dove inviare questa immagine:</item>
+        <item quantity="other">Scegli dove inviare queste %d immagini:</item>
+    </plurals>
+    <string name="share_router_dest_site_photo_title">Foto sito (SignalQuest)</string>
+    <string name="share_router_dest_site_photo_desc">Associa a un sito radio sulla mappa e carica su SignalQuest.</string>
+    <string name="share_router_dest_speedtest_title">Importa in Speedtest</string>
+    <string name="share_router_dest_speedtest_desc">Salva localmente nel registro con lettura OCR automatica.</string>
+    <string name="speedtests_title">Speedtest</string>
+    <string name="speedtests_search_hint">Cerca operatore, tecnologia, luogo, nota…</string>
+    <string name="speedtests_stats_toggle">Mostra statistiche</string>
+    <string name="speedtests_import_action">Importa schermate speedtest</string>
+    <string name="speedtests_empty_title">Nessuno speedtest importato</string>
+    <string name="speedtests_empty_desc">Tocca + per importare schermate o condividile direttamente con GeoTower.</string>
+    <string name="speedtests_no_filter_match">Nessuno speedtest corrisponde ai filtri.</string>
+    <string name="speedtests_no_metrics">Nessun valore inserito</string>
+    <string name="speedtests_stat_avg_dl">Media DL</string>
+    <string name="speedtests_stat_max_dl">Max DL</string>
+    <string name="speedtests_stat_avg_ul">Media UL</string>
+    <string name="speedtests_stat_min_ping">Ping min</string>
+    <string name="speedtests_detail_title">Dettagli speedtest</string>
+    <string name="speedtests_not_found">Speedtest non trovato.</string>
+    <string name="speedtests_field_download">Download (Mbps)</string>
+    <string name="speedtests_field_upload">Upload (Mbps)</string>
+    <string name="speedtests_field_ping">Ping (ms)</string>
+    <string name="speedtests_field_jitter">Jitter (ms)</string>
+    <string name="speedtests_field_operator">Operatore</string>
+    <string name="speedtests_field_band">Banda (es. n78, B28)</string>
+    <string name="speedtests_field_cell_id">eNB / gNB / Cell ID</string>
+    <string name="speedtests_field_location">Luogo</string>
+    <string name="speedtests_use_current_location">Usa posizione attuale</string>
+    <string name="speedtests_field_note">Nota</string>
+    <string name="speedtests_delete_title">Eliminare lo speedtest?</string>
+    <string name="speedtests_delete_confirm">Questa voce e la relativa schermata importata verranno eliminate definitivamente.</string>
+    <string name="speedtests_pick_on_map">Scegli sulla mappa</string>
+    <string name="speedtests_confirm_location">Usa questa posizione</string>
+    <string name="speedtests_rerun_ocr">Riesegui OCR</string>
+    <plurals name="speedtests_selected_count">
+        <item quantity="one">%d selezionato</item>
+        <item quantity="other">%d selezionati</item>
+    </plurals>
+    <plurals name="speedtests_delete_selected_confirm">
+        <item quantity="one">Eliminare questo speedtest e la sua schermata?</item>
+        <item quantity="other">Eliminare questi %d speedtest e le loro schermate?</item>
+    </plurals>
+    <plurals name="history_delete_selected_confirm">
+        <item quantity="one">Eliminare questo elemento selezionato?</item>
+        <item quantity="other">Eliminare questi %d elementi selezionati?</item>
+    </plurals>
 </resources>

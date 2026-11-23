@@ -175,6 +175,7 @@ fun PhotoUploadHistoryScreen(
     var showClearDialog by rememberSaveable { mutableStateOf(false) }
     var historyItems by remember { mutableStateOf<List<ExternalPhotoUploadHistoryEntry>>(emptyList()) }
     var selectedIds by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
+    var showDeleteSelectedDialog by remember { mutableStateOf(false) }
     val selectedIdSet = selectedIds.toSet()
     val isSelectionMode = selectedIds.isNotEmpty()
     val selectedItems = historyItems.filter { it.id in selectedIdSet }
@@ -415,9 +416,7 @@ fun PhotoUploadHistoryScreen(
                     Button(
                         onClick = {
                             safeClick("photo_upload_history_delete_selected") {
-                                ExternalPhotoUploadHistoryStore.removeEntries(appContext, selectedIds)
-                                selectedIds = emptyList()
-                                reloadHistory()
+                                showDeleteSelectedDialog = true
                             }
                         },
                         shape = floatingShape
@@ -454,6 +453,34 @@ fun PhotoUploadHistoryScreen(
             sheetState = settingsSheetState,
             useOneUi = AppConfig.useOneUiDesign,
             bubbleColor = cardColor
+        )
+    }
+
+    if (showDeleteSelectedDialog && selectedIds.isNotEmpty()) {
+        val count = selectedIds.size
+        AlertDialog(
+            onDismissRequest = { showDeleteSelectedDialog = false },
+            title = { Text(stringResource(R.string.appstrings_delete)) },
+            text = { Text(pluralStringResource(R.plurals.history_delete_selected_confirm, count, count)) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        safeClick("photo_upload_history_delete_selected_confirm") {
+                            ExternalPhotoUploadHistoryStore.removeEntries(appContext, selectedIds)
+                            selectedIds = emptyList()
+                            showDeleteSelectedDialog = false
+                            reloadHistory()
+                        }
+                    }
+                ) {
+                    Text(stringResource(R.string.appstrings_delete))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteSelectedDialog = false }) {
+                    Text(stringResource(R.string.appstrings_cancel))
+                }
+            }
         )
     }
 
