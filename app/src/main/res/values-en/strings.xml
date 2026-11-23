@@ -3524,6 +3524,8 @@
     <string name="appstrings_release_v2135_summary_support_detail_coordinate_fallback">More reliable support detail loading using site coordinates fallback</string>
     <string name="appstrings_release_v2136_summary_home_banner_canada_download">Accurate home banner label and navigation during Canadian database download</string>
     <string name="appstrings_release_v2137_summary_speedtests_ocr_map_legend_and_batch_delete">New Speedtests log with OCR screenshot import, interactive map legend, and multi-select deletion in histories</string>
+    <string name="appstrings_release_v2138_summary_map_release_crash_fix">Fixed crash when opening the map in Play Store Release builds</string>
+    <string name="appstrings_release_v2138_summary_speedtests_ocr_improvements">Improved OCR recognition for speedtest screenshots (MVNO operators, Cell ID, PLMN, and server line filtering)</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Network requests log</string>

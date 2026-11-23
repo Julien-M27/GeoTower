@@ -155,6 +155,70 @@ class SpeedtestOcrParserTest {
     }
 
     @Test
+    fun parseNperfScreenshot1WithServerLineAnd5GNsa() {
+        val text = """
+            nPerf
+            Test de débit
+            Auto: [FR] Anycast-FR - 100 Gb/s - Free
+            Réception
+            Max: 699.63 Mb/s
+            Moy: 620.01 Mb/s
+            Envoi
+            Max: 174.09 Mb/s
+            Moy: 163.08 Mb/s
+            Latence
+            Min: 21 ms
+            Moy: 25 ms / Gig: 7 ms
+            Connexion
+            5G (NSA)
+            Opérateur
+            Lebara
+            Réseau
+            SFR
+        """.trimIndent()
+
+        val parsed = SpeedtestOcrParser.parse(text)
+        assertEquals(699.63, parsed.downloadMbps ?: -1.0, 0.01)
+        assertEquals(174.09, parsed.uploadMbps ?: -1.0, 0.01)
+        assertEquals(21.0, parsed.pingMs ?: -1.0, 0.01)
+        assertEquals(7.0, parsed.jitterMs ?: -1.0, 0.01)
+        assertEquals("Lebara", parsed.operatorName)
+        assertEquals("5G NSA", parsed.networkTech)
+    }
+
+    @Test
+    fun parseNperfScreenshot2RowByRowWithPlmnAndCell() {
+        val text = """
+            nPerf
+            Auto: [FR] Anycast-FR - 10 Gb/s - Bouygues Teleco...
+            Réception
+            Envoi
+            Latence
+            Max: 0.03 Mb/s
+            Max: 0.00 Mb/s
+            Min: 30 ms
+            Moy: 0.02 Mb/s
+            Moy: 0.00 Mb/s
+            Moy: 59 ms / Gig: 244
+            Connexion
+            4G+ (LTE-A)
+            Opérateur
+            La Poste Mobile
+            Réseau
+            Bouygues Telecom
+            PLMN: 208:20 Cell: 517983:8 TAC: 32536 RSRP: -106
+        """.trimIndent()
+
+        val parsed = SpeedtestOcrParser.parse(text)
+        assertEquals(0.03, parsed.downloadMbps ?: -1.0, 0.001)
+        assertEquals(0.00, parsed.uploadMbps ?: -1.0, 0.001)
+        assertEquals(30.0, parsed.pingMs ?: -1.0, 0.01)
+        assertEquals("Bouygues Telecom", parsed.operatorName)
+        assertEquals("4G+", parsed.networkTech)
+        assertEquals("517983:8", parsed.cellIdentifier)
+    }
+
+    @Test
     fun parsePlmnAcrossCountries() {
         assertEquals("Swisscom", SpeedtestOcrParser.parse("PLMN 228-01\nDownload 120 Mbps").operatorName)
         assertEquals("Rogers", SpeedtestOcrParser.parse("MCC/MNC 302720\nDownload 80 Mbps").operatorName)

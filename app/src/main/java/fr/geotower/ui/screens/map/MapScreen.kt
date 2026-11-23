@@ -7180,7 +7180,6 @@ fun MapScreen(
         // de la colonne d'infos, pour détecter en paysage un vrai chevauchement.
         var shareButtonBottomPx by remember { mutableFloatStateOf(0f) }
         var infoColumnTopPx by remember { mutableFloatStateOf(0f) }
-        var legendPillTopPx by remember { mutableFloatStateOf(0f) }
         // Place naturelle du tiroir de mesure et emprise du bloc « total + supprimer les tracés » :
         // de quoi faire descendre le tiroir sous ce bloc quand il lui passe devant (cf. plus bas).
         var measureDrawerAnchorTopPx by remember { mutableFloatStateOf(0f) }
@@ -7281,7 +7280,6 @@ fun MapScreen(
         var isMapUsingOnlineDb by remember { mutableStateOf(false) }
         var mapSwitchCheckTrigger by remember { mutableIntStateOf(0) }
         var showMapSwitchToast by remember { mutableStateOf(false) }
-        var isLegendExpanded by remember { mutableStateOf(false) }
 
         LaunchedEffect(currentLat, map3dLon, manualMapCountry) {
             val targetCountry = manualMapCountry ?: run {
@@ -8719,99 +8717,18 @@ fun MapScreen(
             verticalArrangement = Arrangement.spacedBy(sizing.spacing(4.dp))
         ) {
             // Pilule de légende au-dessus du compteur de vitesse (descend si compteur/échelle/crédits sont masqués)
-            AnimatedVisibility(
+            MapLegendControl(
                 visible = !hideMapChrome && !isComparatorSelectionMode,
-                enter = fadeIn(),
-                exit = fadeOut()
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.Start,
-                    verticalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))
-                ) {
-                    val legendMaxHeight = if (legendPillTopPx > 0f) {
-                        val legendPopupRightPx = with(density) {
-                            (sizing.spacing(16.dp) + sizing.component(244.dp)).toPx()
-                        }
-                        var topObstacleBottomPx = shareButtonBottomPx
-                        if (isMeasuringMode && !hideMapControlsForSuggestions) {
-                            if (measureDrawerAnchoredTop) {
-                                measureDrawerBoundsInRoot?.let { measureBounds ->
-                                    if (measureBounds.left < legendPopupRightPx &&
-                                        measureBounds.bottom < legendPillTopPx
-                                    ) {
-                                        topObstacleBottomPx = maxOf(topObstacleBottomPx, measureBounds.bottom)
-                                    }
-                                }
-                            }
-                            if (measureInfoBottomPx > 0f &&
-                                measureInfoLeftPx < legendPopupRightPx &&
-                                measureInfoBottomPx < legendPillTopPx
-                            ) {
-                                topObstacleBottomPx = maxOf(topObstacleBottomPx, measureInfoBottomPx)
-                            }
-                        }
-                        if (topObstacleBottomPx > 0f) {
-                            val availableDp = with(density) { (legendPillTopPx - topObstacleBottomPx).toDp() } -
-                                sizing.spacing(20.dp)
-                            availableDp.coerceIn(sizing.component(96.dp), sizing.component(360.dp))
-                        } else {
-                            sizing.component(360.dp)
-                        }
-                    } else {
-                        sizing.component(360.dp)
-                    }
-                    AnimatedVisibility(
-                        visible = isLegendExpanded,
-                        enter = fadeIn(animationSpec = tween(180)) +
-                            expandVertically(animationSpec = tween(220), expandFrom = Alignment.Bottom),
-                        exit = fadeOut(animationSpec = tween(150)) +
-                            shrinkVertically(animationSpec = tween(180), shrinkTowards = Alignment.Bottom)
-                    ) {
-                        MapLegendPopup(
-                            activeCountry = activeMapCountry,
-                            showSignalQuestCoverageRuler = canUseSignalQuestCoverage && AppConfig.showSignalQuestCoveragePoints.value,
-                            maxHeight = legendMaxHeight
-                        )
-                    }
-
-                    Surface(
-                        onClick = { safeClick("map_legend_toggle") { isLegendExpanded = !isLegendExpanded } },
-                        modifier = Modifier.onGloballyPositioned {
-                            legendPillTopPx = it.positionInRoot().y
-                        },
-                        shape = RoundedCornerShape(50),
-                        color = if (isLegendExpanded) {
-                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = AppConfig.floatingUiAlpha)
-                        } else {
-                            MaterialTheme.colorScheme.surface.copy(alpha = AppConfig.floatingUiAlpha)
-                        },
-                        shadowElevation = AppConfig.floatingUiShadowElevation(6.dp),
-                        border = BorderStroke(
-                            width = if (isLegendExpanded) 1.5.dp else 1.dp,
-                            color = if (isLegendExpanded) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                AppConfig.floatingUiBorderColor()
-                            }
-                        )
-                    ) {
-                        Text(
-                            text = stringResource(R.string.map_legend_title),
-                            style = sizing.textStyle(MaterialTheme.typography.labelLarge),
-                            fontWeight = FontWeight.SemiBold,
-                            color = if (isLegendExpanded) {
-                                MaterialTheme.colorScheme.onPrimaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.onSurface
-                            },
-                            modifier = Modifier.padding(
-                                horizontal = sizing.spacing(14.dp),
-                                vertical = sizing.spacing(8.dp)
-                            )
-                        )
-                    }
-                }
-            }
+                activeMapCountry = activeMapCountry,
+                showSignalQuestCoverageRuler = canUseSignalQuestCoverage && AppConfig.showSignalQuestCoveragePoints.value,
+                shareButtonBottomPx = shareButtonBottomPx,
+                isMeasuringMode = isMeasuringMode,
+                hideMapControlsForSuggestions = hideMapControlsForSuggestions,
+                measureDrawerAnchoredTop = measureDrawerAnchoredTop,
+                measureDrawerBoundsInRoot = measureDrawerBoundsInRoot,
+                measureInfoBottomPx = measureInfoBottomPx,
+                measureInfoLeftPx = measureInfoLeftPx
+            )
 
             // Le compteur reste pendant le suivi : c'est une information de conduite, comme sur les
             // applis de guidage. Il ne disparaît qu'en consultation et en édition.
@@ -8874,48 +8791,13 @@ fun MapScreen(
         }
 
         // Barre de chargement animée collée tout en bas de l'écran, signalant la recherche des sites
-        AnimatedVisibility(
+        MapBottomLoadingBar(
             visible = isLoading || isAdminAreaStatsLoading || isSignalQuestCoverageLoading,
-            enter = fadeIn(animationSpec = tween(180)) + expandVertically(
-                animationSpec = tween(180),
-                expandFrom = Alignment.Bottom
-            ),
-            exit = fadeOut(animationSpec = tween(280)) + shrinkVertically(
-                animationSpec = tween(280),
-                shrinkTowards = Alignment.Bottom
-            ),
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
                 .zIndex(10f)
-        ) {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // Léger dégradé d'ambiance vers le haut pour une visibilité optimale sur tous les fonds de carte
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(sizing.component(12.dp))
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.Transparent,
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
-                                )
-                            )
-                        )
-                )
-                LinearProgressIndicator(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(sizing.component(3.5.dp)),
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-                )
-            }
-        }
+        )
 
         }
     }
@@ -11106,6 +10988,167 @@ private fun coverageQualityLabelRes(signalStrength: Float): Int = when {
     signalStrength >= -105f -> R.string.appstrings_signalquest_coverage_quality_fair
     signalStrength >= -115f -> R.string.appstrings_signalquest_coverage_quality_poor
     else -> R.string.appstrings_signalquest_coverage_quality_bad
+}
+
+@Composable
+private fun MapBottomLoadingBar(
+    visible: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val sizing = LocalGeoTowerUiSizing.current
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(animationSpec = tween(180)) + expandVertically(
+            animationSpec = tween(180),
+            expandFrom = Alignment.Bottom
+        ),
+        exit = fadeOut(animationSpec = tween(280)) + shrinkVertically(
+            animationSpec = tween(280),
+            shrinkTowards = Alignment.Bottom
+        ),
+        modifier = modifier
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Léger dégradé d'ambiance vers le haut pour une visibilité optimale sur tous les fonds de carte
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(sizing.component(12.dp))
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
+                            )
+                        )
+                    )
+            )
+            LinearProgressIndicator(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(sizing.component(3.5.dp)),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun MapLegendControl(
+    visible: Boolean,
+    activeMapCountry: fr.geotower.data.db.DatabaseCountry,
+    showSignalQuestCoverageRuler: Boolean,
+    shareButtonBottomPx: Float,
+    isMeasuringMode: Boolean,
+    hideMapControlsForSuggestions: Boolean,
+    measureDrawerAnchoredTop: Boolean,
+    measureDrawerBoundsInRoot: Rect?,
+    measureInfoBottomPx: Float,
+    measureInfoLeftPx: Float
+) {
+    val sizing = LocalGeoTowerUiSizing.current
+    val density = LocalDensity.current
+    val safeClick = rememberSafeClick()
+    var legendPillTopPx by remember { mutableFloatStateOf(0f) }
+    var isLegendExpanded by remember { mutableStateOf(false) }
+
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(),
+        exit = fadeOut()
+    ) {
+        Column(
+            horizontalAlignment = Alignment.Start,
+            verticalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))
+        ) {
+            val legendMaxHeight = if (legendPillTopPx > 0f) {
+                val legendPopupRightPx = with(density) {
+                    (sizing.spacing(16.dp) + sizing.component(244.dp)).toPx()
+                }
+                var topObstacleBottomPx = shareButtonBottomPx
+                if (isMeasuringMode && !hideMapControlsForSuggestions) {
+                    if (measureDrawerAnchoredTop) {
+                        measureDrawerBoundsInRoot?.let { measureBounds ->
+                            if (measureBounds.left < legendPopupRightPx &&
+                                measureBounds.bottom < legendPillTopPx
+                            ) {
+                                topObstacleBottomPx = maxOf(topObstacleBottomPx, measureBounds.bottom)
+                            }
+                        }
+                    }
+                    if (measureInfoBottomPx > 0f &&
+                        measureInfoLeftPx < legendPopupRightPx &&
+                        measureInfoBottomPx < legendPillTopPx
+                    ) {
+                        topObstacleBottomPx = maxOf(topObstacleBottomPx, measureInfoBottomPx)
+                    }
+                }
+                if (topObstacleBottomPx > 0f) {
+                    val availableDp = with(density) { (legendPillTopPx - topObstacleBottomPx).toDp() } -
+                        sizing.spacing(20.dp)
+                    availableDp.coerceIn(sizing.component(96.dp), sizing.component(360.dp))
+                } else {
+                    sizing.component(360.dp)
+                }
+            } else {
+                sizing.component(360.dp)
+            }
+            AnimatedVisibility(
+                visible = isLegendExpanded,
+                enter = fadeIn(animationSpec = tween(180)) +
+                    expandVertically(animationSpec = tween(220), expandFrom = Alignment.Bottom),
+                exit = fadeOut(animationSpec = tween(150)) +
+                    shrinkVertically(animationSpec = tween(180), shrinkTowards = Alignment.Bottom)
+            ) {
+                MapLegendPopup(
+                    activeCountry = activeMapCountry,
+                    showSignalQuestCoverageRuler = showSignalQuestCoverageRuler,
+                    maxHeight = legendMaxHeight
+                )
+            }
+
+            Surface(
+                onClick = { safeClick("map_legend_toggle") { isLegendExpanded = !isLegendExpanded } },
+                modifier = Modifier.onGloballyPositioned {
+                    legendPillTopPx = it.positionInRoot().y
+                },
+                shape = RoundedCornerShape(50),
+                color = if (isLegendExpanded) {
+                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = AppConfig.floatingUiAlpha)
+                } else {
+                    MaterialTheme.colorScheme.surface.copy(alpha = AppConfig.floatingUiAlpha)
+                },
+                shadowElevation = AppConfig.floatingUiShadowElevation(6.dp),
+                border = BorderStroke(
+                    width = if (isLegendExpanded) 1.5.dp else 1.dp,
+                    color = if (isLegendExpanded) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        AppConfig.floatingUiBorderColor()
+                    }
+                )
+            ) {
+                Text(
+                    text = stringResource(R.string.map_legend_title),
+                    style = sizing.textStyle(MaterialTheme.typography.labelLarge),
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (isLegendExpanded) {
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
+                    modifier = Modifier.padding(
+                        horizontal = sizing.spacing(14.dp),
+                        vertical = sizing.spacing(8.dp)
+                    )
+                )
+            }
+        }
+    }
 }
 
 @Composable

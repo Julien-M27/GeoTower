@@ -37,7 +37,7 @@ object SpeedtestOcrParser {
         "ping", "latence", "latency", "latenz", "latencia", "latenza"
     )
     private val jitterKeywords = listOf(
-        "gigue", "jitter"
+        "gigue", "jitter", "gig"
     )
 
     private val knownOperators = listOf(
@@ -47,6 +47,16 @@ object SpeedtestOcrParser {
         "Free" to listOf("free", "free mobile", "freemobile", "free caraibe", "free caraïbe", "telco oi"),
         "Sosh" to listOf("sosh"),
         "RED by SFR" to listOf("red by sfr", "red sfr"),
+        "Lebara" to listOf("lebara"),
+        "La Poste Mobile" to listOf("la poste mobile", "la poste"),
+        "NRJ Mobile" to listOf("nrj mobile"),
+        "Auchan Telecom" to listOf("auchan telecom"),
+        "Cdiscount Mobile" to listOf("cdiscount mobile"),
+        "Prixtel" to listOf("prixtel"),
+        "Syma" to listOf("syma"),
+        "Lycamobile" to listOf("lycamobile"),
+        "YouPrice" to listOf("youprice"),
+        "Coriolis" to listOf("coriolis"),
         "Rogers" to listOf("rogers"),
         "Bell" to listOf("bell"),
         "Telus" to listOf("telus"),
@@ -192,10 +202,10 @@ object SpeedtestOcrParser {
         """\b([Bn]\d{1,3}(?:\s*\+\s*[Bn]\d{1,3})*)\b"""
     )
     private val cellIdRegex = Regex(
-        """\b(?:eNB|gNB|eNodeB|gNodeB|Cell\s*ID|CID|PCI)\s*[:=#]?\s*(\d{2,10})\b""",
+        """\b(?:eNB|gNB|eNodeB|gNodeB|Cell\s*ID|Cell|CID|PCI)\s*[:=#]?\s*(\d{2,10}(?::\d{1,3})?)\b""",
         RegexOption.IGNORE_CASE
     )
-    private val plmnRegex = Regex("""\b(\d{3})[\s-]?(\d{2,3})\b""")
+    private val plmnRegex = Regex("""\b(\d{3})[\s:-]?(\d{2,3})\b""")
     private val ooklaRatePromptRegex = Regex(
         """(?:quelle note donneriez-vous|how would you rate|¿cómo calificarías a|come valuti|como avalia|wie würden sie .* bewerten)\s+([A-Za-zÀ-ÿ0-9&\s-]{2,24})[?？]?""",
         RegexOption.IGNORE_CASE
@@ -215,12 +225,16 @@ object SpeedtestOcrParser {
         var jitterMs: Double? = null
 
         val speedCandidates = mutableListOf<Double>()
+        val speedCandidateLines = mutableListOf<String>()
 
         // Passe 1 : valeurs avec unité explicite (ex: "482,5 Mb/s", "21 ms")
         for (i in lines.indices) {
             val line = lines[i]
             val lower = line.lowercase(Locale.ROOT)
+            if (isServerInfoLine(lower)) continue
+
             val prevLower = if (i > 0) lines[i - 1].lowercase(Locale.ROOT) else ""
+            val prev2Lower = if (i > 1) lines[i - 2].lowercase(Locale.ROOT) else ""
 
             val speedMatches = speedValueRegex.findAll(line).toList()
             for (match in speedMatches) {
@@ -229,24 +243,43 @@ object SpeedtestOcrParser {
                     unit = match.groupValues[2]
                 ) ?: continue
                 speedCandidates.add(mbps)
+                speedCandidateLines.add(lower)
+
+                val isDl = containsAny(lower, downloadKeywords) ||
+                    containsAny(prevLower, downloadKeywords) ||
+                    (isAvgOrMaxLine(prevLower) && containsAny(prev2Lower, downloadKeywords))
+                val isUl = containsAny(lower, uploadKeywords) ||
+                    containsAny(prevLower, uploadKeywords) ||
+                    (isAvgOrMaxLine(prevLower) && containsAny(prev2Lower, uploadKeywords))
 
                 when {
-                    downloadMbps == null && (containsAny(lower, downloadKeywords) || containsAny(prevLower, downloadKeywords)) -> downloadMbps = mbps
-                    uploadMbps == null && (containsAny(lower, uploadKeywords) || containsAny(prevLower, uploadKeywords)) -> uploadMbps = mbps
+                    downloadMbps == null && isDl -> downloadMbps = mbps
+                    uploadMbps == null && isUl -> uploadMbps = mbps
                 }
             }
 
-            val msMatch = msValueRegex.find(line)
-            if (msMatch != null) {
-                val ms = parseNumber(msMatch.groupValues[1])
-                if (ms != null) {
-                    val contextLabel = when {
-                        containsAny(lower, jitterKeywords) || containsAny(lower, pingKeywords) -> lower
-                        else -> prevLower
+            // Plusieurs valeurs ms possibles sur la même ligne (ex: "Moy: 25 ms / Gig: 7 ms")
+            for (msMatch in msValueRegex.findAll(line)) {
+                val ms = parseNumber(msMatch.groupValues[1]) ?: continue
+                val beforeMatch = lower.substring(0, msMatch.range.first)
+                val segStart = maxOf(beforeMatch.lastIndexOf('/'), beforeMatch.lastIndexOf('|'), 0)
+                val localLabel = beforeMatch.substring(segStart)
+
+                when {
+                    containsAny(localLabel, jitterKeywords) -> {
+                        if (jitterMs == null) jitterMs = ms
                     }
-                    when {
-                        jitterMs == null && containsAny(contextLabel, jitterKeywords) -> jitterMs = ms
-                        pingMs == null && containsAny(contextLabel, pingKeywords) -> pingMs = ms
+                    containsAny(localLabel, pingKeywords) -> {
+                        if (pingMs == null) pingMs = ms
+                    }
+                    containsAny(prevLower, jitterKeywords) ||
+                        (isAvgOrMaxLine(localLabel) && containsAny(prevLower, jitterKeywords)) -> {
+                        if (jitterMs == null) jitterMs = ms
+                    }
+                    containsAny(prevLower, pingKeywords) ||
+                        (isAvgOrMaxLine(localLabel) && containsAny(prevLower, pingKeywords)) ||
+                        (isAvgOrMaxLine(prevLower) && containsAny(prev2Lower, pingKeywords)) -> {
+                        if (pingMs == null) pingMs = ms
                     }
                 }
             }
@@ -279,6 +312,8 @@ object SpeedtestOcrParser {
             val pingIndex = lines.indexOfFirst { containsAny(it.lowercase(Locale.ROOT), pingKeywords) }
             if (pingIndex >= 0) {
                 pingMs = findNumberAfterKeyword(lines, pingIndex, pingKeywords, maxValue = 5000.0, allowThousandsSpace = false)
+                    ?: (pingIndex + 1..minOf(lines.lastIndex, pingIndex + 6))
+                        .firstNotNullOfOrNull { idx -> msValueRegex.find(lines[idx])?.let { parseNumber(it.groupValues[1]) } }
             }
         }
         if (jitterMs == null) {
@@ -288,14 +323,18 @@ object SpeedtestOcrParser {
             }
         }
 
-        // Fallback générique si des débits avec unité ont été trouvés sans label reconnu
+        // Fallback générique pour nPerf / captures où Moy: et Max: apparaissent dans l'ordre DL puis UL
         if (downloadMbps == null && speedCandidates.isNotEmpty()) {
             downloadMbps = speedCandidates.first()
         }
         if (uploadMbps == null && speedCandidates.size >= 2) {
-            val second = speedCandidates[1]
-            if (second != downloadMbps || speedCandidates.count { it == second } >= 2) {
-                uploadMbps = second
+            val isColumnGrouped = speedCandidateLines.size >= 4 &&
+                speedCandidateLines[0].contains("max") &&
+                speedCandidateLines[1].contains("moy")
+            val candidateIndex = if (isColumnGrouped) 2 else 1
+            val candidate = speedCandidates[candidateIndex]
+            if (candidate != downloadMbps || speedCandidates.count { it == candidate } >= 2) {
+                uploadMbps = candidate
             }
         }
 
@@ -380,13 +419,24 @@ object SpeedtestOcrParser {
             if (trimmed.isNotEmpty()) return trimmed
         }
 
-        // 2. Premier opérateur apparaissant dans le texte (évite de prendre le serveur de test à droite)
+        // 2. Recherche par code PLMN (MCC+MNC, ex: "PLMN: 208:20" sur nPerf)
+        for (match in plmnRegex.findAll(rawText)) {
+            val normalized = "${match.groupValues[1]}${match.groupValues[2]}"
+            operatorByPlmn[normalized]?.let { return it }
+        }
+
+        // 3. Premier opérateur apparaissant hors lignes serveur (évite "Anycast-FR - 100 Gb/s - Free")
+        val nonServerLower = rawText.lines()
+            .filterNot { isServerInfoLine(it.lowercase(Locale.ROOT)) }
+            .joinToString("\n")
+            .lowercase(Locale.ROOT)
+
         var bestMatchIndex = Int.MAX_VALUE
         var bestOperator: String? = null
         for ((displayName, aliases) in knownOperators) {
             for (alias in aliases) {
                 val pattern = Regex("""\b${Regex.escape(alias)}\b""")
-                val match = pattern.find(fullLower)
+                val match = pattern.find(nonServerLower)
                 if (match != null && match.range.first < bestMatchIndex) {
                     bestMatchIndex = match.range.first
                     bestOperator = displayName
@@ -395,18 +445,28 @@ object SpeedtestOcrParser {
         }
         if (bestOperator != null) return bestOperator
 
-        // 3. Recherche par code PLMN (MCC+MNC)
-        for (match in plmnRegex.findAll(rawText)) {
-            val normalized = "${match.groupValues[1]}${match.groupValues[2]}"
-            operatorByPlmn[normalized]?.let { return it }
-        }
         return null
+    }
+
+    private fun isServerInfoLine(lower: String): Boolean {
+        return lower.contains("anycast") ||
+            lower.contains("serveur") ||
+            lower.contains("server") ||
+            Regex("""(?:^|[\s-])(?:10|25|40|100)\s*gb(?:/s|ps)\b""").containsMatchIn(lower)
+    }
+
+    private fun isAvgOrMaxLine(lower: String): Boolean {
+        return lower.contains("max") ||
+            lower.contains("moy") ||
+            lower.contains("avg") ||
+            lower.contains("min") ||
+            lower.contains("pic")
     }
 
     private fun detectNetworkTech(rawText: String, fullLower: String): String? {
         return when {
-            Regex("""\b5g\s*sa\b|\bnr\s*sa\b""", RegexOption.IGNORE_CASE).containsMatchIn(rawText) -> "5G SA"
-            Regex("""\b5g\s*nsa\b|\bnr\s*nsa\b""", RegexOption.IGNORE_CASE).containsMatchIn(rawText) -> "5G NSA"
+            Regex("""\b5g\s*\(?\s*sa\s*\)?|\bnr\s*\(?\s*sa\s*\)?""", RegexOption.IGNORE_CASE).containsMatchIn(rawText) -> "5G SA"
+            Regex("""\b5g\s*\(?\s*nsa\s*\)?|\bnr\s*\(?\s*nsa\s*\)?""", RegexOption.IGNORE_CASE).containsMatchIn(rawText) -> "5G NSA"
             Regex("""\b5g\b|\bnr\b""", RegexOption.IGNORE_CASE).containsMatchIn(rawText) -> "5G"
             Regex("""\b4g\+|\blte-?a\b""", RegexOption.IGNORE_CASE).containsMatchIn(rawText) -> "4G+"
             Regex("""\b4g\b|\blte\b""", RegexOption.IGNORE_CASE).containsMatchIn(rawText) -> "4G"

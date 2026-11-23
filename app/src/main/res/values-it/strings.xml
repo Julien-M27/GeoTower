@@ -3524,6 +3524,8 @@
     <string name="appstrings_release_v2135_summary_support_detail_coordinate_fallback">Caricamento più affidabile delle schede di supporto tramite fallback sulle coordinate del sito</string>
     <string name="appstrings_release_v2136_summary_home_banner_canada_download">Etichetta e reindirizzamento corretti del banner iniziale durante il download del database del Canada</string>
     <string name="appstrings_release_v2137_summary_speedtests_ocr_map_legend_and_batch_delete">Nuovo registro Speedtest con importazione OCR, legenda sulla mappa ed eliminazione multipla nelle cronologie</string>
+    <string name="appstrings_release_v2138_summary_map_release_crash_fix">Risolto il crash all\'apertura della mappa nelle build Release</string>
+    <string name="appstrings_release_v2138_summary_speedtests_ocr_improvements">Migliorato il riconoscimento OCR degli screenshot speedtest (operatori MVNO, Cell ID, PLMN e filtro delle righe server)</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registro richieste di rete</string>
