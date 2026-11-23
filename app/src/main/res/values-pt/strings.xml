@@ -3522,6 +3522,7 @@
     <string name="appstrings_release_v2133_summary_canada_nearby_country_and_detail_fix">Respeito pelo país selecionado em Perto e carregamento fiável das fichas de locais canadianos (ISED)</string>
     <string name="appstrings_release_v2134_summary_canada_ised_release_fix">Corrigida a apresentação das fichas detalhadas do Canadá (ISED) na versão Release</string>
     <string name="appstrings_release_v2135_summary_support_detail_coordinate_fallback">Carregamento mais fiável das fichas de suporte recorrendo às coordenadas do local</string>
+    <string name="appstrings_release_v2136_summary_home_banner_canada_download">Etiqueta e redirecionamento exatos da faixa inicial ao transferir a base de dados do Canadá</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registo de pedidos de rede</string>

@@ -27,10 +27,16 @@ data class ChangelogMilestone(
 object AppChangelogRepository {
     val milestones: List<ChangelogMilestone> = listOf(
         ChangelogMilestone(
-            versionName = "2.1.35",
+            versionName = "2.1.36",
             releaseDate = "2026-11-23",
             isCurrent = true,
             badge = MilestoneBadge.CURRENT,
+            summary = "Identification et redirection exactes de la bannière d'accueil lors du téléchargement de la base Canada",
+            itemResIds = listOf(R.string.appstrings_release_v2136_summary_home_banner_canada_download)
+        ),
+        ChangelogMilestone(
+            versionName = "2.1.35",
+            releaseDate = "2026-11-23",
             summary = "Fiabilisation de l'ouverture des fiches de support par repli sur les coordonnées du site",
             itemResIds = listOf(R.string.appstrings_release_v2135_summary_support_detail_coordinate_fallback)
         ),

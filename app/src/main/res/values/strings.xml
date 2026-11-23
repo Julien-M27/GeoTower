@@ -3545,6 +3545,7 @@
     <string name="appstrings_release_v2133_summary_canada_nearby_country_and_detail_fix">Respect selected country in Nearby queries and reliable loading of Canadian (ISED) site details</string>
     <string name="appstrings_release_v2134_summary_canada_ised_release_fix">Fixed Canadian (ISED) site details display in Release builds</string>
     <string name="appstrings_release_v2135_summary_support_detail_coordinate_fallback">More reliable support detail loading using site coordinates fallback</string>
+    <string name="appstrings_release_v2136_summary_home_banner_canada_download">Accurate home banner label and navigation during Canadian database download</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Network requests log</string>

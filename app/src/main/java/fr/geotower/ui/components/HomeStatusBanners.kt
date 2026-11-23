@@ -422,10 +422,14 @@ fun HomeStatusBanners(
         onBannerVisibilityChange?.invoke(hideHomeLogo, hasBanner)
     }
 
+    val isCurrentMobileCaDownload = currentWorkTarget == DatabaseBulkUpdate.Target.MOBILE && (
+        currentWork?.tags?.contains(DatabaseDownloadWorker.countryTag(fr.geotower.data.db.DatabaseCountry.CA)) == true ||
+            (currentWork?.tags?.none { it.startsWith("database_download_country_") } == true && isCanadaActive)
+        )
     val isRebuildBanner = isRebuildOffer && effectiveUpdateAvailable && !effectiveDbMissing && !effectiveDbInvalid
     val databaseBannerTargetSection = when {
         isGeneratingDb -> "db_local_build"
-        isDownloading -> currentWorkTarget?.let(::databaseSettingsSection) ?: "database"
+        isDownloading -> if (isCurrentMobileCaDownload) "db_mobile_ca" else (currentWorkTarget?.let(::databaseSettingsSection) ?: "database")
         isRebuildBanner || (!isCanadaActive && AppConfig.dbForcedLocal()) -> "db_local_build"
         (isCaInvalid || isCaUpdateAvailable) && !isFrInvalid && !isFrUpdateAvailable -> "db_mobile_ca"
         (isFrInvalid || isFrUpdateAvailable) && !isCaInvalid && !isCaUpdateAvailable -> "db_mobile"
@@ -460,7 +464,7 @@ fun HomeStatusBanners(
             }
         }
         currentWorkTarget?.let { target ->
-            if (isCanadaActive && target == DatabaseBulkUpdate.Target.MOBILE) {
+            if (isCurrentMobileCaDownload) {
                 add("$mobileBaseName (Canada)")
             } else {
                 databaseNamesByTarget[target]?.let(::add)

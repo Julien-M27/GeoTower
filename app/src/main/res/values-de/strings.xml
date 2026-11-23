@@ -3522,6 +3522,7 @@
     <string name="appstrings_release_v2133_summary_canada_nearby_country_and_detail_fix">Berücksichtigung des gewählten Landes in der Umgebungssuche und zuverlässiges Laden kanadischer (ISED) Standortdetails</string>
     <string name="appstrings_release_v2134_summary_canada_ised_release_fix">Anzeige kanadischer (ISED) Standortdetails in der Release-Version korrigiert</string>
     <string name="appstrings_release_v2135_summary_support_detail_coordinate_fallback">Zuverlässigeres Öffnen der Mastdetails durch Ausweichen auf die Standortkoordinaten</string>
+    <string name="appstrings_release_v2136_summary_home_banner_canada_download">Korrekte Beschriftung und Weiterleitung im Startbanner beim Herunterladen der Kanada-Datenbank</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Netzwerkanfragen-Protokoll</string>

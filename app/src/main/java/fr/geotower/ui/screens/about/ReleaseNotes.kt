@@ -31,8 +31,8 @@ internal data class ReleaseNoteItem(
  */
 @Composable
 internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
-    section(stringResource(R.string.appstrings_release_section_support_detail)) {
-        item(stringResource(R.string.appstrings_release_v2135_summary_support_detail_coordinate_fallback))
+    section(stringResource(R.string.appstrings_release_section_home_onboarding)) {
+        item(stringResource(R.string.appstrings_release_v2136_summary_home_banner_canada_download))
     }
 }
 
