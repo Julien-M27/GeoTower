@@ -228,6 +228,11 @@ class SpeedtestOcrParserTest {
         assertEquals(0.6, parsedRowByRow.uploadMbps ?: -1.0, 0.01)
         assertEquals(41.0, parsedRowByRow.pingMs ?: -1.0, 0.01)
         assertEquals(65.0, parsedRowByRow.jitterMs ?: -1.0, 0.01)
+
+        // Espaces autour de la virgule décimale (ex: "0, 6 Mb/s", "86, 7 Mbps")
+        val spacedDecimals = SpeedtestOcrParser.parse("↓ DESCENDANT\n86, 7 Mbps\n↑ MONTANT\n0, 6 Mb/s")
+        assertEquals(86.7, spacedDecimals.downloadMbps ?: -1.0, 0.01)
+        assertEquals(0.6, spacedDecimals.uploadMbps ?: -1.0, 0.01)
     }
 
     @Test

@@ -216,7 +216,7 @@ object SpeedtestOcrParser {
 
         val lines = rawText
             .lines()
-            .map { it.trim() }
+            .map { it.trim().replace(Regex("""(\d)\s*([.,])\s*(\d)"""), "$1$2$3") }
             .filter { it.isNotEmpty() }
 
         var downloadMbps: Double? = null

@@ -3553,6 +3553,7 @@
     <string name="appstrings_release_v2140_summary_speedtests_exif_location_preservation">Preserved EXIF GPS coordinates when importing speedtest screenshots</string>
     <string name="appstrings_release_v2141_summary_speedtests_ocr_parser_formats">Improved speedtest OCR parser for split unit lines, side-by-side Ookla columns, and SignalQuest share cards</string>
     <string name="appstrings_release_v2142_summary_speedtests_ocr_max_priority_and_raw_text">Prioritized main speed values over chart MAX peaks in OCR and added raw OCR text viewer in speedtest details</string>
+    <string name="appstrings_release_v2143_summary_speedtests_ocr_dual_pass_and_decimals">Dual-scale OCR pass for large display digits and spaced decimal normalization in speedtests</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Network requests log</string>

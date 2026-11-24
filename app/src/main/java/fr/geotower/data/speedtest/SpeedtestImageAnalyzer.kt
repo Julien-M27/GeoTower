@@ -1,6 +1,7 @@
 package fr.geotower.data.speedtest
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
@@ -111,24 +112,65 @@ object SpeedtestImageAnalyzer {
                 testedAtMillis = if (mod > 0L) mod else now
             }
 
-            val rawOcrText = runCatching {
+            var rawOcrText: String? = null
+            var parsed = ParsedSpeedtestData()
+
+            runCatching {
                 val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
                 try {
-                    val bitmap = BitmapFactory.decodeFile(imageFile.absolutePath)
+                    val options = BitmapFactory.Options().apply {
+                        inPreferredConfig = Bitmap.Config.ARGB_8888
+                    }
+                    val bitmap = BitmapFactory.decodeFile(imageFile.absolutePath, options)
                     val inputImage = if (bitmap != null) {
                         InputImage.fromBitmap(bitmap, rotationDegrees)
                     } else {
                         InputImage.fromFilePath(context.applicationContext, imageFile.toUri())
                     }
-                    recognizer.process(inputImage).await().text
+                    val firstText = recognizer.process(inputImage).await().text
+                    rawOcrText = firstText.takeIf { it.isNotBlank() }
+                    if (rawOcrText != null) {
+                        parsed = SpeedtestOcrParser.parse(rawOcrText!!)
+                    }
+
+                    // Seconde passe à échelle réduite (0.5x) si des débits manquent :
+                    // ML Kit rate parfois les très gros chiffres d'affichage (>150px de haut)
+                    // comme sur SignalQuest ou Ookla.
+                    if (bitmap != null &&
+                        (parsed.downloadMbps == null || parsed.uploadMbps == null) &&
+                        bitmap.width >= 600 && bitmap.height >= 600
+                    ) {
+                        val scaled = Bitmap.createScaledBitmap(
+                            bitmap,
+                            bitmap.width / 2,
+                            bitmap.height / 2,
+                            true
+                        )
+                        val secondText = recognizer.process(InputImage.fromBitmap(scaled, rotationDegrees))
+                            .await().text
+                        if (secondText.isNotBlank()) {
+                            val secondParsed = SpeedtestOcrParser.parse(secondText)
+                            parsed = ParsedSpeedtestData(
+                                downloadMbps = parsed.downloadMbps ?: secondParsed.downloadMbps,
+                                uploadMbps = parsed.uploadMbps ?: secondParsed.uploadMbps,
+                                pingMs = parsed.pingMs ?: secondParsed.pingMs,
+                                jitterMs = parsed.jitterMs ?: secondParsed.jitterMs,
+                                operatorName = parsed.operatorName ?: secondParsed.operatorName,
+                                networkTech = parsed.networkTech ?: secondParsed.networkTech,
+                                band = parsed.band ?: secondParsed.band,
+                                cellIdentifier = parsed.cellIdentifier ?: secondParsed.cellIdentifier
+                            )
+                            if (rawOcrText == null) {
+                                rawOcrText = secondText
+                            }
+                        }
+                    }
                 } finally {
                     recognizer.close()
                 }
             }.onFailure { error ->
                 Log.e("SpeedtestOCR", "ML Kit OCR failed for ${imageFile.name}", error)
-            }.getOrNull()?.takeIf { it.isNotBlank() }
-
-            val parsed = rawOcrText?.let { SpeedtestOcrParser.parse(it) } ?: ParsedSpeedtestData()
+            }
 
             SpeedtestImageMetadata(
                 testedAtMillis = testedAtMillis ?: now,
