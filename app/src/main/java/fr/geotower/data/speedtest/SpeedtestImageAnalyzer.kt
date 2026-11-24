@@ -3,6 +3,8 @@ package fr.geotower.data.speedtest
 import android.content.Context
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.os.Build
+import android.provider.MediaStore
 import android.provider.OpenableColumns
 import android.util.Log
 import android.webkit.MimeTypeMap
@@ -49,14 +51,28 @@ object SpeedtestImageAnalyzer {
             val fileName = "st_${UUID.randomUUID()}.$ext"
             val targetFile = imageFile(appContext, fileName)
 
+            val effectiveUri = resolveOriginalMediaUri(appContext, sourceUri)
             val copied = runCatching {
-                resolver.openInputStream(sourceUri)?.use { input ->
+                resolver.openInputStream(effectiveUri)?.use { input ->
                     targetFile.outputStream().use { output ->
                         input.copyTo(output)
                     }
                     true
                 } ?: false
-            }.getOrDefault(false)
+            }.getOrElse {
+                if (effectiveUri != sourceUri) {
+                    runCatching {
+                        resolver.openInputStream(sourceUri)?.use { input ->
+                            targetFile.outputStream().use { output ->
+                                input.copyTo(output)
+                            }
+                            true
+                        } ?: false
+                    }.getOrDefault(false)
+                } else {
+                    false
+                }
+            }
 
             if (!copied || !targetFile.exists() || targetFile.length() == 0L) {
                 runCatching { targetFile.delete() }
@@ -122,6 +138,13 @@ object SpeedtestImageAnalyzer {
                 rawOcrText = rawOcrText
             )
         }
+
+    private fun resolveOriginalMediaUri(context: Context, uri: Uri): Uri {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return uri
+        return runCatching {
+            MediaStore.setRequireOriginal(uri)
+        }.getOrDefault(uri)
+    }
 
     private fun parseExifDate(raw: String): Long? {
         val formats = listOf(

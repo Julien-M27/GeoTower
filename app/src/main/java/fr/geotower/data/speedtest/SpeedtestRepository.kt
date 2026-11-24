@@ -88,6 +88,8 @@ object SpeedtestRepository {
                 networkTech = meta.parsed.networkTech ?: entry.networkTech,
                 band = meta.parsed.band ?: entry.band,
                 cellIdentifier = meta.parsed.cellIdentifier ?: entry.cellIdentifier,
+                latitude = entry.latitude ?: meta.latitude,
+                longitude = entry.longitude ?: meta.longitude,
                 ocrRawText = meta.rawOcrText ?: entry.ocrRawText
             )
             SpeedtestDatabase.getDatabase(context).speedtestDao().upsert(updated)

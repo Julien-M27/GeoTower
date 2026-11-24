@@ -1,10 +1,13 @@
 package fr.geotower.ui.screens.speedtests
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
@@ -112,13 +115,41 @@ fun SpeedtestsScreen(
     var showDeleteSelectedConfirm by remember { mutableStateOf(false) }
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickMultipleVisualMedia()
+        contract = ActivityResultContracts.GetMultipleContents()
     ) { uris: List<Uri> ->
         if (uris.isNotEmpty() && !isImporting) {
             isImporting = true
             scope.launch {
                 SpeedtestRepository.importImages(context, uris)
                 isImporting = false
+            }
+        }
+    }
+
+    val mediaPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) {
+        imagePickerLauncher.launch("image/*")
+    }
+
+    val launchImagePicker: () -> Unit = {
+        if (!isImporting) {
+            val requiredPermissions = buildList {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    add(Manifest.permission.READ_MEDIA_IMAGES)
+                } else {
+                    add(Manifest.permission.READ_EXTERNAL_STORAGE)
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    add(Manifest.permission.ACCESS_MEDIA_LOCATION)
+                }
+            }.filter {
+                ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED
+            }
+            if (requiredPermissions.isNotEmpty()) {
+                mediaPermissionLauncher.launch(requiredPermissions.toTypedArray())
+            } else {
+                imagePickerLauncher.launch("image/*")
             }
         }
     }
@@ -234,13 +265,7 @@ fun SpeedtestsScreen(
                 )
             } else {
                 FloatingActionButton(
-                    onClick = {
-                        if (!isImporting) {
-                            imagePickerLauncher.launch(
-                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                            )
-                        }
-                    }
+                    onClick = launchImagePicker
                 ) {
                     Icon(
                         imageVector = Icons.Default.Add,
