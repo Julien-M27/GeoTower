@@ -227,14 +227,33 @@ object SpeedtestOcrParser {
         val speedCandidates = mutableListOf<Double>()
         val speedCandidateLines = mutableListOf<String>()
 
+        // Pré-passe : si une ligne est un nombre seul suivi d'une ligne contenant uniquement une unité
+        // (ex: "86,7" puis "Mbps"), on les fusionne virtuellement pour la passe 1.
+        val mergedLines = buildList {
+            var idx = 0
+            while (idx < lines.size) {
+                val cur = lines[idx]
+                if (idx + 1 < lines.size &&
+                    standaloneNumberRegex.matches(cur) &&
+                    unitOnlyLineRegex.matches(lines[idx + 1])
+                ) {
+                    add("$cur ${lines[idx + 1]}")
+                    idx += 2
+                } else {
+                    add(cur)
+                    idx += 1
+                }
+            }
+        }
+
         // Passe 1 : valeurs avec unité explicite (ex: "482,5 Mb/s", "21 ms")
-        for (i in lines.indices) {
-            val line = lines[i]
+        for (i in mergedLines.indices) {
+            val line = mergedLines[i]
             val lower = line.lowercase(Locale.ROOT)
             if (isServerInfoLine(lower)) continue
 
-            val prevLower = if (i > 0) lines[i - 1].lowercase(Locale.ROOT) else ""
-            val prev2Lower = if (i > 1) lines[i - 2].lowercase(Locale.ROOT) else ""
+            val prevLower = if (i > 0) mergedLines[i - 1].lowercase(Locale.ROOT) else ""
+            val prev2Lower = if (i > 1) mergedLines[i - 2].lowercase(Locale.ROOT) else ""
 
             val speedMatches = speedValueRegex.findAll(line).toList()
             for (match in speedMatches) {
@@ -267,7 +286,9 @@ object SpeedtestOcrParser {
 
                 when {
                     containsAny(localLabel, jitterKeywords) -> {
-                        if (jitterMs == null) jitterMs = ms
+                        if (jitterMs == null || localLabel.contains("repos") || localLabel.contains("idle")) {
+                            jitterMs = ms
+                        }
                     }
                     containsAny(localLabel, pingKeywords) -> {
                         if (pingMs == null) pingMs = ms
@@ -290,8 +311,8 @@ object SpeedtestOcrParser {
             val dlIndex = lines.indexOfFirst { containsAny(it.lowercase(Locale.ROOT), downloadKeywords) }
             val ulIndex = lines.indexOfFirst { containsAny(it.lowercase(Locale.ROOT), uploadKeywords) }
 
-            if (dlIndex >= 0 && ulIndex >= 0 && ulIndex == dlIndex + 1) {
-                val followingNumbers = findStandaloneNumbersAfter(lines, ulIndex, maxScan = 5, limit = 2)
+            if (dlIndex >= 0 && ulIndex >= 0 && (ulIndex == dlIndex || ulIndex == dlIndex + 1)) {
+                val followingNumbers = findNumbersAcrossLinesAfter(lines, ulIndex, maxScan = 5, limit = 2)
                 if (downloadMbps == null && followingNumbers.isNotEmpty()) {
                     downloadMbps = followingNumbers[0]
                 }
@@ -380,6 +401,45 @@ object SpeedtestOcrParser {
             if (value != null && value <= maxValue) return value
         }
         return findStandaloneNumbersAfter(lines, labelIndex, maxScan = 3, limit = 1, maxValue = maxValue).firstOrNull()
+    }
+
+    private fun findNumbersAcrossLinesAfter(
+        lines: List<String>,
+        startIndex: Int,
+        maxScan: Int,
+        limit: Int,
+        maxValue: Double = 100_000.0
+    ): List<Double> {
+        val found = mutableListOf<Double>()
+        val end = minOf(lines.size - 1, startIndex + maxScan)
+        for (i in (startIndex + 1)..end) {
+            val line = lines[i]
+            if (unitOnlyLineRegex.matches(line)) continue
+            val standalone = standaloneNumberRegex.matchEntire(line)
+            if (standalone != null) {
+                val value = parseNumber(standalone.groupValues[1])
+                if (value != null && value <= maxValue) {
+                    found.add(value)
+                    if (found.size >= limit) break
+                    continue
+                }
+            }
+            // Cas où 2 nombres sont sur la même ligne (ex: "225 4,17" ou "86,7   1,35")
+            val lineNumbers = simpleInlineNumberRegex.findAll(line)
+                .mapNotNull { parseNumber(it.groupValues[1]) }
+                .filter { it <= maxValue }
+                .toList()
+            if (lineNumbers.isNotEmpty()) {
+                for (num in lineNumbers) {
+                    found.add(num)
+                    if (found.size >= limit) break
+                }
+                if (found.size >= limit) break
+            } else if (found.isNotEmpty()) {
+                break
+            }
+        }
+        return found
     }
 
     private fun findStandaloneNumbersAfter(

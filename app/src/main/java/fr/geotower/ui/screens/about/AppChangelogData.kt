@@ -27,10 +27,16 @@ data class ChangelogMilestone(
 object AppChangelogRepository {
     val milestones: List<ChangelogMilestone> = listOf(
         ChangelogMilestone(
-            versionName = "2.1.40",
+            versionName = "2.1.41",
             releaseDate = "2026-11-24",
             isCurrent = true,
             badge = MilestoneBadge.CURRENT,
+            summary = "Amélioration du parseur OCR des speedtests (unités sur ligne séparée, colonnes Ookla et cartes SignalQuest)",
+            itemResIds = listOf(R.string.appstrings_release_v2141_summary_speedtests_ocr_parser_formats)
+        ),
+        ChangelogMilestone(
+            versionName = "2.1.40",
+            releaseDate = "2026-11-24",
             summary = "Conservation des coordonnées GPS EXIF lors de l'import de captures de speedtest",
             itemResIds = listOf(R.string.appstrings_release_v2140_summary_speedtests_exif_location_preservation)
         ),

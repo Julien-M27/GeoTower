@@ -3528,6 +3528,7 @@
     <string name="appstrings_release_v2138_summary_speedtests_ocr_improvements">Mejora del reconocimiento OCR en capturas de speedtests (operadores MVNO, Cell ID, PLMN y filtrado de líneas de servidor)</string>
     <string name="appstrings_release_v2139_summary_speedtests_ocr_release_fix">Mayor fiabilidad del OCR de speedtests en la versión Release y soporte de orientación EXIF</string>
     <string name="appstrings_release_v2140_summary_speedtests_exif_location_preservation">Conservación de las coordenadas GPS EXIF al importar capturas de speedtests</string>
+    <string name="appstrings_release_v2141_summary_speedtests_ocr_parser_formats">Mejora del analizador OCR de speedtests (unidades en línea separada, columnas de Ookla y tarjetas de SignalQuest)</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registro de solicitudes de red</string>

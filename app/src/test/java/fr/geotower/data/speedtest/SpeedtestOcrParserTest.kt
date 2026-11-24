@@ -132,6 +132,82 @@ class SpeedtestOcrParserTest {
     }
 
     @Test
+    fun parseOoklaSplitUnitBelowNumberAndSameLineColumns() {
+        val text1 = """
+            SPEEDTEST
+            Descendant
+            86,7
+            Mbps
+            Ascendant
+            1,35
+            Mbps
+            Ping ms 44 419 2093 Gigue ms 45
+            Orange
+            5G
+        """.trimIndent()
+
+        val parsed1 = SpeedtestOcrParser.parse(text1)
+        assertEquals(86.7, parsed1.downloadMbps ?: -1.0, 0.01)
+        assertEquals(1.35, parsed1.uploadMbps ?: -1.0, 0.01)
+        assertEquals(44.0, parsed1.pingMs ?: -1.0, 0.01)
+        assertEquals(45.0, parsed1.jitterMs ?: -1.0, 0.01)
+        assertEquals("Orange", parsed1.operatorName)
+        assertEquals("5G", parsed1.networkTech)
+
+        val text2 = """
+            SPEEDTEST
+            Descendant Mbps Ascendant Mbps
+            225 4,17
+            Ping ms 34 473 1079 Gigue ms 4
+            Orange
+            5G
+        """.trimIndent()
+
+        val parsed2 = SpeedtestOcrParser.parse(text2)
+        assertEquals(225.0, parsed2.downloadMbps ?: -1.0, 0.01)
+        assertEquals(4.17, parsed2.uploadMbps ?: -1.0, 0.01)
+        assertEquals(34.0, parsed2.pingMs ?: -1.0, 0.01)
+        assertEquals(4.0, parsed2.jitterMs ?: -1.0, 0.01)
+        assertEquals("Orange", parsed2.operatorName)
+        assertEquals("5G", parsed2.networkTech)
+    }
+
+    @Test
+    fun parseSignalQuestShareCard() {
+        val text = """
+            signal quest
+            Speedtest · 24 novembre 2026 à 14:20
+            Orange · 5G NSA · n78+B1+B3+B7
+            ↓ DESCENDANT
+            120
+            Mb/s
+            ↑ MONTANT
+            0,6 Mb/s
+            LATENCE MIN.
+            41 ms
+            Moyenne 104 ms
+            ↓ DESCENDANT MAX 139 Mb/s
+            ↑ MONTANT MAX 2,6 Mb/s
+            ANCRE 4G eNB 55562 · PCI 425
+            Sous charge ↓ 161 ms · gigue 83 ms
+            Sous charge ↑ 554 ms · gigue 224 ms
+            Gigue au repos 65 ms
+            Serveur Poitiers · hébergé par Bouygues
+            Samsung SM-A5460 · Le Mans
+        """.trimIndent()
+
+        val parsed = SpeedtestOcrParser.parse(text)
+        assertEquals(120.0, parsed.downloadMbps ?: -1.0, 0.01)
+        assertEquals(0.6, parsed.uploadMbps ?: -1.0, 0.01)
+        assertEquals(41.0, parsed.pingMs ?: -1.0, 0.01)
+        assertEquals(65.0, parsed.jitterMs ?: -1.0, 0.01)
+        assertEquals("Orange", parsed.operatorName)
+        assertEquals("5G NSA", parsed.networkTech)
+        assertEquals("n78+B1+B3+B7", parsed.band)
+        assertEquals("55562", parsed.cellIdentifier)
+    }
+
+    @Test
     fun parseInternationalOoklaFormatsAndUnknownOperator() {
         val text = """
             SPEEDTEST
