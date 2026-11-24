@@ -3526,6 +3526,7 @@
     <string name="appstrings_release_v2137_summary_speedtests_ocr_map_legend_and_batch_delete">Novo registo de Speedtests com importação OCR de capturas, legenda no mapa e eliminação múltipla nos históricos</string>
     <string name="appstrings_release_v2138_summary_map_release_crash_fix">Corrigida a falha ao abrir o mapa em versões Release</string>
     <string name="appstrings_release_v2138_summary_speedtests_ocr_improvements">Melhorado o reconhecimento OCR de capturas de speedtests (operadores MVNO, Cell ID, PLMN e filtragem de linhas de servidor)</string>
+    <string name="appstrings_release_v2139_summary_speedtests_ocr_release_fix">OCR de speedtests mais fiável na versão Release e suporte à orientação EXIF</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registo de pedidos de rede</string>

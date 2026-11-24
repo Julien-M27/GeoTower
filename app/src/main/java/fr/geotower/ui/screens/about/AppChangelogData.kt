@@ -27,10 +27,16 @@ data class ChangelogMilestone(
 object AppChangelogRepository {
     val milestones: List<ChangelogMilestone> = listOf(
         ChangelogMilestone(
-            versionName = "2.1.38",
+            versionName = "2.1.39",
             releaseDate = "2026-11-24",
             isCurrent = true,
             badge = MilestoneBadge.CURRENT,
+            summary = "Fiabilisation de l'OCR des captures de speedtest en version Release et gestion de l'orientation EXIF",
+            itemResIds = listOf(R.string.appstrings_release_v2139_summary_speedtests_ocr_release_fix)
+        ),
+        ChangelogMilestone(
+            versionName = "2.1.38",
+            releaseDate = "2026-11-24",
             summary = "Correctif du plantage à l'ouverture de la carte en version Release et amélioration de la reconnaissance OCR des speedtests",
             itemResIds = listOf(
                 R.string.appstrings_release_v2138_summary_map_release_crash_fix,

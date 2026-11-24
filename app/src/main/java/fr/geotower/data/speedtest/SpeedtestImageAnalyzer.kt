@@ -1,8 +1,10 @@
 package fr.geotower.data.speedtest
 
 import android.content.Context
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.OpenableColumns
+import android.util.Log
 import android.webkit.MimeTypeMap
 import androidx.core.net.toUri
 import androidx.exifinterface.media.ExifInterface
@@ -71,8 +73,10 @@ object SpeedtestImageAnalyzer {
             var latitude: Double? = null
             var longitude: Double? = null
 
+            var rotationDegrees = 0
             runCatching {
                 val exif = ExifInterface(imageFile.absolutePath)
+                rotationDegrees = exif.rotationDegrees
                 val latLong = exif.latLong
                 if (latLong != null && latLong.size == 2 && latLong[0].isFinite() && latLong[1].isFinite()) {
                     latitude = latLong[0]
@@ -94,11 +98,18 @@ object SpeedtestImageAnalyzer {
             val rawOcrText = runCatching {
                 val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
                 try {
-                    val inputImage = InputImage.fromFilePath(context.applicationContext, imageFile.toUri())
+                    val bitmap = BitmapFactory.decodeFile(imageFile.absolutePath)
+                    val inputImage = if (bitmap != null) {
+                        InputImage.fromBitmap(bitmap, rotationDegrees)
+                    } else {
+                        InputImage.fromFilePath(context.applicationContext, imageFile.toUri())
+                    }
                     recognizer.process(inputImage).await().text
                 } finally {
                     recognizer.close()
                 }
+            }.onFailure { error ->
+                Log.e("SpeedtestOCR", "ML Kit OCR failed for ${imageFile.name}", error)
             }.getOrNull()?.takeIf { it.isNotBlank() }
 
             val parsed = rawOcrText?.let { SpeedtestOcrParser.parse(it) } ?: ParsedSpeedtestData()

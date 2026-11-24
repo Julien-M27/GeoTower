@@ -3526,6 +3526,7 @@
     <string name="appstrings_release_v2137_summary_speedtests_ocr_map_legend_and_batch_delete">Neues Speedtest-Protokoll mit OCR-Screenshot-Import, Kartenlegende und Mehrfachlöschung in Verläufen</string>
     <string name="appstrings_release_v2138_summary_map_release_crash_fix">Absturz beim Öffnen der Karte in Release-Versionen behoben</string>
     <string name="appstrings_release_v2138_summary_speedtests_ocr_improvements">Verbesserte OCR-Erkennung für Speedtest-Screenshots (MVNO-Anbieter, Cell ID, PLMN und Filterung von Serverzeilen)</string>
+    <string name="appstrings_release_v2139_summary_speedtests_ocr_release_fix">Zuverlässigere Speedtest-OCR in der Release-Version und Unterstützung der EXIF-Drehung</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Netzwerkanfragen-Protokoll</string>

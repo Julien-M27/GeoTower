@@ -3528,6 +3528,7 @@
     <string name="appstrings_release_v2137_summary_speedtests_ocr_map_legend_and_batch_delete">Nouveau journal de Speedtests avec import OCR de captures, légende sur la carte et suppression multiple dans les historiques</string>
     <string name="appstrings_release_v2138_summary_map_release_crash_fix">Correction du plantage à l\'ouverture de la carte en version Release</string>
     <string name="appstrings_release_v2138_summary_speedtests_ocr_improvements">Amélioration de la reconnaissance OCR des captures de speedtests (opérateurs MVNO, Cell ID, PLMN et filtrage des lignes serveur)</string>
+    <string name="appstrings_release_v2139_summary_speedtests_ocr_release_fix">Fiabilisation de l\'OCR des captures de speedtests en version Release et prise en charge de l\'orientation EXIF</string>
 
     <!-- Journal des requêtes réseau -->
     <string name="network_log_title">Journal des requêtes réseau</string>
