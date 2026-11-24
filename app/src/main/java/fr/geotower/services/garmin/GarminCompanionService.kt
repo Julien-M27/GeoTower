@@ -189,9 +189,9 @@ class GarminCompanionService : Service() {
 
     private fun buildStandardNotification(pendingIntent: PendingIntent): Notification {
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("GeoTower • Montre Garmin")
-            .setContentText("Liaison active • Durée : Illimité (écran éteint)")
-            .setSubText("Illimité")
+            .setContentTitle(getString(fr.geotower.R.string.garmin_notif_title))
+            .setContentText(getString(fr.geotower.R.string.garmin_notif_unlimited_text))
+            .setSubText(getString(fr.geotower.R.string.garmin_notif_unlimited_sub))
             .setContentIntent(pendingIntent)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true)
@@ -213,8 +213,8 @@ class GarminCompanionService : Service() {
                 listOf(Notification.ProgressStyle.Segment(100).setColor(0xFF00A0E2.toInt()))
             )
         val nativeBuilder = Notification.Builder(this, CHANNEL_ID)
-            .setContentTitle("GeoTower • Montre Garmin")
-            .setContentText("Liaison active • Reste $remainingText")
+            .setContentTitle(getString(fr.geotower.R.string.garmin_notif_title))
+            .setContentText(getString(fr.geotower.R.string.garmin_notif_remaining_text, remainingText))
             .setSubText(remainingText)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
@@ -252,8 +252,8 @@ class GarminCompanionService : Service() {
         remainingText: String
     ): Notification {
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("GeoTower • Montre Garmin")
-            .setContentText("Liaison active • Reste $remainingText")
+            .setContentTitle(getString(fr.geotower.R.string.garmin_notif_title))
+            .setContentText(getString(fr.geotower.R.string.garmin_notif_remaining_text, remainingText))
             .setSubText(remainingText)
             .setContentIntent(pendingIntent)
             .setPriority(NotificationCompat.PRIORITY_LOW)

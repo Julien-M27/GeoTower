@@ -33,6 +33,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
+import fr.geotower.R
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -894,7 +896,7 @@ fun ChangesMapScreen(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Button(onClick = { loadWeeks() }) {
-                            Text("Réessayer", fontSize = 12.sp)
+                            Text(stringResource(R.string.appstrings_retry), fontSize = 12.sp)
                         }
                     }
                 }

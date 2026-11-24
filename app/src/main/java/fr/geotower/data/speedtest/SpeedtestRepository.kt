@@ -1,7 +1,9 @@
 package fr.geotower.data.speedtest
 
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
+import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
@@ -56,6 +58,7 @@ object SpeedtestRepository {
                     pingMs = meta.parsed.pingMs,
                     jitterMs = meta.parsed.jitterMs,
                     operatorName = meta.parsed.operatorName,
+                    networkName = meta.parsed.networkName,
                     networkTech = meta.parsed.networkTech,
                     band = meta.parsed.band,
                     cellIdentifier = meta.parsed.cellIdentifier,
@@ -85,6 +88,7 @@ object SpeedtestRepository {
                 pingMs = meta.parsed.pingMs ?: entry.pingMs,
                 jitterMs = meta.parsed.jitterMs ?: entry.jitterMs,
                 operatorName = meta.parsed.operatorName ?: entry.operatorName,
+                networkName = meta.parsed.networkName ?: entry.networkName,
                 networkTech = meta.parsed.networkTech ?: entry.networkTech,
                 band = meta.parsed.band ?: entry.band,
                 cellIdentifier = meta.parsed.cellIdentifier ?: entry.cellIdentifier,
@@ -100,5 +104,36 @@ object SpeedtestRepository {
         SpeedtestDatabase.getDatabase(context).speedtestDao().deleteById(entry.id)
         val file = imageFile(context, entry.imageFileName)
         runCatching { if (file.exists()) file.delete() }
+    }
+
+    fun shareImages(context: Context, entries: List<SpeedtestEntryEntity>) {
+        val uris = ArrayList<Uri>()
+        for (entry in entries) {
+            val file = imageFile(context, entry.imageFileName)
+            if (file.exists()) {
+                runCatching {
+                    FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                }.getOrNull()?.let { uris.add(it) }
+            }
+        }
+        if (uris.isEmpty()) return
+
+        val shareIntent = if (uris.size == 1) {
+            Intent(Intent.ACTION_SEND).apply {
+                type = "image/*"
+                putExtra(Intent.EXTRA_STREAM, uris.first())
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+        } else {
+            Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+                type = "image/*"
+                putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+        }
+        val chooser = Intent.createChooser(shareIntent, null).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(chooser)
     }
 }

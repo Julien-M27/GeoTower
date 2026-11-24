@@ -26,9 +26,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import fr.geotower.R
 import fr.geotower.data.models.ChangeMapPoint
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.OperatorColors
@@ -93,13 +95,13 @@ fun ChangesFilterSheet(
                         ) {
                             Icon(imageVector = Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Réinitialiser", fontSize = 12.sp)
+                            Text(stringResource(R.string.changes_filter_reset), fontSize = 12.sp)
                         }
                     }
                 }
 
                 IconButton(onClick = onDismiss) {
-                    Icon(imageVector = Icons.Default.Close, contentDescription = "Fermer")
+                    Icon(imageVector = Icons.Default.Close, contentDescription = stringResource(R.string.appstrings_close))
                 }
             }
 
@@ -364,7 +366,7 @@ fun ChangesFilterSheet(
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp)
                     ) {
-                        Text("Annuler")
+                        Text(stringResource(R.string.appstrings_cancel))
                     }
 
                     Button(
@@ -375,8 +377,12 @@ fun ChangesFilterSheet(
                         modifier = Modifier.weight(2f),
                         shape = RoundedCornerShape(12.dp)
                     ) {
-                        val label = if (matchingCount > 1) "$matchingCount résultats" else "$matchingCount résultat"
-                        Text("Afficher ($label)", fontWeight = FontWeight.Bold)
+                        val text = if (matchingCount > 1) {
+                            stringResource(R.string.changes_filter_show_count_plural, matchingCount)
+                        } else {
+                            stringResource(R.string.changes_filter_show_count_singular, matchingCount)
+                        }
+                        Text(text, fontWeight = FontWeight.Bold)
                     }
                 }
             }

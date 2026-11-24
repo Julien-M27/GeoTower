@@ -4681,6 +4681,14 @@ fun StatsSettingsSheet(
             editor.putBoolean(StatsPreferences.statsFrequencyVisiblePrefKey(normalizedTech, frequencyId), true)
         }
         editor.apply()
+        PageScrollPrefs.Aid.entries.forEach { aid ->
+            PageScrollPrefs.set(
+                prefs,
+                aid,
+                PageScrollPrefs.STATS,
+                PageScrollPrefs.defaultEnabled(aid, PageScrollPrefs.STATS)
+            )
+        }
     }
 
     fun resetStatsSettings() {
@@ -4706,6 +4714,14 @@ fun StatsSettingsSheet(
             }
         }
         editor.apply()
+        PageScrollPrefs.Aid.entries.forEach { aid ->
+            PageScrollPrefs.set(
+                prefs,
+                aid,
+                PageScrollPrefs.STATS,
+                PageScrollPrefs.defaultEnabled(aid, PageScrollPrefs.STATS)
+            )
+        }
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
@@ -5003,13 +5019,13 @@ fun SiteFreqFiltersSheet(
                     FilterChip(
                         selected = !selectedCanada,
                         onClick = { selectedCanada = false },
-                        label = { Text("France", maxLines = 1) },
+                        label = { Text(stringResource(R.string.appstrings_frequency_reference_france_tab), maxLines = 1) },
                         modifier = Modifier.weight(1f)
                     )
                     FilterChip(
                         selected = selectedCanada,
                         onClick = { selectedCanada = true },
-                        label = { Text("Canada", maxLines = 1) },
+                        label = { Text(stringResource(R.string.country_name_ca), maxLines = 1) },
                         modifier = Modifier.weight(1f)
                     )
                 }

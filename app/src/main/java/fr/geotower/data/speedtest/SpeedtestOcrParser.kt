@@ -8,6 +8,7 @@ data class ParsedSpeedtestData(
     val pingMs: Double? = null,
     val jitterMs: Double? = null,
     val operatorName: String? = null,
+    val networkName: String? = null,
     val networkTech: String? = null,
     val band: String? = null,
     val cellIdentifier: String? = null
@@ -26,6 +27,7 @@ data class ParsedSpeedtestData(
 object SpeedtestOcrParser {
 
     private val downloadKeywords = listOf(
+        "téléchargement", "telechargement",
         "réception", "reception", "download", "descendant", "débit descendant",
         "debit descendant", "dl", "empfang", "herunterladen", "descarga", "ricezione"
     )
@@ -37,7 +39,7 @@ object SpeedtestOcrParser {
         "ping", "latence", "latency", "latenz", "latencia", "latenza"
     )
     private val jitterKeywords = listOf(
-        "gigue", "jitter", "gig"
+        "gigue", "jitter", "jittee", "gig"
     )
 
     private val knownOperators = listOf(
@@ -70,7 +72,7 @@ object SpeedtestOcrParser {
         "Vodafone" to listOf("vodafone"),
         "Telekom" to listOf("telekom", "t-mobile", "deutsche telekom"),
         "O2" to listOf("o2"),
-        "EE" to listOf("ee"),
+        "EE" to listOf("ee mobile"),
         "Three" to listOf("three", "3 uk"),
         "AT&T" to listOf("at&t", "att"),
         "Verizon" to listOf("verizon"),
@@ -80,12 +82,12 @@ object SpeedtestOcrParser {
         "WindTre" to listOf("windtre", "wind tre"),
         "Iliad" to listOf("iliad"),
         "MEO" to listOf("meo"),
-        "NOS" to listOf("nos"),
+        "NOS" to listOf("nos telecom"),
         "Telstra" to listOf("telstra"),
         "Optus" to listOf("optus"),
         "NTT Docomo" to listOf("docomo", "ntt docomo"),
         "SoftBank" to listOf("softbank"),
-        "KDDI" to listOf("kddi", "au"),
+        "KDDI" to listOf("kddi", "au by kddi"),
         "Rakuten Mobile" to listOf("rakuten"),
         "Jio" to listOf("jio", "reliance jio"),
         "Airtel" to listOf("airtel"),
@@ -199,7 +201,7 @@ object SpeedtestOcrParser {
         RegexOption.IGNORE_CASE
     )
     private val bandRegex = Regex(
-        """\b([Bn]\d{1,3}(?:\s*\+\s*[Bn]\d{1,3})*)\b"""
+        """\b((?:[Bn]\d{1,3}|Bl)(?:\s*\+\s*(?:[Bn]\d{1,3}|Bl))*)\b"""
     )
     private val cellIdRegex = Regex(
         """\b(?:eNB|gNB|eNodeB|gNodeB|Cell\s*ID|Cell|CID|PCI)\s*[:=#]?\s*(\d{2,10}(?::\d{1,3})?)\b""",
@@ -214,9 +216,17 @@ object SpeedtestOcrParser {
     fun parse(rawText: String): ParsedSpeedtestData {
         if (rawText.isBlank()) return ParsedSpeedtestData()
 
-        val lines = rawText
+        val normalizedRaw = rawText
+            .replace(Regex("""([A-Za-zÀ-ÿ])(5G|4G|3G)\b""", RegexOption.IGNORE_CASE), "$1 $2")
+            .replace(Regex("""\b(\d{1,3})\s+(\d{2})\s*ms\b""", RegexOption.IGNORE_CASE), "$1.$2 ms")
+
+        val lines = normalizedRaw
             .lines()
-            .map { it.trim().replace(Regex("""(\d)\s*([.,])\s*(\d)"""), "$1$2$3") }
+            .map {
+                it.trim()
+                    .replace(Regex("""(\d)\s*([.,])\s*(\d)"""), "$1$2$3")
+                    .replace(Regex("""(\d)[.,]+(?=\s|$)"""), "$1")
+            }
             .filter { it.isNotEmpty() }
 
         var downloadMbps: Double? = null
@@ -225,6 +235,7 @@ object SpeedtestOcrParser {
         var uploadFromChartMax = false
         var pingMs: Double? = null
         var jitterMs: Double? = null
+        var jitterFromLoaded = false
 
         val speedCandidates = mutableListOf<Double>()
         val speedCandidateLines = mutableListOf<String>()
@@ -293,10 +304,17 @@ object SpeedtestOcrParser {
                 val segStart = maxOf(beforeMatch.lastIndexOf('/'), beforeMatch.lastIndexOf('|'), 0)
                 val localLabel = beforeMatch.substring(segStart)
 
+                val isLoadedOnCurrentLine = lower.contains("charg") || lower.contains("loaded")
+                val isLoadedOnPrevLine = prevLower.contains("charg") || prevLower.contains("loaded")
                 when {
                     containsAny(localLabel, jitterKeywords) -> {
-                        if (jitterMs == null || localLabel.contains("repos") || localLabel.contains("idle")) {
+                        if (jitterMs == null ||
+                            (jitterFromLoaded && !isLoadedOnCurrentLine) ||
+                            localLabel.contains("repos") || localLabel.contains("idle") ||
+                            prevLower.contains("repos") || prevLower.contains("idle")
+                        ) {
                             jitterMs = ms
+                            jitterFromLoaded = isLoadedOnCurrentLine
                         }
                     }
                     containsAny(localLabel, pingKeywords) -> {
@@ -304,7 +322,14 @@ object SpeedtestOcrParser {
                     }
                     containsAny(prevLower, jitterKeywords) ||
                         (isAvgOrMaxLine(localLabel) && containsAny(prevLower, jitterKeywords)) -> {
-                        if (jitterMs == null) jitterMs = ms
+                        val isLoaded = isLoadedOnCurrentLine || isLoadedOnPrevLine
+                        if (jitterMs == null ||
+                            (jitterFromLoaded && !isLoaded) ||
+                            prevLower.contains("repos") || prevLower.contains("idle")
+                        ) {
+                            jitterMs = ms
+                            jitterFromLoaded = isLoaded
+                        }
                     }
                     containsAny(prevLower, pingKeywords) ||
                         (isAvgOrMaxLine(localLabel) && containsAny(prevLower, pingKeywords)) ||
@@ -330,10 +355,10 @@ object SpeedtestOcrParser {
                 }
             } else {
                 if (downloadMbps == null && dlIndex >= 0) {
-                    downloadMbps = findNumberAfterKeyword(lines, dlIndex, downloadKeywords)
+                    downloadMbps = findSpeedAfterKeyword(lines, dlIndex, downloadKeywords)
                 }
                 if (uploadMbps == null && ulIndex >= 0) {
-                    uploadMbps = findNumberAfterKeyword(lines, ulIndex, uploadKeywords)
+                    uploadMbps = findSpeedAfterKeyword(lines, ulIndex, uploadKeywords)
                 }
             }
         }
@@ -341,15 +366,38 @@ object SpeedtestOcrParser {
         if (pingMs == null) {
             val pingIndex = lines.indexOfFirst { containsAny(it.lowercase(Locale.ROOT), pingKeywords) }
             if (pingIndex >= 0) {
-                pingMs = findNumberAfterKeyword(lines, pingIndex, pingKeywords, maxValue = 5000.0, allowThousandsSpace = false)
-                    ?: (pingIndex + 1..minOf(lines.lastIndex, pingIndex + 6))
-                        .firstNotNullOfOrNull { idx -> msValueRegex.find(lines[idx])?.let { parseNumber(it.groupValues[1]) } }
+                val pingLineTail = lines[pingIndex].let { line ->
+                    val lower = line.lowercase(Locale.ROOT)
+                    val kwEnd = pingKeywords.mapNotNull { kw -> lower.indexOf(kw).takeIf { it >= 0 }?.plus(kw.length) }.minOrNull() ?: 0
+                    line.substring(kwEnd)
+                }
+                val nextJitterIdx = ((pingIndex + 1)..lines.lastIndex)
+                    .firstOrNull { containsAny(lines[it].lowercase(Locale.ROOT), jitterKeywords) }
+                    ?: (lines.lastIndex + 1)
+                val msScanEnd = minOf(lines.lastIndex, pingIndex + 6, nextJitterIdx - 1)
+                pingMs = msValueRegex.find(pingLineTail)?.let { parseNumber(it.groupValues[1]) }
+                    ?: (if (pingIndex > 0) {
+                        msValueRegex.find(lines[pingIndex - 1])?.let { parseNumber(it.groupValues[1]) }
+                    } else null)
+                    ?: (if (pingIndex + 1 <= msScanEnd) {
+                        (pingIndex + 1..msScanEnd)
+                            .firstNotNullOfOrNull { idx -> msValueRegex.find(lines[idx])?.let { parseNumber(it.groupValues[1]) } }
+                    } else null)
+                    ?: findNumberAfterKeyword(lines, pingIndex, pingKeywords, maxValue = 5000.0, allowThousandsSpace = false)
             }
         }
         if (jitterMs == null) {
             val jitterIndex = lines.indexOfFirst { containsAny(it.lowercase(Locale.ROOT), jitterKeywords) }
             if (jitterIndex >= 0) {
-                jitterMs = findNumberAfterKeyword(lines, jitterIndex, jitterKeywords, maxValue = 5000.0, allowThousandsSpace = false)
+                val jitterLineTail = lines[jitterIndex].let { line ->
+                    val lower = line.lowercase(Locale.ROOT)
+                    val kwEnd = jitterKeywords.mapNotNull { kw -> lower.indexOf(kw).takeIf { it >= 0 }?.plus(kw.length) }.minOrNull() ?: 0
+                    line.substring(kwEnd)
+                }
+                jitterMs = msValueRegex.find(jitterLineTail)?.let { parseNumber(it.groupValues[1]) }
+                    ?: (jitterIndex + 1..minOf(lines.lastIndex, jitterIndex + 6))
+                        .firstNotNullOfOrNull { idx -> msValueRegex.find(lines[idx])?.let { parseNumber(it.groupValues[1]) } }
+                    ?: findNumberAfterKeyword(lines, jitterIndex, jitterKeywords, maxValue = 5000.0, allowThousandsSpace = false)
             }
         }
 
@@ -368,11 +416,33 @@ object SpeedtestOcrParser {
             }
         }
 
-        val fullLower = rawText.lowercase(Locale.ROOT)
-        val operatorName = detectOperator(rawText, fullLower)
-        val networkTech = detectNetworkTech(rawText, fullLower)
-        val band = bandRegex.find(rawText)?.groupValues?.getOrNull(1)?.replace(" ", "")
-        val cellIdentifier = cellIdRegex.find(rawText)?.groupValues?.getOrNull(1)
+        val fullLower = normalizedRaw.lowercase(Locale.ROOT)
+        val hasIdleJitterLabel = fullLower.contains("gigue au repos") || fullLower.contains("idle jitter")
+        if (hasIdleJitterLabel) {
+            // Sur SignalQuest, ML Kit lit souvent "Gigue au repos" dans la colonne gauche puis "65 ms"
+            // tout seul après les deux lignes "XXX ms gigue YYY ms" de la colonne droite.
+            val standaloneAfterLoadedJitter = mergedLines.indices.firstNotNullOfOrNull { idx ->
+                val cur = mergedLines[idx]
+                val prev = if (idx > 0) mergedLines[idx - 1].lowercase(Locale.ROOT) else ""
+                val isStandaloneMs = Regex("""^\s*$NUM_PATTERN\s*ms\s*$""", RegexOption.IGNORE_CASE).matches(cur)
+                if (isStandaloneMs && containsAny(prev, jitterKeywords)) {
+                    msValueRegex.find(cur)?.let { parseNumber(it.groupValues[1]) }
+                } else {
+                    null
+                }
+            }
+            if (standaloneAfterLoadedJitter != null) {
+                jitterMs = standaloneAfterLoadedJitter
+            }
+        }
+
+        val operatorName = detectOperator(normalizedRaw, fullLower)
+        val networkName = detectNetworkName(normalizedRaw)
+        val networkTech = detectNetworkTech(normalizedRaw, fullLower)
+        val band = bandRegex.find(normalizedRaw)?.groupValues?.getOrNull(1)
+            ?.replace(" ", "")
+            ?.replace("Bl", "B1")
+        val cellIdentifier = cellIdRegex.find(normalizedRaw)?.groupValues?.getOrNull(1)
 
         return ParsedSpeedtestData(
             downloadMbps = downloadMbps,
@@ -380,10 +450,37 @@ object SpeedtestOcrParser {
             pingMs = pingMs,
             jitterMs = jitterMs,
             operatorName = operatorName,
+            networkName = networkName,
             networkTech = networkTech,
             band = band,
             cellIdentifier = cellIdentifier
         )
+    }
+
+    private fun findSpeedAfterKeyword(
+        lines: List<String>,
+        labelIndex: Int,
+        keywords: List<String>
+    ): Double? {
+        // Ne pas confondre "DL chargée 153 ms" avec un débit en Mbps
+        val labelLineLower = lines[labelIndex].lowercase(Locale.ROOT)
+        if (msValueRegex.containsMatchIn(labelLineLower) && !speedValueRegex.containsMatchIn(labelLineLower)) {
+            return null
+        }
+        val value = findNumberAfterKeyword(lines, labelIndex, keywords) ?: return null
+        val end = minOf(lines.lastIndex, labelIndex + 5)
+        for (i in (labelIndex + 1)..end) {
+            val lower = lines[i].lowercase(Locale.ROOT)
+            if (i > labelIndex + 1 && (containsAny(lower, downloadKeywords) || containsAny(lower, uploadKeywords))) {
+                break
+            }
+            when {
+                lower.contains("gb/s") || lower.contains("gbps") -> return value * 1000.0
+                lower.contains("kb/s") || lower.contains("kbps") || lower.contains("kbit/s") -> return value / 1000.0
+                lower.contains("mb/s") || lower.contains("mbps") || lower.contains("mbit/s") -> return value
+            }
+        }
+        return value
     }
 
     private fun findNumberAfterKeyword(
@@ -423,6 +520,14 @@ object SpeedtestOcrParser {
         val end = minOf(lines.size - 1, startIndex + maxScan)
         for (i in (startIndex + 1)..end) {
             val line = lines[i]
+            val lower = line.lowercase(Locale.ROOT)
+            if (containsAny(lower, downloadKeywords) ||
+                containsAny(lower, uploadKeywords) ||
+                containsAny(lower, pingKeywords) ||
+                containsAny(lower, jitterKeywords)
+            ) {
+                break
+            }
             if (unitOnlyLineRegex.matches(line)) continue
             val standalone = standaloneNumberRegex.matchEntire(line)
             if (standalone != null) {
@@ -462,6 +567,14 @@ object SpeedtestOcrParser {
         val end = minOf(lines.size - 1, startIndex + maxScan)
         for (i in (startIndex + 1)..end) {
             val line = lines[i]
+            val lower = line.lowercase(Locale.ROOT)
+            if (containsAny(lower, downloadKeywords) ||
+                containsAny(lower, uploadKeywords) ||
+                containsAny(lower, pingKeywords) ||
+                containsAny(lower, jitterKeywords)
+            ) {
+                break
+            }
             if (unitOnlyLineRegex.matches(line)) continue
             val standalone = standaloneNumberRegex.matchEntire(line)
             if (standalone != null) {
@@ -488,17 +601,29 @@ object SpeedtestOcrParser {
             if (trimmed.isNotEmpty()) return trimmed
         }
 
-        // 2. Recherche par code PLMN (MCC+MNC, ex: "PLMN: 208:20" sur nPerf)
-        for (match in plmnRegex.findAll(rawText)) {
-            val normalized = "${match.groupValues[1]}${match.groupValues[2]}"
-            operatorByPlmn[normalized]?.let { return it }
-        }
+        // 2. Sur nPerf, l'opérateur est sous "Opérateur" (prioritaire sur Réseau / PLMN)
+        detectNperfOperatorUnderOperateur(rawText)?.let { return it }
 
-        // 3. Premier opérateur apparaissant hors lignes serveur (évite "Anycast-FR - 100 Gb/s - Free")
-        val nonServerLower = rawText.lines()
-            .filterNot { isServerInfoLine(it.lowercase(Locale.ROOT)) }
-            .joinToString("\n")
-            .lowercase(Locale.ROOT)
+        // 3. Premier opérateur apparaissant hors lignes serveur (et ligne suivant "Serveur" / logo)
+        val rawLines = rawText.lines().map { it.trim() }.filter { it.isNotEmpty() }
+        val nonServerLines = buildList {
+            var skipNext = false
+            for (line in rawLines) {
+                val lower = line.lowercase(Locale.ROOT)
+                if (skipNext) {
+                    skipNext = false
+                    continue
+                }
+                if (lower == "serveur" || lower == "server") {
+                    skipNext = true
+                    continue
+                }
+                if (!isServerInfoLine(lower)) {
+                    add(line)
+                }
+            }
+        }
+        val nonServerLower = nonServerLines.joinToString("\n").lowercase(Locale.ROOT)
 
         var bestMatchIndex = Int.MAX_VALUE
         var bestOperator: String? = null
@@ -514,6 +639,83 @@ object SpeedtestOcrParser {
         }
         if (bestOperator != null) return bestOperator
 
+        // 4. Fallback par code PLMN (MCC+MNC)
+        for (match in plmnRegex.findAll(rawText)) {
+            val normalized = "${match.groupValues[1]}${match.groupValues[2]}"
+            operatorByPlmn[normalized]?.let { return it }
+        }
+
+        return null
+    }
+
+    private fun detectNetworkName(rawText: String): String? {
+        detectNperfNetworkUnderReseau(rawText)?.let { return it }
+        for (match in plmnRegex.findAll(rawText)) {
+            val normalized = "${match.groupValues[1]}${match.groupValues[2]}"
+            operatorByPlmn[normalized]?.let { return it }
+        }
+        return null
+    }
+
+    private fun detectNperfOperatorUnderOperateur(rawText: String): String? {
+        val lines = rawText.lines().map { it.trim() }.filter { it.isNotEmpty() }
+        val opLabels = listOf("opérateur", "operateur", "operator")
+        for (i in lines.indices) {
+            val lower = lines[i].lowercase(Locale.ROOT)
+            if (opLabels.any { lower == it || lower.endsWith(" $it") }) {
+                for (offset in 1..3) {
+                    val candidate = lines.getOrNull(i + offset) ?: break
+                    matchKnownOperator(candidate.lowercase(Locale.ROOT))?.let { return it }
+                }
+            }
+        }
+        return null
+    }
+
+    private fun detectNperfNetworkUnderReseau(rawText: String): String? {
+        val lines = rawText.lines().map { it.trim() }.filter { it.isNotEmpty() }
+        val reseauLabels = listOf("réseau", "reseau", "network")
+        for (i in lines.indices) {
+            val lower = lines[i].lowercase(Locale.ROOT)
+            if (reseauLabels.any { lower == it || lower.endsWith(" $it") }) {
+                // Cas colonne : la valeur est juste en dessous de "Réseau"
+                if (i + 1 < lines.size) {
+                    matchKnownOperator(lines[i + 1].lowercase(Locale.ROOT))?.let { return it }
+                }
+                // Cas ligne : "Connexion", "Opérateur", "Réseau" puis 3 valeurs en dessous -> la 3e est sous Réseau
+                if (i >= 2 &&
+                    (lines[i - 1].lowercase(Locale.ROOT).contains("opérateur") ||
+                        lines[i - 1].lowercase(Locale.ROOT).contains("operateur") ||
+                        lines[i - 1].lowercase(Locale.ROOT).contains("operator"))
+                ) {
+                    for (offset in 1..4) {
+                        val candidateIdx = i + offset
+                        if (candidateIdx < lines.size) {
+                            matchKnownOperator(lines[candidateIdx].lowercase(Locale.ROOT))?.let { found ->
+                                // Si on a d'abord croisé un MVNO (ex: Lebara) avant SFR, on continue jusqu'au dernier
+                                if (offset >= 3) return found
+                            }
+                        }
+                    }
+                    // Fallback : dernier opérateur connu dans les 4 lignes suivant "Réseau"
+                    val lastOp = (1..4)
+                        .mapNotNull { offset -> lines.getOrNull(i + offset)?.lowercase(Locale.ROOT) }
+                        .mapNotNull { matchKnownOperator(it) }
+                        .lastOrNull()
+                    if (lastOp != null) return lastOp
+                }
+            }
+        }
+        return null
+    }
+
+    private fun matchKnownOperator(lowerText: String): String? {
+        for ((displayName, aliases) in knownOperators) {
+            for (alias in aliases) {
+                val pattern = Regex("""\b${Regex.escape(alias)}\b""")
+                if (pattern.containsMatchIn(lowerText)) return displayName
+            }
+        }
         return null
     }
 
@@ -533,13 +735,23 @@ object SpeedtestOcrParser {
     }
 
     private fun detectNetworkTech(rawText: String, fullLower: String): String? {
+        val withoutAnchor = rawText.replace(
+            Regex("""\b(?:ancre\s*4g|4g\s*anchor)\b""", RegexOption.IGNORE_CASE),
+            " "
+        )
+        val hasNrBand = Regex("""\bn\d{1,3}\b""").containsMatchIn(rawText)
+        val hasLteBandOrAnchor = Regex("""\bB\d{1,3}\b|\bancre\s*4g\b|\b4g\s*anchor\b""", RegexOption.IGNORE_CASE)
+            .containsMatchIn(rawText)
+
         return when {
-            Regex("""\b5g\s*\(?\s*sa\s*\)?|\bnr\s*\(?\s*sa\s*\)?""", RegexOption.IGNORE_CASE).containsMatchIn(rawText) -> "5G SA"
-            Regex("""\b5g\s*\(?\s*nsa\s*\)?|\bnr\s*\(?\s*nsa\s*\)?""", RegexOption.IGNORE_CASE).containsMatchIn(rawText) -> "5G NSA"
-            Regex("""\b5g\b|\bnr\b""", RegexOption.IGNORE_CASE).containsMatchIn(rawText) -> "5G"
-            Regex("""\b4g\+|\blte-?a\b""", RegexOption.IGNORE_CASE).containsMatchIn(rawText) -> "4G+"
-            Regex("""\b4g\b|\blte\b""", RegexOption.IGNORE_CASE).containsMatchIn(rawText) -> "4G"
-            Regex("""\b3g\+|\bhspa\b|\b3g\b""", RegexOption.IGNORE_CASE).containsMatchIn(rawText) -> "3G"
+            Regex("""\b5g\s*[:(\s-]*sa\s*\)?|\bnr\s*[:(\s-]*sa\s*\)?""", RegexOption.IGNORE_CASE).containsMatchIn(withoutAnchor) -> "5G SA"
+            Regex("""\b5g\s*[:(\s-]*nsa\s*\)?|\bnr\s*[:(\s-]*nsa\s*\)?""", RegexOption.IGNORE_CASE).containsMatchIn(withoutAnchor) -> "5G NSA"
+            Regex("""\b5g\b|\bnr\b""", RegexOption.IGNORE_CASE).containsMatchIn(withoutAnchor) -> "5G"
+            hasNrBand && hasLteBandOrAnchor -> "5G NSA"
+            hasNrBand -> "5G"
+            Regex("""\b4g\+|\blte-?a\b""", RegexOption.IGNORE_CASE).containsMatchIn(withoutAnchor) -> "4G+"
+            Regex("""\b4g\b|\blte\b""", RegexOption.IGNORE_CASE).containsMatchIn(withoutAnchor) -> "4G"
+            Regex("""\b3g\+|\bhspa\b|\b3g\b""", RegexOption.IGNORE_CASE).containsMatchIn(withoutAnchor) -> "3G"
             fullLower.contains("wi-fi") || Regex("""\bwifi\b""").containsMatchIn(fullLower) -> "Wi-Fi"
             else -> null
         }

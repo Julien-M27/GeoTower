@@ -229,10 +229,222 @@ class SpeedtestOcrParserTest {
         assertEquals(41.0, parsedRowByRow.pingMs ?: -1.0, 0.01)
         assertEquals(65.0, parsedRowByRow.jitterMs ?: -1.0, 0.01)
 
+        // Régression : "Gigue au repos" ne doit pas matcher "au" -> KDDI, et "ANCRE 4G" + n78 doit donner "5G NSA"
+        val splitGigueAndAnchor = SpeedtestOcrParser.parse(
+            """
+            n78+B1+B3+B7
+            ↓ DESCENDANT
+            120 Mb/s
+            ↑ MONTANT
+            0,6 Mb/s
+            ANCRE 4G eNB 55562
+            Sous charge ↓ 161 ms · gigue 83 ms
+            Gigue au repos
+            65 ms
+            """.trimIndent()
+        )
+        assertNull(splitGigueAndAnchor.operatorName)
+        assertEquals("5G NSA", splitGigueAndAnchor.networkTech)
+        assertEquals(65.0, splitGigueAndAnchor.jitterMs ?: -1.0, 0.01)
+
         // Espaces autour de la virgule décimale (ex: "0, 6 Mb/s", "86, 7 Mbps")
         val spacedDecimals = SpeedtestOcrParser.parse("↓ DESCENDANT\n86, 7 Mbps\n↑ MONTANT\n0, 6 Mb/s")
         assertEquals(86.7, spacedDecimals.downloadMbps ?: -1.0, 0.01)
         assertEquals(0.6, spacedDecimals.uploadMbps ?: -1.0, 0.01)
+
+        // Texte OCR réel collé depuis l'appareil (Orange5G, n78+Bl+B3+B7, Gigue au repos séparée de 65 ms)
+        val realDeviceOcr = """
+            signal quest
+            | Orange5G NSA-n78+Bl+B3+B7
+            DESCENDANT
+            120
+            ↑ MONTANT
+            0,6
+            Mb/s
+            Samsung SM-A5460 Le Mans
+            Mb/s
+            LATENCE MIN.
+            41
+            ms
+            Moyenne 104 ms
+            DESCENDANT
+            ↑ MONTANT
+            ANCRE 4G
+            RSRP
+            -111 dBm
+            Sous charge
+            Sous charge ↑
+            Gigue au repos
+            Serveur
+            Speedtest- 24 novembre 2026 à 14:20
+            SS-RSRP
+            -115 dBm
+            SS-SINR
+            MAX 139 Mb/s
+            8 JB
+            MAX 2,6 Mb/s
+            eNB 55562 • PCI 425
+            10s
+            161 ms- gigue 83 ms
+            554 ms gigue 224 ms
+            65 ms
+            Poitiers- hébergé par Bouygues
+            signalquest.fr
+        """.trimIndent()
+        val parsedReal = SpeedtestOcrParser.parse(realDeviceOcr)
+        assertEquals(120.0, parsedReal.downloadMbps ?: -1.0, 0.01)
+        assertEquals(0.6, parsedReal.uploadMbps ?: -1.0, 0.01)
+        assertEquals(41.0, parsedReal.pingMs ?: -1.0, 0.01)
+        assertEquals(65.0, parsedReal.jitterMs ?: -1.0, 0.01)
+        assertEquals("Orange", parsedReal.operatorName)
+        assertEquals("5G NSA", parsedReal.networkTech)
+        assertEquals("n78+B1+B3+B7", parsedReal.band)
+        assertEquals("55562", parsedReal.cellIdentifier)
+
+        // Texte OCR réel Cellular FR ("20 ms" au-dessus de "PING", "↑ UPLOAD" puis "150" séparé de "Mbps")
+        val cellularFrRealOcr = """
+            12:37 Tellement
+            ll MOBILE
+            Orange France
+            20 ms
+            PING
+            DOWNLOAD
+            1219
+            Mbps
+            DÉTAILS TECHNIQUES
+            Tech: 5G NSA
+            eNB: 55707
+            Bandes: B7
+            Accueil
+            RSRP: -71 dBm
+            SNR: 24 dB
+            Speedtest
+            & Refaire
+            Speedtest
+            ↑ UPLOAD
+            150
+            Carte
+            Cloudflare
+            SERVEUR
+            Mbps
+            < Partager
+            Logs
+            l 60
+            Paramètres
+        """.trimIndent()
+        val parsedCellular = SpeedtestOcrParser.parse(cellularFrRealOcr)
+        assertEquals(1219.0, parsedCellular.downloadMbps ?: -1.0, 0.01)
+        assertEquals(150.0, parsedCellular.uploadMbps ?: -1.0, 0.01)
+        assertEquals(20.0, parsedCellular.pingMs ?: -1.0, 0.01)
+        assertEquals("Orange", parsedCellular.operatorName)
+        assertEquals("5G NSA", parsedCellular.networkTech)
+        assertEquals("B7", parsedCellular.band)
+        assertEquals("55707", parsedCellular.cellIdentifier)
+
+        // Carte de partage nPerf en Gb/s ("1.61" séparé de "Gb/s", "5G: NSA", "Jittee:" / "15 00 ms")
+        val nperfGbpsShareCard = """
+            Speed test
+            #3623476400412662
+            Coulaines
+            Pays de la Loire, FR
+            Download
+            1.61
+            Average:
+            Packet loss :
+            Gb/s
+            1.35 Gb/s
+            0.04 %
+            Orange Mobile (FR) D
+            5G: NSA
+            Djperr
+            Upload
+            LO
+            184.52
+            Average
+            Samsung Galaxy A54
+            Android 16
+            Mb/s
+            2026-01-24 17:26:26 UTC
+            nPerf Android 2.15.25
+            176.08 Mb/s
+            Latency
+            24.00
+            Jittee:
+            Paris, Île-de-France |
+            100 Gb/s moji
+            ms
+            15 00 ms
+        """.trimIndent()
+        val parsedGbps = SpeedtestOcrParser.parse(nperfGbpsShareCard)
+        assertEquals(1610.0, parsedGbps.downloadMbps ?: -1.0, 0.1)
+        assertEquals(184.52, parsedGbps.uploadMbps ?: -1.0, 0.01)
+        assertEquals(24.0, parsedGbps.pingMs ?: -1.0, 0.01)
+        assertEquals(15.0, parsedGbps.jitterMs ?: -1.0, 0.01)
+        assertEquals("Orange", parsedGbps.operatorName)
+        assertEquals("5G NSA", parsedGbps.networkTech)
+
+        // Carte SignalQuest sombre ("TÉLÉCHARGEMENT", "861,6.", "DL chargée 153 ms", "Jitter 3,7 ms")
+        val signalQuestDarkOcr = """
+            SIGNALQUEST
+            TÉLÉCHARGEMENT
+            861,6.
+            MAX 1020,9 Mbps
+            DL chargée 153 ms jitter 109,3 ms
+            Latence 22 ms
+            Mbps
+            UPLOAD
+            83,1
+            MAX 88,1 Mbps
+            LA POSTE MOBILE• 5G NSA
+            Mbps
+            UL chargée 44 ms jitter 22,7 ms
+            moy. 27 ms: Jitter 3,7 ms AWS à Paris
+            Bande B3-eNB 517988
+        """.trimIndent()
+        val parsedDark = SpeedtestOcrParser.parse(signalQuestDarkOcr)
+        assertEquals(861.6, parsedDark.downloadMbps ?: -1.0, 0.01)
+        assertEquals(83.1, parsedDark.uploadMbps ?: -1.0, 0.01)
+        assertEquals(22.0, parsedDark.pingMs ?: -1.0, 0.01)
+        assertEquals(3.7, parsedDark.jitterMs ?: -1.0, 0.01)
+        assertEquals("La Poste Mobile", parsedDark.operatorName)
+        assertEquals("5G NSA", parsedDark.networkTech)
+        assertEquals("B3", parsedDark.band)
+        assertEquals("517988", parsedDark.cellIdentifier)
+
+        // nPerf avec chiffres de jauge intercalés ("Latence", "70", "100", "Min: 19 ms")
+        val nperfWithGaugeNumbers = """
+            nPerf
+            Réception
+            Max: 213.50 Mb/s
+            Moy: 174.76 Mb/s
+            Connexion
+            5G (NSA)
+            Envoi
+            [FR] Paris - 100 Gb/s - moji
+            Max: 91.45 Mb/s
+            Moy: 75.55 Mb/s
+            Opérateur
+            LA POSTE MOBILE
+            Latence
+            70
+            100
+            Min: 19 ms
+            80
+            90
+            Réseau
+            Bouygues Telecom
+            PLMN: 208:20 Cell: 504743:1 TAC: 32536 RSRP: -88 dBm
+            Moy: 25 ms / Gig: 15 ms
+        """.trimIndent()
+        val parsedGauge = SpeedtestOcrParser.parse(nperfWithGaugeNumbers)
+        assertEquals(213.50, parsedGauge.downloadMbps ?: -1.0, 0.01)
+        assertEquals(91.45, parsedGauge.uploadMbps ?: -1.0, 0.01)
+        assertEquals(19.0, parsedGauge.pingMs ?: -1.0, 0.01)
+        assertEquals(15.0, parsedGauge.jitterMs ?: -1.0, 0.01)
+        assertEquals("La Poste Mobile", parsedGauge.operatorName)
+        assertEquals("Bouygues Telecom", parsedGauge.networkName)
+        assertEquals("5G NSA", parsedGauge.networkTech)
+        assertEquals("504743:1", parsedGauge.cellIdentifier)
     }
 
     @Test
@@ -263,6 +475,8 @@ class SpeedtestOcrParserTest {
         val text = """
             nPerf
             Test de débit
+            Serveur
+            free
             Auto: [FR] Anycast-FR - 100 Gb/s - Free
             Réception
             Max: 699.63 Mb/s
@@ -287,6 +501,7 @@ class SpeedtestOcrParserTest {
         assertEquals(21.0, parsed.pingMs ?: -1.0, 0.01)
         assertEquals(7.0, parsed.jitterMs ?: -1.0, 0.01)
         assertEquals("Lebara", parsed.operatorName)
+        assertEquals("SFR", parsed.networkName)
         assertEquals("5G NSA", parsed.networkTech)
     }
 
@@ -317,7 +532,8 @@ class SpeedtestOcrParserTest {
         assertEquals(0.03, parsed.downloadMbps ?: -1.0, 0.001)
         assertEquals(0.00, parsed.uploadMbps ?: -1.0, 0.001)
         assertEquals(30.0, parsed.pingMs ?: -1.0, 0.01)
-        assertEquals("Bouygues Telecom", parsed.operatorName)
+        assertEquals("La Poste Mobile", parsed.operatorName)
+        assertEquals("Bouygues Telecom", parsed.networkName)
         assertEquals("4G+", parsed.networkTech)
         assertEquals("517983:8", parsed.cellIdentifier)
     }

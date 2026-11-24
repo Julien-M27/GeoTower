@@ -495,52 +495,49 @@ fun CompassScreen(
 
     // NOUVEAU : On ajoute defaultOp pour que ça se mette à jour si tu changes de préféré !
     LaunchedEffect(latitude, longitude, antennasList, defaultOp, activeCountry, isCompassLoading) {
-        while (true) {
-            if (latitude == 0.0 && longitude == 0.0 || antennasList.isEmpty() || (radarSites.isEmpty() && isCompassLoading)) {
-                radarSites = emptyList()
-            } else {
-                withContext(Dispatchers.Default) {
+        if (latitude == 0.0 && longitude == 0.0 || antennasList.isEmpty() || (radarSites.isEmpty() && isCompassLoading)) {
+            radarSites = emptyList()
+        } else {
+            withContext(Dispatchers.Default) {
 
-                    // --- 1. DÉFINITION DE L'ORDRE DE PRIORITÉ ---
-                    val priorityList = getOperatorPriorityList(defaultOp)
+                // --- 1. DÉFINITION DE L'ORDRE DE PRIORITÉ ---
+                val priorityList = getOperatorPriorityList(defaultOp)
 
-                    val groupedSites = antennasList.groupBy { "${it.latitude}_${it.longitude}" }.values
+                val groupedSites = antennasList.groupBy { "${it.latitude}_${it.longitude}" }.values
 
-                    val results = groupedSites.map { siteAntennas ->
-                        val mainAntenna = siteAntennas.first()
+                val results = groupedSites.map { siteAntennas ->
+                    val mainAntenna = siteAntennas.first()
 
-                        val res = FloatArray(2)
-                        Location.distanceBetween(latitude, longitude, mainAntenna.latitude, mainAntenna.longitude, res)
+                    val res = FloatArray(2)
+                    Location.distanceBetween(latitude, longitude, mainAntenna.latitude, mainAntenna.longitude, res)
 
-                        var bearing = res[1]
-                        if (bearing < 0) bearing += 360f
+                    var bearing = res[1]
+                    if (bearing < 0) bearing += 360f
 
-                        // --- 2. FUSION ET TRI DES OPÉRATEURS ---
-                        val ops = siteAntennas.asSequence()
-                            .mapNotNull { it.operateur }
-                            .flatMap { OperatorColors.keysFor(it).asSequence() }
-                            .distinct()
-                            .filterNot { operatorKey ->
-                                HiddenSitesStore.isHidden(context, mainAntenna.physicalSiteKey(), operatorKey)
-                            }
-                            .sortedBy { op -> priorityList.indexOf(op).takeIf { it >= 0 } ?: 99 }
-                            .toList()
+                    // --- 2. FUSION ET TRI DES OPÉRATEURS ---
+                    val ops = siteAntennas.asSequence()
+                        .mapNotNull { it.operateur }
+                        .flatMap { OperatorColors.keysFor(it).asSequence() }
+                        .distinct()
+                        .filterNot { operatorKey ->
+                            HiddenSitesStore.isHidden(context, mainAntenna.physicalSiteKey(), operatorKey)
+                        }
+                        .sortedBy { op -> priorityList.indexOf(op).takeIf { it >= 0 } ?: 99 }
+                        .toList()
 
-                        RadarSite(
-                            id = mainAntenna.idAnfr.toLongOrNull() ?: mainAntenna.idAnfr.hashCode().toLong(),
-                            siteKey = mainAntenna.idAnfr,
-                            operateurs = ops,
-                            distance = res[0],
-                            bearing = bearing,
-                            latitude = mainAntenna.latitude,   // ✅ NOUVEAU
-                            longitude = mainAntenna.longitude  // ✅ NOUVEAU
-                        )
-                    }
-
-                    radarSites = results.sortedBy { it.distance }.take(10)
+                    RadarSite(
+                        id = mainAntenna.idAnfr.toLongOrNull() ?: mainAntenna.idAnfr.hashCode().toLong(),
+                        siteKey = mainAntenna.idAnfr,
+                        operateurs = ops,
+                        distance = res[0],
+                        bearing = bearing,
+                        latitude = mainAntenna.latitude,   // ✅ NOUVEAU
+                        longitude = mainAntenna.longitude  // ✅ NOUVEAU
+                    )
                 }
+
+                radarSites = results.sortedBy { it.distance }.take(10)
             }
-            kotlinx.coroutines.delay(3000L)
         }
     }
 

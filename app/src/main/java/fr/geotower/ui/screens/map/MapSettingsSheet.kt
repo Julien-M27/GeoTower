@@ -147,6 +147,7 @@ fun MapFiltersControls(
     var showRadioFh by AppConfig.showRadioFh
     var showRadioOther by AppConfig.showRadioOther
     var showSignalQuestCoveragePoints by AppConfig.showSignalQuestCoveragePoints
+    var showSpeedtestMapMarkers by AppConfig.showSpeedtestMapMarkers
     var selectedSignalQuestCoverageOperatorKeys by AppConfig.selectedSignalQuestCoverageOperatorKeys
 
     // Variables Affichage des sites
@@ -336,7 +337,7 @@ fun MapFiltersControls(
                     onClick = onOpenFhMap,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Ouvrir la carte dédiée FH")
+                    Text(stringResource(R.string.fh_open_dedicated_map))
                 }
             }
             Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
@@ -547,6 +548,19 @@ fun MapFiltersControls(
                     showDescription = false,
                     modifier = Modifier.padding(sizing.spacing(16.dp))
                 )
+            }
+
+            Spacer(modifier = Modifier.height(sizing.spacing(32.dp)))
+            SectionTitle(stringResource(R.string.speedtests_title))
+            SelectableButton(
+                label = stringResource(R.string.map_filter_speedtests),
+                isSelected = showSpeedtestMapMarkers,
+                modifier = Modifier.fillMaxWidth()
+            ) { enabled ->
+                showSpeedtestMapMarkers = enabled
+                prefs.edit()
+                    .putBoolean(AppConfig.PREF_SHOW_SPEEDTEST_MAP_MARKERS, enabled)
+                    .apply()
             }
 
             if (featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SIGNALQUEST_COVERAGE)) {

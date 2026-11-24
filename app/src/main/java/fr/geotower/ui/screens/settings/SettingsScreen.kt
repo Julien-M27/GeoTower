@@ -283,6 +283,7 @@ private fun resetSettingsToDefaultsAndRestart(context: Context, prefs: SharedPre
             .putBoolean("isFirstRun", false)
             .putBoolean("is_blur_enabled", true)
     ).apply()
+    appContext.getSharedPreferences("geotower_prefs", Context.MODE_PRIVATE).edit().clear().apply()
     AppConfig.isBlurEnabled.value = true
     CommunityDataPreferences.reset(prefs)
 

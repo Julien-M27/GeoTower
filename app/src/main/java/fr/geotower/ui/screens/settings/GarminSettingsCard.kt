@@ -1,6 +1,8 @@
 package fr.geotower.ui.screens.settings
 
 import android.widget.Toast
+import androidx.compose.ui.res.stringResource
+import fr.geotower.R
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -402,7 +404,7 @@ fun GarminSettingsCard(
                                 ) {
                                     Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(14.dp))
                                     Spacer(Modifier.width(4.dp))
-                                    Text("Copier le crash", fontSize = 12.sp)
+                                    Text(stringResource(R.string.garmin_copy_crash), fontSize = 12.sp)
                                 }
                             }
                         }
@@ -441,13 +443,13 @@ fun GarminSettingsCard(
                         FilledTonalButton(
                             onClick = {
                                 GarminCompanionManager.pingConnectedWatches()
-                                Toast.makeText(context, "Ping BLE envoyé !", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.garmin_ping_sent), Toast.LENGTH_SHORT).show()
                             },
                             modifier = Modifier.weight(1f)
                         ) {
                             Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(4.dp))
-                            Text("Ping test", fontSize = 12.sp)
+                            Text(stringResource(R.string.garmin_ping_test), fontSize = 12.sp)
                         }
 
                         OutlinedButton(
@@ -455,31 +457,31 @@ fun GarminSettingsCard(
                                 val fullLog = combinedLogs.joinToString("\n")
                                 if (fullLog.isNotBlank()) {
                                     clipboardManager.setText(AnnotatedString(fullLog))
-                                    Toast.makeText(context, "Logs BLE copiés dans le presse-papier", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, context.getString(R.string.garmin_logs_copied), Toast.LENGTH_SHORT).show()
                                 } else {
-                                    Toast.makeText(context, "Aucun log à copier", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, context.getString(R.string.garmin_logs_none), Toast.LENGTH_SHORT).show()
                                 }
                             },
                             modifier = Modifier.weight(1f)
                         ) {
                             Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(4.dp))
-                            Text("Copier", fontSize = 12.sp)
+                            Text(stringResource(R.string.appstrings_copy), fontSize = 12.sp)
                         }
                     }
 
                     // Partage complet du journal de diagnostic
                     OutlinedButton(
                         onClick = {
-                            if (!AppFileLog.share(context, "Partager le journal GeoTower")) {
-                                Toast.makeText(context, "Journal vide ou impossible à partager", Toast.LENGTH_SHORT).show()
+                            if (!AppFileLog.share(context, context.getString(R.string.garmin_share_log_title))) {
+                                Toast.makeText(context, context.getString(R.string.garmin_share_log_empty), Toast.LENGTH_SHORT).show()
                             }
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Partager tout le journal de débogage (disque)", fontSize = 12.sp)
+                        Text(stringResource(R.string.garmin_share_all_debug_log), fontSize = 12.sp)
                     }
 
                     Row(
@@ -488,7 +490,7 @@ fun GarminSettingsCard(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Journal consolidé (${combinedLogs.size} entrées) :",
+                            text = stringResource(R.string.garmin_consolidated_log_header, combinedLogs.size),
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.weight(1f, fill = false),
@@ -506,7 +508,7 @@ fun GarminSettingsCard(
                         ) {
                             Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(14.dp))
                             Spacer(Modifier.width(4.dp))
-                            Text("Effacer", fontSize = 11.sp, maxLines = 1, softWrap = false)
+                            Text(stringResource(R.string.appstrings_clear), fontSize = 11.sp, maxLines = 1, softWrap = false)
                         }
                     }
 
@@ -529,7 +531,7 @@ fun GarminSettingsCard(
                     ) {
                         if (combinedLogs.isEmpty()) {
                             Text(
-                                text = "Aucun événement BLE enregistré.\n\nLancez la recherche d'antennes sur la montre Garmin pour observer les échanges et requêtes.",
+                                text = stringResource(R.string.garmin_no_ble_events),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                                 fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
@@ -548,7 +550,7 @@ fun GarminSettingsCard(
             },
             confirmButton = {
                 Button(onClick = { showDialog = false }) {
-                    Text("Fermer")
+                    Text(stringResource(R.string.appstrings_close))
                 }
             }
         )

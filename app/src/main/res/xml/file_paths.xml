@@ -14,6 +14,8 @@
     <cache-path name="netlog_exports" path="netlog/"/>
     <!-- Journal de débogage (AppFileLog) : dans filesDir, pour survivre au vidage du cache. -->
     <files-path name="debug_logs" path="logs/"/>
+    <!-- Captures de speedtests importées dans filesDir/speedtests/. -->
+    <files-path name="speedtests" path="speedtests/"/>
     <!-- Rapports PDF enregistrés dans Téléchargements avant Android 10 (MediaStore ensuite). -->
     <external-path name="downloaded_reports" path="Download/GeoTower/"/>
 </paths>

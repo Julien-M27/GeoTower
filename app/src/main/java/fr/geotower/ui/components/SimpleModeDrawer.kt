@@ -307,7 +307,7 @@ private fun SimpleModeDrawerContent(
                             val isChanges = currentRoute?.startsWith(CHANGES_MAP_ROUTE) == true
                             NavigationDrawerItem(
                                 icon = { Icon(Icons.Default.NewReleases, contentDescription = null) },
-                                label = { Text("Carte des évolutions") },
+                                label = { Text(stringResource(R.string.drawer_changes_map)) },
                                 selected = isChanges,
                                 onClick = {
                                     safeClick {
@@ -325,7 +325,7 @@ private fun SimpleModeDrawerContent(
                             val isFhMap = currentRoute?.startsWith(FH_MAP_ROUTE) == true
                             NavigationDrawerItem(
                                 icon = { Icon(Icons.Default.Timeline, contentDescription = null) },
-                                label = { Text("Carte des faisceaux FH") },
+                                label = { Text(stringResource(R.string.drawer_fh_map)) },
                                 selected = isFhMap,
                                 onClick = {
                                     safeClick {

@@ -953,7 +953,7 @@ fun FhMapScreen(
                                 modifier = Modifier.weight(1f),
                                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
                             ) {
-                                Text("Centrer A (${link.idAnfrA})", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(stringResource(R.string.fh_map_center_a, link.idAnfrA), maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                             OutlinedButton(
                                 onClick = {
@@ -966,7 +966,7 @@ fun FhMapScreen(
                                 modifier = Modifier.weight(1f),
                                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
                             ) {
-                                Text("Centrer B (${link.idAnfrB})", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(stringResource(R.string.fh_map_center_b, link.idAnfrB), maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                         }
 
@@ -987,7 +987,7 @@ fun FhMapScreen(
                                 modifier = Modifier.weight(1f),
                                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
                             ) {
-                                Text("Fiche A", maxLines = 1)
+                                Text(stringResource(R.string.fh_map_sheet_a), maxLines = 1)
                             }
                             Button(
                                 onClick = {
@@ -1002,7 +1002,7 @@ fun FhMapScreen(
                                 modifier = Modifier.weight(1f),
                                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
                             ) {
-                                Text("Fiche B", maxLines = 1)
+                                Text(stringResource(R.string.fh_map_sheet_b), maxLines = 1)
                             }
                         }
                     }
@@ -1072,14 +1072,14 @@ fun FhMapScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     OutlinedButton(onClick = { updateExcludedOperators(emptySet()) }) {
-                        Text("Tout sélectionner")
+                        Text(stringResource(R.string.fh_map_select_all))
                     }
                     OutlinedButton(
                         onClick = {
                             updateExcludedOperators(operatorBuckets.map { it.id }.toSet())
                         }
                     ) {
-                        Text("Tout masquer")
+                        Text(stringResource(R.string.fh_map_hide_all))
                     }
                     if (hasNonMajor) {
                         OutlinedButton(
@@ -1089,7 +1089,7 @@ fun FhMapScreen(
                                 )
                             }
                         ) {
-                            Text("4 opérateurs mobiles")
+                            Text(stringResource(R.string.fh_map_four_mobile_operators))
                         }
                     }
                 }
@@ -1101,7 +1101,7 @@ fun FhMapScreen(
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                        placeholder = { Text("Rechercher un opérateur FH...") }
+                        placeholder = { Text(stringResource(R.string.fh_map_search_operator_hint)) }
                     )
                 }
 
@@ -1156,7 +1156,7 @@ fun FhMapScreen(
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
-                                    text = "${numberFormat.format(bucket.count)} liaisons",
+                                    text = stringResource(R.string.fh_map_links_count, numberFormat.format(bucket.count)),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -1168,7 +1168,7 @@ fun FhMapScreen(
                                     )
                                 }
                             ) {
-                                Text("Seul")
+                                Text(stringResource(R.string.fh_map_only))
                             }
                         }
                     }

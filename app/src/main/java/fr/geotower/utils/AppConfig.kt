@@ -57,6 +57,7 @@ object AppConfig {
     const val PREF_SHOW_RADIO_FH = "show_radio_fh"
     const val PREF_SHOW_RADIO_OTHER = "show_radio_other"
     const val PREF_SHOW_SIGNALQUEST_COVERAGE_POINTS = "show_signalquest_coverage_points"
+    const val PREF_SHOW_SPEEDTEST_MAP_MARKERS = "show_speedtest_map_markers"
     const val PREF_SIGNALQUEST_COVERAGE_OPERATOR_KEYS = "signalquest_coverage_operator_keys"
     const val PREF_HIDE_UNDERGROUND_SITES = "hide_underground_sites"
     const val PREF_SHOW_ONLY_ZB_SITES = "show_only_zb_sites"
@@ -344,6 +345,7 @@ object AppConfig {
     var showRadioFh = mutableStateOf(false)
     var showRadioOther = mutableStateOf(false)
     var showSignalQuestCoveragePoints = mutableStateOf(false)
+    var showSpeedtestMapMarkers = mutableStateOf(false)
     var selectedSignalQuestCoverageOperatorKeys = mutableStateOf(defaultSignalQuestCoverageOperatorKeys)
 
     // --- FILTRES : OPÉRATEURS ---
@@ -635,6 +637,7 @@ object AppConfig {
         showRadioOther.value = prefs.getBoolean(PREF_SHOW_RADIO_OTHER, legacyShowRadioSites)
         updateShowRadioSitesFromCategoryFilters()
         showSignalQuestCoveragePoints.value = prefs.getBoolean(PREF_SHOW_SIGNALQUEST_COVERAGE_POINTS, false)
+        showSpeedtestMapMarkers.value = prefs.getBoolean(PREF_SHOW_SPEEDTEST_MAP_MARKERS, false)
         selectedSignalQuestCoverageOperatorKeys.value = loadSignalQuestCoverageOperatorKeys(prefs)
         showSpeedometer.value = MapDisplayPrefs.showSpeedometer.read(prefs)
         measureReconnectOnDelete.value = MapDisplayPrefs.measureReconnectOnDelete.read(prefs)

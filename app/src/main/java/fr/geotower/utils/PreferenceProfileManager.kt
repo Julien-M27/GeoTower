@@ -186,7 +186,24 @@ object PreferenceProfileManager {
         AppConfig.PREF_SHOW_ONLY_ZB_SITES,
         AppConfig.PREF_SHOW_PROJECT_SITES,
         AppConfig.PREF_MOBILE_TECHNOLOGY_ONLY,
-        AppLogoDrawingResources.PREF_KEY
+        AppLogoDrawingResources.PREF_KEY,
+        AppConfig.PREF_LOW_POWER_LEVEL,
+        AppConfig.PREF_LOW_POWER_FOLLOW_SYSTEM,
+        AppConfig.PREF_APP_NAV_MODE,
+        AppConfig.PREF_PREVIOUS_NAV_MODE,
+        AppConfig.PREF_BOTTOM_NAV_OPACITY,
+        AppConfig.PREF_BOTTOM_NAV_TABS,
+        AppConfig.PREF_SIMPLE_MODE,
+        AppConfig.PREF_HOME_SPEEDTEST_POSITION,
+        "home_corner_secondary",
+        AppConfig.PREF_LOGO_MATERIAL_WAVES,
+        "map_3d_style_id",
+        "fh_map_excluded_operators",
+        AppConfig.PREF_LOCAL_MODE_LEVEL,
+        AppConfig.PREF_OUTAGE_SOURCE_MODE,
+        "api_server_mode",
+        "network_log_retention_days",
+        "hidden_sites_v1"
     )
 
     private val visiblePrefixes = setOf(
@@ -195,13 +212,23 @@ object PreferenceProfileManager {
         "site_show_",
         "site_freq_",
         "site_techno_",
+        "site_f2g_",
+        "site_f3g_",
+        "site_f4g_",
+        "site_f5g_",
         "community_",
         "show_",
         "f2g_",
         "f3g_",
         "f4g_",
         "f5g_",
-        "throughput_"
+        "throughput_",
+        "more_",
+        "simple_drawer_",
+        "scrollbar_page_",
+        "scroll_top_page_",
+        "scroll_bottom_page_",
+        "local_build_source_"
     )
 
     private val excludedPrefixes = setOf(
@@ -1065,7 +1092,7 @@ object PreferenceProfileManager {
             textSize = 22f
             textAlign = Paint.Align.CENTER
         }
-        canvas.drawText("Profil de préférences", width / 2f, 115f, subtitlePaint)
+        canvas.drawText(context.getString(fr.geotower.R.string.profile_qr_subtitle), width / 2f, 115f, subtitlePaint)
 
         val badgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = profile.colorArgb
@@ -1084,13 +1111,13 @@ object PreferenceProfileManager {
 
         val diffCount = profileDifferencesCount(context, profile)
         val countText = if (profile.isDefault) {
-            "Version de base"
+            context.getString(fr.geotower.R.string.profile_qr_base_version)
         } else if (diffCount == 0) {
-            "Identique à la version de base"
+            context.getString(fr.geotower.R.string.profile_qr_same_as_base)
         } else if (diffCount == 1) {
-            "1 préférence modifiée"
+            context.getString(fr.geotower.R.string.profile_qr_diff_singular)
         } else {
-            "$diffCount préférences modifiées"
+            context.getString(fr.geotower.R.string.profile_qr_diff_plural, diffCount)
         }
         val countPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = android.graphics.Color.parseColor("#475569")
@@ -1122,14 +1149,14 @@ object PreferenceProfileManager {
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             textAlign = Paint.Align.CENTER
         }
-        canvas.drawText("Scannez avec l'appareil photo ou GeoTower", width / 2f, 850f, hintPaint)
+        canvas.drawText(context.getString(fr.geotower.R.string.profile_qr_scan_hint), width / 2f, 850f, hintPaint)
 
         val subHintPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = android.graphics.Color.parseColor("#94A3B8")
             textSize = 18f
             textAlign = Paint.Align.CENTER
         }
-        canvas.drawText("pour importer ce profil", width / 2f, 885f, subHintPaint)
+        canvas.drawText(context.getString(fr.geotower.R.string.profile_qr_scan_subhint), width / 2f, 885f, subHintPaint)
 
         return bitmap
     }
@@ -1362,10 +1389,29 @@ object PreferenceProfileManager {
             "filter_default_show_techno_3g", "show_techno_3g",
             "filter_default_show_techno_4g", "show_techno_4g",
             "filter_default_show_techno_5g", "show_techno_5g" -> PreferenceProfileValue(PreferenceProfileValue.TYPE_BOOLEAN, true)
+            AppConfig.PREF_APP_NAV_MODE -> PreferenceProfileValue(PreferenceProfileValue.TYPE_INT, AppConfig.APP_NAV_MODE_STANDARD)
+            AppConfig.PREF_PREVIOUS_NAV_MODE -> PreferenceProfileValue(PreferenceProfileValue.TYPE_INT, AppConfig.APP_NAV_MODE_STANDARD)
+            AppConfig.PREF_BOTTOM_NAV_OPACITY -> PreferenceProfileValue(PreferenceProfileValue.TYPE_INT, AppConfig.DEFAULT_BOTTOM_NAV_OPACITY)
+            AppConfig.PREF_BOTTOM_NAV_TABS -> PreferenceProfileValue(PreferenceProfileValue.TYPE_STRING, AppConfig.DEFAULT_BOTTOM_NAV_TABS)
+            AppConfig.PREF_SIMPLE_MODE -> PreferenceProfileValue(PreferenceProfileValue.TYPE_BOOLEAN, false)
+            AppConfig.PREF_HOME_SPEEDTEST_POSITION -> PreferenceProfileValue(PreferenceProfileValue.TYPE_STRING, AppConfig.DEFAULT_HOME_SPEEDTEST_POSITION)
+            "home_corner_secondary" -> PreferenceProfileValue(PreferenceProfileValue.TYPE_STRING, "speedtests")
+            AppConfig.PREF_LOGO_MATERIAL_WAVES -> PreferenceProfileValue(PreferenceProfileValue.TYPE_BOOLEAN, false)
+            "map_3d_style_id" -> PreferenceProfileValue(PreferenceProfileValue.TYPE_INT, -1)
+            "fh_map_excluded_operators" -> PreferenceProfileValue(PreferenceProfileValue.TYPE_STRING_SET, emptySet<String>())
+            AppConfig.PREF_LOCAL_MODE_LEVEL -> PreferenceProfileValue(PreferenceProfileValue.TYPE_INT, AppConfig.LOCAL_MODE_SERVER)
+            AppConfig.PREF_OUTAGE_SOURCE_MODE -> PreferenceProfileValue(PreferenceProfileValue.TYPE_STRING, fr.geotower.data.outages.OutageSourceMode.OPERATORS.key)
+            "api_server_mode" -> PreferenceProfileValue(PreferenceProfileValue.TYPE_STRING, "auto")
+            "network_log_retention_days" -> PreferenceProfileValue(PreferenceProfileValue.TYPE_INT, 7)
+            "hidden_sites_v1" -> PreferenceProfileValue(PreferenceProfileValue.TYPE_STRING, "")
             else -> when {
                 key.startsWith("site_show_") ->
                     PreferenceProfileValue(PreferenceProfileValue.TYPE_BOOLEAN, true)
-                key.startsWith("f2g_") || key.startsWith("f3g_") || key.startsWith("f4g_") || key.startsWith("f5g_") ->
+                key.startsWith("f2g_") || key.startsWith("f3g_") || key.startsWith("f4g_") || key.startsWith("f5g_") ||
+                    key.startsWith("site_f2g_") || key.startsWith("site_f3g_") || key.startsWith("site_f4g_") || key.startsWith("site_f5g_") ->
+                    PreferenceProfileValue(PreferenceProfileValue.TYPE_BOOLEAN, true)
+                key.startsWith("more_show_") || key.startsWith("simple_drawer_show_") ||
+                    key == AppConfig.PREF_MORE_LONG_PRESS_REORDER || key == AppConfig.PREF_SIMPLE_DRAWER_LONG_PRESS_REORDER ->
                     PreferenceProfileValue(PreferenceProfileValue.TYPE_BOOLEAN, true)
                 key.startsWith("show_radio_") ->
                     PreferenceProfileValue(PreferenceProfileValue.TYPE_BOOLEAN, false)

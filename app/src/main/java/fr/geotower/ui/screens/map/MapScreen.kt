@@ -2477,18 +2477,18 @@ fun MapScreen(
         }
         AlertDialog(
             onDismissRequest = { selectedFhLink = null },
-            title = { Text("Liaison FH • $opLabel") },
+            title = { Text(stringResource(R.string.fh_dialog_title, opLabel)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("Distance : $distText")
-                    Text("Azimut (A → B) : ${kotlin.math.round(link.azimutAb).toInt()}°")
-                    Text("Site A : ${link.idAnfrA}")
-                    Text("Site B : ${link.idAnfrB}")
+                    Text(stringResource(R.string.fh_dialog_distance, distText))
+                    Text(stringResource(R.string.fh_dialog_azimuth, kotlin.math.round(link.azimutAb).toInt()))
+                    Text(stringResource(R.string.fh_dialog_site_a, link.idAnfrA))
+                    Text(stringResource(R.string.fh_dialog_site_b, link.idAnfrB))
                 }
             },
             confirmButton = {
                 TextButton(onClick = { selectedFhLink = null }) {
-                    Text("Fermer")
+                    Text(stringResource(R.string.appstrings_close))
                 }
             },
             dismissButton = {
@@ -2505,7 +2505,7 @@ fun MapScreen(
                             selectedFhLink = null
                         }
                     ) {
-                        Text("Voir A")
+                        Text(stringResource(R.string.fh_dialog_view_a))
                     }
                     TextButton(
                         onClick = {
@@ -2519,7 +2519,7 @@ fun MapScreen(
                             selectedFhLink = null
                         }
                     ) {
-                        Text("Voir B")
+                        Text(stringResource(R.string.fh_dialog_view_b))
                     }
                 }
             }
@@ -2592,6 +2592,10 @@ fun MapScreen(
         map.invalidate()
     }
     val signalQuestCoverageOverlay = remember { SignalQuestCoverageOverlay(context) }
+    val speedtestOverlay = remember { fr.geotower.ui.screens.speedtests.SpeedtestMapOverlay() }
+    val showSpeedtestMapMarkers by AppConfig.showSpeedtestMapMarkers
+    val speedtestEntries by remember { fr.geotower.data.speedtest.SpeedtestRepository.observeAll(context) }
+        .collectAsState(initial = emptyList())
     var selectedCoveragePoint by remember { mutableStateOf<SignalQuestCoveragePoint?>(null) }
     signalQuestCoverageOverlay.onPointClick = { selectedCoveragePoint = it }
     selectedCoveragePoint?.let { coveragePoint ->
@@ -2883,6 +2887,7 @@ fun MapScreen(
     // prendre le relais quand le signal se tait. Coupé d'office en mode faible consommation.
     val smoothDeadReckoning = remember { PedestrianDeadReckoning() }
     val smoothEngine = remember { SmoothLocationEngine(smoothDeadReckoning) }
+    val smoothWakeChannel = remember { kotlinx.coroutines.channels.Channel<Unit>(kotlinx.coroutines.channels.Channel.CONFLATED) }
     // Compteur d'images : le lire depuis la phase de dessin force le repère à se redessiner avec la
     // projection de l'image courante (cf. la couche fluide, plus bas).
     var smoothFrameTick by remember { mutableIntStateOf(0) }
@@ -5106,6 +5111,20 @@ fun MapScreen(
         mapViewRef?.invalidate()
     }
 
+    LaunchedEffect(showSpeedtestMapMarkers, speedtestEntries, mapViewRef) {
+        val map = mapViewRef ?: return@LaunchedEffect
+        speedtestOverlay.updateEntries(
+            context = context,
+            mapView = map,
+            entries = if (showSpeedtestMapMarkers) speedtestEntries else emptyList(),
+            onClickEntry = { entry ->
+                navController.navigate("speedtests/${android.net.Uri.encode(entry.id)}") {
+                    launchSingleTop = true
+                }
+            }
+        )
+    }
+
     LaunchedEffect(
         canUseSignalQuestCoverage,
         AppConfig.showSignalQuestCoveragePoints.value,
@@ -5403,9 +5422,21 @@ fun MapScreen(
     // =====================================================================
     // ✅ CORRECTION : MOTEUR DE SUIVI SANS "TRAITS FANTÔMES"
     // =====================================================================
-    LaunchedEffect(Unit) {
-        var lastTrackedAllId: String? = null
-        var lastTrackedFavId: String? = null
+    var lastTrackedAllId by remember { mutableStateOf<String?>(null) }
+    var lastTrackedFavId by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(trackNearestAll, trackNearestFav) {
+        if (!trackNearestAll && !trackNearestFav) {
+            if (lastTrackedAllId != null || lastTrackedFavId != null) {
+                lastTrackedAllId?.let { measuredSites.remove(it) }
+                lastTrackedFavId?.let { measuredSites.remove(it) }
+                lastTrackedAllId = null
+                lastTrackedFavId = null
+                mapViewRef?.let { refreshMeasureLayers(it) }
+            }
+            return@LaunchedEffect
+        }
+
         // Voisinage relu en base autour de la position. Le suivi ne peut pas se contenter de la
         // liste affichée : la carte peut regarder ailleurs, être dézoomée (elle ne porte alors que
         // des regroupements) ou verrouillée sur une commune, et la cible n'y serait pas. Relu
@@ -5672,6 +5703,7 @@ fun MapScreen(
                                         accuracyM = if (location.hasAccuracy()) location.accuracy else null
                                     )
                                 )
+                                smoothWakeChannel.trySend(Unit)
                             }
                         }
                     }
@@ -5723,6 +5755,7 @@ fun MapScreen(
                     overlays.add(fhLinksOverlay)
                     overlays.add(markersOverlay) // <-- Calque micro au milieu
                     overlays.add(fhUnclusteredOverlay) // <-- Antennes liées par FH non clusterisées
+                    overlays.add(speedtestOverlay) // <-- Miniatures des speedtests géolocalisés
                     overlays.add(locationOverlay) // <-- Curseur devant
 
                     // Ajouté en dernier : les calques reçoivent les gestes dans l'ordre inverse du
@@ -6293,8 +6326,14 @@ fun MapScreen(
                 )
             }
 
+            LaunchedEffect(mapViewRef, mapSwoopActive) {
+                if (mapViewRef != null && (mapSwoopActive || !smoothEngine.isIdle(SystemClock.elapsedRealtime()))) {
+                    smoothWakeChannel.trySend(Unit)
+                }
+            }
+
             // Boucle d'animation : une passe par image, mais uniquement tant qu'il y a quelque chose
-            // à bouger — à l'arrêt le moteur se déclare au repos et plus rien n'est redessiné.
+            // à bouger — à l'arrêt le moteur se déclare au repos et attend un réveil par événement.
             LaunchedEffect(Unit) {
                 val projected = android.graphics.Point()
                 val target = GeoPoint(0.0, 0.0)
@@ -6308,10 +6347,8 @@ fun MapScreen(
                     if (map == null ||
                         (smoothEngine.isIdle(SystemClock.elapsedRealtime()) && !mapSwoopActive)
                     ) {
-                        // Rien à animer (immobile, ou pas encore de position) : on relâche la boucle
-                        // plutôt que de réveiller le processeur à chaque image pour ne rien peindre.
-                        // 50 ms de latence au démarrage d'un glissement, soit moins d'un pixel.
-                        delay(SMOOTH_LOCATION_IDLE_POLL_MS)
+                        // Rien à animer : on suspend la coroutine jusqu'au prochain relevé ou survol.
+                        smoothWakeChannel.receive()
                         continue
                     }
 

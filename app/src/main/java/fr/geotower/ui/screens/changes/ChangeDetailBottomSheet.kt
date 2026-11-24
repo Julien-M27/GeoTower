@@ -256,7 +256,7 @@ fun ChangeDetailBottomSheet(
                 ) {
                     Icon(imageVector = Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Coordonnées", fontSize = 13.sp)
+                    Text(stringResource(R.string.car_coordinates), fontSize = 13.sp)
                 }
 
                 if (!point.supportId.isNullOrBlank() && onOpenSupportDetail != null) {
@@ -269,7 +269,7 @@ fun ChangeDetailBottomSheet(
                     ) {
                         Icon(imageVector = Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Fiche support", fontSize = 13.sp)
+                        Text(stringResource(R.string.changes_action_support_sheet), fontSize = 13.sp)
                     }
                 }
             }

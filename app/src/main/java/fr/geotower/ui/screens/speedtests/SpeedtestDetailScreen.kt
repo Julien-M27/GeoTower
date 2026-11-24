@@ -9,14 +9,18 @@ import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -25,11 +29,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -47,6 +54,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -77,8 +85,15 @@ import coil.compose.AsyncImage
 import com.google.android.gms.location.LocationServices
 import fr.geotower.R
 import fr.geotower.data.speedtest.SpeedtestRepository
+import fr.geotower.ui.components.FullScreenDialogWindow
 import fr.geotower.ui.components.GeoTowerBackTopBar
+import fr.geotower.ui.components.PageScrollEdgeButtons
+import fr.geotower.ui.components.geoTowerFadingEdge
+import fr.geotower.ui.components.pageScrollbar
+import fr.geotower.ui.screens.settings.HistoryPageSettingsSheet
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
+import fr.geotower.utils.AppConfig
+import fr.geotower.utils.PageScrollPrefs
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.text.SimpleDateFormat
@@ -89,14 +104,92 @@ import java.util.TimeZone
 
 private val TECH_OPTIONS = listOf("5G SA", "5G NSA", "5G", "4G+", "4G", "3G", "Wi-Fi")
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SpeedtestDetailScreen(
     entryId: String,
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
-    val sizing = LocalGeoTowerUiStyle.current.sizing
+    val uiStyle = LocalGeoTowerUiStyle.current
     val scope = rememberCoroutineScope()
+    val settingsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var showSettingsSheet by remember { mutableStateOf(false) }
+
+    val entry by remember(entryId) { SpeedtestRepository.observeById(context, entryId) }
+        .collectAsState(initial = null)
+
+    val currentEntry = entry
+
+    Scaffold(
+        topBar = {
+            GeoTowerBackTopBar(
+                title = stringResource(R.string.speedtests_detail_title),
+                onBack = onBack,
+                actionsWidth = if (currentEntry != null) 96.dp else 48.dp,
+                actions = {
+                    if (currentEntry != null) {
+                        IconButton(
+                            onClick = {
+                                scope.launch {
+                                    SpeedtestRepository.reanalyzeOcr(context, currentEntry)
+                                }
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = stringResource(R.string.speedtests_rerun_ocr)
+                            )
+                        }
+                    }
+                    IconButton(onClick = { showSettingsSheet = true }) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = stringResource(R.string.appstrings_settings_title)
+                        )
+                    }
+                }
+            )
+        }
+    ) { innerPadding ->
+        SpeedtestDetailContent(
+            entryId = entryId,
+            onDeleted = onBack,
+            onSaved = onBack,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+        )
+
+        if (showSettingsSheet) {
+            val bubbleColor = if (uiStyle.useOneUi) uiStyle.bubbleColor else MaterialTheme.colorScheme.surfaceVariant
+            HistoryPageSettingsSheet(
+                title = stringResource(R.string.speedtests_detail_title),
+                page = PageScrollPrefs.SPEEDTESTS,
+                options = emptyList(),
+                onReset = {},
+                onDismiss = { showSettingsSheet = false },
+                onBack = { showSettingsSheet = false },
+                sheetState = settingsSheetState,
+                useOneUi = AppConfig.useOneUiDesign,
+                bubbleColor = bubbleColor
+            )
+        }
+    }
+}
+
+@Composable
+fun SpeedtestDetailContent(
+    entryId: String,
+    onDeleted: () -> Unit,
+    onSaved: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val uiStyle = LocalGeoTowerUiStyle.current
+    val sizing = uiStyle.sizing
+    val scope = rememberCoroutineScope()
+    val scrollState = rememberScrollState()
 
     val entry by remember(entryId) { SpeedtestRepository.observeById(context, entryId) }
         .collectAsState(initial = null)
@@ -106,6 +199,7 @@ fun SpeedtestDetailScreen(
     var showMapPicker by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
+    var isReanalyzingOcr by remember { mutableStateOf(false) }
 
     var testedAtMillis by remember(entry?.id) { mutableLongStateOf(entry?.testedAtMillis ?: System.currentTimeMillis()) }
     var downloadText by remember(entry?.id) { mutableStateOf(entry?.downloadMbps?.toString().orEmpty()) }
@@ -113,6 +207,7 @@ fun SpeedtestDetailScreen(
     var pingText by remember(entry?.id) { mutableStateOf(entry?.pingMs?.toString().orEmpty()) }
     var jitterText by remember(entry?.id) { mutableStateOf(entry?.jitterMs?.toString().orEmpty()) }
     var operatorText by remember(entry?.id) { mutableStateOf(entry?.operatorName.orEmpty()) }
+    var networkText by remember(entry?.id) { mutableStateOf(entry?.networkName.orEmpty()) }
     var techText by remember(entry?.id) { mutableStateOf(entry?.networkTech.orEmpty()) }
     var bandText by remember(entry?.id) { mutableStateOf(entry?.band.orEmpty()) }
     var cellIdText by remember(entry?.id) { mutableStateOf(entry?.cellIdentifier.orEmpty()) }
@@ -129,6 +224,7 @@ fun SpeedtestDetailScreen(
         pingText = current.pingMs?.toString().orEmpty()
         jitterText = current.jitterMs?.toString().orEmpty()
         operatorText = current.operatorName.orEmpty()
+        networkText = current.networkName.orEmpty()
         techText = current.networkTech.orEmpty()
         bandText = current.band.orEmpty()
         cellIdText = current.cellIdentifier.orEmpty()
@@ -140,344 +236,317 @@ fun SpeedtestDetailScreen(
 
     val currentEntry = entry
 
-    Scaffold(
-        topBar = {
-            GeoTowerBackTopBar(
-                title = stringResource(R.string.speedtests_detail_title),
-                onBack = onBack,
-                actions = {
-                    if (currentEntry != null) {
-                        IconButton(
-                            onClick = {
-                                scope.launch {
-                                    SpeedtestRepository.reanalyzeOcr(context, currentEntry)
-                                }
-                            }
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Refresh,
-                                contentDescription = stringResource(R.string.speedtests_rerun_ocr)
-                            )
-                        }
-                        IconButton(onClick = { showDeleteConfirm = true }) {
-                            Icon(
-                                imageVector = Icons.Default.Delete,
-                                contentDescription = stringResource(R.string.common_delete)
-                            )
-                        }
-                    }
-                }
-            )
+    if (currentEntry == null) {
+        Box(
+            modifier = modifier,
+            contentAlignment = Alignment.Center
+        ) {
+            Text(stringResource(R.string.speedtests_not_found))
         }
-    ) { innerPadding ->
-        if (currentEntry == null) {
-            Box(
+        return
+    }
+
+    val imageFile = remember(currentEntry.imageFileName) {
+        SpeedtestRepository.imageFile(context, currentEntry.imageFileName)
+    }
+
+    BoxWithConstraints(modifier = modifier) {
+        val isWidePane = maxWidth >= 600.dp
+
+        if (isWidePane) {
+            // Mode Fold / tablette : image + date à gauche, formulaire à droite
+            Row(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(innerPadding),
-                contentAlignment = Alignment.Center
+                    .padding(sizing.spacing(16.dp)),
+                horizontalArrangement = Arrangement.spacedBy(sizing.spacing(16.dp))
             ) {
-                Text(stringResource(R.string.speedtests_not_found))
-            }
-            return@Scaffold
-        }
-
-        val imageFile = remember(currentEntry.imageFileName) {
-            SpeedtestRepository.imageFile(context, currentEntry.imageFileName)
-        }
-
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
-                .padding(sizing.spacing(16.dp)),
-            verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))
-        ) {
-            // Aperçu cliquable pour zoom plein écran
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(220.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .clickable { showFullscreenImage = true }
-            ) {
-                AsyncImage(
-                    model = imageFile,
-                    contentDescription = null,
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier.fillMaxSize()
-                )
-                Icon(
-                    imageVector = Icons.Default.ZoomIn,
-                    contentDescription = null,
-                    tint = Color.White,
+                Column(
                     modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(10.dp)
-                        .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(8.dp))
-                        .padding(6.dp)
-                )
-            }
+                        .weight(0.44f)
+                        .fillMaxHeight(),
+                    verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .clickable { showFullscreenImage = true }
+                    ) {
+                        AsyncImage(
+                            model = imageFile,
+                            contentDescription = null,
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                        Icon(
+                            imageVector = Icons.Default.ZoomIn,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(10.dp)
+                                .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(8.dp))
+                                .padding(6.dp)
+                        )
+                    }
 
-            // Date & heure modifiables
-            val formattedDate = remember(testedAtMillis) {
-                SimpleDateFormat("dd MMM yyyy • HH:mm", Locale.getDefault()).format(Date(testedAtMillis))
-            }
-            OutlinedButton(
-                onClick = { showDatePicker = true },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Icon(Icons.Default.CalendarToday, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(formattedDate)
-            }
+                    val formattedDate = remember(testedAtMillis) {
+                        SimpleDateFormat("dd MMM yyyy • HH:mm", Locale.getDefault()).format(Date(testedAtMillis))
+                    }
+                    OutlinedButton(
+                        onClick = { showDatePicker = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.CalendarToday, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(formattedDate)
+                    }
+                }
 
-            // Débits & latence
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                OutlinedTextField(
-                    value = downloadText,
-                    onValueChange = { downloadText = it },
-                    label = { Text(stringResource(R.string.speedtests_field_download)) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true,
-                    modifier = Modifier.weight(1f)
-                )
-                OutlinedTextField(
-                    value = uploadText,
-                    onValueChange = { uploadText = it },
-                    label = { Text(stringResource(R.string.speedtests_field_upload)) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                OutlinedTextField(
-                    value = pingText,
-                    onValueChange = { pingText = it },
-                    label = { Text(stringResource(R.string.speedtests_field_ping)) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true,
-                    modifier = Modifier.weight(1f)
-                )
-                OutlinedTextField(
-                    value = jitterText,
-                    onValueChange = { jitterText = it },
-                    label = { Text(stringResource(R.string.speedtests_field_jitter)) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            // Opérateur & Techno
-            OutlinedTextField(
-                value = operatorText,
-                onValueChange = { operatorText = it },
-                label = { Text(stringResource(R.string.speedtests_field_operator)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                TECH_OPTIONS.forEach { tech ->
-                    FilterChip(
-                        selected = techText.equals(tech, ignoreCase = true),
-                        onClick = { techText = if (techText.equals(tech, ignoreCase = true)) "" else tech },
-                        label = { Text(tech) }
-                    )
+                Box(
+                    modifier = Modifier
+                        .weight(0.56f)
+                        .fillMaxHeight()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .geoTowerFadingEdge(scrollState)
+                            .pageScrollbar(PageScrollPrefs.SPEEDTESTS, scrollState)
+                            .verticalScroll(scrollState),
+                        verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))
+                    ) {
+                        SpeedtestDetailFormFields(
+                            downloadText = downloadText,
+                            onDownloadChange = { downloadText = it },
+                            uploadText = uploadText,
+                            onUploadChange = { uploadText = it },
+                            pingText = pingText,
+                            onPingChange = { pingText = it },
+                            jitterText = jitterText,
+                            onJitterChange = { jitterText = it },
+                            operatorText = operatorText,
+                            onOperatorChange = { operatorText = it },
+                            networkText = networkText,
+                            onNetworkChange = { networkText = it },
+                            techText = techText,
+                            onTechChange = { techText = it },
+                            bandText = bandText,
+                            onBandChange = { bandText = it },
+                            cellIdText = cellIdText,
+                            onCellIdChange = { cellIdText = it },
+                            locationLabelText = locationLabelText,
+                            onLocationLabelChange = { locationLabelText = it },
+                            latText = latText,
+                            onLatChange = { latText = it },
+                            lonText = lonText,
+                            onLonChange = { lonText = it },
+                            noteText = noteText,
+                            onNoteChange = { noteText = it },
+                            rawOcr = currentEntry.ocrRawText,
+                            isReanalyzingOcr = isReanalyzingOcr,
+                            onRerunOcr = {
+                                if (!isReanalyzingOcr) {
+                                    isReanalyzingOcr = true
+                                    scope.launch {
+                                        SpeedtestRepository.reanalyzeOcr(context, currentEntry)
+                                        isReanalyzingOcr = false
+                                    }
+                                }
+                            },
+                            onShare = { SpeedtestRepository.shareImages(context, listOf(currentEntry)) },
+                            onUseCurrentLocation = {
+                                val hasFine = ContextCompat.checkSelfPermission(
+                                    context,
+                                    Manifest.permission.ACCESS_FINE_LOCATION
+                                ) == PackageManager.PERMISSION_GRANTED
+                                val hasCoarse = ContextCompat.checkSelfPermission(
+                                    context,
+                                    Manifest.permission.ACCESS_COARSE_LOCATION
+                                ) == PackageManager.PERMISSION_GRANTED
+                                if (hasFine || hasCoarse) {
+                                    scope.launch {
+                                        val loc = getLastKnownLocationSafe(context)
+                                        if (loc != null) {
+                                            latText = String.format(Locale.US, "%.6f", loc.first)
+                                            lonText = String.format(Locale.US, "%.6f", loc.second)
+                                        }
+                                    }
+                                }
+                            },
+                            onPickOnMap = { showMapPicker = true },
+                            onSave = {
+                                scope.launch {
+                                    val updated = currentEntry.copy(
+                                        testedAtMillis = testedAtMillis,
+                                        downloadMbps = parseOptionalDouble(downloadText),
+                                        uploadMbps = parseOptionalDouble(uploadText),
+                                        pingMs = parseOptionalDouble(pingText),
+                                        jitterMs = parseOptionalDouble(jitterText),
+                                        operatorName = operatorText.trim().ifEmpty { null },
+                                        networkName = networkText.trim().ifEmpty { null },
+                                        networkTech = techText.trim().ifEmpty { null },
+                                        band = bandText.trim().ifEmpty { null },
+                                        cellIdentifier = cellIdText.trim().ifEmpty { null },
+                                        locationLabel = locationLabelText.trim().ifEmpty { null },
+                                        latitude = parseOptionalDouble(latText),
+                                        longitude = parseOptionalDouble(lonText),
+                                        note = noteText.trim().ifEmpty { null }
+                                    )
+                                    SpeedtestRepository.upsert(context, updated)
+                                    onSaved()
+                                }
+                            },
+                            onDelete = { showDeleteConfirm = true }
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
+                    PageScrollEdgeButtons(PageScrollPrefs.SPEEDTESTS, scrollState)
                 }
             }
+        } else {
+            Box(modifier = Modifier.fillMaxSize()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .geoTowerFadingEdge(scrollState)
+                        .pageScrollbar(PageScrollPrefs.SPEEDTESTS, scrollState)
+                        .verticalScroll(scrollState)
+                        .padding(sizing.spacing(16.dp)),
+                    verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(220.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .clickable { showFullscreenImage = true }
+                    ) {
+                        AsyncImage(
+                            model = imageFile,
+                            contentDescription = null,
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                        Icon(
+                            imageVector = Icons.Default.ZoomIn,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(10.dp)
+                                .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(8.dp))
+                                .padding(6.dp)
+                        )
+                    }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                OutlinedTextField(
-                    value = bandText,
-                    onValueChange = { bandText = it },
-                    label = { Text(stringResource(R.string.speedtests_field_band)) },
-                    singleLine = true,
-                    modifier = Modifier.weight(1f)
-                )
-                OutlinedTextField(
-                    value = cellIdText,
-                    onValueChange = { cellIdText = it },
-                    label = { Text(stringResource(R.string.speedtests_field_cell_id)) },
-                    singleLine = true,
-                    modifier = Modifier.weight(1f)
-                )
-            }
+                    val formattedDate = remember(testedAtMillis) {
+                        SimpleDateFormat("dd MMM yyyy • HH:mm", Locale.getDefault()).format(Date(testedAtMillis))
+                    }
+                    OutlinedButton(
+                        onClick = { showDatePicker = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.CalendarToday, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(formattedDate)
+                    }
 
-            // Lieu & Coordonnées GPS
-            OutlinedTextField(
-                value = locationLabelText,
-                onValueChange = { locationLabelText = it },
-                label = { Text(stringResource(R.string.speedtests_field_location)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                OutlinedTextField(
-                    value = latText,
-                    onValueChange = { latText = it },
-                    label = { Text("Lat") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true,
-                    modifier = Modifier.weight(1f)
-                )
-                OutlinedTextField(
-                    value = lonText,
-                    onValueChange = { lonText = it },
-                    label = { Text("Lon") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true,
-                    modifier = Modifier.weight(1f)
-                )
-                IconButton(
-                    onClick = {
-                        val hasFine = ContextCompat.checkSelfPermission(
-                            context,
-                            Manifest.permission.ACCESS_FINE_LOCATION
-                        ) == PackageManager.PERMISSION_GRANTED
-                        val hasCoarse = ContextCompat.checkSelfPermission(
-                            context,
-                            Manifest.permission.ACCESS_COARSE_LOCATION
-                        ) == PackageManager.PERMISSION_GRANTED
-                        if (hasFine || hasCoarse) {
-                            scope.launch {
-                                val loc = getLastKnownLocationSafe(context)
-                                if (loc != null) {
-                                    latText = String.format(Locale.US, "%.6f", loc.first)
-                                    lonText = String.format(Locale.US, "%.6f", loc.second)
+                    SpeedtestDetailFormFields(
+                        downloadText = downloadText,
+                        onDownloadChange = { downloadText = it },
+                        uploadText = uploadText,
+                        onUploadChange = { uploadText = it },
+                        pingText = pingText,
+                        onPingChange = { pingText = it },
+                        jitterText = jitterText,
+                        onJitterChange = { jitterText = it },
+                        operatorText = operatorText,
+                        onOperatorChange = { operatorText = it },
+                        networkText = networkText,
+                        onNetworkChange = { networkText = it },
+                        techText = techText,
+                        onTechChange = { techText = it },
+                        bandText = bandText,
+                        onBandChange = { bandText = it },
+                        cellIdText = cellIdText,
+                        onCellIdChange = { cellIdText = it },
+                        locationLabelText = locationLabelText,
+                        onLocationLabelChange = { locationLabelText = it },
+                        latText = latText,
+                        onLatChange = { latText = it },
+                        lonText = lonText,
+                        onLonChange = { lonText = it },
+                        noteText = noteText,
+                        onNoteChange = { noteText = it },
+                        rawOcr = currentEntry.ocrRawText,
+                        isReanalyzingOcr = isReanalyzingOcr,
+                        onRerunOcr = {
+                            if (!isReanalyzingOcr) {
+                                isReanalyzingOcr = true
+                                scope.launch {
+                                    SpeedtestRepository.reanalyzeOcr(context, currentEntry)
+                                    isReanalyzingOcr = false
                                 }
                             }
-                        }
-                    }
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.MyLocation,
-                        contentDescription = stringResource(R.string.speedtests_use_current_location)
+                        },
+                        onShare = { SpeedtestRepository.shareImages(context, listOf(currentEntry)) },
+                        onUseCurrentLocation = {
+                            val hasFine = ContextCompat.checkSelfPermission(
+                                context,
+                                Manifest.permission.ACCESS_FINE_LOCATION
+                            ) == PackageManager.PERMISSION_GRANTED
+                            val hasCoarse = ContextCompat.checkSelfPermission(
+                                context,
+                                Manifest.permission.ACCESS_COARSE_LOCATION
+                            ) == PackageManager.PERMISSION_GRANTED
+                            if (hasFine || hasCoarse) {
+                                scope.launch {
+                                    val loc = getLastKnownLocationSafe(context)
+                                    if (loc != null) {
+                                        latText = String.format(Locale.US, "%.6f", loc.first)
+                                        lonText = String.format(Locale.US, "%.6f", loc.second)
+                                    }
+                                }
+                            }
+                        },
+                        onPickOnMap = { showMapPicker = true },
+                        onSave = {
+                            scope.launch {
+                                val updated = currentEntry.copy(
+                                    testedAtMillis = testedAtMillis,
+                                    downloadMbps = parseOptionalDouble(downloadText),
+                                    uploadMbps = parseOptionalDouble(uploadText),
+                                    pingMs = parseOptionalDouble(pingText),
+                                    jitterMs = parseOptionalDouble(jitterText),
+                                    operatorName = operatorText.trim().ifEmpty { null },
+                                    networkTech = techText.trim().ifEmpty { null },
+                                    band = bandText.trim().ifEmpty { null },
+                                    cellIdentifier = cellIdText.trim().ifEmpty { null },
+                                    locationLabel = locationLabelText.trim().ifEmpty { null },
+                                    latitude = parseOptionalDouble(latText),
+                                    longitude = parseOptionalDouble(lonText),
+                                    note = noteText.trim().ifEmpty { null }
+                                )
+                                SpeedtestRepository.upsert(context, updated)
+                                onSaved()
+                            }
+                        },
+                        onDelete = { showDeleteConfirm = true }
                     )
+
+                    Spacer(modifier = Modifier.height(16.dp))
                 }
+                PageScrollEdgeButtons(PageScrollPrefs.SPEEDTESTS, scrollState)
             }
-
-            OutlinedButton(
-                onClick = { showMapPicker = true },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Icon(Icons.Default.Map, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(stringResource(R.string.speedtests_pick_on_map))
-            }
-
-            OutlinedTextField(
-                value = noteText,
-                onValueChange = { noteText = it },
-                label = { Text(stringResource(R.string.speedtests_field_note)) },
-                minLines = 2,
-                maxLines = 4,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Button(
-                onClick = {
-                    scope.launch {
-                        val updated = currentEntry.copy(
-                            testedAtMillis = testedAtMillis,
-                            downloadMbps = parseOptionalDouble(downloadText),
-                            uploadMbps = parseOptionalDouble(uploadText),
-                            pingMs = parseOptionalDouble(pingText),
-                            jitterMs = parseOptionalDouble(jitterText),
-                            operatorName = operatorText.trim().ifEmpty { null },
-                            networkTech = techText.trim().ifEmpty { null },
-                            band = bandText.trim().ifEmpty { null },
-                            cellIdentifier = cellIdText.trim().ifEmpty { null },
-                            locationLabel = locationLabelText.trim().ifEmpty { null },
-                            latitude = parseOptionalDouble(latText),
-                            longitude = parseOptionalDouble(lonText),
-                            note = noteText.trim().ifEmpty { null }
-                        )
-                        SpeedtestRepository.upsert(context, updated)
-                        onBack()
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp)
-            ) {
-                Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(stringResource(R.string.common_save))
-            }
-
-            OutlinedButton(
-                onClick = { showDeleteConfirm = true },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
-                    contentColor = MaterialTheme.colorScheme.error
-                ),
-                border = androidx.compose.foundation.BorderStroke(
-                    1.dp,
-                    MaterialTheme.colorScheme.error.copy(alpha = 0.6f)
-                )
-            ) {
-                Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(stringResource(R.string.common_delete))
-            }
-
-            val rawOcr = currentEntry.ocrRawText
-            if (!rawOcr.isNullOrBlank()) {
-                var showRawOcr by remember { mutableStateOf(false) }
-                TextButton(
-                    onClick = { showRawOcr = !showRawOcr },
-                    modifier = Modifier.align(Alignment.CenterHorizontally)
-                ) {
-                    Text(
-                        text = if (showRawOcr) "Masquer le texte OCR" else "Voir le texte OCR détecté",
-                        style = MaterialTheme.typography.labelMedium
-                    )
-                }
-                if (showRawOcr) {
-                    androidx.compose.material3.Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainerLow,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            text = rawOcr,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(12.dp)
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
         }
+    }
 
         if (showFullscreenImage) {
             FullscreenZoomImageDialog(
@@ -533,7 +602,7 @@ fun SpeedtestDetailScreen(
                             showDeleteConfirm = false
                             scope.launch {
                                 SpeedtestRepository.delete(context, currentEntry)
-                                onBack()
+                                onDeleted()
                             }
                         }
                     ) {
@@ -546,6 +615,311 @@ fun SpeedtestDetailScreen(
                     }
                 }
             )
+        }
+    }
+
+@Composable
+private fun SpeedtestDetailFormFields(
+    downloadText: String,
+    onDownloadChange: (String) -> Unit,
+    uploadText: String,
+    onUploadChange: (String) -> Unit,
+    pingText: String,
+    onPingChange: (String) -> Unit,
+    jitterText: String,
+    onJitterChange: (String) -> Unit,
+    operatorText: String,
+    onOperatorChange: (String) -> Unit,
+    networkText: String,
+    onNetworkChange: (String) -> Unit,
+    techText: String,
+    onTechChange: (String) -> Unit,
+    bandText: String,
+    onBandChange: (String) -> Unit,
+    cellIdText: String,
+    onCellIdChange: (String) -> Unit,
+    locationLabelText: String,
+    onLocationLabelChange: (String) -> Unit,
+    latText: String,
+    onLatChange: (String) -> Unit,
+    lonText: String,
+    onLonChange: (String) -> Unit,
+    noteText: String,
+    onNoteChange: (String) -> Unit,
+    rawOcr: String?,
+    isReanalyzingOcr: Boolean,
+    onRerunOcr: () -> Unit,
+    onShare: () -> Unit,
+    onUseCurrentLocation: () -> Unit,
+    onPickOnMap: () -> Unit,
+    onSave: () -> Unit,
+    onDelete: () -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            OutlinedTextField(
+                value = downloadText,
+                onValueChange = onDownloadChange,
+                label = { Text(stringResource(R.string.speedtests_field_download)) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                singleLine = true,
+                modifier = Modifier.weight(1f)
+            )
+            OutlinedTextField(
+                value = uploadText,
+                onValueChange = onUploadChange,
+                label = { Text(stringResource(R.string.speedtests_field_upload)) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                singleLine = true,
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            OutlinedTextField(
+                value = pingText,
+                onValueChange = onPingChange,
+                label = { Text(stringResource(R.string.speedtests_field_ping)) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                singleLine = true,
+                modifier = Modifier.weight(1f)
+            )
+            OutlinedTextField(
+                value = jitterText,
+                onValueChange = onJitterChange,
+                label = { Text(stringResource(R.string.speedtests_field_jitter)) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                singleLine = true,
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            OutlinedTextField(
+                value = operatorText,
+                onValueChange = onOperatorChange,
+                label = { Text(stringResource(R.string.speedtests_field_operator)) },
+                singleLine = true,
+                modifier = Modifier.weight(1f)
+            )
+            OutlinedTextField(
+                value = networkText,
+                onValueChange = onNetworkChange,
+                label = { Text(stringResource(R.string.speedtests_field_network)) },
+                singleLine = true,
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            TECH_OPTIONS.forEach { tech ->
+                FilterChip(
+                    selected = techText.equals(tech, ignoreCase = true),
+                    onClick = { onTechChange(if (techText.equals(tech, ignoreCase = true)) "" else tech) },
+                    label = { Text(tech) }
+                )
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            OutlinedTextField(
+                value = bandText,
+                onValueChange = onBandChange,
+                label = { Text(stringResource(R.string.speedtests_field_band)) },
+                singleLine = true,
+                modifier = Modifier.weight(1f)
+            )
+            OutlinedTextField(
+                value = cellIdText,
+                onValueChange = onCellIdChange,
+                label = { Text(stringResource(R.string.speedtests_field_cell_id)) },
+                singleLine = true,
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        OutlinedTextField(
+            value = locationLabelText,
+            onValueChange = onLocationLabelChange,
+            label = { Text(stringResource(R.string.speedtests_field_location)) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OutlinedTextField(
+                value = latText,
+                onValueChange = onLatChange,
+                label = { Text("Lat") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                singleLine = true,
+                modifier = Modifier.weight(1f)
+            )
+            OutlinedTextField(
+                value = lonText,
+                onValueChange = onLonChange,
+                label = { Text("Lon") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                singleLine = true,
+                modifier = Modifier.weight(1f)
+            )
+            IconButton(onClick = onUseCurrentLocation) {
+                Icon(
+                    imageVector = Icons.Default.MyLocation,
+                    contentDescription = stringResource(R.string.speedtests_use_current_location)
+                )
+            }
+        }
+
+        OutlinedButton(
+            onClick = onPickOnMap,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Icon(Icons.Default.Map, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(stringResource(R.string.speedtests_pick_on_map))
+        }
+
+        OutlinedTextField(
+            value = noteText,
+            onValueChange = onNoteChange,
+            label = { Text(stringResource(R.string.speedtests_field_note)) },
+            minLines = 2,
+            maxLines = 4,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Button(
+            onClick = onSave,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(14.dp)
+        ) {
+            Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(stringResource(R.string.common_save))
+        }
+
+        OutlinedButton(
+            onClick = onShare,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(14.dp)
+        ) {
+            Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(stringResource(R.string.speedtests_share_image))
+        }
+
+        OutlinedButton(
+            onClick = onRerunOcr,
+            enabled = !isReanalyzingOcr,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(14.dp)
+        ) {
+            if (isReanalyzingOcr) {
+                androidx.compose.material3.CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    strokeWidth = 2.dp
+                )
+            } else {
+                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(stringResource(R.string.speedtests_rerun_ocr))
+        }
+
+        OutlinedButton(
+            onClick = onDelete,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(14.dp),
+            colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
+                contentColor = MaterialTheme.colorScheme.error
+            ),
+            border = androidx.compose.foundation.BorderStroke(
+                1.dp,
+                MaterialTheme.colorScheme.error.copy(alpha = 0.6f)
+            )
+        ) {
+            Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(stringResource(R.string.common_delete))
+        }
+
+        if (!rawOcr.isNullOrBlank()) {
+            var showRawOcr by remember { mutableStateOf(false) }
+            TextButton(
+                onClick = { showRawOcr = !showRawOcr },
+                modifier = Modifier.align(Alignment.CenterHorizontally)
+            ) {
+                Text(
+                    text = stringResource(
+                        if (showRawOcr) R.string.speedtests_hide_raw_ocr else R.string.speedtests_show_raw_ocr
+                    ),
+                    style = MaterialTheme.typography.labelMedium
+                )
+            }
+            if (showRawOcr) {
+                val context = LocalContext.current
+                val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
+                val copiedMessage = stringResource(R.string.speedtests_ocr_copied)
+                androidx.compose.material3.Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            TextButton(
+                                onClick = {
+                                    clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(rawOcr))
+                                    android.widget.Toast.makeText(
+                                        context,
+                                        copiedMessage,
+                                        android.widget.Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.ContentCopy,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(stringResource(R.string.speedtests_copy_ocr))
+                            }
+                        }
+                        Text(
+                            text = rawOcr,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -663,12 +1037,16 @@ private fun FullscreenZoomImageDialog(
 
     Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
+        )
     ) {
+        FullScreenDialogWindow()
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black)
+                .background(MaterialTheme.colorScheme.background)
                 .pointerInput(Unit) {
                     detectTransformGestures { _, pan, zoom, _ ->
                         val newScale = (scale * zoom).coerceIn(1f, 5f)
@@ -683,6 +1061,7 @@ private fun FullscreenZoomImageDialog(
                 contentScale = ContentScale.Fit,
                 modifier = Modifier
                     .fillMaxSize()
+                    .systemBarsPadding()
                     .graphicsLayer(
                         scaleX = scale,
                         scaleY = scale,
@@ -694,10 +1073,18 @@ private fun FullscreenZoomImageDialog(
                 onClick = onDismiss,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
+                    .statusBarsPadding()
                     .padding(16.dp)
-                    .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(50))
+                    .background(
+                        MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.85f),
+                        RoundedCornerShape(50)
+                    )
             ) {
-                Icon(Icons.Default.Close, contentDescription = null, tint = Color.White)
+                Icon(
+                    Icons.Default.Close,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurface
+                )
             }
         }
     }

@@ -227,6 +227,7 @@ internal object AppBackupCodec {
         .putFinite("pingMs", entry.pingMs)
         .putFinite("jitterMs", entry.jitterMs)
         .putOrNull("operatorName", entry.operatorName)
+        .putOrNull("networkName", entry.networkName)
         .putOrNull("networkTech", entry.networkTech)
         .putOrNull("band", entry.band)
         .putOrNull("cellIdentifier", entry.cellIdentifier)
@@ -253,6 +254,7 @@ internal object AppBackupCodec {
             pingMs = json.doubleOrNull("pingMs"),
             jitterMs = json.doubleOrNull("jitterMs"),
             operatorName = json.stringOrNull("operatorName"),
+            networkName = json.stringOrNull("networkName"),
             networkTech = json.stringOrNull("networkTech"),
             band = json.stringOrNull("band"),
             cellIdentifier = json.stringOrNull("cellIdentifier"),

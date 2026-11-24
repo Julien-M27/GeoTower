@@ -17,7 +17,10 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -29,8 +32,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -41,10 +46,13 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SelectAll
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -56,6 +64,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -86,20 +95,31 @@ import fr.geotower.R
 import fr.geotower.data.speedtest.SpeedtestEntryEntity
 import fr.geotower.data.speedtest.SpeedtestRepository
 import fr.geotower.ui.components.GeoTowerBackTopBar
+import fr.geotower.ui.components.PageScrollEdgeButtons
+import fr.geotower.ui.components.geoTowerLazyListFadingEdge
+import fr.geotower.ui.components.pageScrollbar
+import fr.geotower.ui.screens.settings.HistoryPageSettingsSheet
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
+import fr.geotower.utils.AppConfig
+import fr.geotower.utils.PageScrollPrefs
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SpeedtestsScreen(
     onBack: () -> Unit,
     onOpenEntry: (String) -> Unit
 ) {
     val context = LocalContext.current
-    val sizing = LocalGeoTowerUiStyle.current.sizing
+    val uiStyle = LocalGeoTowerUiStyle.current
+    val sizing = uiStyle.sizing
     val scope = rememberCoroutineScope()
+    val listState = rememberLazyListState()
+    val settingsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var showSettingsSheet by remember { mutableStateOf(false) }
 
     val entries by remember { SpeedtestRepository.observeAll(context) }
         .collectAsState(initial = emptyList())
@@ -113,6 +133,7 @@ fun SpeedtestsScreen(
 
     var selectedIds by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
     var showDeleteSelectedConfirm by remember { mutableStateOf(false) }
+    var focusedEntryId by rememberSaveable { mutableStateOf<String?>(null) }
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetMultipleContents()
@@ -169,6 +190,7 @@ fun SpeedtestsScreen(
             if (q.isNotEmpty()) {
                 val haystack = listOfNotNull(
                     entry.operatorName,
+                    entry.networkName,
                     entry.networkTech,
                     entry.band,
                     entry.cellIdentifier,
@@ -192,8 +214,14 @@ fun SpeedtestsScreen(
     val isSelectionMode = selectedIds.isNotEmpty()
     val isAllSelected = filteredEntries.isNotEmpty() && filteredEntries.all { it.id in selectedIdSet }
 
-    BackHandler(enabled = isSelectionMode) {
-        selectedIds = emptyList()
+    val activeFocusedId = focusedEntryId?.takeIf { id -> filteredEntries.any { it.id == id } }
+
+    BackHandler(enabled = isSelectionMode || activeFocusedId != null) {
+        if (isSelectionMode) {
+            selectedIds = emptyList()
+        } else {
+            focusedEntryId = null
+        }
     }
 
     Scaffold(
@@ -202,7 +230,19 @@ fun SpeedtestsScreen(
                 GeoTowerBackTopBar(
                     title = pluralStringResource(R.plurals.speedtests_selected_count, selectedIds.size, selectedIds.size),
                     onBack = { selectedIds = emptyList() },
+                    actionsWidth = 144.dp,
                     actions = {
+                        IconButton(
+                            onClick = {
+                                val selectedEntries = entries.filter { it.id in selectedIdSet }
+                                SpeedtestRepository.shareImages(context, selectedEntries)
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Share,
+                                contentDescription = stringResource(R.string.speedtests_share_image)
+                            )
+                        }
                         IconButton(
                             onClick = {
                                 selectedIds = if (isAllSelected) emptyList() else filteredEntries.map { it.id }
@@ -227,6 +267,7 @@ fun SpeedtestsScreen(
                 GeoTowerBackTopBar(
                     title = stringResource(R.string.speedtests_title),
                     onBack = onBack,
+                    actionsWidth = if (entries.isNotEmpty()) 144.dp else 48.dp,
                     actions = {
                         if (entries.isNotEmpty()) {
                             IconButton(onClick = { showSearch = !showSearch }) {
@@ -242,6 +283,12 @@ fun SpeedtestsScreen(
                                     tint = if (showStats) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                                 )
                             }
+                        }
+                        IconButton(onClick = { showSettingsSheet = true }) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = stringResource(R.string.appstrings_settings_title)
+                            )
                         }
                     }
                 )
@@ -374,44 +421,138 @@ fun SpeedtestsScreen(
                     )
                 }
             } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(
-                        start = sizing.spacing(12.dp),
-                        end = sizing.spacing(16.dp),
-                        top = sizing.spacing(8.dp),
-                        bottom = sizing.spacing(88.dp)
-                    )
-                ) {
-                    itemsIndexed(filteredEntries, key = { _, item -> item.id }) { index, entry ->
-                        val isSelected = entry.id in selectedIdSet
-                        SpeedtestTimelineRow(
-                            entry = entry,
-                            isFirst = index == 0,
-                            isLast = index == filteredEntries.lastIndex,
-                            isSelected = isSelected,
-                            isSelectionMode = isSelectionMode,
-                            onClick = {
-                                if (isSelectionMode) {
-                                    selectedIds = if (isSelected) {
-                                        selectedIds.filterNot { it == entry.id }
-                                    } else {
-                                        selectedIds + entry.id
+                BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                    val isFoldOrWide = maxWidth >= 600.dp
+                    val activeEntryId = activeFocusedId
+
+                    if (isFoldOrWide && activeEntryId != null) {
+                        Row(modifier = Modifier.fillMaxSize()) {
+                            Box(
+                                modifier = Modifier
+                                    .weight(0.45f)
+                                    .fillMaxHeight()
+                            ) {
+                                LazyColumn(
+                                    state = listState,
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .geoTowerLazyListFadingEdge(listState)
+                                        .pageScrollbar(PageScrollPrefs.SPEEDTESTS, listState),
+                                    contentPadding = PaddingValues(
+                                        start = sizing.spacing(12.dp),
+                                        end = sizing.spacing(12.dp),
+                                        top = sizing.spacing(8.dp),
+                                        bottom = sizing.spacing(88.dp)
+                                    )
+                                ) {
+                                    itemsIndexed(filteredEntries, key = { _, item -> item.id }) { index, entry ->
+                                        val isSelected = entry.id in selectedIdSet
+                                        SpeedtestTimelineRow(
+                                            entry = entry,
+                                            isFirst = index == 0,
+                                            isLast = index == filteredEntries.lastIndex,
+                                            isSelected = isSelected || (!isSelectionMode && entry.id == activeEntryId),
+                                            isSelectionMode = isSelectionMode,
+                                            onClick = {
+                                                if (isSelectionMode) {
+                                                    selectedIds = if (isSelected) {
+                                                        selectedIds.filterNot { it == entry.id }
+                                                    } else {
+                                                        selectedIds + entry.id
+                                                    }
+                                                } else if (isFoldOrWide) {
+                                                    focusedEntryId = if (focusedEntryId == entry.id) null else entry.id
+                                                } else {
+                                                    onOpenEntry(entry.id)
+                                                }
+                                            },
+                                            onLongClick = {
+                                                if (entry.id !in selectedIds) {
+                                                    selectedIds = selectedIds + entry.id
+                                                }
+                                            }
+                                        )
                                     }
-                                } else {
-                                    onOpenEntry(entry.id)
                                 }
-                            },
-                            onLongClick = {
-                                if (entry.id !in selectedIds) {
-                                    selectedIds = selectedIds + entry.id
+                                PageScrollEdgeButtons(PageScrollPrefs.SPEEDTESTS, listState)
+                            }
+                            VerticalDivider(
+                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                            )
+                            SpeedtestDetailContent(
+                                entryId = activeEntryId,
+                                onDeleted = { focusedEntryId = null },
+                                onSaved = {},
+                                modifier = Modifier
+                                    .weight(0.55f)
+                                    .fillMaxHeight()
+                            )
+                        }
+                    } else {
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            LazyColumn(
+                                state = listState,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .geoTowerLazyListFadingEdge(listState)
+                                    .pageScrollbar(PageScrollPrefs.SPEEDTESTS, listState),
+                                contentPadding = PaddingValues(
+                                    start = sizing.spacing(12.dp),
+                                    end = sizing.spacing(16.dp),
+                                    top = sizing.spacing(8.dp),
+                                    bottom = sizing.spacing(88.dp)
+                                )
+                            ) {
+                                itemsIndexed(filteredEntries, key = { _, item -> item.id }) { index, entry ->
+                                    val isSelected = entry.id in selectedIdSet
+                                    SpeedtestTimelineRow(
+                                        entry = entry,
+                                        isFirst = index == 0,
+                                        isLast = index == filteredEntries.lastIndex,
+                                        isSelected = isSelected,
+                                        isSelectionMode = isSelectionMode,
+                                        onClick = {
+                                            if (isSelectionMode) {
+                                                selectedIds = if (isSelected) {
+                                                    selectedIds.filterNot { it == entry.id }
+                                                } else {
+                                                    selectedIds + entry.id
+                                                }
+                                            } else if (isFoldOrWide) {
+                                                focusedEntryId = entry.id
+                                            } else {
+                                                onOpenEntry(entry.id)
+                                            }
+                                        },
+                                        onLongClick = {
+                                            if (entry.id !in selectedIds) {
+                                                selectedIds = selectedIds + entry.id
+                                            }
+                                        }
+                                    )
                                 }
                             }
-                        )
+                            PageScrollEdgeButtons(PageScrollPrefs.SPEEDTESTS, listState)
+                        }
                     }
                 }
             }
         }
+    }
+
+    if (showSettingsSheet) {
+        val bubbleColor = if (uiStyle.useOneUi) uiStyle.bubbleColor else MaterialTheme.colorScheme.surfaceVariant
+        HistoryPageSettingsSheet(
+            title = stringResource(R.string.speedtests_title),
+            page = PageScrollPrefs.SPEEDTESTS,
+            options = emptyList(),
+            onReset = {},
+            onDismiss = { showSettingsSheet = false },
+            onBack = { showSettingsSheet = false },
+            sheetState = settingsSheetState,
+            useOneUi = AppConfig.useOneUiDesign,
+            bubbleColor = bubbleColor
+        )
     }
 
     if (showDeleteSelectedConfirm) {
@@ -447,7 +588,7 @@ fun SpeedtestsScreen(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
 private fun SpeedtestTimelineRow(
     entry: SpeedtestEntryEntity,
@@ -589,16 +730,29 @@ private fun SpeedtestTimelineRow(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    val metricsLine = buildSpeedMetricsSummary(entry)
-                    if (metricsLine.isNotEmpty()) {
-                        Text(
-                            text = metricsLine,
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                    val metricParts = remember(entry) {
+                        buildList {
+                            entry.downloadMbps?.let { add("↓ ${formatMbps(it)}") }
+                            entry.uploadMbps?.let { add("↑ ${formatMbps(it)}") }
+                            entry.pingMs?.let { add("${formatNum(it)} ms") }
+                        }
+                    }
+                    if (metricParts.isNotEmpty()) {
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            metricParts.forEachIndexed { idx, part ->
+                                val text = if (idx < metricParts.lastIndex) "$part •" else part
+                                Text(
+                                    text = text,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1
+                                )
+                            }
+                        }
                     } else {
                         Text(
                             text = stringResource(R.string.speedtests_no_metrics),
@@ -607,13 +761,20 @@ private fun SpeedtestTimelineRow(
                         )
                     }
 
+                    val networkBadge = entry.networkName
+                        ?.trim()
+                        ?.takeIf { it.isNotEmpty() && !it.equals(entry.operatorName?.trim(), ignoreCase = true) }
                     val metaBadges = listOfNotNull(
                         entry.operatorName,
+                        networkBadge,
                         entry.networkTech,
                         entry.band
                     )
                     if (metaBadges.isNotEmpty()) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
                             metaBadges.forEach { badge ->
                                 Surface(
                                     shape = RoundedCornerShape(6.dp),
@@ -623,6 +784,8 @@ private fun SpeedtestTimelineRow(
                                         text = badge,
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
                                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                     )
                                 }

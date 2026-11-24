@@ -21,6 +21,7 @@ data class SpeedtestEntryEntity(
     val pingMs: Double? = null,
     val jitterMs: Double? = null,
     val operatorName: String? = null,
+    val networkName: String? = null,
     val networkTech: String? = null,
     val band: String? = null,
     val cellIdentifier: String? = null,
