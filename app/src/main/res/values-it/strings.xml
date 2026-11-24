@@ -3529,6 +3529,7 @@
     <string name="appstrings_release_v2139_summary_speedtests_ocr_release_fix">OCR degli speedtest più affidabile nella versione Release e gestione dell\'orientamento EXIF</string>
     <string name="appstrings_release_v2140_summary_speedtests_exif_location_preservation">Conservazione delle coordinate GPS EXIF durante l\'importazione degli screenshot degli speedtest</string>
     <string name="appstrings_release_v2141_summary_speedtests_ocr_parser_formats">Migliorato il parser OCR degli speedtest (unità su riga separata, colonne Ookla e schede SignalQuest)</string>
+    <string name="appstrings_release_v2142_summary_speedtests_ocr_max_priority_and_raw_text">Priorità alle velocità principali rispetto ai picchi MAX in OCR e visualizzazione del testo OCR rilevato nei dettagli</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registro richieste di rete</string>

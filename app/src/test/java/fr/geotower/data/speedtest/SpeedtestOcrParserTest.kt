@@ -205,6 +205,29 @@ class SpeedtestOcrParserTest {
         assertEquals("5G NSA", parsed.networkTech)
         assertEquals("n78+B1+B3+B7", parsed.band)
         assertEquals("55562", parsed.cellIdentifier)
+
+        // Cas où ML Kit lit les valeurs "MAX 139 Mb/s" et "MAX 2,6 Mb/s" avant "120 Mb/s" et "0,6 Mb/s"
+        val rowByRow = """
+            Orange · 5G NSA · n78+B1+B3+B7
+            ↓ DESCENDANT
+            ↓ DESCENDANT MAX 139 Mb/s
+            120
+            Mb/s
+            ↑ MONTANT MAX 2,6 Mb/s
+            ↑ MONTANT
+            0,6
+            Mb/s
+            LATENCE MIN.
+            41
+            ms
+            Gigue au repos 65 ms
+            ANCRE 4G eNB 55562 · PCI 425
+        """.trimIndent()
+        val parsedRowByRow = SpeedtestOcrParser.parse(rowByRow)
+        assertEquals(120.0, parsedRowByRow.downloadMbps ?: -1.0, 0.01)
+        assertEquals(0.6, parsedRowByRow.uploadMbps ?: -1.0, 0.01)
+        assertEquals(41.0, parsedRowByRow.pingMs ?: -1.0, 0.01)
+        assertEquals(65.0, parsedRowByRow.jitterMs ?: -1.0, 0.01)
     }
 
     @Test

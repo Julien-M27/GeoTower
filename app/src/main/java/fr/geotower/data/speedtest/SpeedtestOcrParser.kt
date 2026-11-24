@@ -220,7 +220,9 @@ object SpeedtestOcrParser {
             .filter { it.isNotEmpty() }
 
         var downloadMbps: Double? = null
+        var downloadFromChartMax = false
         var uploadMbps: Double? = null
+        var uploadFromChartMax = false
         var pingMs: Double? = null
         var jitterMs: Double? = null
 
@@ -271,9 +273,16 @@ object SpeedtestOcrParser {
                     containsAny(prevLower, uploadKeywords) ||
                     (isAvgOrMaxLine(prevLower) && containsAny(prev2Lower, uploadKeywords))
 
+                val isChartMax = Regex("""\bmax\s+\d""").containsMatchIn(lower)
                 when {
-                    downloadMbps == null && isDl -> downloadMbps = mbps
-                    uploadMbps == null && isUl -> uploadMbps = mbps
+                    isDl && (downloadMbps == null || (downloadFromChartMax && !isChartMax)) -> {
+                        downloadMbps = mbps
+                        downloadFromChartMax = isChartMax
+                    }
+                    isUl && (uploadMbps == null || (uploadFromChartMax && !isChartMax)) -> {
+                        uploadMbps = mbps
+                        uploadFromChartMax = isChartMax
+                    }
                 }
             }
 

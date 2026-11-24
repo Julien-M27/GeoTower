@@ -448,6 +448,34 @@ fun SpeedtestDetailScreen(
                 Text(stringResource(R.string.common_delete))
             }
 
+            val rawOcr = currentEntry.ocrRawText
+            if (!rawOcr.isNullOrBlank()) {
+                var showRawOcr by remember { mutableStateOf(false) }
+                TextButton(
+                    onClick = { showRawOcr = !showRawOcr },
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                ) {
+                    Text(
+                        text = if (showRawOcr) "Masquer le texte OCR" else "Voir le texte OCR détecté",
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                }
+                if (showRawOcr) {
+                    androidx.compose.material3.Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = rawOcr,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(12.dp)
+                        )
+                    }
+                }
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
         }
 
