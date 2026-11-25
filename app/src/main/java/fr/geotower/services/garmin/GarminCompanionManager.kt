@@ -44,7 +44,8 @@ import kotlin.math.roundToInt
 data class GarminConnectedWatch(
     val id: Long,
     val name: String,
-    val status: IQDevice.IQDeviceStatus
+    val status: IQDevice.IQDeviceStatus,
+    val isActive: Boolean = false
 )
 
 /**
@@ -111,6 +112,14 @@ object GarminCompanionManager {
 
     private val _connectedWatches = MutableStateFlow<List<GarminConnectedWatch>>(emptyList())
     val connectedWatches: StateFlow<List<GarminConnectedWatch>> = _connectedWatches.asStateFlow()
+
+    private val _activeWatch = MutableStateFlow<GarminConnectedWatch?>(null)
+    val activeWatch: StateFlow<GarminConnectedWatch?> = _activeWatch.asStateFlow()
+
+    private val _preferredWatchId = MutableStateFlow<Long?>(null)
+    val preferredWatchId: StateFlow<Long?> = _preferredWatchId.asStateFlow()
+
+    const val PREF_GARMIN_PREFERRED_WATCH_ID = "garmin_preferred_watch_id"
 
     private val _lastSyncTimestamp = MutableStateFlow(0L)
     val lastSyncTimestamp: StateFlow<Long> = _lastSyncTimestamp.asStateFlow()
@@ -236,6 +245,11 @@ object GarminCompanionManager {
         repository = anfrRepo
 
         val prefs = appCtx.getSharedPreferences("geotower_prefs", Context.MODE_PRIVATE)
+        val savedPreferredId = if (prefs.contains(PREF_GARMIN_PREFERRED_WATCH_ID)) {
+            val pid = prefs.getLong(PREF_GARMIN_PREFERRED_WATCH_ID, -1L)
+            if (pid != -1L) pid else null
+        } else null
+        _preferredWatchId.value = savedPreferredId
         val bgEnabled = prefs.getBoolean(PREF_GARMIN_BACKGROUND_SERVICE, false)
         val durationMs = prefs.getLong(PREF_GARMIN_BACKGROUND_DURATION, 0L)
         var startTime = prefs.getLong(PREF_GARMIN_SERVICE_START_TIME, 0L)
@@ -282,6 +296,7 @@ object GarminCompanionManager {
                     _isSdkReady.value = false
                     _lastStatusMessage.value = "SDK arrêté"
                     _connectedWatches.value = emptyList()
+                    _activeWatch.value = null
                     log("GarminBridge", "SDK Connect IQ arrêté")
                 }
             })
@@ -320,6 +335,7 @@ object GarminCompanionManager {
                     }
                     val payloadBytes = intent.getByteArrayExtra("com.garmin.android.connectiq.EXTRA_PAYLOAD")
                     if (dev != null && app != null && payloadBytes != null) {
+                        updateActiveWatchFromDevice(dev)
                         val deserialized = Serializer.deserialize(payloadBytes)
                         log("GarminBridge", "Broadcast direct reçu de ${dev.friendlyName}: ${deserialized.size} élément(s)")
                         for (item in deserialized) {
@@ -359,6 +375,53 @@ object GarminCompanionManager {
         }
     }
 
+    private fun updateActiveWatchFromDevice(device: IQDevice) {
+        val current = _activeWatch.value
+        val isDifferent = current?.id != device.deviceIdentifier || current.status != IQDevice.IQDeviceStatus.CONNECTED
+        if (isDifferent) {
+            log("GarminBridge", "Montre active détectée en direct : ${device.friendlyName} (id=${device.deviceIdentifier})")
+            val activeItem = GarminConnectedWatch(
+                id = device.deviceIdentifier,
+                name = device.friendlyName ?: "Montre Garmin",
+                status = IQDevice.IQDeviceStatus.CONNECTED,
+                isActive = true
+            )
+            _activeWatch.value = activeItem
+            _connectedWatches.update { list ->
+                if (list.any { it.id == device.deviceIdentifier }) {
+                    list.map { w ->
+                        if (w.id == device.deviceIdentifier) w.copy(status = IQDevice.IQDeviceStatus.CONNECTED, isActive = true)
+                        else w.copy(isActive = false)
+                    }
+                } else {
+                    listOf(activeItem) + list.map { it.copy(isActive = false) }
+                }
+            }
+        }
+    }
+
+    fun selectActiveWatch(context: Context, deviceId: Long?) {
+        val appCtx = context.applicationContext
+        _preferredWatchId.value = deviceId
+        val prefs = appCtx.getSharedPreferences("geotower_prefs", Context.MODE_PRIVATE)
+        if (deviceId != null) {
+            prefs.edit().putLong(PREF_GARMIN_PREFERRED_WATCH_ID, deviceId).apply()
+            log("GarminBridge", "Montre active préférée sélectionnée (id=$deviceId)")
+        } else {
+            prefs.edit().remove(PREF_GARMIN_PREFERRED_WATCH_ID).apply()
+            log("GarminBridge", "Sélection automatique de la montre active activée")
+        }
+        refreshConnectedDevices()
+    }
+
+    fun getActiveDevice(): IQDevice? {
+        val ciq = connectIQ ?: return null
+        val active = _activeWatch.value ?: return null
+        val connected = runCatching { ciq.connectedDevices }.getOrNull() ?: emptyList()
+        val known = runCatching { ciq.knownDevices }.getOrNull() ?: emptyList()
+        return (connected + known).firstOrNull { it.deviceIdentifier == active.id }
+    }
+
     fun refreshConnectedDevices() {
         val ciq = connectIQ ?: return
         if (!_isSdkReady.value) return
@@ -366,13 +429,50 @@ object GarminCompanionManager {
             val connected = runCatching { ciq.connectedDevices }.getOrNull() ?: emptyList()
             val known = runCatching { ciq.knownDevices }.getOrNull() ?: emptyList()
             val allDevices = (connected + known).distinctBy { it.deviceIdentifier }
-            _connectedWatches.value = allDevices.map {
+
+            val preferredId = _preferredWatchId.value
+
+            val watchesWithStatus = allDevices.map { dev ->
+                val isDirectlyConnected = connected.any { it.deviceIdentifier == dev.deviceIdentifier }
+                val status = if (isDirectlyConnected) {
+                    IQDevice.IQDeviceStatus.CONNECTED
+                } else {
+                    val queried = runCatching { ciq.getDeviceStatus(dev) }.getOrNull()
+                    queried ?: dev.status ?: IQDevice.IQDeviceStatus.NOT_CONNECTED
+                }
+                dev to status
+            }
+
+            val connectedList = watchesWithStatus.filter { it.second == IQDevice.IQDeviceStatus.CONNECTED }
+
+            val activePair = when {
+                preferredId != null && connectedList.any { it.first.deviceIdentifier == preferredId } -> {
+                    connectedList.first { it.first.deviceIdentifier == preferredId }
+                }
+                connectedList.isNotEmpty() -> {
+                    connectedList.first()
+                }
+                preferredId != null && watchesWithStatus.any { it.first.deviceIdentifier == preferredId } -> {
+                    watchesWithStatus.first { it.first.deviceIdentifier == preferredId }
+                }
+                watchesWithStatus.isNotEmpty() -> {
+                    watchesWithStatus.first()
+                }
+                else -> null
+            }
+
+            val list = watchesWithStatus.map { (dev, status) ->
+                val isActive = (dev.deviceIdentifier == activePair?.first?.deviceIdentifier)
                 GarminConnectedWatch(
-                    id = it.deviceIdentifier,
-                    name = it.friendlyName ?: "Montre Garmin",
-                    status = it.status ?: IQDevice.IQDeviceStatus.UNKNOWN
+                    id = dev.deviceIdentifier,
+                    name = dev.friendlyName ?: "Montre Garmin",
+                    status = status,
+                    isActive = isActive
                 )
             }
+
+            _connectedWatches.value = list
+            _activeWatch.value = list.firstOrNull { it.isActive }
         } catch (e: Exception) {
             log("GarminBridge", "Erreur rafraîchissement des montres", e)
         }
@@ -384,17 +484,17 @@ object GarminCompanionManager {
             log("GarminBridge", "Ping impossible : ConnectIQ non initialisé")
             return
         }
-        val connected = runCatching { ciq.connectedDevices }.getOrNull() ?: emptyList()
-        val known = runCatching { ciq.knownDevices }.getOrNull() ?: emptyList()
-        val allDevices = (connected + known).distinctBy { it.deviceIdentifier }
-        log("GarminBridge", "Envoi d'un ping test vers ${allDevices.size} montre(s)...")
-        if (allDevices.isEmpty()) {
-            log("GarminBridge", "Aucune montre Garmin détectée par ConnectIQ.")
-            return
+        val target = getActiveDevice() ?: run {
+            val connected = runCatching { ciq.connectedDevices }.getOrNull() ?: emptyList()
+            val known = runCatching { ciq.knownDevices }.getOrNull() ?: emptyList()
+            connected.firstOrNull() ?: known.firstOrNull()
         }
-        for (dev in allDevices) {
-            log("GarminBridge", "Ping vers ${dev.friendlyName} (id=${dev.deviceIdentifier})...")
-            sendToWatch(dev, iqApp, mapOf("cmd" to "ping", "time" to System.currentTimeMillis()))
+
+        if (target != null) {
+            log("GarminBridge", "Ping vers la montre active ${target.friendlyName} (id=${target.deviceIdentifier})...")
+            sendToWatch(target, iqApp, mapOf("cmd" to "ping", "time" to System.currentTimeMillis()))
+        } else {
+            log("GarminBridge", "Aucune montre Garmin détectée par ConnectIQ.")
         }
     }
 
@@ -402,6 +502,7 @@ object GarminCompanionManager {
     private var lastHandledTimestamp: Long = 0L
 
     private fun handleWatchMessage(device: IQDevice, app: IQApp, data: Map<*, *>) {
+        updateActiveWatchFromDevice(device)
         val payloadKey = "${device.deviceIdentifier}_$data"
         val now = System.currentTimeMillis()
         if (payloadKey == lastHandledPayload && now - lastHandledTimestamp < 1500L) {

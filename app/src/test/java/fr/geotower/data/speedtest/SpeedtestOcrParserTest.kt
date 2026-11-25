@@ -445,6 +445,83 @@ class SpeedtestOcrParserTest {
         assertEquals("Bouygues Telecom", parsedGauge.networkName)
         assertEquals("5G NSA", parsedGauge.networkTech)
         assertEquals("504743:1", parsedGauge.cellIdentifier)
+
+        // nPerf avec deux "Max:" sur la même ligne après "Envoi" et "20" + "100 Gb/s" sur la ligne serveur
+        val nperfDualMaxOnOneLine = """
+            12:57 12 mars
+            STOP
+            Serveur
+            orange
+            nPerf
+            Test de débit
+            Réception
+            Connexion
+            5G (NSA)
+            20
+            A9.l 46%
+            Auto: [FR] Puteaux - 100 Gb/s - Orange
+            Envoi
+            Max: 397.75 Mb/s Max: 37.90 Mb/s
+            Moy: 282.92 Mb/s
+            Moy: 34.59 Mb/s
+            Opérateur
+            Orange Mobile
+            Latence
+            Min: 18 ms
+            Réseau
+            Orange
+            Moy: 24 ms / Gig: 13 ms
+        """.trimIndent()
+        val parsedDual = SpeedtestOcrParser.parse(nperfDualMaxOnOneLine)
+        assertEquals(397.75, parsedDual.downloadMbps ?: -1.0, 0.01)
+        assertEquals(37.90, parsedDual.uploadMbps ?: -1.0, 0.01)
+        assertEquals(18.0, parsedDual.pingMs ?: -1.0, 0.01)
+        assertEquals(13.0, parsedDual.jitterMs ?: -1.0, 0.01)
+        assertEquals("Orange", parsedDual.operatorName)
+        assertEquals("Orange", parsedDual.networkName)
+        assertEquals("5G NSA", parsedDual.networkTech)
+
+        // nPerf avec "30" + ligne serveur "1 Gb/s" entre "Envoi" et "Max: 103.70 Mb/s", et "SFR" au-dessus de "Réseau"
+        val nperfWithServerBetweenEnvoiAndMax = """
+            17:34 mar. 24 déc.
+            nPerf
+            Test de débit
+            Réception
+            Max: 709.04 Mb/s
+            Moy: 625.97 Mb/s
+            Connexion
+            5G (NSA)
+            20
+            PARTAGER
+            RELANCER
+            Envoi
+            30
+            Auto: [FR] Lucé - 1 Gb/s - CCIN
+            Max: 103.70 Mb/s
+            Moy: 92.30 Mb/s
+            Opérateur
+            Lebara
+            40
+            50
+            60
+            Latence
+            Min: 22 ms
+            SFR
+            100
+            Réseau
+            70
+            80
+            90
+            Moy: 25 ms / Gig: 8 ms
+        """.trimIndent()
+        val parsedSplit = SpeedtestOcrParser.parse(nperfWithServerBetweenEnvoiAndMax)
+        assertEquals(709.04, parsedSplit.downloadMbps ?: -1.0, 0.01)
+        assertEquals(103.70, parsedSplit.uploadMbps ?: -1.0, 0.01)
+        assertEquals(22.0, parsedSplit.pingMs ?: -1.0, 0.01)
+        assertEquals(8.0, parsedSplit.jitterMs ?: -1.0, 0.01)
+        assertEquals("Lebara", parsedSplit.operatorName)
+        assertEquals("SFR", parsedSplit.networkName)
+        assertEquals("5G NSA", parsedSplit.networkTech)
     }
 
     @Test

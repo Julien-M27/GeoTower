@@ -187,9 +187,18 @@ class GarminCompanionService : Service() {
         )
     }
 
+    private fun getNotificationTitle(): String {
+        val activeName = GarminCompanionManager.activeWatch.value?.name
+        return if (!activeName.isNullOrBlank()) {
+            "GeoTower • $activeName"
+        } else {
+            getString(fr.geotower.R.string.garmin_notif_title)
+        }
+    }
+
     private fun buildStandardNotification(pendingIntent: PendingIntent): Notification {
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle(getString(fr.geotower.R.string.garmin_notif_title))
+            .setContentTitle(getNotificationTitle())
             .setContentText(getString(fr.geotower.R.string.garmin_notif_unlimited_text))
             .setSubText(getString(fr.geotower.R.string.garmin_notif_unlimited_sub))
             .setContentIntent(pendingIntent)
@@ -213,7 +222,7 @@ class GarminCompanionService : Service() {
                 listOf(Notification.ProgressStyle.Segment(100).setColor(0xFF00A0E2.toInt()))
             )
         val nativeBuilder = Notification.Builder(this, CHANNEL_ID)
-            .setContentTitle(getString(fr.geotower.R.string.garmin_notif_title))
+            .setContentTitle(getNotificationTitle())
             .setContentText(getString(fr.geotower.R.string.garmin_notif_remaining_text, remainingText))
             .setSubText(remainingText)
             .setContentIntent(pendingIntent)
@@ -252,7 +261,7 @@ class GarminCompanionService : Service() {
         remainingText: String
     ): Notification {
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle(getString(fr.geotower.R.string.garmin_notif_title))
+            .setContentTitle(getNotificationTitle())
             .setContentText(getString(fr.geotower.R.string.garmin_notif_remaining_text, remainingText))
             .setSubText(remainingText)
             .setContentIntent(pendingIntent)

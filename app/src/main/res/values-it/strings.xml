@@ -3011,6 +3011,7 @@
     <string name="appstrings_release_v2142_summary_speedtests_ocr_max_priority_and_raw_text">Priorità alle velocità principali rispetto ai picchi MAX in OCR e visualizzazione del testo OCR rilevato nei dettagli</string>
     <string name="appstrings_release_v2143_summary_speedtests_ocr_dual_pass_and_decimals">Doppia passata OCR in scala ridotta per le cifre grandi e normalizzazione dei decimali spaziati negli speedtest</string>
     <string name="appstrings_release_v2144_summary_speedtests_map_thumbnails_and_translations">Miniature cliccabili degli speedtest sulla mappa, condivisione e copia OCR, e traduzioni complete dell\'interfaccia</string>
+    <string name="appstrings_release_v2146_summary_nperf_ocr_and_garmin_watch">Miglioramento dell\'OCR nPerf e selezione/ping dell\'orologio Garmin attivo</string>
     <string name="appstrings_release_v2145_summary_default_country_and_speedtests_stats">Impostazione del paese predefinito (avvio e preferenze) e schede statistiche cliccabili negli Speedtest</string>
 
     <!-- Network request log -->
@@ -3321,6 +3322,12 @@
     <string name="garmin_share_all_debug_log">Condividi tutto il log di debug (disco)</string>
     <string name="garmin_consolidated_log_header">Log consolidato (%1$d voci)</string>
     <string name="garmin_no_ble_events">Nessun evento BLE registrato.\n\nAvvia la ricerca antenne sull\'orologio Garmin per osservare gli scambi.</string>
+    <string name="garmin_active_watch_label">Smartwatch attivo</string>
+    <string name="garmin_auto_selection">Automatico</string>
+    <string name="garmin_status_connected">Connesso</string>
+    <string name="garmin_status_not_connected">Non connesso</string>
+    <string name="garmin_no_watch_detected">Nessuno smartwatch rilevato (controlla Garmin Connect)</string>
+    <string name="garmin_ping_active_watch">Ping %1$s</string>
     <string name="profile_qr_subtitle">Profilo preferenze</string>
     <string name="profile_qr_base_version">Versione base</string>
     <string name="profile_qr_same_as_base">Identico alla versione base</string>

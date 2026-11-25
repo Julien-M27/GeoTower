@@ -3013,6 +3013,7 @@
     <string name="appstrings_release_v2142_summary_speedtests_ocr_max_priority_and_raw_text">Priorité aux débits principaux sur les valeurs MAX en OCR et affichage du texte OCR détecté dans les détails</string>
     <string name="appstrings_release_v2143_summary_speedtests_ocr_dual_pass_and_decimals">Double passe OCR à échelle réduite pour les grands chiffres et normalisation des décimales espacées dans les speedtests</string>
     <string name="appstrings_release_v2144_summary_speedtests_map_thumbnails_and_translations">Miniatures des speedtests géolocalisés sur la carte, partage et copie OCR, et traductions complètes de l\'interface</string>
+    <string name="appstrings_release_v2146_summary_nperf_ocr_and_garmin_watch">Amélioration de l\'OCR nPerf et sélection/ping de la montre Garmin active</string>
     <string name="appstrings_release_v2145_summary_default_country_and_speedtests_stats">Choix du pays par défaut (démarrage et préférences) et cartes de statistiques cliquables dans les Speedtests</string>
 
     <!-- Journal des requêtes réseau -->
@@ -3323,6 +3324,12 @@
     <string name="garmin_share_all_debug_log">Partager tout le journal de débogage (disque)</string>
     <string name="garmin_consolidated_log_header">Journal consolidé (%1$d entrées)</string>
     <string name="garmin_no_ble_events">Aucun événement BLE enregistré.\n\nLancez la recherche d\'antennes sur la montre Garmin pour observer les échanges et requêtes.</string>
+    <string name="garmin_active_watch_label">Montre active</string>
+    <string name="garmin_auto_selection">Automatique</string>
+    <string name="garmin_status_connected">Connectée</string>
+    <string name="garmin_status_not_connected">Non connectée</string>
+    <string name="garmin_no_watch_detected">Aucune montre détectée (vérifiez Garmin Connect)</string>
+    <string name="garmin_ping_active_watch">Ping %1$s</string>
     <string name="profile_qr_subtitle">Profil de préférences</string>
     <string name="profile_qr_base_version">Version de base</string>
     <string name="profile_qr_same_as_base">Identique à la version de base</string>

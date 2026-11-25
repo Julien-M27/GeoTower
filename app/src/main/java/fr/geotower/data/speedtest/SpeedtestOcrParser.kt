@@ -259,6 +259,9 @@ object SpeedtestOcrParser {
             }
         }
 
+        val fullLower = normalizedRaw.lowercase(Locale.ROOT)
+        val isNperf = fullLower.contains("nperf")
+
         // Passe 1 : valeurs avec unité explicite (ex: "482,5 Mb/s", "21 ms")
         for (i in mergedLines.indices) {
             val line = mergedLines[i]
@@ -269,7 +272,8 @@ object SpeedtestOcrParser {
             val prev2Lower = if (i > 1) mergedLines[i - 2].lowercase(Locale.ROOT) else ""
 
             val speedMatches = speedValueRegex.findAll(line).toList()
-            for (match in speedMatches) {
+            val isDualNperfLine = isNperf && speedMatches.size == 2
+            for ((matchIdx, match) in speedMatches.withIndex()) {
                 val mbps = convertToMbps(
                     rawNumber = match.groupValues[1],
                     unit = match.groupValues[2]
@@ -277,12 +281,20 @@ object SpeedtestOcrParser {
                 speedCandidates.add(mbps)
                 speedCandidateLines.add(lower)
 
-                val isDl = containsAny(lower, downloadKeywords) ||
-                    containsAny(prevLower, downloadKeywords) ||
-                    (isAvgOrMaxLine(prevLower) && containsAny(prev2Lower, downloadKeywords))
-                val isUl = containsAny(lower, uploadKeywords) ||
-                    containsAny(prevLower, uploadKeywords) ||
-                    (isAvgOrMaxLine(prevLower) && containsAny(prev2Lower, uploadKeywords))
+                val isDl = if (isDualNperfLine) {
+                    matchIdx == 0
+                } else {
+                    containsAny(lower, downloadKeywords) ||
+                        containsAny(prevLower, downloadKeywords) ||
+                        (isAvgOrMaxLine(prevLower) && containsAny(prev2Lower, downloadKeywords))
+                }
+                val isUl = if (isDualNperfLine) {
+                    matchIdx == 1
+                } else {
+                    containsAny(lower, uploadKeywords) ||
+                        containsAny(prevLower, uploadKeywords) ||
+                        (isAvgOrMaxLine(prevLower) && containsAny(prev2Lower, uploadKeywords))
+                }
 
                 val isChartMax = Regex("""\bmax\s+\d""").containsMatchIn(lower)
                 when {
@@ -340,8 +352,9 @@ object SpeedtestOcrParser {
             }
         }
 
-        // Passe 2 : valeurs sans unité collée (Ookla Speedtest, Cellular FR)
-        if (downloadMbps == null || uploadMbps == null) {
+        // Passe 2 : valeurs sans unité collée (Ookla Speedtest, Cellular FR, SignalQuest)
+        val hasNperfMaxSpeeds = isNperf && speedCandidateLines.any { it.contains("max:") }
+        if (!hasNperfMaxSpeeds && (downloadMbps == null || uploadMbps == null)) {
             val dlIndex = lines.indexOfFirst { containsAny(it.lowercase(Locale.ROOT), downloadKeywords) }
             val ulIndex = lines.indexOfFirst { containsAny(it.lowercase(Locale.ROOT), uploadKeywords) }
 
@@ -416,7 +429,6 @@ object SpeedtestOcrParser {
             }
         }
 
-        val fullLower = normalizedRaw.lowercase(Locale.ROOT)
         val hasIdleJitterLabel = fullLower.contains("gigue au repos") || fullLower.contains("idle jitter")
         if (hasIdleJitterLabel) {
             // Sur SignalQuest, ML Kit lit souvent "Gigue au repos" dans la colonne gauche puis "65 ms"
@@ -471,6 +483,7 @@ object SpeedtestOcrParser {
         val end = minOf(lines.lastIndex, labelIndex + 5)
         for (i in (labelIndex + 1)..end) {
             val lower = lines[i].lowercase(Locale.ROOT)
+            if (isServerInfoLine(lower)) continue
             if (i > labelIndex + 1 && (containsAny(lower, downloadKeywords) || containsAny(lower, uploadKeywords))) {
                 break
             }
@@ -675,6 +688,7 @@ object SpeedtestOcrParser {
     private fun detectNperfNetworkUnderReseau(rawText: String): String? {
         val lines = rawText.lines().map { it.trim() }.filter { it.isNotEmpty() }
         val reseauLabels = listOf("réseau", "reseau", "network")
+        val opLabels = listOf("opérateur", "operateur", "operator")
         for (i in lines.indices) {
             val lower = lines[i].lowercase(Locale.ROOT)
             if (reseauLabels.any { lower == it || lower.endsWith(" $it") }) {
@@ -704,6 +718,18 @@ object SpeedtestOcrParser {
                         .lastOrNull()
                     if (lastOp != null) return lastOp
                 }
+                // Cas où ML Kit lit le nom du réseau 1 à 2 lignes au-dessus de "Réseau" (ex: "SFR", "100", "Réseau")
+                for (offset in 1..2) {
+                    val idx = i - offset
+                    if (idx < 0) break
+                    val candLower = lines[idx].lowercase(Locale.ROOT)
+                    if (opLabels.any { candLower == it || candLower.endsWith(" $it") }) break
+                    val prevLower = lines.getOrNull(idx - 1)?.lowercase(Locale.ROOT).orEmpty()
+                    if (opLabels.any { prevLower == it || prevLower.endsWith(" $it") }) continue
+                    if (!isServerInfoLine(candLower)) {
+                        matchKnownOperator(candLower)?.let { return it }
+                    }
+                }
             }
         }
         return null
@@ -723,7 +749,8 @@ object SpeedtestOcrParser {
         return lower.contains("anycast") ||
             lower.contains("serveur") ||
             lower.contains("server") ||
-            Regex("""(?:^|[\s-])(?:10|25|40|100)\s*gb(?:/s|ps)\b""").containsMatchIn(lower)
+            lower.startsWith("auto:") ||
+            Regex("""(?:^|[\s-])(?:1|2|5|10|25|40|50|100|200|400)\s*gb(?:/s|ps)\b""").containsMatchIn(lower)
     }
 
     private fun isAvgOrMaxLine(lower: String): Boolean {

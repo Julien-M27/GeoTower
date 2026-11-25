@@ -92,6 +92,8 @@ fun GarminSettingsCard(
     val isGcmInstalled = remember { GarminCompanionManager.isGarminConnectInstalled(context) }
     val isReady by GarminCompanionManager.isSdkReady.collectAsStateWithLifecycle()
     val watches by GarminCompanionManager.connectedWatches.collectAsStateWithLifecycle()
+    val activeWatch by GarminCompanionManager.activeWatch.collectAsStateWithLifecycle()
+    val preferredWatchId by GarminCompanionManager.preferredWatchId.collectAsStateWithLifecycle()
     val lastSync by GarminCompanionManager.lastSyncTimestamp.collectAsStateWithLifecycle()
     val liveLogs by GarminCompanionManager.logs.collectAsStateWithLifecycle()
     val lastError by GarminCompanionManager.lastError.collectAsStateWithLifecycle()
@@ -123,16 +125,25 @@ fun GarminSettingsCard(
         (diskGarminLines + liveLogs).distinct().takeLast(80)
     }
 
-    val subtitle = remember(isGcmInstalled, isReady, watches, lastSync) {
+    val subtitle = remember(isGcmInstalled, isReady, watches, activeWatch, lastSync) {
         when {
             !isGcmInstalled -> "Optionnel • Requis uniquement si vous utilisez une montre Garmin"
             !isReady -> "En attente de Garmin Connect Mobile"
-            watches.isNotEmpty() -> {
-                val watchNames = watches.joinToString(", ") { it.name }
-                if (lastSync > 0) {
-                    "$watchNames • Synchronisé en BLE"
+            activeWatch != null -> {
+                val isConn = activeWatch?.status == com.garmin.android.connectiq.IQDevice.IQDeviceStatus.CONNECTED
+                val statusStr = if (isConn) {
+                    if (lastSync > 0) "Synchronisé en BLE" else "Connecté en BLE"
                 } else {
-                    "$watchNames • Connecté en BLE"
+                    "Non connectée"
+                }
+                "${activeWatch?.name} • $statusStr"
+            }
+            watches.isNotEmpty() -> {
+                val connectedCount = watches.count { it.status == com.garmin.android.connectiq.IQDevice.IQDeviceStatus.CONNECTED }
+                if (connectedCount > 0) {
+                    "$connectedCount montre(s) connectée(s) • En attente"
+                } else {
+                    "Montres détectées hors-ligne"
                 }
             }
             else -> "Service actif • En attente de connexion avec la montre"
@@ -216,7 +227,10 @@ fun GarminSettingsCard(
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Column(modifier = Modifier.padding(10.dp)) {
+                        Column(
+                            modifier = Modifier.padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
                             Text(
                                 text = "État du service BLE :",
                                 fontWeight = FontWeight.Bold,
@@ -226,15 +240,87 @@ fun GarminSettingsCard(
                                 text = "• SDK Connect IQ : ${sdkStatusMsg ?: if (isReady) "Prêt" else "En attente"}",
                                 style = MaterialTheme.typography.bodySmall
                             )
-                            val watchDetails = if (watches.isNotEmpty()) {
-                                watches.joinToString(", ") { "${it.name} (${it.status})" }
+
+                            // Montre active
+                            if (activeWatch != null) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = "• ${stringResource(R.string.garmin_active_watch_label)} : ",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Text(
+                                        text = activeWatch?.name ?: "",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                    val isConn = activeWatch?.status == com.garmin.android.connectiq.IQDevice.IQDeviceStatus.CONNECTED
+                                    Surface(
+                                        shape = RoundedCornerShape(4.dp),
+                                        color = if (isConn) Color(0xFF2E7D32).copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant
+                                    ) {
+                                        Text(
+                                            text = if (isConn) stringResource(R.string.garmin_status_connected) else stringResource(R.string.garmin_status_not_connected),
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = if (isConn) Color(0xFF2E7D32) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
                             } else {
-                                "Aucune montre détectée (vérifiez Garmin Connect)"
+                                Text(
+                                    text = "• " + stringResource(R.string.garmin_no_watch_detected),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
-                            Text(
-                                text = "• Montres : $watchDetails",
-                                style = MaterialTheme.typography.bodySmall
-                            )
+
+                            // Sélecteur de montre si plusieurs montres sont connues
+                            if (watches.size > 1) {
+                                Text(
+                                    text = "Choix de la montre active :",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.padding(top = 2.dp)
+                                )
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    FilterChip(
+                                        selected = preferredWatchId == null,
+                                        onClick = { GarminCompanionManager.selectActiveWatch(context, null) },
+                                        label = {
+                                            Text(
+                                                text = stringResource(R.string.garmin_auto_selection),
+                                                fontSize = sizing.text(11.sp)
+                                            )
+                                        }
+                                    )
+                                    watches.forEach { watch ->
+                                        val isConn = watch.status == com.garmin.android.connectiq.IQDevice.IQDeviceStatus.CONNECTED
+                                        FilterChip(
+                                            selected = (preferredWatchId == watch.id) || (preferredWatchId == null && watch.isActive),
+                                            onClick = { GarminCompanionManager.selectActiveWatch(context, watch.id) },
+                                            label = {
+                                                Text(
+                                                    text = "${watch.name}${if (isConn) " (BLE)" else ""}",
+                                                    fontSize = sizing.text(11.sp)
+                                                )
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+
                             if (lastReceivedPayload != null) {
                                 Text(
                                     text = "• Dernier échange : $lastReceivedPayload",
@@ -443,13 +529,19 @@ fun GarminSettingsCard(
                         FilledTonalButton(
                             onClick = {
                                 GarminCompanionManager.pingConnectedWatches()
-                                Toast.makeText(context, context.getString(R.string.garmin_ping_sent), Toast.LENGTH_SHORT).show()
+                                val targetName = activeWatch?.name ?: "la montre"
+                                Toast.makeText(context, "Ping BLE envoyé à $targetName !", Toast.LENGTH_SHORT).show()
                             },
                             modifier = Modifier.weight(1f)
                         ) {
                             Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(4.dp))
-                            Text(stringResource(R.string.garmin_ping_test), fontSize = 12.sp)
+                            Text(
+                                text = activeWatch?.let { stringResource(R.string.garmin_ping_active_watch, it.name) } ?: stringResource(R.string.garmin_ping_test),
+                                fontSize = 12.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
                         }
 
                         OutlinedButton(

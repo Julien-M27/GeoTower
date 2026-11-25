@@ -3011,6 +3011,7 @@
     <string name="appstrings_release_v2142_summary_speedtests_ocr_max_priority_and_raw_text">Prioridade às velocidades principais sobre os picos MAX em OCR e visualização do texto OCR detetado nos detalhes</string>
     <string name="appstrings_release_v2143_summary_speedtests_ocr_dual_pass_and_decimals">Dupla passagem OCR em escala reduzida para dígitos grandes e normalização de decimais espaçados nos speedtests</string>
     <string name="appstrings_release_v2144_summary_speedtests_map_thumbnails_and_translations">Miniaturas clicáveis de speedtests no mapa, partilha e cópia OCR, e traduções completas da interface</string>
+    <string name="appstrings_release_v2146_summary_nperf_ocr_and_garmin_watch">Melhoria do OCR nPerf e seleção/ping do relógio Garmin ativo</string>
     <string name="appstrings_release_v2145_summary_default_country_and_speedtests_stats">Configuração do país predefinido (início e preferências) e cartões de estatísticas clicáveis nos Speedtests</string>
 
     <!-- Network request log -->
@@ -3321,6 +3322,12 @@
     <string name="garmin_share_all_debug_log">Partilhar todo o registo de depuração (disco)</string>
     <string name="garmin_consolidated_log_header">Registo consolidado (%1$d entradas)</string>
     <string name="garmin_no_ble_events">Nenhum evento BLE registado.\n\nInicie a pesquisa de antenas no relógio Garmin para observar as trocas.</string>
+    <string name="garmin_active_watch_label">Relógio ativo</string>
+    <string name="garmin_auto_selection">Automático</string>
+    <string name="garmin_status_connected">Ligado</string>
+    <string name="garmin_status_not_connected">Desligado</string>
+    <string name="garmin_no_watch_detected">Nenhum relógio detetado (verifique o Garmin Connect)</string>
+    <string name="garmin_ping_active_watch">Ping %1$s</string>
     <string name="profile_qr_subtitle">Perfil de preferências</string>
     <string name="profile_qr_base_version">Versão base</string>
     <string name="profile_qr_same_as_base">Idêntico à versão base</string>

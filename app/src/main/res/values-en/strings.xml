@@ -3011,6 +3011,7 @@
     <string name="appstrings_release_v2142_summary_speedtests_ocr_max_priority_and_raw_text">Prioritized main speed values over chart MAX peaks in OCR and added raw OCR text viewer in speedtest details</string>
     <string name="appstrings_release_v2143_summary_speedtests_ocr_dual_pass_and_decimals">Dual-scale OCR pass for large display digits and spaced decimal normalization in speedtests</string>
     <string name="appstrings_release_v2144_summary_speedtests_map_thumbnails_and_translations">Clickable speedtest thumbnails on the map, speedtest image sharing and OCR copy, and complete UI translations</string>
+    <string name="appstrings_release_v2146_summary_nperf_ocr_and_garmin_watch">Improved nPerf speedtest OCR parsing and active Garmin watch selection/ping</string>
     <string name="appstrings_release_v2145_summary_default_country_and_speedtests_stats">Customizable default country setting (onboarding and preferences) and clickable Speedtests statistics cards</string>
 
     <!-- Network request log -->
@@ -3321,6 +3322,12 @@
     <string name="garmin_share_all_debug_log">Share full debug log (disk)</string>
     <string name="garmin_consolidated_log_header">Consolidated log (%1$d entries)</string>
     <string name="garmin_no_ble_events">No BLE events recorded.\n\nStart antenna search on the Garmin watch to observe exchanges and requests.</string>
+    <string name="garmin_active_watch_label">Active smartwatch</string>
+    <string name="garmin_auto_selection">Automatic</string>
+    <string name="garmin_status_connected">Connected</string>
+    <string name="garmin_status_not_connected">Not connected</string>
+    <string name="garmin_no_watch_detected">No smartwatch detected (check Garmin Connect)</string>
+    <string name="garmin_ping_active_watch">Ping %1$s</string>
     <string name="profile_qr_subtitle">Preferences profile</string>
     <string name="profile_qr_base_version">Base version</string>
     <string name="profile_qr_same_as_base">Identical to base version</string>
