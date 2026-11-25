@@ -109,6 +109,7 @@ import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.ui.screens.map.MapViewModel
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.PowerProfile
+import fr.geotower.ui.components.rememberLocationFixAction
 import fr.geotower.utils.LocationReadiness
 import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.locationReadiness
@@ -144,32 +145,7 @@ fun CompassScreen(
     val locationReadinessState = rememberLocationReadinessState()
     val readiness by locationReadinessState
     val isLocationReady = readiness == LocationReadiness.Ready
-    val locationPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestMultiplePermissions()
-    ) { result ->
-        val granted = result[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
-            result[Manifest.permission.ACCESS_COARSE_LOCATION] == true
-        locationReadinessState.value = locationReadiness(context)
-        if (!granted) {
-            val canAskAgain = activity?.let {
-                ActivityCompat.shouldShowRequestPermissionRationale(it, Manifest.permission.ACCESS_FINE_LOCATION) ||
-                    ActivityCompat.shouldShowRequestPermissionRationale(it, Manifest.permission.ACCESS_COARSE_LOCATION)
-            } ?: false
-            if (!canAskAgain) openAppLocationSettings(context)
-        }
-    }
-    val onFixLocation: () -> Unit = {
-        when (readiness) {
-            LocationReadiness.PermissionMissing -> locationPermissionLauncher.launch(
-                arrayOf(
-                    Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.ACCESS_COARSE_LOCATION
-                )
-            )
-            LocationReadiness.ServicesOff -> openLocationSourceSettings(context)
-            LocationReadiness.Ready -> {}
-        }
-    }
+    val onFixLocation = rememberLocationFixAction(locationReadinessState)
     var showLocation by remember { mutableStateOf(prefs.getBoolean("show_compass_location", true)) }
     var showGps by remember { mutableStateOf(prefs.getBoolean("show_compass_gps", true)) }
     var showAccuracy by remember { mutableStateOf(prefs.getBoolean("show_compass_accuracy", true)) }

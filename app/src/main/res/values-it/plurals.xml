@@ -3,10 +3,6 @@
         <item quantity="one">%1$d foto registrata</item>
         <item quantity="other">%1$d foto registrate</item>
     </plurals>
-    <plurals name="upload_history_selected">
-        <item quantity="one">%1$d foto selezionata</item>
-        <item quantity="other">%1$d foto selezionate</item>
-    </plurals>
     <plurals name="sites_found">
         <item quantity="one">%1$d sito trovato</item>
         <item quantity="other">%1$d siti trovati</item>
@@ -22,14 +18,6 @@
     <plurals name="upload_confirm_message">
         <item quantity="one">Vuoi davvero inviare %1$d foto a Signal Quest?</item>
         <item quantity="other">Vuoi davvero inviare queste %1$d foto a Signal Quest?</item>
-    </plurals>
-    <plurals name="community_photos_title">
-        <item quantity="one">Foto della comunità da\n%1$s</item>
-        <item quantity="other">Foto della comunità da\n%1$s</item>
-    </plurals>
-    <plurals name="community_photos_title_short">
-        <item quantity="one">%1$d foto della comunità</item>
-        <item quantity="other">%1$d foto della comunità</item>
     </plurals>
     <plurals name="help_section_count">
         <item quantity="one">%1$d sezione</item>

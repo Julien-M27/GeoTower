@@ -591,11 +591,7 @@ fun FrequencyReferenceScreen(navController: NavController) {
                         FrequencyReferenceScope.FRANCE ->
                             stringResource(R.string.appstrings_frequency_reference_france_heading)
                         FrequencyReferenceScope.CANADA ->
-                            if (androidx.compose.ui.platform.LocalConfiguration.current.locales[0]?.language.equals("fr", ignoreCase = true)) {
-                                "Bandes de fréquences au Canada"
-                            } else {
-                                "Frequency bands in Canada"
-                            }
+                            stringResource(R.string.appstrings_frequency_reference_canada_heading)
                         FrequencyReferenceScope.INTERNATIONAL ->
                             stringResource(R.string.appstrings_frequency_reference_international_heading)
                     },

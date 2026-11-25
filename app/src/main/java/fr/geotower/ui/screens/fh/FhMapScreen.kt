@@ -559,7 +559,7 @@ fun FhMapScreen(
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Public,
-                                    contentDescription = "Ouvrir Carte-FH en ligne"
+                                    contentDescription = stringResource(R.string.fh_map_open_web)
                                 )
                             }
                             IconButton(
@@ -787,7 +787,7 @@ fun FhMapScreen(
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
                                     imageVector = Icons.Default.Add,
-                                    contentDescription = "Zoomer",
+                                    contentDescription = stringResource(R.string.map_zoom_in),
                                     modifier = Modifier.size(sizing.component(26.dp))
                                 )
                             }
@@ -821,7 +821,7 @@ fun FhMapScreen(
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
                                     imageVector = Icons.Default.Remove,
-                                    contentDescription = "Dézoomer",
+                                    contentDescription = stringResource(R.string.map_zoom_out),
                                     modifier = Modifier.size(sizing.component(26.dp))
                                 )
                             }
@@ -856,7 +856,7 @@ fun FhMapScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Default.MyLocation,
-                            contentDescription = "Ma position",
+                            contentDescription = stringResource(R.string.map_my_location),
                             tint = MaterialTheme.colorScheme.onPrimaryContainer,
                             modifier = Modifier.size(sizing.component(24.dp))
                         )
@@ -919,7 +919,10 @@ fun FhMapScreen(
                                     .background(Color(prepared.colorInt))
                             )
                             Text(
-                                text = "Liaison FH • ${prepared.operatorLabel}",
+                                text = stringResource(
+                                    R.string.fh_dialog_title,
+                                    if (prepared.operatorId == FhOperatorResolver.OTHER_OPERATOR_ID) stringResource(R.string.fh_map_other_operators) else prepared.operatorLabel
+                                ),
                                 style = sizing.textStyle(MaterialTheme.typography.titleSmall),
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.weight(1f)
@@ -928,12 +931,12 @@ fun FhMapScreen(
                                 onClick = { selectedLink = null },
                                 modifier = Modifier.size(28.dp)
                             ) {
-                                Icon(Icons.Default.Close, contentDescription = "Fermer")
+                                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.appstrings_close))
                             }
                         }
 
                         Text(
-                            text = "Distance : $distText  •  Azimut : $azAB° ↔ $azBA°",
+                            text = stringResource(R.string.fh_map_distance_azimuth, distText, azAB, azBA),
                             style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -1149,7 +1152,7 @@ fun FhMapScreen(
                             Spacer(modifier = Modifier.width(10.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = bucket.label,
+                                    text = if (bucket.id == FhOperatorResolver.OTHER_OPERATOR_ID) stringResource(R.string.fh_map_other_operators) else bucket.label,
                                     style = MaterialTheme.typography.bodyLarge,
                                     fontWeight = FontWeight.Medium,
                                     maxLines = 1,

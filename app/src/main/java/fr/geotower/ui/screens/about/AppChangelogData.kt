@@ -27,10 +27,16 @@ data class ChangelogMilestone(
 object AppChangelogRepository {
     val milestones: List<ChangelogMilestone> = listOf(
         ChangelogMilestone(
-            versionName = "2.1.46",
+            versionName = "2.1.47",
             releaseDate = "2026-11-25",
             isCurrent = true,
             badge = MilestoneBadge.CURRENT,
+            summary = "OCR spatial des speedtests, dialogues de permissions unifiés, ajustements Garmin et traductions complètes",
+            itemResIds = listOf(R.string.appstrings_release_v2147_summary_spatial_ocr_permissions_and_i18n)
+        ),
+        ChangelogMilestone(
+            versionName = "2.1.46",
+            releaseDate = "2026-11-25",
             summary = "Amélioration de l'OCR nPerf et sélection/ping de la montre Garmin active",
             itemResIds = listOf(R.string.appstrings_release_v2146_summary_nperf_ocr_and_garmin_watch)
         ),

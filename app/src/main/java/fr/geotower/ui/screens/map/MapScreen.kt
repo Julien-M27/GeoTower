@@ -253,6 +253,7 @@ import fr.geotower.utils.FrenchAdminAreas
 import fr.geotower.utils.FrequencyFilterSelection
 import fr.geotower.utils.MapFilterDefaults
 import fr.geotower.utils.MobileTechnologyOnly
+import fr.geotower.ui.components.rememberLocationFixAction
 import fr.geotower.utils.LocationReadiness
 import fr.geotower.utils.locationReadiness
 import fr.geotower.utils.openAppLocationSettings
@@ -1636,33 +1637,7 @@ fun MapScreen(
     val locationReadinessState = rememberLocationReadinessState()
     val readiness by locationReadinessState
     val isLocationReady = readiness == LocationReadiness.Ready
-    val locationPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestMultiplePermissions()
-    ) { result ->
-        val granted = result[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
-            result[Manifest.permission.ACCESS_COARSE_LOCATION] == true
-        locationReadinessState.value = locationReadiness(context)
-        if (!granted) {
-            val canAskAgain = activity?.let {
-                ActivityCompat.shouldShowRequestPermissionRationale(it, Manifest.permission.ACCESS_FINE_LOCATION) ||
-                    ActivityCompat.shouldShowRequestPermissionRationale(it, Manifest.permission.ACCESS_COARSE_LOCATION)
-            } ?: false
-            if (!canAskAgain) openAppLocationSettings(context)
-        }
-    }
-    // Selon la cause : demander la permission OU ouvrir les réglages de localisation (GPS).
-    val onFixLocation: () -> Unit = {
-        when (readiness) {
-            LocationReadiness.PermissionMissing -> locationPermissionLauncher.launch(
-                arrayOf(
-                    Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.ACCESS_COARSE_LOCATION
-                )
-            )
-            LocationReadiness.ServicesOff -> openLocationSourceSettings(context)
-            LocationReadiness.Ready -> {}
-        }
-    }
+    val onFixLocation = rememberLocationFixAction(locationReadinessState)
     val currentScreenRotation by androidx.compose.runtime.rememberUpdatedState(screenRotation)
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current // ✅ AJOUT
     val isUltraCompact = configuration.screenWidthDp < 300 || configuration.screenHeightDp < 350 // ✅ AJOUT
@@ -2469,7 +2444,7 @@ fun MapScreen(
         val opLabel = OperatorColors.keyFor(link.operatorLabel)
             ?.let { OperatorColors.specForKey(it)?.label }
             ?: link.operatorLabel?.takeIf { it.isNotBlank() && !it.startsWith("adm_") && !it.startsWith("op_") }
-            ?: "Opérateur inconnu"
+            ?: stringResource(R.string.common_unknown_operator)
         val currentLocale = androidx.compose.ui.platform.LocalConfiguration.current.locales[0] ?: java.util.Locale.ROOT
         val distText = if (link.distanceM >= 1000) {
             String.format(currentLocale, "%.2f km", link.distanceM / 1000.0)
@@ -8091,7 +8066,7 @@ fun MapScreen(
                             color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                         Text(
-                            text = "Touchez un site sur la carte",
+                            text = stringResource(R.string.map_comparator_tap_site),
                             fontSize = sizing.text(13.sp),
                             color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.78f)
                         )

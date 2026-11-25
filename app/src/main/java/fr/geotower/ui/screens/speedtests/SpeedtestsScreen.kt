@@ -5,8 +5,10 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
@@ -46,6 +48,7 @@ import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Settings
@@ -150,10 +153,45 @@ fun SpeedtestsScreen(
         }
     }
 
+    val activity = LocalActivity.current
+    var showMediaPermissionDialog by remember { mutableStateOf(false) }
+
     val mediaPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
-    ) {
-        imagePickerLauncher.launch("image/*")
+    ) { result ->
+        val allGranted = result.values.all { it }
+        if (allGranted) {
+            imagePickerLauncher.launch("image/*")
+        } else {
+            val canAskAgain = activity?.let { act ->
+                result.keys.any { perm ->
+                    ActivityCompat.shouldShowRequestPermissionRationale(act, perm)
+                }
+            } ?: false
+            if (!canAskAgain) {
+                showMediaPermissionDialog = true
+            } else {
+                imagePickerLauncher.launch("image/*")
+            }
+        }
+    }
+
+    if (showMediaPermissionDialog) {
+        fr.geotower.ui.components.PermissionSettingsDialog(
+            title = stringResource(R.string.permission_photos_settings_title),
+            message = stringResource(R.string.permission_photos_settings_desc),
+            icon = Icons.Default.PhotoLibrary,
+            confirmLabel = stringResource(R.string.permission_open_settings),
+            dismissLabel = stringResource(R.string.permission_continue_without),
+            onConfirm = {
+                showMediaPermissionDialog = false
+                fr.geotower.utils.openAppLocationSettings(context)
+            },
+            onDismiss = {
+                showMediaPermissionDialog = false
+                imagePickerLauncher.launch("image/*")
+            }
+        )
     }
 
     val launchImagePicker: () -> Unit = {

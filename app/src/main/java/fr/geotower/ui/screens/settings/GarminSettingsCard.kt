@@ -125,29 +125,27 @@ fun GarminSettingsCard(
         (diskGarminLines + liveLogs).distinct().takeLast(80)
     }
 
-    val subtitle = remember(isGcmInstalled, isReady, watches, activeWatch, lastSync) {
-        when {
-            !isGcmInstalled -> "Optionnel • Requis uniquement si vous utilisez une montre Garmin"
-            !isReady -> "En attente de Garmin Connect Mobile"
-            activeWatch != null -> {
-                val isConn = activeWatch?.status == com.garmin.android.connectiq.IQDevice.IQDeviceStatus.CONNECTED
-                val statusStr = if (isConn) {
-                    if (lastSync > 0) "Synchronisé en BLE" else "Connecté en BLE"
-                } else {
-                    "Non connectée"
-                }
-                "${activeWatch?.name} • $statusStr"
+    val subtitle = when {
+        !isGcmInstalled -> stringResource(R.string.garmin_sub_optional)
+        !isReady -> stringResource(R.string.garmin_sub_waiting_gcm)
+        activeWatch != null -> {
+            val isConn = activeWatch?.status == com.garmin.android.connectiq.IQDevice.IQDeviceStatus.CONNECTED
+            val statusStr = if (isConn) {
+                if (lastSync > 0) stringResource(R.string.garmin_sub_synced_ble) else stringResource(R.string.garmin_sub_connected_ble)
+            } else {
+                stringResource(R.string.garmin_status_not_connected)
             }
-            watches.isNotEmpty() -> {
-                val connectedCount = watches.count { it.status == com.garmin.android.connectiq.IQDevice.IQDeviceStatus.CONNECTED }
-                if (connectedCount > 0) {
-                    "$connectedCount montre(s) connectée(s) • En attente"
-                } else {
-                    "Montres détectées hors-ligne"
-                }
-            }
-            else -> "Service actif • En attente de connexion avec la montre"
+            "${activeWatch?.name} • $statusStr"
         }
+        watches.isNotEmpty() -> {
+            val connectedCount = watches.count { it.status == com.garmin.android.connectiq.IQDevice.IQDeviceStatus.CONNECTED }
+            if (connectedCount > 0) {
+                stringResource(R.string.garmin_sub_watches_waiting, connectedCount)
+            } else {
+                stringResource(R.string.garmin_sub_watches_offline)
+            }
+        }
+        else -> stringResource(R.string.garmin_sub_service_active)
     }
 
     Surface(
@@ -176,7 +174,7 @@ fun GarminSettingsCard(
             Spacer(Modifier.width(sizing.spacing(16.dp)))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Montres connectées Garmin (BLE)",
+                    text = stringResource(R.string.garmin_card_title),
                     style = sizing.textStyle(MaterialTheme.typography.titleMedium),
                     fontWeight = FontWeight.Bold
                 )
@@ -189,7 +187,7 @@ fun GarminSettingsCard(
             Spacer(Modifier.width(sizing.spacing(8.dp)))
             Icon(
                 Icons.Default.BugReport,
-                contentDescription = "Diagnostic BLE",
+                contentDescription = stringResource(R.string.garmin_ble_diagnostic),
                 tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
                 modifier = Modifier.size(sizing.component(20.dp))
             )
@@ -209,7 +207,7 @@ fun GarminSettingsCard(
             },
             title = {
                 Text(
-                    text = "Moniteur & Journal BLE Garmin",
+                    text = stringResource(R.string.garmin_dialog_title),
                     fontWeight = FontWeight.Bold,
                     style = MaterialTheme.typography.titleMedium
                 )
@@ -232,12 +230,15 @@ fun GarminSettingsCard(
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Text(
-                                text = "État du service BLE :",
+                                text = stringResource(R.string.garmin_ble_service_state),
                                 fontWeight = FontWeight.Bold,
                                 style = MaterialTheme.typography.labelMedium
                             )
                             Text(
-                                text = "• SDK Connect IQ : ${sdkStatusMsg ?: if (isReady) "Prêt" else "En attente"}",
+                                text = stringResource(
+                                    R.string.garmin_sdk_connect_iq,
+                                    sdkStatusMsg ?: if (isReady) stringResource(R.string.garmin_sdk_ready) else stringResource(R.string.garmin_sdk_waiting)
+                                ),
                                 style = MaterialTheme.typography.bodySmall
                             )
 
@@ -284,7 +285,7 @@ fun GarminSettingsCard(
                             // Sélecteur de montre si plusieurs montres sont connues
                             if (watches.size > 1) {
                                 Text(
-                                    text = "Choix de la montre active :",
+                                    text = stringResource(R.string.garmin_choose_active_watch),
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.SemiBold,
                                     modifier = Modifier.padding(top = 2.dp)
@@ -321,12 +322,13 @@ fun GarminSettingsCard(
                                 }
                             }
 
-                            if (lastReceivedPayload != null) {
-                                Text(
-                                    text = "• Dernier échange : $lastReceivedPayload",
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                            }
+                            Text(
+                                text = stringResource(
+                                    R.string.garmin_last_exchange,
+                                    lastReceivedPayload ?: stringResource(R.string.garmin_last_payload_none)
+                                ),
+                                style = MaterialTheme.typography.bodySmall
+                            )
                         }
                     }
 
@@ -343,30 +345,28 @@ fun GarminSettingsCard(
                         }
                     }
 
-                    val timerText = remember(isBgEnabled, selectedDuration, startTime, now) {
-                        if (isBgEnabled) {
-                            val start = if (startTime > 0L) startTime else now
-                            if (selectedDuration == 0L) {
-                                val elapsedSec = maxOf(0L, (now - start) / 1000L)
-                                val h = elapsedSec / 3600
-                                val m = (elapsedSec % 3600) / 60
-                                val s = elapsedSec % 60
-                                String.format(java.util.Locale.ROOT, "⏱️ Chrono : %02d:%02d:%02d (Illimité)", h, m, s)
-                            } else {
-                                val remainingSec = maxOf(0L, ((start + selectedDuration) - now) / 1000L)
-                                val h = remainingSec / 3600
-                                val m = (remainingSec % 3600) / 60
-                                val s = remainingSec % 60
-                                val totalHours = selectedDuration / 3600000L
-                                String.format(java.util.Locale.ROOT, "⏳ Décompte : %02d:%02d:%02d restant(s) (sur %dh)", h, m, s, totalHours)
-                            }
+                    val timerText = if (isBgEnabled) {
+                        val start = if (startTime > 0L) startTime else now
+                        if (selectedDuration == 0L) {
+                            val elapsedSec = maxOf(0L, (now - start) / 1000L)
+                            val h = elapsedSec / 3600
+                            val m = (elapsedSec % 3600) / 60
+                            val s = elapsedSec % 60
+                            stringResource(R.string.garmin_timer_chrono_unlimited, h, m, s)
                         } else {
-                            if (selectedDuration == 0L) {
-                                "⏱️ Chrono : 00:00:00 (en attente d'activation)"
-                            } else {
-                                val totalHours = selectedDuration / 3600000L
-                                String.format(java.util.Locale.ROOT, "⏳ Décompte : %02d:00:00 (démarrera à l'activation)", totalHours)
-                            }
+                            val remainingSec = maxOf(0L, ((start + selectedDuration) - now) / 1000L)
+                            val h = remainingSec / 3600
+                            val m = (remainingSec % 3600) / 60
+                            val s = remainingSec % 60
+                            val totalHours = selectedDuration / 3600000L
+                            stringResource(R.string.garmin_timer_countdown_remaining, h, m, s, totalHours)
+                        }
+                    } else {
+                        if (selectedDuration == 0L) {
+                            stringResource(R.string.garmin_timer_chrono_waiting)
+                        } else {
+                            val totalHours = selectedDuration / 3600000L
+                            stringResource(R.string.garmin_timer_countdown_waiting, totalHours)
                         }
                     }
 
@@ -383,12 +383,12 @@ fun GarminSettingsCard(
                             ) {
                                 Column(modifier = Modifier.weight(1f).padding(end = sizing.spacing(12.dp))) {
                                     Text(
-                                        text = "Liaison écran éteint",
+                                        text = stringResource(R.string.garmin_bg_link_title),
                                         style = sizing.textStyle(MaterialTheme.typography.titleSmall),
                                         fontWeight = FontWeight.SemiBold
                                     )
                                     Text(
-                                        text = "Répondre avec le téléphone dans la poche",
+                                        text = stringResource(R.string.garmin_bg_link_desc),
                                         style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -418,7 +418,7 @@ fun GarminSettingsCard(
                                         },
                                         label = {
                                             Text(
-                                                text = label,
+                                                text = if (durationMs == 0L) stringResource(R.string.garmin_notif_unlimited_sub) else label,
                                                 fontSize = sizing.text(12.sp)
                                             )
                                         }
@@ -461,7 +461,7 @@ fun GarminSettingsCard(
                                     )
                                     Spacer(Modifier.width(6.dp))
                                     Text(
-                                        text = "Plantage détecté (enregistré sur disque) :",
+                                        text = stringResource(R.string.garmin_crash_detected),
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onErrorContainer,
                                         style = MaterialTheme.typography.labelSmall
@@ -483,7 +483,7 @@ fun GarminSettingsCard(
                                 Button(
                                     onClick = {
                                         clipboardManager.setText(AnnotatedString(diskCrash))
-                                        Toast.makeText(context, "Rapport de crash copié !", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, context.getString(R.string.garmin_crash_copied), Toast.LENGTH_SHORT).show()
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                                     modifier = Modifier.fillMaxWidth()
@@ -529,8 +529,13 @@ fun GarminSettingsCard(
                         FilledTonalButton(
                             onClick = {
                                 GarminCompanionManager.pingConnectedWatches()
-                                val targetName = activeWatch?.name ?: "la montre"
-                                Toast.makeText(context, "Ping BLE envoyé à $targetName !", Toast.LENGTH_SHORT).show()
+                                val targetName = activeWatch?.name
+                                val msg = if (!targetName.isNullOrBlank()) {
+                                    context.getString(R.string.garmin_ping_sent_to, targetName)
+                                } else {
+                                    context.getString(R.string.garmin_ping_sent)
+                                }
+                                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                             },
                             modifier = Modifier.weight(1f)
                         ) {

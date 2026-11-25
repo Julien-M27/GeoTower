@@ -205,14 +205,17 @@ fun ChangesMapScreen(
                     if (loadedWeeks.isNotEmpty()) {
                         selectedWeek = loadedWeeks.first()
                     } else {
-                        errorMessage = "Aucune semaine d'historique disponible pour le moment."
+                        errorMessage = context.getString(R.string.changes_map_no_weeks)
                     }
                 } else {
-                    errorMessage = "Impossible de récupérer les semaines (erreur ${response.code()})"
+                    errorMessage = context.getString(R.string.changes_map_weeks_error, response.code())
                 }
             } catch (e: Exception) {
                 AppLogger.w("ChangesMap", "Erreur chargement semaines", e)
-                errorMessage = "Erreur de connexion au serveur : ${e.localizedMessage ?: "serveur injoignable"}"
+                errorMessage = context.getString(
+                    R.string.changes_map_connection_error,
+                    e.localizedMessage ?: context.getString(R.string.changes_map_server_unreachable)
+                )
             } finally {
                 isLoading = false
             }
@@ -231,11 +234,11 @@ fun ChangesMapScreen(
             if (response.isSuccessful && response.body() != null) {
                 allPoints = response.body()!!.points
             } else {
-                errorMessage = "Impossible de charger la carte de cette semaine (code ${response.code()})"
+                errorMessage = context.getString(R.string.changes_map_load_week_error, response.code())
             }
         } catch (e: Exception) {
             AppLogger.w("ChangesMap", "Erreur chargement points", e)
-            errorMessage = "Erreur lors du téléchargement des points : ${e.localizedMessage}"
+            errorMessage = context.getString(R.string.changes_map_download_points_error, e.localizedMessage ?: "")
         } finally {
             isLoading = false
         }
@@ -516,7 +519,7 @@ fun ChangesMapScreen(
                                 .padding(horizontal = sizing.spacing(8.dp))
                         ) {
                             Text(
-                                text = "Carte des évolutions",
+                                text = stringResource(R.string.drawer_changes_map),
                                 style = sizing.textStyle(MaterialTheme.typography.titleSmall),
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface,
@@ -525,7 +528,7 @@ fun ChangesMapScreen(
                             )
                             selectedWeek?.let { week ->
                                 Text(
-                                    text = "Semaine du ${formatDisplayDate(week.date)}",
+                                    text = stringResource(R.string.changes_map_week_of, formatDisplayDate(week.date)),
                                     style = sizing.textStyle(MaterialTheme.typography.labelSmall),
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 1,
@@ -537,7 +540,7 @@ fun ChangesMapScreen(
 
                     SmallFloatingCircleButton(
                         icon = Icons.Default.Refresh,
-                        desc = "Actualiser",
+                        desc = stringResource(R.string.common_refresh),
                         size = 44.dp,
                         onClick = {
                             refreshTrigger++
@@ -554,7 +557,7 @@ fun ChangesMapScreen(
                 ) {
                     SmallFloatingCircleButton(
                         icon = Icons.Default.Public,
-                        desc = "Ouvrir fraetech.github.io",
+                        desc = stringResource(R.string.changes_map_open_site),
                         size = 44.dp,
                         onClick = { uriHandler.openUri("https://fraetech.github.io/") }
                     )
@@ -594,7 +597,7 @@ fun ChangesMapScreen(
                             if (isFiltered) {
                                 Icon(
                                     imageVector = Icons.Default.Close,
-                                    contentDescription = "Réinitialiser",
+                                    contentDescription = stringResource(R.string.changes_filter_reset),
                                     modifier = Modifier.size(sizing.component(14.dp)),
                                     tint = MaterialTheme.colorScheme.primary
                                 )
@@ -602,11 +605,11 @@ fun ChangesMapScreen(
                             }
                             val countText = if (!isFiltered) {
                                 val tot = allPoints.size
-                                if (tot > 1) "$tot changements" else "$tot changement"
+                                if (tot > 1) stringResource(R.string.changes_map_count_plural, tot) else stringResource(R.string.changes_map_count_singular, tot)
                             } else {
                                 val f = filteredPoints.size
                                 val tot = allPoints.size
-                                "$f / $tot changements"
+                                stringResource(R.string.changes_map_count_filtered, f, tot)
                             }
                             Text(
                                 text = countText,
@@ -622,7 +625,7 @@ fun ChangesMapScreen(
                     Box {
                         SmallFloatingCircleButton(
                             icon = Icons.Default.CalendarMonth,
-                            desc = "Choisir la semaine",
+                            desc = stringResource(R.string.changes_map_choose_week),
                             size = 44.dp,
                             onClick = { showWeekMenu = true }
                         )
@@ -636,12 +639,12 @@ fun ChangesMapScreen(
                                     text = {
                                         Column {
                                             Text(
-                                                text = "Semaine du ${formatDisplayDate(week.date)}",
+                                                text = stringResource(R.string.changes_map_week_of, formatDisplayDate(week.date)),
                                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                                                 color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                                             )
                                             val ptsCount = week.pointsCount
-                                            val ptsCountLabel = if (ptsCount > 1) "$ptsCount supports concernés" else "$ptsCount support concerné"
+                                            val ptsCountLabel = if (ptsCount > 1) stringResource(R.string.changes_map_supports_plural, ptsCount) else stringResource(R.string.changes_map_supports_singular, ptsCount)
                                             Text(
                                                 text = ptsCountLabel,
                                                 fontSize = 11.sp,
@@ -721,7 +724,7 @@ fun ChangesMapScreen(
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
                                     imageVector = Icons.Default.Add,
-                                    contentDescription = "Zoomer",
+                                    contentDescription = stringResource(R.string.map_zoom_in),
                                     modifier = Modifier.size(sizing.component(26.dp))
                                 )
                             }
@@ -755,7 +758,7 @@ fun ChangesMapScreen(
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
                                     imageVector = Icons.Default.Remove,
-                                    contentDescription = "Dézoomer",
+                                    contentDescription = stringResource(R.string.map_zoom_out),
                                     modifier = Modifier.size(sizing.component(26.dp))
                                 )
                             }
@@ -792,7 +795,7 @@ fun ChangesMapScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Default.MyLocation,
-                            contentDescription = "Ma position",
+                            contentDescription = stringResource(R.string.map_my_location),
                             tint = MaterialTheme.colorScheme.onPrimaryContainer,
                             modifier = Modifier.size(sizing.component(24.dp))
                         )
@@ -870,7 +873,7 @@ fun ChangesMapScreen(
                     ) {
                         CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.5.dp)
                         Spacer(modifier = Modifier.width(14.dp))
-                        Text(text = "Chargement des changements...", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                        Text(text = stringResource(R.string.changes_map_loading), fontSize = 13.sp, fontWeight = FontWeight.Medium)
                     }
                 }
             }
@@ -1051,12 +1054,12 @@ fun ChangesMapEntryCard(
             Spacer(modifier = Modifier.width(sizing.spacing(12.dp)))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Carte des évolutions",
+                    text = stringResource(R.string.drawer_changes_map),
                     style = sizing.textStyle(MaterialTheme.typography.titleSmall),
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
-                    text = "Historique cartographié des activations et démantèlements",
+                    text = stringResource(R.string.changes_map_subtitle),
                     style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

@@ -1445,7 +1445,7 @@ fun SectionVersions(
                 } else {
                     "-"
                 }
-                add("Données mensuelles (Canada)" to caSourceFormatted)
+                add(stringResource(R.string.db_source_monthly_canada) to caSourceFormatted)
                 add("${stringResource(R.string.appstrings_version_quarterly_label).replace("\n", " ")} (France)" to LocalizedDateLabels.formatQuarterlyVersion(context, quarterlyVersion))
                 add("$hsLabel (France)" to hsValue)
             }
@@ -1633,7 +1633,7 @@ private fun LiveDatabaseVersionsCard(
                         )
                     }
                     add(
-                        (if (isCanada) "Données mensuelles (Canada)" else stringResource(R.string.appstrings_version_monthly_label)) to
+                        (if (isCanada) stringResource(R.string.db_source_monthly_canada) else stringResource(R.string.appstrings_version_monthly_label)) to
                             LocalizedDateLabels.formatMonthlyVersion(
                                 context,
                                 dataset.zipVersion?.takeIf { it.isNotBlank() } ?: "-"

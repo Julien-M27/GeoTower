@@ -1297,7 +1297,7 @@ private fun ShareProfileQrDialog(
                     TextButton(
                         onClick = {
                             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                            val clip = android.content.ClipData.newPlainText("Profil GeoTower", deepLink)
+                            val clip = android.content.ClipData.newPlainText(context.getString(R.string.preference_profile_clipboard_label), deepLink)
                             clipboard.setPrimaryClip(clip)
                             Toast.makeText(context, R.string.preference_profiles_link_copied, Toast.LENGTH_SHORT).show()
                         }

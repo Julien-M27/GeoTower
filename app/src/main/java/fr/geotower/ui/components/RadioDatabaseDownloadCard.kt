@@ -320,7 +320,7 @@ fun RadioDatabaseDownloadCard(
                 val radioButtonLabel = when {
                     locallyGenerated -> stringResource(R.string.database_replace_generated_radio_with_online)
                     showAsUpToDate -> stringResource(R.string.database_up_to_date)
-                    else -> "Télécharger les radios"
+                    else -> stringResource(R.string.database_download_radios)
                 }
 
                 if (fr.geotower.utils.AppConfig.dbForcedLocal()) {

@@ -282,32 +282,32 @@ private fun ApiServersDatabaseVersionsTable(
                 categoryTitle = stringResource(R.string.appstrings_version_table_category_versions),
                 rows = listOf(
                     TableRowData(
-                        label = "Base mobile (France)",
+                        label = stringResource(R.string.db_version_mobile_france),
                         primaryValue = formatVersion(primaryVersions.mobileDbVersion, primaryVersions.unreachable, primaryVersions.isLoading),
                         mirrorValue = formatVersion(mirrorVersions.mobileDbVersion, mirrorVersions.unreachable, mirrorVersions.isLoading)
                     ),
                     TableRowData(
-                        label = "Base mobile (Canada)",
+                        label = stringResource(R.string.db_version_mobile_canada),
                         primaryValue = formatVersion(primaryVersions.caDbVersion, primaryVersions.unreachable, primaryVersions.isLoading),
                         mirrorValue = formatVersion(mirrorVersions.caDbVersion, mirrorVersions.unreachable, mirrorVersions.isLoading)
                     ),
                     TableRowData(
-                        label = "Base radio (France)",
+                        label = stringResource(R.string.db_version_radio_france),
                         primaryValue = formatVersion(primaryVersions.radioDbVersion, primaryVersions.unreachable, primaryVersions.isLoading),
                         mirrorValue = formatVersion(mirrorVersions.radioDbVersion, mirrorVersions.unreachable, mirrorVersions.isLoading)
                     ),
                     TableRowData(
-                        label = "Base eNB (France)",
+                        label = stringResource(R.string.db_version_enb_france),
                         primaryValue = formatVersion(primaryVersions.enbDbVersion, primaryVersions.unreachable, primaryVersions.isLoading),
                         mirrorValue = formatVersion(mirrorVersions.enbDbVersion, mirrorVersions.unreachable, mirrorVersions.isLoading)
                     ),
                     TableRowData(
-                        label = "Base en ligne (France)",
+                        label = stringResource(R.string.db_version_live_france),
                         primaryValue = formatVersion(primaryVersions.liveDbVersion, primaryVersions.unreachable, primaryVersions.isLoading),
                         mirrorValue = formatVersion(mirrorVersions.liveDbVersion, mirrorVersions.unreachable, mirrorVersions.isLoading)
                     ),
                     TableRowData(
-                        label = "Base en ligne (Canada)",
+                        label = stringResource(R.string.db_version_live_canada),
                         primaryValue = formatVersion(primaryVersions.caLiveDbVersion, primaryVersions.unreachable, primaryVersions.isLoading),
                         mirrorValue = formatVersion(mirrorVersions.caLiveDbVersion, mirrorVersions.unreachable, mirrorVersions.isLoading)
                     )
@@ -321,22 +321,22 @@ private fun ApiServersDatabaseVersionsTable(
                 categoryTitle = stringResource(R.string.appstrings_version_table_category_sources),
                 rows = listOf(
                     TableRowData(
-                        label = "Données hebdomadaires (France)",
+                        label = stringResource(R.string.db_source_weekly_france),
                         primaryValue = formatDate(primaryVersions.anfrWeeklyDate, primaryVersions.unreachable, primaryVersions.isLoading),
                         mirrorValue = formatDate(mirrorVersions.anfrWeeklyDate, mirrorVersions.unreachable, mirrorVersions.isLoading)
                     ),
                     TableRowData(
-                        label = "Données mensuelles (France)",
+                        label = stringResource(R.string.db_source_monthly_france),
                         primaryValue = formatMonthly(primaryVersions.anfrMonthlyVersion, primaryVersions.unreachable, primaryVersions.isLoading),
                         mirrorValue = formatMonthly(mirrorVersions.anfrMonthlyVersion, mirrorVersions.unreachable, mirrorVersions.isLoading)
                     ),
                     TableRowData(
-                        label = "Données mensuelles (Canada)",
+                        label = stringResource(R.string.db_source_monthly_canada),
                         primaryValue = formatMonthly(primaryVersions.caSourceZip ?: primaryVersions.caSourceDate, primaryVersions.unreachable, primaryVersions.isLoading),
                         mirrorValue = formatMonthly(mirrorVersions.caSourceZip ?: mirrorVersions.caSourceDate, mirrorVersions.unreachable, mirrorVersions.isLoading)
                     ),
                     TableRowData(
-                        label = "Données trimestrielles (France)",
+                        label = stringResource(R.string.db_source_quarterly_france),
                         primaryValue = formatQuarterly(primaryVersions.arcepQuarterlyVersion, primaryVersions.unreachable, primaryVersions.isLoading),
                         mirrorValue = formatQuarterly(mirrorVersions.arcepQuarterlyVersion, mirrorVersions.unreachable, mirrorVersions.isLoading)
                     )
@@ -350,22 +350,22 @@ private fun ApiServersDatabaseVersionsTable(
                 categoryTitle = stringResource(R.string.appstrings_version_table_category_sizes),
                 rows = listOf(
                     TableRowData(
-                        label = "Base mobile (France)",
+                        label = stringResource(R.string.db_version_mobile_france),
                         primaryValue = formatSize(primaryVersions.mobileSizeBytes, primaryVersions.unreachable, primaryVersions.isLoading),
                         mirrorValue = formatSize(mirrorVersions.mobileSizeBytes, mirrorVersions.unreachable, mirrorVersions.isLoading)
                     ),
                     TableRowData(
-                        label = "Base mobile (Canada)",
+                        label = stringResource(R.string.db_version_mobile_canada),
                         primaryValue = formatSize(primaryVersions.caSizeBytes, primaryVersions.unreachable, primaryVersions.isLoading),
                         mirrorValue = formatSize(mirrorVersions.caSizeBytes, mirrorVersions.unreachable, mirrorVersions.isLoading)
                     ),
                     TableRowData(
-                        label = "Base radio (France)",
+                        label = stringResource(R.string.db_version_radio_france),
                         primaryValue = formatSize(primaryVersions.radioSizeBytes, primaryVersions.unreachable, primaryVersions.isLoading),
                         mirrorValue = formatSize(mirrorVersions.radioSizeBytes, mirrorVersions.unreachable, mirrorVersions.isLoading)
                     ),
                     TableRowData(
-                        label = "Base eNB (France)",
+                        label = stringResource(R.string.db_version_enb_france),
                         primaryValue = formatSize(primaryVersions.enbSizeBytes, primaryVersions.unreachable, primaryVersions.isLoading),
                         mirrorValue = formatSize(mirrorVersions.enbSizeBytes, mirrorVersions.unreachable, mirrorVersions.isLoading)
                     )

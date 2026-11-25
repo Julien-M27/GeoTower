@@ -143,34 +143,8 @@ fun HomeStatusBanners(
     // 1. Détection de la disponibilité de la localisation
     val locationReadinessState = rememberLocationReadinessState()
     val readiness by locationReadinessState
-    val locationPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestMultiplePermissions()
-    ) { result ->
-        val granted = result[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
-            result[Manifest.permission.ACCESS_COARSE_LOCATION] == true
-        locationReadinessState.value = locationReadiness(context)
-        if (!granted) {
-            val canAskAgain = activity?.let {
-                ActivityCompat.shouldShowRequestPermissionRationale(it, Manifest.permission.ACCESS_FINE_LOCATION) ||
-                    ActivityCompat.shouldShowRequestPermissionRationale(it, Manifest.permission.ACCESS_COARSE_LOCATION)
-            } ?: false
-            if (!canAskAgain) openAppLocationSettings(context)
-        }
-    }
-    val onFixLocation: () -> Unit = {
-        safeClick {
-            when (readiness) {
-                LocationReadiness.PermissionMissing -> locationPermissionLauncher.launch(
-                    arrayOf(
-                        Manifest.permission.ACCESS_FINE_LOCATION,
-                        Manifest.permission.ACCESS_COARSE_LOCATION
-                    )
-                )
-                LocationReadiness.ServicesOff -> openLocationSourceSettings(context)
-                LocationReadiness.Ready -> {}
-            }
-        }
-    }
+    val rawFixLocation = rememberLocationFixAction(locationReadinessState)
+    val onFixLocation: () -> Unit = { safeClick { rawFixLocation() } }
 
     // 2. Annonce distante
     val featureFlags by RemoteFeatureFlags.config

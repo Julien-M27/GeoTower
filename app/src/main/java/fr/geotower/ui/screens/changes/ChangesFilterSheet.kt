@@ -115,14 +115,17 @@ fun ChangesFilterSheet(
                     .verticalScroll(rememberScrollState())
                     .padding(bottom = sizing.spacing(16.dp))
             ) {
+                val selectAllLabel = stringResource(R.string.changes_filter_select_all)
+                val deselectAllLabel = stringResource(R.string.changes_filter_deselect_all)
+
                 // 1. TECHNOLOGIES
                 val allTechCodes = ChangesFilterState.ALL_TECHS.map { it.first }.toSet()
                 val allTechsSelected = filter.techs.containsAll(allTechCodes)
                 FilterSectionHeader(
-                    title = "Technologies",
+                    title = stringResource(R.string.changes_filter_section_techs),
                     isExpanded = techExpanded,
                     onToggleExpand = { techExpanded = !techExpanded },
-                    actionLabel = if (allTechsSelected) "Tout décocher" else "Tout cocher",
+                    actionLabel = if (allTechsSelected) deselectAllLabel else selectAllLabel,
                     onAction = {
                         filter = filter.copy(techs = if (allTechsSelected) emptySet() else allTechCodes)
                     }
@@ -152,10 +155,10 @@ fun ChangesFilterSheet(
                 val allFreqCodes = ChangesFilterState.ALL_FREQS.map { it.first }.toSet()
                 val allFreqsSelected = filter.freqs.containsAll(allFreqCodes)
                 FilterSectionHeader(
-                    title = "Fréquences",
+                    title = stringResource(R.string.changes_filter_section_freqs),
                     isExpanded = freqExpanded,
                     onToggleExpand = { freqExpanded = !freqExpanded },
-                    actionLabel = if (allFreqsSelected) "Tout décocher" else "Tout cocher",
+                    actionLabel = if (allFreqsSelected) deselectAllLabel else selectAllLabel,
                     onAction = {
                         filter = filter.copy(freqs = if (allFreqsSelected) emptySet() else allFreqCodes)
                     }
@@ -185,10 +188,10 @@ fun ChangesFilterSheet(
                 val allOps = ChangesFilterState.defaultAllOperators()
                 val allOpsSelected = filter.operators.containsAll(allOps)
                 FilterSectionHeader(
-                    title = "Opérateurs",
+                    title = stringResource(R.string.changes_filter_section_operators),
                     isExpanded = opExpanded,
                     onToggleExpand = { opExpanded = !opExpanded },
-                    actionLabel = if (allOpsSelected) "Tout décocher" else "Tout cocher",
+                    actionLabel = if (allOpsSelected) deselectAllLabel else selectAllLabel,
                     onAction = {
                         filter = filter.copy(operators = if (allOpsSelected) emptySet() else allOps)
                     }
@@ -203,10 +206,10 @@ fun ChangesFilterSheet(
                         val metroKeys = ChangesFilterState.METRO_OP_KEYS.map { it.first }.toSet()
                         val allMetroSelected = filter.operators.containsAll(metroKeys)
                         FilterSubSectionHeader(
-                            title = "France Métropolitaine",
+                            title = stringResource(R.string.changes_filter_section_metro),
                             isExpanded = metroExpanded,
                             onToggleExpand = { metroExpanded = !metroExpanded },
-                            actionLabel = if (allMetroSelected) "Tout décocher" else "Tout cocher",
+                            actionLabel = if (allMetroSelected) deselectAllLabel else selectAllLabel,
                             onAction = {
                                 filter = filter.copy(
                                     operators = if (allMetroSelected) filter.operators - metroKeys else filter.operators + metroKeys
@@ -241,10 +244,10 @@ fun ChangesFilterSheet(
                         val dromKeys = ChangesFilterState.DROM_OP_KEYS.map { it.first }.toSet()
                         val allDromSelected = filter.operators.containsAll(dromKeys)
                         FilterSubSectionHeader(
-                            title = "DROM/COM",
+                            title = stringResource(R.string.changes_filter_section_drom),
                             isExpanded = dromExpanded,
                             onToggleExpand = { dromExpanded = !dromExpanded },
-                            actionLabel = if (allDromSelected) "Tout décocher" else "Tout cocher",
+                            actionLabel = if (allDromSelected) deselectAllLabel else selectAllLabel,
                             onAction = {
                                 filter = filter.copy(
                                     operators = if (allDromSelected) filter.operators - dromKeys else filter.operators + dromKeys
@@ -281,10 +284,10 @@ fun ChangesFilterSheet(
                 val allActions = ChangeActionType.values().toSet()
                 val allActionsSelected = filter.actions.containsAll(allActions)
                 FilterSectionHeader(
-                    title = "Actions",
+                    title = stringResource(R.string.changes_filter_section_actions),
                     isExpanded = actionsExpanded,
                     onToggleExpand = { actionsExpanded = !actionsExpanded },
-                    actionLabel = if (allActionsSelected) "Tout décocher" else "Tout cocher",
+                    actionLabel = if (allActionsSelected) deselectAllLabel else selectAllLabel,
                     onAction = {
                         filter = filter.copy(actions = if (allActionsSelected) emptySet() else allActions)
                     }
@@ -307,7 +310,7 @@ fun ChangesFilterSheet(
                                 else -> Pair(null, null)
                             }
                             FilterCheckboxRow(
-                                label = action.label,
+                                label = stringResource(action.labelRes),
                                 checked = checked,
                                 iconRes = iconRes,
                                 iconTint = iconTint,
@@ -323,7 +326,7 @@ fun ChangesFilterSheet(
 
                 // 5. SITES NEUFS / EXISTANTS
                 FilterSectionHeader(
-                    title = "Sites Neufs",
+                    title = stringResource(R.string.changes_filter_section_new_sites),
                     isExpanded = siteTypeExpanded,
                     onToggleExpand = { siteTypeExpanded = !siteTypeExpanded },
                     actionLabel = null,
@@ -338,7 +341,7 @@ fun ChangesFilterSheet(
                         SiteTypeOption.values().forEach { option ->
                             val selected = filter.siteType == option
                             FilterRadioRow(
-                                label = option.label,
+                                label = stringResource(option.labelRes),
                                 selected = selected,
                                 onSelect = { filter = filter.copy(siteType = option) }
                             )
@@ -420,7 +423,7 @@ private fun FilterSectionHeader(
             ) {
                 Icon(
                     imageVector = Icons.Default.KeyboardArrowDown,
-                    contentDescription = if (isExpanded) "Replier" else "Déplier",
+                    contentDescription = if (isExpanded) stringResource(R.string.changes_filter_collapse) else stringResource(R.string.changes_filter_expand),
                     modifier = Modifier
                         .size(sizing.component(20.dp))
                         .rotate(rotation),
@@ -478,7 +481,7 @@ private fun FilterSubSectionHeader(
             ) {
                 Icon(
                     imageVector = Icons.Default.KeyboardArrowDown,
-                    contentDescription = if (isExpanded) "Replier" else "Déplier",
+                    contentDescription = if (isExpanded) stringResource(R.string.changes_filter_collapse) else stringResource(R.string.changes_filter_expand),
                     modifier = Modifier
                         .size(sizing.component(18.dp))
                         .rotate(rotation),

@@ -71,7 +71,7 @@ object GarminCompanionManager {
     private val _lastError = MutableStateFlow<String?>(null)
     val lastError: StateFlow<String?> = _lastError.asStateFlow()
 
-    private val _lastReceivedPayload = MutableStateFlow<String?>("Aucun message reçu")
+    private val _lastReceivedPayload = MutableStateFlow<String?>(null)
     val lastReceivedPayload: StateFlow<String?> = _lastReceivedPayload.asStateFlow()
 
     fun log(tag: String, msg: String, tr: Throwable? = null) {
@@ -124,7 +124,7 @@ object GarminCompanionManager {
     private val _lastSyncTimestamp = MutableStateFlow(0L)
     val lastSyncTimestamp: StateFlow<Long> = _lastSyncTimestamp.asStateFlow()
 
-    private val _lastStatusMessage = MutableStateFlow<String?>("Non initialisé")
+    private val _lastStatusMessage = MutableStateFlow<String?>(null)
     val lastStatusMessage: StateFlow<String?> = _lastStatusMessage.asStateFlow()
 
     const val PREF_GARMIN_BACKGROUND_SERVICE = "garmin_background_service_enabled"
@@ -237,7 +237,7 @@ object GarminCompanionManager {
         appContext = appCtx
         if (!isGarminConnectInstalled(appCtx)) {
             _isSdkReady.value = false
-            _lastStatusMessage.value = "Garmin Connect non installé"
+            _lastStatusMessage.value = appCtx.getString(fr.geotower.R.string.garmin_status_gcm_not_installed)
             log("GarminBridge", "Garmin Connect Mobile non détecté sur le téléphone")
             return
         }
@@ -280,7 +280,7 @@ object GarminCompanionManager {
             ciq.initialize(appCtx, false, object : ConnectIQListener {
                 override fun onSdkReady() {
                     _isSdkReady.value = true
-                    _lastStatusMessage.value = "Prêt (Garmin Connect actif)"
+                    _lastStatusMessage.value = appCtx.getString(fr.geotower.R.string.garmin_status_ready_gcm)
                     log("GarminBridge", "SDK Connect IQ prêt et opérationnel")
 
                     registerWithConnectedDevices()
@@ -288,13 +288,13 @@ object GarminCompanionManager {
 
                 override fun onInitializeError(errStatus: IQSdkErrorStatus) {
                     _isSdkReady.value = false
-                    _lastStatusMessage.value = "Erreur initialisation: $errStatus"
+                    _lastStatusMessage.value = "Error: $errStatus"
                     log("GarminBridge", "Erreur initialisation SDK: $errStatus")
                 }
 
                 override fun onSdkShutDown() {
                     _isSdkReady.value = false
-                    _lastStatusMessage.value = "SDK arrêté"
+                    _lastStatusMessage.value = appCtx.getString(fr.geotower.R.string.garmin_status_sdk_stopped)
                     _connectedWatches.value = emptyList()
                     _activeWatch.value = null
                     log("GarminBridge", "SDK Connect IQ arrêté")

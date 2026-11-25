@@ -631,4 +631,123 @@ class SpeedtestOcrParserTest {
         assertNull(parsed.operatorName)
         assertNull(parsed.networkTech)
     }
+
+    @Test
+    fun parseSpatialNperfBoxesWithScrambledReadingOrder() {
+        val boxes = listOf(
+            // Barre d'état en haut (bruit)
+            OcrBoxLine("12:57", 0.05f, 0.01f, 0.15f, 0.025f),
+            OcrBoxLine("46%", 0.85f, 0.01f, 0.95f, 0.025f),
+            // En-tête et jauge au-dessus des colonnes
+            OcrBoxLine("nPerf", 0.40f, 0.04f, 0.60f, 0.07f),
+            OcrBoxLine("20", 0.10f, 0.25f, 0.18f, 0.28f),
+            OcrBoxLine("100", 0.80f, 0.35f, 0.90f, 0.38f),
+            OcrBoxLine("Auto: [FR] Lucé - 1 Gb/s - CCIN", 0.15f, 0.50f, 0.85f, 0.53f),
+            // 3 colonnes en ordre de lecture mélangé
+            OcrBoxLine("Réception", 0.08f, 0.58f, 0.28f, 0.61f),
+            OcrBoxLine("Max: 709.04 Mb/s", 0.05f, 0.62f, 0.32f, 0.65f),
+            OcrBoxLine("Envoi", 0.42f, 0.58f, 0.58f, 0.61f),
+            OcrBoxLine("Max: 103.70 Mb/s", 0.38f, 0.62f, 0.65f, 0.65f),
+            OcrBoxLine("Latence", 0.72f, 0.58f, 0.92f, 0.61f),
+            OcrBoxLine("Min: 22 ms", 0.72f, 0.62f, 0.92f, 0.65f),
+            OcrBoxLine("Moy: 25 ms / Gig: 8 ms", 0.68f, 0.66f, 0.95f, 0.69f),
+            // Ligne Connexion / Opérateur / Réseau dans le désordre
+            OcrBoxLine("SFR", 0.75f, 0.82f, 0.90f, 0.85f),
+            OcrBoxLine("Réseau", 0.75f, 0.77f, 0.90f, 0.80f),
+            OcrBoxLine("Opérateur", 0.40f, 0.77f, 0.60f, 0.80f),
+            OcrBoxLine("Lebara", 0.40f, 0.82f, 0.60f, 0.85f),
+            OcrBoxLine("Connexion", 0.08f, 0.77f, 0.28f, 0.80f),
+            OcrBoxLine("5G (NSA)", 0.08f, 0.82f, 0.28f, 0.85f)
+        )
+
+        val rawText = boxes.joinToString("\n") { it.text }
+        val parsed = SpeedtestOcrParser.parse(rawText, boxes)
+        assertEquals(709.04, parsed.downloadMbps ?: -1.0, 0.01)
+        assertEquals(103.70, parsed.uploadMbps ?: -1.0, 0.01)
+        assertEquals(22.0, parsed.pingMs ?: -1.0, 0.01)
+        assertEquals(8.0, parsed.jitterMs ?: -1.0, 0.01)
+        assertEquals("Lebara", parsed.operatorName)
+        assertEquals("SFR", parsed.networkName)
+        assertEquals("5G NSA", parsed.networkTech)
+    }
+
+    @Test
+    fun parseNperfWebAndCellularFrUppercaseNrBand() {
+        val nperfWeb = """
+            nPerf
+            [FR] Anycast-FR - 100 Gb/s - Free
+            35.69 Mb/s
+            Moyenne 33.33 Mb/s
+            30.54 Mb/s
+            Moyenne 28.56 Mb/s
+            14.30 ms
+            Moyenne 24.04 ms
+            Opérateur :
+            Free
+        """.trimIndent()
+        val parsedWeb = SpeedtestOcrParser.parse(nperfWeb)
+        assertEquals(35.69, parsedWeb.downloadMbps ?: -1.0, 0.01)
+        assertEquals(30.54, parsedWeb.uploadMbps ?: -1.0, 0.01)
+        assertEquals(14.30, parsedWeb.pingMs ?: -1.0, 0.01)
+        assertEquals("Free", parsedWeb.operatorName)
+
+        val cellularN77 = """
+            Speedtest
+            Orange France
+            DOWNLOAD
+            904
+            Mbps
+            UPLOAD
+            77
+            Mbps
+            19 ms
+            PING
+            Tech: 5G NSA
+            eNB: 55562
+            Bandes: B3 + N77
+        """.trimIndent()
+        val parsedCellular = SpeedtestOcrParser.parse(cellularN77)
+        assertEquals(904.0, parsedCellular.downloadMbps ?: -1.0, 0.01)
+        assertEquals(77.0, parsedCellular.uploadMbps ?: -1.0, 0.01)
+        assertEquals(19.0, parsedCellular.pingMs ?: -1.0, 0.01)
+        assertEquals("B3+n77", parsedCellular.band)
+        assertEquals("55562", parsedCellular.cellIdentifier)
+    }
+
+    @Test
+    fun parseSpatialNperfShareCardAndOoklaBoxes() {
+        val nperfShareBoxes = listOf(
+            OcrBoxLine("nPerf Android 2.15.25", 0.70f, 0.04f, 0.95f, 0.08f),
+            OcrBoxLine("Download", 0.05f, 0.36f, 0.20f, 0.42f),
+            OcrBoxLine("1.61", 0.05f, 0.46f, 0.16f, 0.55f),
+            OcrBoxLine("Gb/s", 0.17f, 0.49f, 0.24f, 0.54f),
+            OcrBoxLine("Average: 1.35 Gb/s", 0.05f, 0.62f, 0.28f, 0.66f),
+            OcrBoxLine("Upload", 0.38f, 0.36f, 0.52f, 0.42f),
+            OcrBoxLine("184.52", 0.38f, 0.46f, 0.52f, 0.55f),
+            OcrBoxLine("Mb/s", 0.53f, 0.49f, 0.60f, 0.54f),
+            OcrBoxLine("Average: 176.08 Mb/s", 0.38f, 0.62f, 0.62f, 0.66f),
+            OcrBoxLine("Latency", 0.70f, 0.36f, 0.85f, 0.42f),
+            OcrBoxLine("24.00 ms", 0.70f, 0.46f, 0.85f, 0.55f),
+            OcrBoxLine("Jitter: 15.00 ms", 0.70f, 0.65f, 0.92f, 0.70f)
+        )
+        val parsedNperfShare = SpeedtestOcrParser.parse(nperfShareBoxes.joinToString("\n") { it.text }, nperfShareBoxes)
+        assertEquals(1610.0, parsedNperfShare.downloadMbps ?: -1.0, 0.1)
+        assertEquals(184.52, parsedNperfShare.uploadMbps ?: -1.0, 0.01)
+        assertEquals(24.0, parsedNperfShare.pingMs ?: -1.0, 0.01)
+        assertEquals(15.0, parsedNperfShare.jitterMs ?: -1.0, 0.01)
+
+        val ooklaBoxes = listOf(
+            OcrBoxLine("SPEEDTEST", 0.38f, 0.05f, 0.62f, 0.08f),
+            OcrBoxLine("DESCENDANT Mbps", 0.15f, 0.09f, 0.45f, 0.12f),
+            OcrBoxLine("ASCENDANT Mbps", 0.55f, 0.09f, 0.85f, 0.12f),
+            OcrBoxLine("1,39", 0.18f, 0.13f, 0.35f, 0.18f),
+            OcrBoxLine("0,09", 0.58f, 0.13f, 0.75f, 0.18f),
+            OcrBoxLine("Ping ms 381 Gigue ms 386", 0.10f, 0.20f, 0.90f, 0.23f)
+        )
+        val parsedOokla = SpeedtestOcrParser.parse(ooklaBoxes.joinToString("\n") { it.text }, ooklaBoxes)
+        assertEquals(1.39, parsedOokla.downloadMbps ?: -1.0, 0.01)
+        assertEquals(0.09, parsedOokla.uploadMbps ?: -1.0, 0.01)
+        assertEquals(381.0, parsedOokla.pingMs ?: -1.0, 0.01)
+        assertEquals(386.0, parsedOokla.jitterMs ?: -1.0, 0.01)
+    }
 }

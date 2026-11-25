@@ -142,10 +142,10 @@ class GarminCompanionService : Service() {
 
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "Liaison montre Garmin",
+                getString(fr.geotower.R.string.garmin_notif_title),
                 NotificationManager.IMPORTANCE_DEFAULT
             ).apply {
-                description = "Maintient la liaison Bluetooth avec la montre Garmin lorsque l'écran est éteint."
+                description = getString(fr.geotower.R.string.garmin_notif_channel_desc)
                 setSound(null, null)
                 setShowBadge(false)
                 enableVibration(false)

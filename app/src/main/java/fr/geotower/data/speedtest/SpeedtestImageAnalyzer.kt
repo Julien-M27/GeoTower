@@ -3,6 +3,10 @@ package fr.geotower.data.speedtest
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.ColorMatrix
+import android.graphics.ColorMatrixColorFilter
+import android.graphics.Paint
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
@@ -127,10 +131,12 @@ object SpeedtestImageAnalyzer {
                     } else {
                         InputImage.fromFilePath(context.applicationContext, imageFile.toUri())
                     }
-                    val firstText = recognizer.process(inputImage).await().text
+                    val firstResult = recognizer.process(inputImage).await()
+                    val firstText = firstResult.text
+                    val firstBoxes = extractBoxedLines(firstResult, inputImage, rotationDegrees)
                     rawOcrText = firstText.takeIf { it.isNotBlank() }
-                    if (rawOcrText != null) {
-                        parsed = SpeedtestOcrParser.parse(rawOcrText!!)
+                    if (firstText.isNotBlank()) {
+                        parsed = SpeedtestOcrParser.parse(firstText, firstBoxes)
                     }
 
                     // Seconde passe à échelle réduite (0.5x) si des débits manquent :
@@ -146,23 +152,42 @@ object SpeedtestImageAnalyzer {
                             bitmap.height / 2,
                             true
                         )
-                        val secondText = recognizer.process(InputImage.fromBitmap(scaled, rotationDegrees))
-                            .await().text
-                        if (secondText.isNotBlank()) {
-                            val secondParsed = SpeedtestOcrParser.parse(secondText)
-                            parsed = ParsedSpeedtestData(
-                                downloadMbps = parsed.downloadMbps ?: secondParsed.downloadMbps,
-                                uploadMbps = parsed.uploadMbps ?: secondParsed.uploadMbps,
-                                pingMs = parsed.pingMs ?: secondParsed.pingMs,
-                                jitterMs = parsed.jitterMs ?: secondParsed.jitterMs,
-                                operatorName = parsed.operatorName ?: secondParsed.operatorName,
-                                networkTech = parsed.networkTech ?: secondParsed.networkTech,
-                                band = parsed.band ?: secondParsed.band,
-                                cellIdentifier = parsed.cellIdentifier ?: secondParsed.cellIdentifier
-                            )
-                            if (rawOcrText == null) {
-                                rawOcrText = secondText
+                        try {
+                            val scaledInput = InputImage.fromBitmap(scaled, rotationDegrees)
+                            val secondResult = recognizer.process(scaledInput).await()
+                            val secondText = secondResult.text
+                            if (secondText.isNotBlank()) {
+                                val secondBoxes = extractBoxedLines(secondResult, scaledInput, rotationDegrees)
+                                parsed = mergeParsed(parsed, SpeedtestOcrParser.parse(secondText, secondBoxes))
+                                if (rawOcrText == null) {
+                                    rawOcrText = secondText
+                                }
                             }
+                        } finally {
+                            if (scaled !== bitmap) scaled.recycle()
+                        }
+                    }
+
+                    // Troisième passe en niveaux de gris + contraste accentué si des métriques
+                    // principales (DL/UL/Ping/Gigue) manquent encore (petits textes gris peu contrastés).
+                    if (bitmap != null &&
+                        (parsed.downloadMbps == null || parsed.uploadMbps == null ||
+                            parsed.pingMs == null || parsed.jitterMs == null)
+                    ) {
+                        val contrastBitmap = createHighContrastGrayscaleBitmap(bitmap)
+                        try {
+                            val contrastInput = InputImage.fromBitmap(contrastBitmap, rotationDegrees)
+                            val contrastResult = recognizer.process(contrastInput).await()
+                            val contrastText = contrastResult.text
+                            if (contrastText.isNotBlank()) {
+                                val contrastBoxes = extractBoxedLines(contrastResult, contrastInput, rotationDegrees)
+                                parsed = mergeParsed(parsed, SpeedtestOcrParser.parse(contrastText, contrastBoxes))
+                                if (rawOcrText == null) {
+                                    rawOcrText = contrastText
+                                }
+                            }
+                        } finally {
+                            contrastBitmap.recycle()
                         }
                     }
                 } finally {
@@ -173,13 +198,75 @@ object SpeedtestImageAnalyzer {
             }
 
             SpeedtestImageMetadata(
-                testedAtMillis = testedAtMillis ?: now,
+                testedAtMillis = testedAtMillis,
                 latitude = latitude,
                 longitude = longitude,
                 parsed = parsed,
                 rawOcrText = rawOcrText
             )
         }
+
+    private fun mergeParsed(primary: ParsedSpeedtestData, secondary: ParsedSpeedtestData): ParsedSpeedtestData {
+        return ParsedSpeedtestData(
+            downloadMbps = primary.downloadMbps ?: secondary.downloadMbps,
+            uploadMbps = primary.uploadMbps ?: secondary.uploadMbps,
+            pingMs = primary.pingMs ?: secondary.pingMs,
+            jitterMs = primary.jitterMs ?: secondary.jitterMs,
+            operatorName = primary.operatorName ?: secondary.operatorName,
+            networkName = primary.networkName ?: secondary.networkName,
+            networkTech = primary.networkTech ?: secondary.networkTech,
+            band = primary.band ?: secondary.band,
+            cellIdentifier = primary.cellIdentifier ?: secondary.cellIdentifier
+        )
+    }
+
+    private fun createHighContrastGrayscaleBitmap(source: Bitmap): Bitmap {
+        val output = Bitmap.createBitmap(source.width, source.height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(output)
+        val grayMatrix = ColorMatrix().apply { setSaturation(0f) }
+        val contrast = 1.75f
+        val translate = (-0.5f * contrast + 0.5f) * 255f
+        val contrastMatrix = ColorMatrix(
+            floatArrayOf(
+                contrast, 0f, 0f, 0f, translate,
+                0f, contrast, 0f, 0f, translate,
+                0f, 0f, contrast, 0f, translate,
+                0f, 0f, 0f, 1f, 0f
+            )
+        )
+        grayMatrix.postConcat(contrastMatrix)
+        val paint = Paint().apply {
+            colorFilter = ColorMatrixColorFilter(grayMatrix)
+        }
+        canvas.drawBitmap(source, 0f, 0f, paint)
+        return output
+    }
+
+    private fun extractBoxedLines(
+        visionText: com.google.mlkit.vision.text.Text,
+        inputImage: InputImage,
+        rotationDegrees: Int
+    ): List<OcrBoxLine> {
+        val rawW = inputImage.width.toFloat().coerceAtLeast(1f)
+        val rawH = inputImage.height.toFloat().coerceAtLeast(1f)
+        val w = if (rotationDegrees == 90 || rotationDegrees == 270) rawH else rawW
+        val h = if (rotationDegrees == 90 || rotationDegrees == 270) rawW else rawH
+
+        return visionText.textBlocks.flatMap { block ->
+            block.lines.mapNotNull { line ->
+                val box = line.boundingBox ?: return@mapNotNull null
+                val text = line.text.trim()
+                if (text.isEmpty()) return@mapNotNull null
+                OcrBoxLine(
+                    text = text,
+                    left = (box.left / w).coerceIn(0f, 1f),
+                    top = (box.top / h).coerceIn(0f, 1f),
+                    right = (box.right / w).coerceIn(0f, 1f),
+                    bottom = (box.bottom / h).coerceIn(0f, 1f)
+                )
+            }
+        }
+    }
 
     private fun resolveOriginalMediaUri(context: Context, uri: Uri): Uri {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return uri

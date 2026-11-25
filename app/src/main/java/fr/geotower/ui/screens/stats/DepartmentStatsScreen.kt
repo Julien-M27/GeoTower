@@ -229,7 +229,7 @@ fun DepartmentStatsEntryCard(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = if (isCanada) {
-                        if (isFr) "Par province / territoire" else "By province / territory"
+                        stringResource(R.string.province_stats_entry_title)
                     } else {
                         stringResource(R.string.department_stats_entry_title)
                     },
@@ -238,7 +238,7 @@ fun DepartmentStatsEntryCard(
                 )
                 Text(
                     text = if (isCanada) {
-                        if (isFr) "Supports, stations et densités par province ou territoire" else "Supports, stations and density by province or territory"
+                        stringResource(R.string.province_stats_entry_description)
                     } else {
                         stringResource(R.string.department_stats_entry_description)
                     },

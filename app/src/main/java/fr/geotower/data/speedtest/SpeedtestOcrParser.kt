@@ -15,6 +15,22 @@ data class ParsedSpeedtestData(
 )
 
 /**
+ * Ligne OCR géolocalisée dans l'image en coordonnées normalisées `[0f..1f]`.
+ * Permet d'associer les labels et valeurs par colonne et proximité visuelle.
+ */
+data class OcrBoxLine(
+    val text: String,
+    val left: Float,
+    val top: Float,
+    val right: Float,
+    val bottom: Float
+) {
+    val centerX: Float get() = (left + right) * 0.5f
+    val centerY: Float get() = (top + bottom) * 0.5f
+    val height: Float get() = (bottom - top).coerceAtLeast(0.001f)
+}
+
+/**
  * Analyseur heuristique de texte OCR issu de captures d'écran de speedtests
  * (nPerf, Speedtest by Ookla, Cellular FR, Fast.com, Débit Test, etc.).
  *
@@ -201,7 +217,7 @@ object SpeedtestOcrParser {
         RegexOption.IGNORE_CASE
     )
     private val bandRegex = Regex(
-        """\b((?:[Bn]\d{1,3}|Bl)(?:\s*\+\s*(?:[Bn]\d{1,3}|Bl))*)\b"""
+        """\b((?:[BNbn]\d{1,3}|Bl)(?:\s*\+\s*(?:[BNbn]\d{1,3}|Bl))*)\b"""
     )
     private val cellIdRegex = Regex(
         """\b(?:eNB|gNB|eNodeB|gNodeB|Cell\s*ID|Cell|CID|PCI)\s*[:=#]?\s*(\d{2,10}(?::\d{1,3})?)\b""",
@@ -213,7 +229,29 @@ object SpeedtestOcrParser {
         RegexOption.IGNORE_CASE
     )
 
-    fun parse(rawText: String): ParsedSpeedtestData {
+    fun parse(rawText: String, boxedLines: List<OcrBoxLine> = emptyList()): ParsedSpeedtestData {
+        if (rawText.isBlank() && boxedLines.isEmpty()) return ParsedSpeedtestData()
+        if (boxedLines.isEmpty()) return parseTextOnly(rawText)
+
+        val cleanBoxes = filterStatusBarNoise(boxedLines)
+        val visualText = buildVisualReadingText(cleanBoxes)
+        val spatial = extractSpatial(cleanBoxes)
+        val textParsed = parseTextOnly(visualText.ifBlank { rawText })
+
+        return ParsedSpeedtestData(
+            downloadMbps = spatial.downloadMbps ?: textParsed.downloadMbps,
+            uploadMbps = spatial.uploadMbps ?: textParsed.uploadMbps,
+            pingMs = spatial.pingMs ?: textParsed.pingMs,
+            jitterMs = spatial.jitterMs ?: textParsed.jitterMs,
+            operatorName = spatial.operatorName ?: textParsed.operatorName,
+            networkName = spatial.networkName ?: textParsed.networkName,
+            networkTech = spatial.networkTech ?: textParsed.networkTech,
+            band = spatial.band ?: textParsed.band,
+            cellIdentifier = spatial.cellIdentifier ?: textParsed.cellIdentifier
+        )
+    }
+
+    private fun parseTextOnly(rawText: String): ParsedSpeedtestData {
         if (rawText.isBlank()) return ParsedSpeedtestData()
 
         val normalizedRaw = rawText
@@ -420,12 +458,20 @@ object SpeedtestOcrParser {
         }
         if (uploadMbps == null && speedCandidates.size >= 2) {
             val isColumnGrouped = speedCandidateLines.size >= 4 &&
-                speedCandidateLines[0].contains("max") &&
-                speedCandidateLines[1].contains("moy")
+                !speedCandidateLines[0].contains("moy") &&
+                !speedCandidateLines[0].contains("avg") &&
+                (speedCandidateLines[1].contains("moy") || speedCandidateLines[1].contains("avg"))
             val candidateIndex = if (isColumnGrouped) 2 else 1
             val candidate = speedCandidates[candidateIndex]
             if (candidate != downloadMbps || speedCandidates.count { it == candidate } >= 2) {
                 uploadMbps = candidate
+            }
+        }
+        if (isNperf && pingMs == null) {
+            pingMs = mergedLines.firstNotNullOfOrNull { line ->
+                val lower = line.lowercase(Locale.ROOT)
+                if (isServerInfoLine(lower) || lower.contains("moy") || lower.contains("avg")) null
+                else msValueRegex.find(line)?.let { parseNumber(it.groupValues[1]) }
             }
         }
 
@@ -454,6 +500,7 @@ object SpeedtestOcrParser {
         val band = bandRegex.find(normalizedRaw)?.groupValues?.getOrNull(1)
             ?.replace(" ", "")
             ?.replace("Bl", "B1")
+            ?.replace(Regex("""\bN(\d+)"""), "n$1")
         val cellIdentifier = cellIdRegex.find(normalizedRaw)?.groupValues?.getOrNull(1)
 
         return ParsedSpeedtestData(
@@ -750,6 +797,7 @@ object SpeedtestOcrParser {
             lower.contains("serveur") ||
             lower.contains("server") ||
             lower.startsWith("auto:") ||
+            Regex("""^\[[a-z]{2}\]\s""").containsMatchIn(lower) ||
             Regex("""(?:^|[\s-])(?:1|2|5|10|25|40|50|100|200|400)\s*gb(?:/s|ps)\b""").containsMatchIn(lower)
     }
 
@@ -766,7 +814,7 @@ object SpeedtestOcrParser {
             Regex("""\b(?:ancre\s*4g|4g\s*anchor)\b""", RegexOption.IGNORE_CASE),
             " "
         )
-        val hasNrBand = Regex("""\bn\d{1,3}\b""").containsMatchIn(rawText)
+        val hasNrBand = Regex("""\bn\d{1,3}\b""", RegexOption.IGNORE_CASE).containsMatchIn(rawText)
         val hasLteBandOrAnchor = Regex("""\bB\d{1,3}\b|\bancre\s*4g\b|\b4g\s*anchor\b""", RegexOption.IGNORE_CASE)
             .containsMatchIn(rawText)
 
@@ -818,5 +866,316 @@ object SpeedtestOcrParser {
             else -> compact
         }
         return normalized.toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0.0 }
+    }
+
+    private fun filterStatusBarNoise(boxes: List<OcrBoxLine>): List<OcrBoxLine> {
+        return boxes.filterNot { box ->
+            if (box.top >= 0.032f) return@filterNot false
+            val t = box.text.trim()
+            Regex("""^\d{1,2}[:.]\d{2}$""").matches(t) ||
+                Regex("""^\d{1,3}%$""").matches(t) ||
+                t.length <= 3
+        }
+    }
+
+    private fun buildVisualReadingText(boxes: List<OcrBoxLine>): String {
+        if (boxes.isEmpty()) return ""
+        val sortedByY = boxes.sortedBy { it.centerY }
+        val rows = mutableListOf<MutableList<OcrBoxLine>>()
+        for (box in sortedByY) {
+            val lastRow = rows.lastOrNull()
+            if (lastRow != null) {
+                val refY = lastRow.map { it.centerY }.average().toFloat()
+                val refH = lastRow.maxOf { it.height }
+                if (kotlin.math.abs(box.centerY - refY) <= maxOf(refH, box.height) * 0.55f) {
+                    lastRow.add(box)
+                    continue
+                }
+            }
+            rows.add(mutableListOf(box))
+        }
+        return rows.joinToString("\n") { row ->
+            row.sortedBy { it.left }.joinToString(" ") { it.text.trim() }
+        }
+    }
+
+    private fun extractSpatial(boxes: List<OcrBoxLine>): ParsedSpeedtestData {
+        if (boxes.isEmpty()) return ParsedSpeedtestData()
+        val normBoxes = boxes.map { box ->
+            box.copy(
+                text = box.text.trim()
+                    .replace(Regex("""(\d)\s*([.,])\s*(\d)"""), "$1$2$3")
+                    .replace(Regex("""(\d)[.,]+(?=\s|$)"""), "$1")
+            )
+        }.filter { it.text.isNotEmpty() }
+
+        val fullLower = normBoxes.joinToString("\n") { it.text }.lowercase(Locale.ROOT)
+        val isNperf = fullLower.contains("nperf")
+        val isSignalQuest = fullLower.contains("signalquest") || fullLower.contains("signal quest") || fullLower.contains("ancre 4g")
+        val isCellularFr = fullLower.contains("détails techniques") || fullLower.contains("details techniques") || fullLower.contains("cloudflare")
+
+        var downloadMbps: Double? = null
+        var uploadMbps: Double? = null
+        var pingMs: Double? = null
+        var jitterMs: Double? = null
+        var operatorName: String? = null
+        var networkName: String? = null
+
+        if (isNperf) {
+            val dlLabel = normBoxes.firstOrNull { b ->
+                val l = b.text.lowercase(Locale.ROOT)
+                (l == "réception" || l == "reception" || l == "download")
+            }
+            val ulLabel = normBoxes.firstOrNull { b ->
+                val l = b.text.lowercase(Locale.ROOT)
+                (l == "envoi" || l == "upload")
+            }
+            val pingLabel = normBoxes.firstOrNull { b ->
+                val l = b.text.lowercase(Locale.ROOT)
+                (l == "latence" || l == "latency")
+            }
+
+            fun findNperfColumnSpeed(label: OcrBoxLine?): Double? {
+                if (label == null) return null
+                val candidates = normBoxes
+                    .filter { b ->
+                        b !== label &&
+                            !isServerInfoLine(b.text.lowercase(Locale.ROOT)) &&
+                            kotlin.math.abs(b.centerX - label.centerX) <= 0.22f &&
+                            b.top >= label.bottom - 0.01f &&
+                            b.top <= label.bottom + 0.14f
+                    }
+                    .sortedBy { it.top }
+
+                val maxFirst = candidates.firstNotNullOfOrNull { b ->
+                    val l = b.text.lowercase(Locale.ROOT)
+                    if (l.contains("max") || (!l.contains("moy") && !l.contains("avg"))) {
+                        speedValueRegex.find(b.text)?.let { convertToMbps(it.groupValues[1], it.groupValues[2]) }
+                            ?: if (standaloneNumberRegex.matches(b.text)) {
+                                val value = parseNumber(b.text)
+                                val unitBox = normBoxes.firstOrNull { u ->
+                                    u !== b && unitOnlyLineRegex.matches(u.text) && (
+                                        (kotlin.math.abs(u.centerY - b.centerY) <= 0.04f && kotlin.math.abs(u.centerX - b.centerX) <= 0.24f) ||
+                                            (kotlin.math.abs(u.centerX - b.centerX) <= 0.15f && u.top >= b.bottom - 0.01f && u.top - b.bottom <= 0.06f)
+                                        )
+                                }
+                                if (value != null && unitBox != null) {
+                                    convertToMbps(b.text, unitBox.text.trim())
+                                } else null
+                            } else null
+                    } else null
+                }
+                if (maxFirst != null) return maxFirst
+                return candidates.firstNotNullOfOrNull { b ->
+                    speedValueRegex.find(b.text)?.let { convertToMbps(it.groupValues[1], it.groupValues[2]) }
+                }
+            }
+
+            downloadMbps = findNperfColumnSpeed(dlLabel)
+            uploadMbps = findNperfColumnSpeed(ulLabel)
+
+            if (pingLabel != null) {
+                val pingBoxes = normBoxes
+                    .filter { b ->
+                        b !== pingLabel &&
+                            kotlin.math.abs(b.centerX - pingLabel.centerX) <= 0.22f &&
+                            b.top >= pingLabel.bottom - 0.01f &&
+                            b.top <= pingLabel.bottom + 0.14f
+                    }
+                    .sortedBy { it.top }
+                for (b in pingBoxes) {
+                    val l = b.text.lowercase(Locale.ROOT)
+                    for (m in msValueRegex.findAll(b.text)) {
+                        val ms = parseNumber(m.groupValues[1]) ?: continue
+                        val before = l.substring(0, m.range.first)
+                        val seg = before.substring(maxOf(before.lastIndexOf('/'), before.lastIndexOf('|'), 0))
+                        if (containsAny(seg, jitterKeywords)) {
+                            if (jitterMs == null) jitterMs = ms
+                        } else if (pingMs == null && (seg.contains("min") || !seg.contains("moy"))) {
+                            pingMs = ms
+                        }
+                    }
+                }
+            }
+
+            val opLabel = normBoxes.firstOrNull { b ->
+                val l = b.text.lowercase(Locale.ROOT)
+                l == "opérateur" || l == "operateur" || l == "operator"
+            }
+            if (opLabel != null) {
+                operatorName = normBoxes
+                    .filter { b ->
+                        b !== opLabel &&
+                            !isServerInfoLine(b.text.lowercase(Locale.ROOT)) &&
+                            kotlin.math.abs(b.centerX - opLabel.centerX) <= 0.20f &&
+                            b.top >= opLabel.bottom - 0.005f &&
+                            b.top <= opLabel.bottom + 0.09f
+                    }
+                    .sortedBy { it.top }
+                    .firstNotNullOfOrNull { matchKnownOperator(it.text.lowercase(Locale.ROOT)) }
+            }
+
+            val netLabel = normBoxes.firstOrNull { b ->
+                val l = b.text.lowercase(Locale.ROOT)
+                l == "réseau" || l == "reseau" || l == "network"
+            }
+            if (netLabel != null) {
+                networkName = normBoxes
+                    .filter { b ->
+                        b !== netLabel &&
+                            !isServerInfoLine(b.text.lowercase(Locale.ROOT)) &&
+                            kotlin.math.abs(b.centerX - netLabel.centerX) <= 0.20f &&
+                            b.top >= netLabel.bottom - 0.005f &&
+                            b.top <= netLabel.bottom + 0.09f
+                    }
+                    .sortedBy { it.top }
+                    .firstNotNullOfOrNull { matchKnownOperator(it.text.lowercase(Locale.ROOT)) }
+            }
+        } else if (isSignalQuest) {
+            val dlLabel = normBoxes.firstOrNull { b ->
+                val l = b.text.lowercase(Locale.ROOT)
+                containsAny(l, downloadKeywords) && !l.contains("max") && !l.contains("charg") && !l.contains("loaded")
+            }
+            val ulLabel = normBoxes.firstOrNull { b ->
+                val l = b.text.lowercase(Locale.ROOT)
+                containsAny(l, uploadKeywords) && !l.contains("max") && !l.contains("charg") && !l.contains("loaded")
+            }
+
+            fun findSignalQuestCardSpeed(label: OcrBoxLine?): Double? {
+                if (label == null) return null
+                val near = normBoxes
+                    .filter { b ->
+                        b !== label &&
+                            kotlin.math.abs(b.centerX - label.centerX) <= 0.25f &&
+                            b.top >= label.bottom - 0.005f &&
+                            b.top <= label.bottom + 0.16f
+                    }
+                    .sortedBy { it.top }
+
+                for (b in near) {
+                    val l = b.text.lowercase(Locale.ROOT)
+                    if (l.contains("max") || l.contains("charg") || l.contains("loaded") || l.contains("ms")) continue
+                    speedValueRegex.find(b.text)?.let {
+                        return convertToMbps(it.groupValues[1], it.groupValues[2])
+                    }
+                    if (standaloneNumberRegex.matches(b.text)) {
+                        val value = parseNumber(b.text) ?: continue
+                        val unitBox = near.firstOrNull { u ->
+                            u !== b && unitOnlyLineRegex.matches(u.text) &&
+                                kotlin.math.abs(u.centerY - b.centerY) <= 0.05f
+                        }
+                        val unit = unitBox?.text?.trim().orEmpty()
+                        return when {
+                            unit.contains("gb", ignoreCase = true) -> value * 1000.0
+                            unit.contains("kb", ignoreCase = true) -> value / 1000.0
+                            else -> value
+                        }
+                    }
+                }
+                return null
+            }
+
+            downloadMbps = findSignalQuestCardSpeed(dlLabel)
+            uploadMbps = findSignalQuestCardSpeed(ulLabel)
+
+            val idleJitterLabel = normBoxes.firstOrNull { b ->
+                val l = b.text.lowercase(Locale.ROOT)
+                l.contains("gigue au repos") || l.contains("idle jitter")
+            }
+            if (idleJitterLabel != null) {
+                jitterMs = msValueRegex.find(idleJitterLabel.text)?.let { parseNumber(it.groupValues[1]) }
+                    ?: normBoxes
+                        .filter { b ->
+                            b !== idleJitterLabel && (
+                                (kotlin.math.abs(b.centerY - idleJitterLabel.centerY) <= 0.03f && b.left >= idleJitterLabel.left) ||
+                                    (kotlin.math.abs(b.centerX - idleJitterLabel.centerX) <= 0.25f &&
+                                        b.top >= idleJitterLabel.bottom - 0.005f &&
+                                        b.top <= idleJitterLabel.bottom + 0.08f)
+                                )
+                        }
+                        .sortedBy { kotlin.math.abs(it.centerY - idleJitterLabel.centerY) }
+                        .firstNotNullOfOrNull { b -> msValueRegex.find(b.text)?.let { parseNumber(it.groupValues[1]) } }
+            }
+        } else if (isCellularFr) {
+            val dlLabel = normBoxes.firstOrNull { it.text.equals("DOWNLOAD", ignoreCase = true) }
+            val ulLabel = normBoxes.firstOrNull { b -> b.text.lowercase(Locale.ROOT).contains("upload") }
+            val pingLabel = normBoxes.firstOrNull { it.text.equals("PING", ignoreCase = true) }
+
+            fun findCellularValueBelow(label: OcrBoxLine?): Double? {
+                if (label == null) return null
+                return normBoxes
+                    .filter { b ->
+                        b !== label &&
+                            kotlin.math.abs(b.centerX - label.centerX) <= 0.22f &&
+                            b.top >= label.bottom - 0.005f &&
+                            b.top <= label.bottom + 0.14f
+                    }
+                    .sortedBy { it.top }
+                    .firstNotNullOfOrNull { b ->
+                        if (standaloneNumberRegex.matches(b.text)) parseNumber(b.text)
+                        else speedValueRegex.find(b.text)?.let { convertToMbps(it.groupValues[1], it.groupValues[2]) }
+                    }
+            }
+
+            downloadMbps = findCellularValueBelow(dlLabel)
+            uploadMbps = findCellularValueBelow(ulLabel)
+            if (pingLabel != null) {
+                pingMs = normBoxes
+                    .filter { b ->
+                        b !== pingLabel &&
+                            kotlin.math.abs(b.centerX - pingLabel.centerX) <= 0.20f &&
+                            b.bottom <= pingLabel.top + 0.01f &&
+                            pingLabel.top - b.bottom <= 0.07f
+                    }
+                    .sortedByDescending { it.bottom }
+                    .firstNotNullOfOrNull { b -> msValueRegex.find(b.text)?.let { parseNumber(it.groupValues[1]) } }
+            }
+        } else if (fullLower.contains("speedtest") || fullLower.contains("ookla")) {
+            val dlLabel = normBoxes.firstOrNull { b ->
+                val l = b.text.lowercase(Locale.ROOT)
+                containsAny(l, downloadKeywords) && !l.contains("speedtest")
+            }
+            val ulLabel = normBoxes.firstOrNull { b ->
+                val l = b.text.lowercase(Locale.ROOT)
+                containsAny(l, uploadKeywords)
+            }
+
+            fun findOoklaSpeedBelow(label: OcrBoxLine?): Double? {
+                if (label == null) return null
+                val headerLower = label.text.lowercase(Locale.ROOT)
+                return normBoxes
+                    .filter { b ->
+                        b !== label &&
+                            kotlin.math.abs(b.centerX - label.centerX) <= 0.22f &&
+                            b.top >= label.bottom - 0.005f &&
+                            b.top <= label.bottom + 0.14f
+                    }
+                    .sortedBy { it.top }
+                    .firstNotNullOfOrNull { b ->
+                        speedValueRegex.find(b.text)?.let { convertToMbps(it.groupValues[1], it.groupValues[2]) }
+                            ?: if (standaloneNumberRegex.matches(b.text)) {
+                                val v = parseNumber(b.text)
+                                when {
+                                    v == null -> null
+                                    headerLower.contains("gb") -> v * 1000.0
+                                    headerLower.contains("kb") -> v / 1000.0
+                                    else -> v
+                                }
+                            } else null
+                    }
+            }
+
+            downloadMbps = findOoklaSpeedBelow(dlLabel)
+            uploadMbps = findOoklaSpeedBelow(ulLabel)
+        }
+
+        return ParsedSpeedtestData(
+            downloadMbps = downloadMbps,
+            uploadMbps = uploadMbps,
+            pingMs = pingMs,
+            jitterMs = jitterMs,
+            operatorName = operatorName,
+            networkName = networkName
+        )
     }
 }

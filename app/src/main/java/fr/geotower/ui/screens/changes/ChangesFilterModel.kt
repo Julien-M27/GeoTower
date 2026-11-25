@@ -1,23 +1,25 @@
 package fr.geotower.ui.screens.changes
 
+import androidx.annotation.StringRes
+import fr.geotower.R
 import fr.geotower.data.models.ChangeDetailItem
 import fr.geotower.data.models.ChangeMapPoint
 import fr.geotower.utils.OperatorColors
 
-enum class SiteTypeOption(val label: String) {
-    ALL("Tous"),
-    NEW("Site neuf"),
-    EXISTING("Site existant")
+enum class SiteTypeOption(val label: String, @StringRes val labelRes: Int) {
+    ALL("Tous", R.string.changes_filter_site_all),
+    NEW("Site neuf", R.string.changes_filter_site_new),
+    EXISTING("Site existant", R.string.changes_filter_site_existing)
 }
 
-enum class ChangeActionType(val label: String) {
-    SYSTEM_ADDED("Ajout fréquence"),
-    ACTIVATION("Activation fréquence"),
-    DEACTIVATION("Extinction fréquence"),
-    SYSTEM_REMOVED("Suppression fréquence"),
-    SITE_ADDED("Nouveaux sites"),
-    SITE_REMOVED("Site démantelé"),
-    MOVED("Déplacement géographique")
+enum class ChangeActionType(val label: String, @StringRes val labelRes: Int) {
+    SYSTEM_ADDED("Ajout fréquence", R.string.changes_filter_action_system_added),
+    ACTIVATION("Activation fréquence", R.string.changes_filter_action_activation),
+    DEACTIVATION("Extinction fréquence", R.string.changes_filter_action_deactivation),
+    SYSTEM_REMOVED("Suppression fréquence", R.string.changes_filter_action_system_removed),
+    SITE_ADDED("Nouveaux sites", R.string.changes_filter_action_site_added),
+    SITE_REMOVED("Site démantelé", R.string.changes_filter_action_site_removed),
+    MOVED("Déplacement géographique", R.string.changes_filter_action_moved)
 }
 
 data class ChangesFilterState(

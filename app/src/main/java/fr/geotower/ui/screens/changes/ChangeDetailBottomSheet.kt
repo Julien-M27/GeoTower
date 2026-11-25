@@ -136,10 +136,10 @@ fun ChangeDetailBottomSheet(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    val locDesc = buildString {
-                        if (!point.department.isNullOrBlank()) append("Dép. ${point.department} • ")
-                        append(String.format(Locale.US, "%.5f, %.5f", point.latitude, point.longitude))
-                    }
+                    val deptPrefix = point.department?.takeIf { it.isNotBlank() }?.let {
+                        stringResource(R.string.changes_detail_dept_prefix, it)
+                    }.orEmpty()
+                    val locDesc = "$deptPrefix${String.format(Locale.US, "%.5f, %.5f", point.latitude, point.longitude)}"
                     Spacer(modifier = Modifier.height(sizing.spacing(2.dp)))
                     Text(
                         text = locDesc,
@@ -149,7 +149,7 @@ fun ChangeDetailBottomSheet(
                 }
 
                 IconButton(onClick = onDismiss) {
-                    Icon(imageVector = Icons.Default.Close, contentDescription = "Fermer")
+                    Icon(imageVector = Icons.Default.Close, contentDescription = stringResource(R.string.appstrings_close))
                 }
             }
 
@@ -159,7 +159,7 @@ fun ChangeDetailBottomSheet(
             val operators = point.operators()
             if (operators.isNotEmpty()) {
                 Text(
-                    text = if (operators.size > 1) "Opérateurs concernés" else "Opérateur concerné",
+                    text = if (operators.size > 1) stringResource(R.string.changes_detail_operators_plural) else stringResource(R.string.changes_detail_operator_singular),
                     style = sizing.textStyle(MaterialTheme.typography.labelMedium),
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -207,19 +207,22 @@ fun ChangeDetailBottomSheet(
             val groupedChanges = groupChanges(point.changes)
             val headerText = if (groupedChanges.size == point.changes.size) {
                 if (groupedChanges.size > 1) {
-                    "Évolutions enregistrées (${groupedChanges.size})"
+                    stringResource(R.string.changes_detail_recorded_plural, groupedChanges.size)
                 } else {
-                    "Évolution enregistrée (1)"
+                    stringResource(R.string.changes_detail_recorded_singular)
                 }
             } else {
                 val totalFreqs = groupedChanges.sumOf { it.systems.size.coerceAtLeast(1) }
-                val evoPrefix = if (groupedChanges.size > 1) {
-                    "Évolutions enregistrées (${groupedChanges.size}"
+                val freqSuffix = if (totalFreqs > 1) {
+                    stringResource(R.string.changes_detail_freq_count_plural, totalFreqs)
                 } else {
-                    "Évolution enregistrée (1"
+                    stringResource(R.string.changes_detail_freq_count_singular)
                 }
-                val freqSuffix = if (totalFreqs > 1) "$totalFreqs fréquences" else "1 fréquence"
-                "$evoPrefix • $freqSuffix)"
+                if (groupedChanges.size > 1) {
+                    stringResource(R.string.changes_detail_recorded_with_freqs_plural, groupedChanges.size, freqSuffix)
+                } else {
+                    stringResource(R.string.changes_detail_recorded_with_freqs_singular, freqSuffix)
+                }
             }
 
             Text(
@@ -249,7 +252,7 @@ fun ChangeDetailBottomSheet(
                         val clip = ClipData.newPlainText("GPS", coords)
                         val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                         cm.setPrimaryClip(clip)
-                        Toast.makeText(context, "Coordonnées copiées : $coords", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.changes_detail_coords_copied, coords), Toast.LENGTH_SHORT).show()
                     },
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(12.dp)
@@ -450,62 +453,64 @@ private fun ChangeItemCard(change: GroupedChangeItem) {
         change.code == "STATUS_CHANGED" && isDeactivationStatus(change.nowStatus)
     )
 
-    val statusTransitionText = remember(change) {
+    val defaultApproved = stringResource(R.string.changes_detail_status_approved_default)
+    val defaultInService = stringResource(R.string.changes_detail_status_in_service_default)
+    val statusTransitionText = remember(change, defaultApproved, defaultInService) {
         val wasText = if (change.distinctWasStatuses.isNotEmpty()) {
             change.distinctWasStatuses.joinToString(" / ")
         } else {
-            change.wasStatus ?: "Projet approuvé"
+            change.wasStatus ?: defaultApproved
         }
         val nowText = if (change.distinctNowStatuses.isNotEmpty()) {
             change.distinctNowStatuses.joinToString(" / ")
         } else {
-            change.nowStatus ?: "En service"
+            change.nowStatus ?: defaultInService
         }
         "$wasText ➔ $nowText"
     }
 
     val (title, subtitle) = when {
         change.code == "SITE_ADDED" -> Pair(
-            "Nouveau site créé",
-            opsNames ?: (if (opName.isNotBlank()) opName else "Tous opérateurs")
+            stringResource(R.string.changes_detail_site_added_title),
+            opsNames ?: (if (opName.isNotBlank()) opName else stringResource(R.string.changes_detail_all_operators))
         )
         isActivation -> Pair(
-            if (change.systems.size > 1) "Activations (${change.systems.size})" else "Activation",
+            if (change.systems.size > 1) stringResource(R.string.changes_detail_activations_plural, change.systems.size) else stringResource(R.string.changes_detail_activation_singular),
             "$statusTransitionText${if (opName.isNotBlank()) " • $opName" else ""}"
         )
         isDeactivation -> Pair(
-            if (change.systems.size > 1) "Mises hors service (${change.systems.size})" else "Mise hors service",
+            if (change.systems.size > 1) stringResource(R.string.changes_detail_deactivations_plural, change.systems.size) else stringResource(R.string.changes_detail_deactivation_singular),
             "$statusTransitionText${if (opName.isNotBlank()) " • $opName" else ""}"
         )
         change.code == "STATUS_CHANGED" -> Pair(
-            "Changement de statut",
+            stringResource(R.string.changes_detail_status_changed_title),
             "$statusTransitionText${if (opName.isNotBlank()) " • $opName" else ""}"
         )
         change.code == "SYSTEM_ADDED" -> Pair(
-            if (change.systems.size > 1) "Nouvelles fréquences (${change.systems.size})" else "Ajout de fréquence",
-            if (opName.isNotBlank()) opName else if (change.systems.size > 1) "Fréquences ajoutées" else "Fréquence ajoutée"
+            if (change.systems.size > 1) stringResource(R.string.changes_detail_systems_added_plural, change.systems.size) else stringResource(R.string.changes_detail_system_added_singular),
+            if (opName.isNotBlank()) opName else if (change.systems.size > 1) stringResource(R.string.changes_detail_freqs_added) else stringResource(R.string.changes_detail_freq_added)
         )
         change.code == "OPERATOR_ADDED" -> Pair(
-            if (change.ops != null && change.ops.size > 1) "Arrivée d'opérateurs" else "Arrivée d'un opérateur",
-            if (opName.isNotBlank()) "$opName sur ce support" else if (change.ops != null && change.ops.size > 1) "Opérateurs ajoutés sur ce support" else "Opérateur ajouté sur ce support"
+            if (change.ops != null && change.ops.size > 1) stringResource(R.string.changes_detail_operators_added) else stringResource(R.string.changes_detail_operator_added),
+            if (opName.isNotBlank()) stringResource(R.string.changes_detail_op_on_support, opName) else if (change.ops != null && change.ops.size > 1) stringResource(R.string.changes_detail_ops_added_on_support) else stringResource(R.string.changes_detail_op_added_on_support)
         )
         change.code == "SITE_REMOVED" -> Pair(
-            "Site démantelé / supprimé",
-            opsNames ?: (if (opName.isNotBlank()) opName else "Retiré de l'observatoire")
+            stringResource(R.string.changes_detail_site_removed_title),
+            opsNames ?: (if (opName.isNotBlank()) opName else stringResource(R.string.changes_detail_removed_observatory))
         )
         change.code == "SYSTEM_REMOVED" -> Pair(
-            if (change.systems.size > 1) "Extinction de fréquences (${change.systems.size})" else "Extinction de fréquence",
-            if (opName.isNotBlank()) opName else if (change.systems.size > 1) "Fréquences retirées" else "Fréquence retirée"
+            if (change.systems.size > 1) stringResource(R.string.changes_detail_systems_removed_plural, change.systems.size) else stringResource(R.string.changes_detail_system_removed_singular),
+            if (opName.isNotBlank()) opName else if (change.systems.size > 1) stringResource(R.string.changes_detail_freqs_removed) else stringResource(R.string.changes_detail_freq_removed)
         )
         change.code == "OPERATOR_REMOVED" -> Pair(
-            if (change.ops != null && change.ops.size > 1) "Départ d'opérateurs" else "Départ d'un opérateur",
-            if (opName.isNotBlank()) "$opName n'émet plus sur ce support" else if (change.ops != null && change.ops.size > 1) "Les opérateurs n'émettent plus sur ce support" else "L'opérateur n'émet plus sur ce support"
+            if (change.ops != null && change.ops.size > 1) stringResource(R.string.changes_detail_operators_removed) else stringResource(R.string.changes_detail_operator_removed),
+            if (opName.isNotBlank()) stringResource(R.string.changes_detail_op_no_longer_emits, opName) else if (change.ops != null && change.ops.size > 1) stringResource(R.string.changes_detail_ops_no_longer_emit) else stringResource(R.string.changes_detail_op_no_longer_emit_singular)
         )
         change.code == "MOVED" -> Pair(
-            "Déplacement géographique",
-            "Coordonnées recalculées (~${change.movedMeters?.toInt() ?: 0} mètres)"
+            stringResource(R.string.changes_detail_moved_title),
+            stringResource(R.string.changes_detail_moved_desc, change.movedMeters?.toInt() ?: 0)
         )
-        else -> Pair("Modification diverse", change.code)
+        else -> Pair(stringResource(R.string.changes_detail_other_title), change.code)
     }
 
     // Couleurs alignées avec celles de statut de la fiche site (FrequencyStatusPalette / SiteStatusCard)
@@ -572,10 +577,10 @@ private fun ChangeItemCard(change: GroupedChangeItem) {
                 Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
                 Text(
                     text = when {
-                        isActivation -> if (change.systems.size > 1) "Fréquences activées :" else "Fréquence activée :"
-                        change.code == "SYSTEM_ADDED" -> if (change.systems.size > 1) "Fréquences ajoutées :" else "Fréquence ajoutée :"
-                        change.code == "SYSTEM_REMOVED" || isDeactivation -> if (change.systems.size > 1) "Fréquences retirées :" else "Fréquence retirée :"
-                        else -> if (change.systems.size > 1) "Fréquences concernées :" else "Fréquence concernée :"
+                        isActivation -> if (change.systems.size > 1) stringResource(R.string.changes_detail_freqs_activated_label) else stringResource(R.string.changes_detail_freq_activated_label)
+                        change.code == "SYSTEM_ADDED" -> if (change.systems.size > 1) stringResource(R.string.changes_detail_freqs_added_label) else stringResource(R.string.changes_detail_freq_added_label)
+                        change.code == "SYSTEM_REMOVED" || isDeactivation -> if (change.systems.size > 1) stringResource(R.string.changes_detail_freqs_removed_label) else stringResource(R.string.changes_detail_freq_removed_label)
+                        else -> if (change.systems.size > 1) stringResource(R.string.changes_detail_freqs_concerned_label) else stringResource(R.string.changes_detail_freq_concerned_label)
                     },
                     style = sizing.textStyle(MaterialTheme.typography.labelSmall),
                     fontWeight = FontWeight.SemiBold,
