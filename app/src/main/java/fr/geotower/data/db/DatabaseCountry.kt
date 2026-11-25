@@ -7,20 +7,32 @@ import androidx.compose.runtime.mutableStateOf
 enum class DatabaseCountry(
     val code: String,
     val displayName: String,
+    val flagEmoji: String,
     val dbFileName: String,
-    val sourceLabel: String
+    val sourceLabel: String,
+    val defaultMapLat: Double,
+    val defaultMapLon: Double,
+    val defaultMapZoom: Double
 ) {
     FR(
         code = "FR",
         displayName = "France",
+        flagEmoji = "🇫🇷",
         dbFileName = "geotower_fr.db",
-        sourceLabel = "ANFR / ARCEP"
+        sourceLabel = "ANFR / ARCEP",
+        defaultMapLat = 46.2276,
+        defaultMapLon = 2.2137,
+        defaultMapZoom = 6.0
     ),
     CA(
         code = "CA",
         displayName = "Canada",
+        flagEmoji = "🇨🇦",
         dbFileName = "geotower_ca.db",
-        sourceLabel = "ISDE / ISED"
+        sourceLabel = "ISDE / ISED",
+        defaultMapLat = 56.1304,
+        defaultMapLon = -106.3468,
+        defaultMapZoom = 4.0
     );
 
     companion object {
@@ -46,22 +58,62 @@ enum class DatabaseCountry(
 object DatabaseCountryStore {
     private const val PREFS_NAME = "GeoTowerPrefs"
     private const val KEY_ACTIVE_COUNTRY = "active_database_country"
+    private const val KEY_DEFAULT_COUNTRY = "default_database_country"
 
     @Volatile
     private var initialized = false
 
     @Volatile
+    private var defaultInitialized = false
+
+    @Volatile
     private var cachedCountry: DatabaseCountry = DatabaseCountry.FR
+
+    @Volatile
+    private var cachedDefaultCountry: DatabaseCountry = DatabaseCountry.FR
 
     private val _activeCountryState = mutableStateOf(DatabaseCountry.FR)
     val activeCountryState: State<DatabaseCountry> get() = _activeCountryState
+
+    private val _defaultCountryState = mutableStateOf(DatabaseCountry.FR)
+    val defaultCountryState: State<DatabaseCountry> get() = _defaultCountryState
+
+    fun getDefault(context: Context? = null): DatabaseCountry {
+        if (!defaultInitialized && context != null) {
+            synchronized(this) {
+                if (!defaultInitialized) {
+                    val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                    val stored = DatabaseCountry.fromCode(prefs.getString(KEY_DEFAULT_COUNTRY, DatabaseCountry.FR.code))
+                    cachedDefaultCountry = stored
+                    _defaultCountryState.value = stored
+                    defaultInitialized = true
+                }
+            }
+        }
+        return cachedDefaultCountry
+    }
+
+    fun setDefault(context: Context, country: DatabaseCountry, updateActive: Boolean = true) {
+        val appContext = context.applicationContext
+        appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_DEFAULT_COUNTRY, country.code)
+            .apply()
+        cachedDefaultCountry = country
+        defaultInitialized = true
+        _defaultCountryState.value = country
+        if (updateActive) {
+            setActive(appContext, country)
+        }
+    }
 
     fun getActive(context: Context? = null): DatabaseCountry {
         if (!initialized && context != null) {
             synchronized(this) {
                 if (!initialized) {
                     val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                    val stored = DatabaseCountry.fromCode(prefs.getString(KEY_ACTIVE_COUNTRY, DatabaseCountry.FR.code))
+                    val fallback = getDefault(context).code
+                    val stored = DatabaseCountry.fromCode(prefs.getString(KEY_ACTIVE_COUNTRY, fallback))
                     cachedCountry = stored
                     _activeCountryState.value = stored
                     initialized = true

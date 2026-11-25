@@ -31,8 +31,8 @@ internal data class ReleaseNoteItem(
  */
 @Composable
 internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
-    section(stringResource(R.string.appstrings_release_section_speedtests)) {
-        item(stringResource(R.string.appstrings_release_v2144_summary_speedtests_map_thumbnails_and_translations))
+    section(stringResource(R.string.nav_settings)) {
+        item(stringResource(R.string.appstrings_release_v2145_summary_default_country_and_speedtests_stats))
     }
 }
 

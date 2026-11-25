@@ -775,6 +775,21 @@ class MainActivity : ComponentActivity() {
             sharedPref.getString("startup_page", "home") ?: "home"
         }
 
+        val startupRoute = when (savedStartupPage) {
+            "home" -> "home"
+            "nearby" -> "emitters"
+            "map" -> "map"
+            "trips" -> "trips"
+            "compass" -> "compass"
+            "stats" -> "stats"
+            "more" -> "more"
+            else -> when {
+                simpleModeAtLaunch -> simpleModeHomeRoute
+                bottomNavAtLaunch -> bottomNavDefaultStartupRoute
+                else -> "home"
+            }
+        }
+
         // On détermine la destination finale en fonction de la demande
         val destinationApresSplash = if (isFirstRun) {
             "first_start"
@@ -808,20 +823,7 @@ class MainActivity : ComponentActivity() {
             "map" // 🗺️ Téléportation directe sur la carte si demandé par la voix !
         } else {
             // Lancement normal : on utilise le choix de l'utilisateur
-            when (savedStartupPage) {
-                "home" -> "home"
-                "nearby" -> "emitters"
-                "map" -> "map"
-                "trips" -> "trips"
-                "compass" -> "compass"
-                "stats" -> "stats"
-                "more" -> "more"
-                else -> when {
-                    simpleModeAtLaunch -> simpleModeHomeRoute
-                    bottomNavAtLaunch -> bottomNavDefaultStartupRoute
-                    else -> "home"
-                }
-            }
+            startupRoute
         }
 
         // 🌟 Si on vient du widget, de l'assistant, de la notification OU d'un QR CODE, on saute le Splash Screen !
@@ -1650,7 +1652,7 @@ class MainActivity : ComponentActivity() {
                                             if (navController.previousBackStackEntry != null) {
                                                 navController.popBackStack()
                                             } else {
-                                                navController.navigate(savedStartupPage) {
+                                                navController.navigate(startupRoute) {
                                                     popUpTo("share_router?draftId={draftId}") { inclusive = true }
                                                 }
                                             }
@@ -1666,7 +1668,7 @@ class MainActivity : ComponentActivity() {
                                             if (navController.previousBackStackEntry != null) {
                                                 navController.popBackStack()
                                             } else {
-                                                navController.navigate(savedStartupPage) {
+                                                navController.navigate(startupRoute) {
                                                     popUpTo("speedtests") { inclusive = true }
                                                 }
                                             }

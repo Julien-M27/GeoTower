@@ -375,6 +375,7 @@ fun SettingsScreen(
     val featureFlags by RemoteFeatureFlags.config
     val uiStyle = LocalGeoTowerUiStyle.current
     var showUnitSheet by remember { mutableStateOf(false) }
+    var showDefaultCountrySheet by remember { mutableStateOf(false) }
     var showTechOrderSheet by remember { mutableStateOf(false) }
     var showNavModeSheet by remember { mutableStateOf(false) }
     var showColorPalettePage by rememberSaveable { mutableStateOf(false) }
@@ -1115,6 +1116,7 @@ fun SettingsScreen(
             entry(resources.getString(R.string.appstrings_offline_maps_title), "cartes hors ligne offline maps telechargement tuiles mapsforge", SECTION_MAPPING)
 
             // --- Préférences ---
+            entry(resources.getString(R.string.settings_default_country_title), "pays country france canada defaut carte", SECTION_PREFERENCES) { showDefaultCountrySheet = true }
             entry(resources.getString(R.string.settings_default_operator), "operateur operator orange sfr free bouygues rogers bell telus videotron freedom sasktel canada sim defaut", SECTION_PREFERENCES) { showOperatorSheet = true }
             entry(resources.getString(R.string.settings_app_language), "langue language francais anglais traduction locale", SECTION_PREFERENCES) { showLanguageSheet = true }
             entry(resources.getString(R.string.settings_units_title), "unites units distance vitesse metre km mesure imperial", SECTION_PREFERENCES) { showUnitSheet = true }
@@ -1753,6 +1755,7 @@ fun SettingsScreen(
                                     lang = appLanguage,
                                     onLang = { showLanguageSheet = true },
                                     onUnitSettings = { showUnitSheet = true },
+                                    onDefaultCountry = { showDefaultCountrySheet = true },
                                     onTechOrderSettings = { showTechOrderSheet = true },
                                     pagesActions = pagesSectionActions,
                                     showPagesSection = pagesCustomizationEnabled,
@@ -1894,7 +1897,8 @@ fun SettingsScreen(
                                         cardBorder,
                                         bubbleBaseColor,
                                         useOneUi,
-                                        safeClick
+                                        safeClick,
+                                        onDefaultCountry = { showDefaultCountrySheet = true }
                                     )
                                     SECTION_PAGES -> SectionPages(
                                         actions = pagesSectionActions,
@@ -2067,6 +2071,15 @@ fun SettingsScreen(
         if (showUnitSheet) {
             fr.geotower.ui.components.UnitSettingsSheet(
                 onDismiss = { showUnitSheet = false },
+                sheetState = sheetState,
+                useOneUi = useOneUi,
+                bubbleColor = bubbleBaseColor
+            )
+        }
+
+        if (showDefaultCountrySheet) {
+            fr.geotower.ui.components.DefaultCountrySettingsSheet(
+                onDismiss = { showDefaultCountrySheet = false },
                 sheetState = sheetState,
                 useOneUi = useOneUi,
                 bubbleColor = bubbleBaseColor
@@ -3128,7 +3141,8 @@ fun AllSettingsContent(
     onDisclosureDismissed: () -> Unit = {},
     onDisclosureAccepted: () -> Unit = {},
     onBgLocationGranted: () -> Unit = {},
-    onAddWidgetClick: () -> Unit = {}
+    onAddWidgetClick: () -> Unit = {},
+    onDefaultCountry: () -> Unit = {}
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
     Column(modifier = appearanceSectionModifier.fillMaxWidth()) {
@@ -3149,7 +3163,7 @@ fun AllSettingsContent(
     }
     Spacer(Modifier.height(sizing.spacing(32.dp)))
     Column(modifier = preferencesSectionModifier.fillMaxWidth()) {
-        SectionPreferences(op, onOp, lang, onLang, onUnitSettings, onTechOrderSettings, onExternalLinks, onSharePrefs, shape, border, bubbleColor, useOneUi, safeClick)
+        SectionPreferences(op, onOp, lang, onLang, onUnitSettings, onTechOrderSettings, onExternalLinks, onSharePrefs, shape, border, bubbleColor, useOneUi, safeClick, onDefaultCountry = onDefaultCountry)
     }
     Spacer(Modifier.height(sizing.spacing(32.dp)))
     if (showPagesSection) {
@@ -3576,12 +3590,30 @@ fun SectionPreferences(
     onTechOrderSettings: () -> Unit = {},
     onExternalLinks: () -> Unit,
     onSharePrefs: () -> Unit,
-    shape: Shape, border: BorderStroke?, bubbleColor: Color, useOneUi: Boolean, safeClick: SafeClick
+    shape: Shape, border: BorderStroke?, bubbleColor: Color, useOneUi: Boolean, safeClick: SafeClick,
+    onDefaultCountry: () -> Unit = {}
 ) {
     val featureFlags by RemoteFeatureFlags.config
     val sizing = LocalGeoTowerUiStyle.current.sizing
+    val context = LocalContext.current
+    val defaultCountry by remember {
+        fr.geotower.data.db.DatabaseCountryStore.getDefault(context)
+        fr.geotower.data.db.DatabaseCountryStore.defaultCountryState
+    }
 
     SectionTitle(stringResource(R.string.settings_section_preferences))
+
+    fr.geotower.ui.components.DefaultCountryPreferenceCard(
+        defaultCountry = defaultCountry,
+        onClick = onDefaultCountry,
+        shape = shape,
+        border = border,
+        bubbleColor = bubbleColor,
+        useOneUi = useOneUi,
+        safeClick = safeClick,
+        clickId = "settings_default_country"
+    )
+    Spacer(Modifier.height(sizing.spacing(12.dp)))
 
     PreferenceOperatorCard(stringResource(R.string.settings_default_operator), op, onOp, shape, border, bubbleColor, useOneUi, safeClick)
     Spacer(Modifier.height(sizing.spacing(12.dp)))

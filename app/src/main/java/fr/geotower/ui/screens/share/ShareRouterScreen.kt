@@ -86,7 +86,7 @@ fun ShareRouterScreen(
         }
     }
 
-    BackHandler(enabled = !isImporting) {
+    BackHandler {
         handleCancel()
     }
 

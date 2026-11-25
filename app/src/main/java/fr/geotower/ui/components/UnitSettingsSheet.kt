@@ -99,7 +99,7 @@ fun UnitSettingsSheet(
 }
 
 @Composable
-private fun UnitOptionItem(name: String, isSelected: Boolean, useOneUi: Boolean, bubbleColor: Color, onClick: () -> Unit) {
+internal fun UnitOptionItem(name: String, isSelected: Boolean, useOneUi: Boolean, bubbleColor: Color, onClick: () -> Unit) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
     val accentColor = MaterialTheme.colorScheme.primary
     val bgColor = if (isSelected) accentColor.copy(alpha = 0.1f) else if (useOneUi) bubbleColor else Color.Transparent

@@ -1876,10 +1876,11 @@ fun MapScreen(
             .firstOrNull { it.isNotBlank() }
     }
 
+    val initialDefaultCountry = remember { fr.geotower.data.db.DatabaseCountryStore.getDefault(context) }
     var currentZoom by rememberSaveable { mutableStateOf(15.0) }
-    var currentLat by rememberSaveable { mutableStateOf(48.8584) }
-    var map3dLat by rememberSaveable { mutableDoubleStateOf(48.8584) }
-    var map3dLon by rememberSaveable { mutableDoubleStateOf(2.2137) }
+    var currentLat by rememberSaveable { mutableStateOf(initialDefaultCountry.defaultMapLat) }
+    var map3dLat by rememberSaveable { mutableDoubleStateOf(initialDefaultCountry.defaultMapLat) }
+    var map3dLon by rememberSaveable { mutableDoubleStateOf(initialDefaultCountry.defaultMapLon) }
     var map3dZoom by rememberSaveable { mutableDoubleStateOf(15.0) }
     var map3dBearing by rememberSaveable { mutableFloatStateOf(0f) }
     var map3dRecenterTrigger by remember { mutableLongStateOf(0L) }
@@ -2976,7 +2977,15 @@ fun MapScreen(
             MapFilterDefaults.endSharedPhotoSession(draftId, prefs)
         }
         restoreOperatorSearchSelection()
-        safeBackNavigation.navigateBack()
+        if (navController.previousBackStackEntry != null) {
+            safeBackNavigation.navigateBack()
+        } else {
+            val fallbackRoute = if (AppConfig.isBottomNavActive()) "map" else AppConfig.homeRoute()
+            navController.navigate(fallbackRoute) {
+                popUpTo(0)
+                launchSingleTop = true
+            }
+        }
     }
 
     LaunchedEffect(isSharedPhotoSelectionMode, pendingSharedPhotoDraftId) {
@@ -5652,9 +5661,22 @@ fun MapScreen(
                         currentLat = focusLat
                         lastStableMapCenter = initialCenter
                     } else {
-                        val lastLat = prefs.getFloat("last_map_lat", 46.2276f).toDouble()
-                        val lastLon = prefs.getFloat("last_map_lon", 2.2137f).toDouble()
-                        val lastZoom = prefs.getFloat("last_map_zoom", 6.0f).toDouble()
+                        val defaultCountry = fr.geotower.data.db.DatabaseCountryStore.getDefault(ctx)
+                        val lastLat = if (hasSavedPosition) {
+                            prefs.getFloat("last_map_lat", defaultCountry.defaultMapLat.toFloat()).toDouble()
+                        } else {
+                            defaultCountry.defaultMapLat
+                        }
+                        val lastLon = if (hasSavedPosition) {
+                            prefs.getFloat("last_map_lon", defaultCountry.defaultMapLon.toFloat()).toDouble()
+                        } else {
+                            defaultCountry.defaultMapLon
+                        }
+                        val lastZoom = if (hasSavedPosition) {
+                            prefs.getFloat("last_map_zoom", defaultCountry.defaultMapZoom.toFloat()).toDouble()
+                        } else {
+                            defaultCountry.defaultMapZoom
+                        }
                         val initialCenter = GeoPoint(lastLat, lastLon)
                         controller.setCenter(initialCenter)
                         controller.setZoom(lastZoom)

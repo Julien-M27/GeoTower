@@ -13,7 +13,9 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -82,6 +84,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
@@ -216,11 +219,12 @@ fun SpeedtestsScreen(
 
     val activeFocusedId = focusedEntryId?.takeIf { id -> filteredEntries.any { it.id == id } }
 
-    BackHandler(enabled = isSelectionMode || activeFocusedId != null) {
-        if (isSelectionMode) {
-            selectedIds = emptyList()
-        } else {
-            focusedEntryId = null
+    BackHandler {
+        when {
+            isImporting -> Unit
+            isSelectionMode -> selectedIds = emptyList()
+            activeFocusedId != null -> focusedEntryId = null
+            else -> onBack()
         }
     }
 
@@ -368,9 +372,17 @@ fun SpeedtestsScreen(
                 }
             }
 
+            val isWideLayout = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 600
             AnimatedVisibility(visible = showStats && filteredEntries.isNotEmpty() && !isSelectionMode) {
                 SpeedtestStatsPanel(
                     entries = filteredEntries,
+                    onOpenEntry = { entryId ->
+                        if (isWideLayout) {
+                            focusedEntryId = entryId
+                        } else {
+                            onOpenEntry(entryId)
+                        }
+                    },
                     modifier = Modifier.padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(8.dp))
                 )
             }
@@ -823,6 +835,7 @@ private fun SpeedtestTimelineRow(
 @Composable
 private fun SpeedtestStatsPanel(
     entries: List<SpeedtestEntryEntity>,
+    onOpenEntry: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val downloads = entries.mapNotNull { it.downloadMbps }
@@ -830,9 +843,15 @@ private fun SpeedtestStatsPanel(
     val pings = entries.mapNotNull { it.pingMs }
 
     val avgDl = downloads.takeIf { it.isNotEmpty() }?.average()
-    val maxDl = downloads.maxOrNull()
+    val maxDlEntry = remember(entries) {
+        entries.filter { it.downloadMbps != null }.maxByOrNull { it.downloadMbps!! }
+    }
+    val maxDl = maxDlEntry?.downloadMbps
     val avgUl = uploads.takeIf { it.isNotEmpty() }?.average()
-    val minPing = pings.minOrNull()
+    val minPingEntry = remember(entries) {
+        entries.filter { it.pingMs != null }.minByOrNull { it.pingMs!! }
+    }
+    val minPing = minPingEntry?.pingMs
 
     Card(
         shape = RoundedCornerShape(18.dp),
@@ -853,7 +872,8 @@ private fun SpeedtestStatsPanel(
                 )
                 StatChip(
                     label = stringResource(R.string.speedtests_stat_max_dl),
-                    value = maxDl?.let { formatMbps(it) } ?: "—"
+                    value = maxDl?.let { formatMbps(it) } ?: "—",
+                    onClick = maxDlEntry?.let { entry -> { onOpenEntry(entry.id) } }
                 )
                 StatChip(
                     label = stringResource(R.string.speedtests_stat_avg_ul),
@@ -861,7 +881,8 @@ private fun SpeedtestStatsPanel(
                 )
                 StatChip(
                     label = stringResource(R.string.speedtests_stat_min_ping),
-                    value = minPing?.let { "${formatNum(it)} ms" } ?: "—"
+                    value = minPing?.let { "${formatNum(it)} ms" } ?: "—",
+                    onClick = minPingEntry?.let { entry -> { onOpenEntry(entry.id) } }
                 )
             }
 
@@ -871,6 +892,7 @@ private fun SpeedtestStatsPanel(
             if (chronological.size >= 2) {
                 SpeedtestEvolutionChart(
                     entries = chronological,
+                    onPointClick = { entry -> onOpenEntry(entry.id) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(120.dp)
@@ -881,8 +903,21 @@ private fun SpeedtestStatsPanel(
 }
 
 @Composable
-private fun StatChip(label: String, value: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+private fun StatChip(
+    label: String,
+    value: String,
+    onClick: (() -> Unit)? = null
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .clip(RoundedCornerShape(10.dp))
+            .then(
+                if (onClick != null) Modifier.clickable(onClick = onClick)
+                else Modifier
+            )
+            .padding(horizontal = 6.dp, vertical = 4.dp)
+    ) {
         Text(
             text = value,
             style = MaterialTheme.typography.labelLarge,
@@ -900,6 +935,7 @@ private fun StatChip(label: String, value: String) {
 @Composable
 private fun SpeedtestEvolutionChart(
     entries: List<SpeedtestEntryEntity>,
+    onPointClick: (SpeedtestEntryEntity) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val dlColor = MaterialTheme.colorScheme.primary
@@ -911,7 +947,40 @@ private fun SpeedtestEvolutionChart(
         maxOf(m, 1.0)
     }
 
-    Canvas(modifier = modifier) {
+    Canvas(
+        modifier = modifier.pointerInput(entries, maxSpeed) {
+            detectTapGestures { tapOffset ->
+                if (entries.isEmpty()) return@detectTapGestures
+                val w = size.width.toFloat()
+                val h = size.height.toFloat()
+                val pad = 8.dp.toPx()
+                val usableW = (w - 2 * pad).coerceAtLeast(1f)
+                val usableH = (h - 2 * pad).coerceAtLeast(1f)
+                val maxHitDistancePx = 28.dp.toPx()
+
+                var bestEntry: SpeedtestEntryEntity? = null
+                var bestDistance = Float.MAX_VALUE
+
+                entries.forEachIndexed { index, entry ->
+                    val x = if (entries.size <= 1) pad + usableW / 2f
+                    else pad + usableW * (index.toFloat() / (entries.size - 1).toFloat())
+
+                    listOfNotNull(entry.downloadMbps, entry.uploadMbps).forEach { value ->
+                        val y = pad + usableH * (1f - (value / maxSpeed).toFloat().coerceIn(0f, 1f))
+                        val dist = kotlin.math.hypot(tapOffset.x - x, tapOffset.y - y)
+                        if (dist < bestDistance) {
+                            bestDistance = dist
+                            bestEntry = entry
+                        }
+                    }
+                }
+
+                if (bestEntry != null && bestDistance <= maxHitDistancePx) {
+                    onPointClick(bestEntry!!)
+                }
+            }
+        }
+    ) {
         val w = size.width
         val h = size.height
         val pad = 8.dp.toPx()

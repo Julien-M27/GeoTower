@@ -44,6 +44,9 @@
     <string name="common_none">Keiner</string>
     <string name="common_current_value">Aktuell: %1$s</string>
     <string name="settings_default_operator">Standardbetreiber</string>
+    <string name="settings_default_country_title">Standardland</string>
+    <string name="settings_default_country_desc">Wird beim ersten Öffnen der Karte oder als Fallback verwendet</string>
+    <string name="country_source_ca_short">ISED</string>
     <string name="operator_region_metro">Französisches Festland</string>
     <string name="operator_region_overseas">Übersee</string>
     <string name="settings_units_title">Maßeinheiten</string>
@@ -3008,6 +3011,7 @@
     <string name="appstrings_release_v2142_summary_speedtests_ocr_max_priority_and_raw_text">Priorisierung der Hauptgeschwindigkeiten vor MAX-Spitzen in der OCR und Anzeige des erkannten OCR-Textes in den Details</string>
     <string name="appstrings_release_v2143_summary_speedtests_ocr_dual_pass_and_decimals">Zweiter OCR-Durchlauf mit reduzierter Skalierung für große Ziffern und Normalisierung getrennter Dezimalstellen bei Speedtests</string>
     <string name="appstrings_release_v2144_summary_speedtests_map_thumbnails_and_translations">Klickbare Speedtest-Vorschaubilder auf der Karte, Teilen/Kopieren von OCR-Text und vollständige Oberflächenübersetzungen</string>
+    <string name="appstrings_release_v2145_summary_default_country_and_speedtests_stats">Auswahl des Standardlandes (Start und Einstellungen) sowie anklickbare Statistikkarten bei den Speedtests</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Netzwerkanfragen-Protokoll</string>

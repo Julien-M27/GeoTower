@@ -44,6 +44,9 @@
     <string name="common_none">Ninguno</string>
     <string name="common_current_value">Actual: %1$s</string>
     <string name="settings_default_operator">Operador predeterminado</string>
+    <string name="settings_default_country_title">País predeterminado</string>
+    <string name="settings_default_country_desc">Usado al abrir el mapa por primera vez o como respaldo</string>
+    <string name="country_source_ca_short">ISED</string>
     <string name="operator_region_metro">Francia metropolitana</string>
     <string name="operator_region_overseas">Ultramar</string>
     <string name="settings_units_title">Unidades de medida</string>
@@ -3008,6 +3011,7 @@
     <string name="appstrings_release_v2142_summary_speedtests_ocr_max_priority_and_raw_text">Prioridad a las velocidades principales frente a los picos MAX en OCR y visualización del texto OCR detectado en los detalles</string>
     <string name="appstrings_release_v2143_summary_speedtests_ocr_dual_pass_and_decimals">Doble pasada OCR a escala reducida para cifras grandes y normalización de decimales espaciados en speedtests</string>
     <string name="appstrings_release_v2144_summary_speedtests_map_thumbnails_and_translations">Miniaturas interactivas de speedtests en el mapa, compartir imagen y copiar OCR, y traducciones completas de la interfaz</string>
+    <string name="appstrings_release_v2145_summary_default_country_and_speedtests_stats">Configuración del país predeterminado (inicio y preferencias) y tarjetas de estadísticas interactivas en Speedtests</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Registro de solicitudes de red</string>

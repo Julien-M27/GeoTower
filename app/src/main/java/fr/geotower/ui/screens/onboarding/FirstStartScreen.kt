@@ -267,6 +267,7 @@ fun FirstStartScreen(
     var showOperatorSheet by remember { mutableStateOf(false) }
     var showWarningDialog by remember { mutableStateOf(false) } // État du pop-up d'avertissement
     var showUnitSheet by remember { mutableStateOf(false) }
+    var showDefaultCountrySheet by remember { mutableStateOf(false) }
     var showPreferenceProfilesSheet by remember { mutableStateOf(false) }
 
     // ✅ NOUVEAU : Variables pour gérer le pop-up de succès de fin de téléchargement
@@ -392,6 +393,7 @@ fun FirstStartScreen(
                                 cardBorder = cardBorder,
                                 bubbleColor = bubbleColor,
                                 onOpenOperatorSheet = { showOperatorSheet = true },
+                                onOpenDefaultCountrySheet = { showDefaultCountrySheet = true },
                                 onOpenUnitSheet = { showUnitSheet = true },
                                 onOpenPreferenceProfilesSheet = { showPreferenceProfilesSheet = true },
                                 onSafeClick = safeClick
@@ -689,6 +691,14 @@ fun FirstStartScreen(
             bubbleColor = bubbleColor
         )
     }
+    if (showDefaultCountrySheet) {
+        fr.geotower.ui.components.DefaultCountrySettingsSheet(
+            onDismiss = { showDefaultCountrySheet = false },
+            sheetState = sheetState,
+            useOneUi = useOneUi,
+            bubbleColor = bubbleColor
+        )
+    }
     if (showPreferenceProfilesSheet) {
         PreferenceProfilesSheet(
             onDismiss = { showPreferenceProfilesSheet = false },
@@ -708,11 +718,17 @@ fun StepPreferencesDesign(
     cardBorder: BorderStroke?,
     bubbleColor: Color,
     onOpenOperatorSheet: () -> Unit,
+    onOpenDefaultCountrySheet: () -> Unit,
     onOpenUnitSheet: () -> Unit,
     onOpenPreferenceProfilesSheet: () -> Unit,
     onSafeClick: SafeClick
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
+    val context = LocalContext.current
+    val defaultCountry by remember {
+        fr.geotower.data.db.DatabaseCountryStore.getDefault(context)
+        fr.geotower.data.db.DatabaseCountryStore.defaultCountryState
+    }
 
     val defaultOperator by AppConfig.defaultOperator
 
@@ -753,6 +769,19 @@ fun StepPreferencesDesign(
                 }
             }
         }
+
+        Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
+
+        fr.geotower.ui.components.DefaultCountryPreferenceCard(
+            defaultCountry = defaultCountry,
+            onClick = onOpenDefaultCountrySheet,
+            shape = cardShape,
+            border = cardBorder,
+            bubbleColor = bubbleColor,
+            useOneUi = useOneUi,
+            safeClick = onSafeClick,
+            clickId = "onboarding_default_country"
+        )
 
         Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
         // --- CARTE UNITÉS ---

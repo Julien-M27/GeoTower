@@ -78,6 +78,9 @@
     <string name="common_none">Aucun</string>
     <string name="common_current_value">Actuel : %1$s</string>
     <string name="settings_default_operator">Opérateur par défaut</string>
+    <string name="settings_default_country_title">Pays par défaut</string>
+    <string name="settings_default_country_desc">Utilisé à l\'ouverture initiale de la carte ou en repli</string>
+    <string name="country_source_ca_short">ISDE</string>
     <string name="operator_region_metro">Métropole</string>
     <string name="operator_region_overseas">Outre-mer</string>
     <string name="settings_units_title">Unités de mesure</string>
@@ -3010,6 +3013,7 @@
     <string name="appstrings_release_v2142_summary_speedtests_ocr_max_priority_and_raw_text">Priorité aux débits principaux sur les valeurs MAX en OCR et affichage du texte OCR détecté dans les détails</string>
     <string name="appstrings_release_v2143_summary_speedtests_ocr_dual_pass_and_decimals">Double passe OCR à échelle réduite pour les grands chiffres et normalisation des décimales espacées dans les speedtests</string>
     <string name="appstrings_release_v2144_summary_speedtests_map_thumbnails_and_translations">Miniatures des speedtests géolocalisés sur la carte, partage et copie OCR, et traductions complètes de l\'interface</string>
+    <string name="appstrings_release_v2145_summary_default_country_and_speedtests_stats">Choix du pays par défaut (démarrage et préférences) et cartes de statistiques cliquables dans les Speedtests</string>
 
     <!-- Journal des requêtes réseau -->
     <string name="network_log_title">Journal des requêtes réseau</string>

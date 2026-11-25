@@ -44,6 +44,9 @@
     <string name="common_none">None</string>
     <string name="common_current_value">Current : %1$s</string>
     <string name="settings_default_operator">Default Operator</string>
+    <string name="settings_default_country_title">Default country</string>
+    <string name="settings_default_country_desc">Used when opening the map for the first time or as fallback</string>
+    <string name="country_source_ca_short">ISED</string>
     <string name="operator_region_metro">Mainland France</string>
     <string name="operator_region_overseas">Overseas</string>
     <string name="settings_units_title">Units of measure</string>
@@ -3008,6 +3011,7 @@
     <string name="appstrings_release_v2142_summary_speedtests_ocr_max_priority_and_raw_text">Prioritized main speed values over chart MAX peaks in OCR and added raw OCR text viewer in speedtest details</string>
     <string name="appstrings_release_v2143_summary_speedtests_ocr_dual_pass_and_decimals">Dual-scale OCR pass for large display digits and spaced decimal normalization in speedtests</string>
     <string name="appstrings_release_v2144_summary_speedtests_map_thumbnails_and_translations">Clickable speedtest thumbnails on the map, speedtest image sharing and OCR copy, and complete UI translations</string>
+    <string name="appstrings_release_v2145_summary_default_country_and_speedtests_stats">Customizable default country setting (onboarding and preferences) and clickable Speedtests statistics cards</string>
 
     <!-- Network request log -->
     <string name="network_log_title">Network requests log</string>
