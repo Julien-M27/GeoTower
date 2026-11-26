@@ -75,17 +75,23 @@ impl<'local, 'a> ProgressSink for JniProgressSink<'local, 'a> {
             },
             None => JObject::null(),
         };
-        let _ = self.env.call_method(
-            self.callback,
-            "onProgress",
-            "(IILjava/lang/String;J)V",
-            &[
-                JValue::Int(phase_ordinal),
-                JValue::Int(percent),
-                JValue::Object(&j_detail),
-                JValue::Long(processed),
-            ],
-        );
+        if self
+            .env
+            .call_method(
+                self.callback,
+                "onProgress",
+                "(IILjava/lang/String;J)V",
+                &[
+                    JValue::Int(phase_ordinal),
+                    JValue::Int(percent),
+                    JValue::Object(&j_detail),
+                    JValue::Long(processed),
+                ],
+            )
+            .is_err()
+        {
+            let _ = self.env.exception_clear();
+        }
         let _ = self.env.delete_local_ref(j_detail);
     }
 
@@ -96,7 +102,10 @@ impl<'local, 'a> ProgressSink for JniProgressSink<'local, 'a> {
                 Ok(1) => Err("CANCELLED".to_string()),
                 _ => Ok(()),
             },
-            Err(_) => Ok(()),
+            Err(_) => {
+                let _ = self.env.exception_clear();
+                Ok(())
+            }
         }
     }
 }

@@ -92,3 +92,7 @@
 -keep class com.google.android.libraries.vision.visionkit.** { *; }
 -dontwarn com.google.mlkit.**
 -dontwarn com.google.android.gms.internal.mlkit_vision_text_common.**
+
+# Rust JNI bridge (libgeotower_builder.so)
+-keep class fr.geotower.data.build.RustDbBuilder* { *; }
+-keep class * implements fr.geotower.data.build.RustDbBuilder$ProgressCallback { *; }

@@ -32,7 +32,7 @@ internal data class ReleaseNoteItem(
 @Composable
 internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
     section(stringResource(R.string.nav_settings)) {
-        item(stringResource(R.string.appstrings_release_v2148_summary_rust_db_builder_and_update_scheduler))
+        item(stringResource(R.string.appstrings_release_v2149_summary_rust_jni_release_fix))
     }
 }
 

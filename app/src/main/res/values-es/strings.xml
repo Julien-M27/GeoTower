@@ -3010,6 +3010,7 @@
     <string name="appstrings_release_v2142_summary_speedtests_ocr_max_priority_and_raw_text">Prioridad a las velocidades principales frente a los picos MAX en OCR y visualización del texto OCR detectado en los detalles</string>
     <string name="appstrings_release_v2143_summary_speedtests_ocr_dual_pass_and_decimals">Doble pasada OCR a escala reducida para cifras grandes y normalización de decimales espaciados en speedtests</string>
     <string name="appstrings_release_v2144_summary_speedtests_map_thumbnails_and_translations">Miniaturas interactivas de speedtests en el mapa, compartir imagen y copiar OCR, y traducciones completas de la interfaz</string>
+    <string name="appstrings_release_v2149_summary_rust_jni_release_fix">Mayor estabilidad del motor nativo Rust para la generación local de bases en versiones Release</string>
     <string name="appstrings_release_v2148_summary_rust_db_builder_and_update_scheduler">Motor experimental en Rust para la generación local de bases de datos y mejoras en el programador de actualizaciones</string>
     <string name="appstrings_release_v2147_summary_spatial_ocr_permissions_and_i18n">OCR espacial para speedtests, diálogos de permisos unificados, ajustes de Garmin y traducciones completas</string>
     <string name="appstrings_release_v2146_summary_nperf_ocr_and_garmin_watch">Mejora del OCR de nPerf y selección/ping del reloj Garmin activo</string>
