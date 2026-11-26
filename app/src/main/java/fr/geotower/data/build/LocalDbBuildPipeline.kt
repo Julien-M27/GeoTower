@@ -110,14 +110,15 @@ class LocalDbBuildPipeline(
         packs: Packs,
         force: Boolean = false,
         sourceConfig: LocalBuildSourceConfig = LocalBuildSourceStore.load(context),
+        engine: LocalBuildEngine = LocalBuildEngine.KOTLIN,
         onProgress: (BuildProgressUpdate) -> Unit,
         onPause: () -> Unit = {},
     ): Result {
         val metrics = LocalBuildMetrics()
         val device = BuildDeviceProfiles.read(context)
-        val result = runMeasured(context, packs, force, sourceConfig, metrics, onProgress, onPause)
+        val result = runMeasured(context, packs, force, sourceConfig, engine, metrics, onProgress, onPause)
         runCatching {
-            LocalBuildReportStore.save(context, metrics.report(device, packs.label, result.success, result.reason))
+            LocalBuildReportStore.save(context, metrics.report(device, packs.label, result.success, result.reason, engine = engine))
         }.onFailure { AppLogger.w("GeoTowerDb", "Rapport de mesures non enregistre", it) }
         return result
     }
@@ -127,6 +128,7 @@ class LocalDbBuildPipeline(
         packs: Packs,
         force: Boolean,
         sourceConfig: LocalBuildSourceConfig,
+        engine: LocalBuildEngine,
         metrics: LocalBuildMetrics,
         onProgress: (BuildProgressUpdate) -> Unit,
         onPause: () -> Unit,
@@ -557,6 +559,93 @@ class LocalDbBuildPipeline(
                     }
                 }.onFailure { AppLogger.w("GeoTowerDb", "ARCEP resolve failed (non-fatal)", it) }
                 metrics.noteFile("arcep (${arcepFiles.size} CSV)", arcepFiles.sumOf { it.length() })
+            }
+
+            if (engine == LocalBuildEngine.RUST) {
+                val wantRadio = packs.anyRadio && refZip.exists()
+                if (packs.anyRadio && !refZip.exists() && !packs.mobile) {
+                    return@withContext Result(false, "References ANFR indisponibles pour la base radio")
+                }
+                val radioVersion = buildVersion()
+                val mobileVersion = buildVersion()
+                val rustError = RustDbBuilder.build(
+                    RustDbBuilder.Config(
+                        packMobile = packs.mobile,
+                        packRadio = wantRadio,
+                        allowedServiceMask = packs.allowedServiceMask,
+                        dataZip = dataZip,
+                        refZip = refZip.takeIf { it.exists() },
+                        observatoireCsv = observatoireCsv.takeIf { packs.mobile && it.exists() },
+                        arcepFiles = arcepFiles,
+                        builtMobileFile = builtFile,
+                        stagingMobileFile = stagingFile,
+                        builtRadioFile = builtRadioFile,
+                        stagingRadioFile = radioStagingFile,
+                        version = mobileVersion,
+                        zipVersion = monthlyFileVersion,
+                        quarterlyVersion = arcepQuarter,
+                        totalRamBytes = eligibility.totalRamBytes,
+                        communes = communes,
+                        departments = departments,
+                    ),
+                    object : RustDbBuilder.ProgressCallback {
+                        override fun onProgress(phaseOrdinal: Int, percent: Int, detail: String?, processed: Long) {
+                            val phase = BuildPhase.values().getOrNull(phaseOrdinal) ?: BuildPhase.READING_SUPPORTS
+                            emit(phase, percent, detail, processed)
+                        }
+
+                        override fun checkControl(): Int {
+                            return try {
+                                onPause()
+                                0
+                            } catch (_: CancellationException) {
+                                1
+                            }
+                        }
+                    },
+                )
+                if (rustError == "CANCELLED") throw CancellationException("Build cancelled")
+                if (rustError != null) return@withContext Result(false, rustError)
+
+                if (packs.mobile) {
+                    emit(BuildPhase.COMPUTING_STATS, 92, null)
+                    runBuildCatching {
+                        val deptDb = AndroidSqlDatabase(SQLiteDatabase.openOrCreateDatabase(builtFile, null))
+                        try {
+                            DepartmentStatsBuilder.populateDepartmentStats(deptDb, departments)
+                        } finally {
+                            deptDb.close()
+                        }
+                    }.onFailure { AppLogger.w("GeoTowerDb", "Department stats failed (non-fatal)", it) }
+
+                    emit(BuildPhase.INSTALLING, 94, null)
+                    metrics.noteFile("${GeoTowerDatabaseValidator.DB_NAME} (produite)", builtFile.length())
+                    val validation = GeoTowerDatabaseValidator.validateDatabaseFile(builtFile)
+                    if (!validation.isValid) {
+                        return@withContext Result(false, "Validation : ${validation.reason ?: "base invalide"}")
+                    }
+                    if (!DatabaseDownloader.installBuiltDatabase(context, builtFile)) {
+                        return@withContext Result(false, "Installation impossible (échange du fichier de base)")
+                    }
+                    AppConfig.alignLocalModeLevelAfterLocalBuild(context)
+                }
+
+                if (wantRadio && builtRadioFile.exists()) {
+                    emit(BuildPhase.INSTALLING, 98, null)
+                    metrics.noteFile("${RadioDatabaseValidator.DB_NAME} (produite)", builtRadioFile.length())
+                    val radioValidation = RadioDatabaseValidator.validateDatabaseFile(builtRadioFile)
+                    if (radioValidation.isValid) {
+                        if (RadioDatabaseDownloader.installBuiltRadioDatabase(context, builtRadioFile)) {
+                            LocalDbProvenance.recordRadioLocalBuild(context, radioVersion)
+                            if (!packs.mobile) AppConfig.alignLocalModeLevelAfterLocalBuild(context)
+                        }
+                    } else if (!packs.mobile) {
+                        return@withContext Result(false, "Validation radio : ${radioValidation.reason ?: "base invalide"}")
+                    }
+                }
+
+                emit(BuildPhase.DONE, 100, null)
+                return@withContext Result(true)
             }
 
             AnfrMonthlyZip(dataZip).use { data ->

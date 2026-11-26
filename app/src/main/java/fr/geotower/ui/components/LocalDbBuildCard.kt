@@ -74,9 +74,11 @@ import fr.geotower.data.build.BuildImportType
 import fr.geotower.data.build.BuildSourceLink
 import fr.geotower.data.build.labelRes
 import fr.geotower.data.build.LocalBuildCapability
+import fr.geotower.data.build.LocalBuildEngine
 import fr.geotower.data.build.LocalBuildSourceConfig
 import fr.geotower.data.build.LocalBuildSourceStore
 import fr.geotower.data.build.OfficialSources
+import fr.geotower.data.build.RustDbBuilder
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.db.DbOperationTimings
 import fr.geotower.data.db.LocalDbProvenance
@@ -159,6 +161,8 @@ fun LocalDbBuildCard(
     // Packs a generer : Mobile coche par defaut (cas le plus courant + le plus utile).
     var packMobile by remember { mutableStateOf(true) }
     var packRadio by remember { mutableStateOf(false) }
+    val rustAvailable = remember { RustDbBuilder.isAvailable() }
+    var selectedEngine by remember { mutableStateOf(LocalBuildEngine.KOTLIN) }
 
     // L'eligibilite depend des packs COCHES : le stockage necessaire va du simple au double entre
     // « mobile seul » et « tout », alors que la memoire, elle, ne bouge presque pas. Un appareil
@@ -785,6 +789,61 @@ fun LocalDbBuildCard(
                         }
                     }
 
+                    if (rustAvailable) {
+                        Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+                        Text(
+                            text = "Moteur de génération",
+                            fontWeight = FontWeight.Bold,
+                            style = sizing.textStyle(MaterialTheme.typography.titleSmall),
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(bottom = sizing.spacing(6.dp)),
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp)),
+                        ) {
+                            listOf(
+                                LocalBuildEngine.KOTLIN to "Kotlin (standard)",
+                                LocalBuildEngine.RUST to "Rust (expérimental)",
+                            ).forEach { (engineOption, label) ->
+                                val selected = selectedEngine == engineOption
+                                Surface(
+                                    shape = RoundedCornerShape(sizing.component(10.dp)),
+                                    border = BorderStroke(
+                                        1.dp,
+                                        if (selected) MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
+                                    ),
+                                    color = if (selected) {
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                                    } else {
+                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
+                                    },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(sizing.component(10.dp)))
+                                        .clickable { selectedEngine = engineOption },
+                                ) {
+                                    Text(
+                                        text = label,
+                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                        style = sizing.textStyle(MaterialTheme.typography.labelLarge),
+                                        color = if (selected) {
+                                            MaterialTheme.colorScheme.primary
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurfaceVariant
+                                        },
+                                        textAlign = TextAlign.Center,
+                                        modifier = Modifier.padding(
+                                            horizontal = sizing.spacing(8.dp),
+                                            vertical = sizing.spacing(10.dp),
+                                        ),
+                                    )
+                                }
+                            }
+                        }
+                    }
+
                     Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
                     Button(
                         onClick = {
@@ -796,6 +855,7 @@ fun LocalDbBuildCard(
                                     mobile = packMobile,
                                     radio = packRadio,
                                     force = forceBuild,
+                                    engine = selectedEngine,
                                 )
                             }
                         },

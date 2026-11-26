@@ -169,6 +169,7 @@ class LocalDbBuildWorker(
             nonMobileTech = inputData.getBoolean(KEY_PACK_NONMOBILE, true),
         )
         val force = inputData.getBoolean(KEY_FORCE, false)
+        val engine = fr.geotower.data.build.LocalBuildEngine.fromId(inputData.getString(KEY_ENGINE))
 
         try {
             val result = LocalDbBuildPipeline().run(
@@ -176,6 +177,7 @@ class LocalDbBuildWorker(
                 packs = packs,
                 force = force,
                 sourceConfig = fr.geotower.data.build.LocalBuildSourceStore.load(context),
+                engine = engine,
                 onProgress = { update: BuildProgressUpdate ->
                     if (update.importType == BuildImportType.WEEKLY &&
                         update.sourceUrl != null && update.sourceLink != null
@@ -459,6 +461,7 @@ class LocalDbBuildWorker(
 
         /** L'utilisateur a demande a generer malgre un appareil sous les budgets mesures. */
         const val KEY_FORCE = "force"
+        const val KEY_ENGINE = "build_engine"
 
         private const val TAG = "GeoTowerDb"
         fun formatDatabasesLabel(
@@ -501,20 +504,23 @@ class LocalDbBuildWorker(
             mobile: Boolean,
             radio: Boolean,
             force: Boolean = false,
-        ) = buildRequest(mobile, radioBroadcast = radio, nonMobileTech = radio, force = force)
+            engine: fr.geotower.data.build.LocalBuildEngine = fr.geotower.data.build.LocalBuildEngine.KOTLIN,
+        ) = buildRequest(mobile, radioBroadcast = radio, nonMobileTech = radio, force = force, engine = engine)
 
         fun enqueue(
             workManager: WorkManager,
             mobile: Boolean = true,
             radio: Boolean = true,
             force: Boolean = false,
-        ) = enqueue(workManager, mobile, radioBroadcast = radio, nonMobileTech = radio, force = force)
+            engine: fr.geotower.data.build.LocalBuildEngine = fr.geotower.data.build.LocalBuildEngine.KOTLIN,
+        ) = enqueue(workManager, mobile, radioBroadcast = radio, nonMobileTech = radio, force = force, engine = engine)
 
         fun buildRequest(
             mobile: Boolean,
             radioBroadcast: Boolean,
             nonMobileTech: Boolean,
             force: Boolean = false,
+            engine: fr.geotower.data.build.LocalBuildEngine = fr.geotower.data.build.LocalBuildEngine.KOTLIN,
         ) =
             OneTimeWorkRequestBuilder<LocalDbBuildWorker>()
                 .setInputData(
@@ -523,6 +529,7 @@ class LocalDbBuildWorker(
                         KEY_PACK_RADIO_BROADCAST to radioBroadcast,
                         KEY_PACK_NONMOBILE to nonMobileTech,
                         KEY_FORCE to force,
+                        KEY_ENGINE to engine.id,
                     ),
                 )
                 // Le réseau est vérifié au démarrage, puis le traitement peut continuer hors ligne.
@@ -541,11 +548,12 @@ class LocalDbBuildWorker(
             radioBroadcast: Boolean = true,
             nonMobileTech: Boolean = true,
             force: Boolean = false,
+            engine: fr.geotower.data.build.LocalBuildEngine = fr.geotower.data.build.LocalBuildEngine.KOTLIN,
         ) {
             workManager.enqueueUniqueWork(
                 UNIQUE_WORK_NAME,
                 ExistingWorkPolicy.KEEP,
-                buildRequest(mobile, radioBroadcast, nonMobileTech, force),
+                buildRequest(mobile, radioBroadcast, nonMobileTech, force, engine),
             )
         }
     }

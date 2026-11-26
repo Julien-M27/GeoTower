@@ -27,10 +27,16 @@ data class ChangelogMilestone(
 object AppChangelogRepository {
     val milestones: List<ChangelogMilestone> = listOf(
         ChangelogMilestone(
-            versionName = "2.1.47",
-            releaseDate = "2026-11-25",
+            versionName = "2.1.48",
+            releaseDate = "2026-11-26",
             isCurrent = true,
             badge = MilestoneBadge.CURRENT,
+            summary = "Moteur expérimental Rust pour la génération locale des bases et fiabilisation du planificateur de mises à jour",
+            itemResIds = listOf(R.string.appstrings_release_v2148_summary_rust_db_builder_and_update_scheduler)
+        ),
+        ChangelogMilestone(
+            versionName = "2.1.47",
+            releaseDate = "2026-11-25",
             summary = "OCR spatial des speedtests, dialogues de permissions unifiés, ajustements Garmin et traductions complètes",
             itemResIds = listOf(R.string.appstrings_release_v2147_summary_spatial_ocr_permissions_and_i18n)
         ),

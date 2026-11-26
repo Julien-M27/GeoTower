@@ -143,6 +143,7 @@ class LocalBuildMetrics(private val nowMs: () -> Long = System::currentTimeMilli
         packs: String,
         success: Boolean,
         reason: String?,
+        engine: LocalBuildEngine = LocalBuildEngine.KOTLIN,
     ): List<String> {
         commitRows()
         currentPhase?.let { phaseDurations[it] = (phaseDurations[it] ?: 0L) + (nowMs() - phaseStartedAt) }
@@ -151,6 +152,7 @@ class LocalBuildMetrics(private val nowMs: () -> Long = System::currentTimeMilli
         val lines = ArrayList<String>()
         lines += "Resultat : " + (if (success) "OK" else "echec — ${reason ?: "cause inconnue"}")
         lines += "Duree totale : " + duration(nowMs() - startedAt)
+        lines += "Moteur : ${if (engine == LocalBuildEngine.RUST) "Rust (natif)" else "Kotlin"}"
         lines += "Packs : $packs"
         lines += "Appareil : RAM ${mo(device.totalRamBytes)} | tas Java max ${mo(device.heapLimitBytes)} " +
             "(largeHeap ${mo(device.largeHeapLimitBytes)}) | ${device.processors} coeurs | " +

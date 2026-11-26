@@ -18,8 +18,9 @@ object UpdateCheckScheduler {
     private const val PREFS_NAME = "GeoTowerPrefs"
     private const val UPDATE_NOTIFICATIONS_KEY = "enable_update_notifications"
     private const val DEFAULT_UPDATE_NOTIFICATIONS_ENABLED = true
-    private const val TARGET_HOUR = 20
-    private const val TARGET_MINUTE = 0
+    private val REGULAR_TARGET_HOURS = listOf(8, 20)
+    private val THURSDAY_TARGET_HOURS = listOf(8, 15, 16, 17, 18, 19, 20, 21, 22, 23)
+    private val FRIDAY_TARGET_HOURS = listOf(0, 8, 20)
 
     fun reconcile(context: Context) {
         cancelLegacyPeriodicCheck(context)
@@ -77,23 +78,37 @@ object UpdateCheckScheduler {
         )
     }
 
-    internal fun delayUntilNextTargetMillis(nowMillis: Long = System.currentTimeMillis()): Long {
-        val now = Calendar.getInstance().apply {
+    internal fun delayUntilNextTargetMillis(
+        nowMillis: Long = System.currentTimeMillis(),
+        timeZone: java.util.TimeZone = java.util.TimeZone.getDefault()
+    ): Long {
+        val now = Calendar.getInstance(timeZone).apply {
             timeInMillis = nowMillis
         }
-        val next = Calendar.getInstance().apply {
-            timeInMillis = nowMillis
-            set(Calendar.HOUR_OF_DAY, TARGET_HOUR)
-            set(Calendar.MINUTE, TARGET_MINUTE)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
+
+        for (dayOffset in 0..1) {
+            val day = Calendar.getInstance(timeZone).apply {
+                timeInMillis = nowMillis
+                add(Calendar.DAY_OF_YEAR, dayOffset)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            for (hour in targetHoursForDay(day.get(Calendar.DAY_OF_WEEK))) {
+                day.set(Calendar.HOUR_OF_DAY, hour)
+                if (day.after(now)) {
+                    return (day.timeInMillis - now.timeInMillis).coerceAtLeast(0L)
+                }
+            }
         }
 
-        if (!next.after(now)) {
-            next.add(Calendar.DAY_OF_YEAR, 1)
-        }
+        return TimeUnit.HOURS.toMillis(12)
+    }
 
-        return (next.timeInMillis - now.timeInMillis).coerceAtLeast(0L)
+    private fun targetHoursForDay(dayOfWeek: Int): List<Int> = when (dayOfWeek) {
+        Calendar.THURSDAY -> THURSDAY_TARGET_HOURS
+        Calendar.FRIDAY -> FRIDAY_TARGET_HOURS
+        else -> REGULAR_TARGET_HOURS
     }
 
     fun areUpdateNotificationsEnabled(context: Context): Boolean {
