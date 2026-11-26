@@ -1625,7 +1625,9 @@ fun MapScreen(
     // gauche ouvre le menu au lieu de revenir en arrière (la carte est la racine du backstack).
     onOpenSimpleModeMenu: (() -> Unit)? = null,
     // Grand écran (tablette / pliable) : interception du clic pour afficher la fiche dans un volet latéral.
-    onSupportClick: ((supportId: String, operatorKey: String?, lat: Double, lon: Double) -> Boolean)? = null
+    onSupportClick: ((supportId: String, operatorKey: String?, lat: Double, lon: Double) -> Boolean)? = null,
+    // Grand écran (tablette / pliable) : interception du clic sur les filtres pour ouvrir un volet latéral.
+    onFilterClick: (() -> Boolean)? = null
 ) {
     SecureScreenEffect(RemoteFeatureFlags.SecureScreens.MAP)
     val context = LocalContext.current
@@ -7853,7 +7855,13 @@ fun MapScreen(
                             SmallFloatingButton(
                                 icon = Icons.Default.Tune,
                                 desc = txtFilter
-                            ) { safeClick { showSettingsSheet = true } }
+                            ) {
+                                safeClick {
+                                    if (onFilterClick?.invoke() != true) {
+                                        showSettingsSheet = true
+                                    }
+                                }
+                            }
                         }
                     }
                 }

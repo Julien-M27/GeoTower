@@ -74,12 +74,12 @@ import fr.geotower.data.build.BuildImportType
 import fr.geotower.data.build.BuildSourceLink
 import fr.geotower.data.build.labelRes
 import fr.geotower.data.build.LocalBuildCapability
-import fr.geotower.data.build.LocalBuildEngine
 import fr.geotower.data.build.LocalBuildSourceConfig
 import fr.geotower.data.build.LocalBuildSourceStore
 import fr.geotower.data.build.OfficialSources
-import fr.geotower.data.build.RustDbBuilder
 import fr.geotower.data.config.RemoteFeatureFlags
+import fr.geotower.data.db.DatabaseCountry
+import fr.geotower.data.db.DatabaseCountryStore
 import fr.geotower.data.db.DbOperationTimings
 import fr.geotower.data.db.LocalDbProvenance
 import fr.geotower.data.workers.DatabaseDownloadWorker
@@ -158,17 +158,25 @@ fun LocalDbBuildCard(
         ?.getLong(LocalDbBuildWorker.KEY_TOTAL_BYTES, -1L)
         ?: -1L
 
+    var selectedCountry by remember { mutableStateOf(DatabaseCountryStore.activeCountryState.value) }
+    val buildingCountry = if (isBuilding && currentBuild != null && LocalDbBuildWorker.TAG_COUNTRY_CA in currentBuild.tags) {
+        DatabaseCountry.CA
+    } else {
+        selectedCountry
+    }
+    val isFrance = selectedCountry == DatabaseCountry.FR
+
     // Packs a generer : Mobile coche par defaut (cas le plus courant + le plus utile).
     var packMobile by remember { mutableStateOf(true) }
     var packRadio by remember { mutableStateOf(false) }
-    val rustAvailable = remember { RustDbBuilder.isAvailable() }
-    var selectedEngine by remember { mutableStateOf(LocalBuildEngine.KOTLIN) }
+    val effectivePackMobile = if (isFrance) packMobile else true
+    val effectivePackRadio = if (isFrance) packRadio else false
 
     // L'eligibilite depend des packs COCHES : le stockage necessaire va du simple au double entre
     // « mobile seul » et « tout », alors que la memoire, elle, ne bouge presque pas. Un appareil
     // trop juste pour tout generer peut donc tres bien generer le pack mobile.
-    val eligibility = remember(packMobile, packRadio) {
-        LocalBuildCapability.evaluate(context, packMobile, packRadio)
+    val eligibility = remember(effectivePackMobile, effectivePackRadio) {
+        LocalBuildCapability.evaluate(context, effectivePackMobile, effectivePackRadio)
     }
     // « Tenter quand meme » : un appareil sous les budgets mesures n'est pas forcement incapable —
     // ils portent une marge, et un echec ne coute que du temps et des donnees (la base installee
@@ -184,11 +192,11 @@ fun LocalDbBuildCard(
     val sectionRefreshKey = refreshState?.refreshKey ?: 0
     DatabaseRefreshMembership(refreshState, DatabaseRefreshIds.LOCAL_BUILD)
 
-    LaunchedEffect(isBuilding, sectionRefreshKey) {
+    LaunchedEffect(isBuilding, sectionRefreshKey, selectedCountry) {
         withContext(Dispatchers.IO) {
-            mobileInfo = LocalDbProvenance.readMobile(context)
-            radioInfo = LocalDbProvenance.readRadio(context)
-            mobileBuildSource = LocalDbProvenance.readMobileBuildSource(context)
+            mobileInfo = LocalDbProvenance.readMobile(context, selectedCountry)
+            radioInfo = if (isFrance) LocalDbProvenance.readRadio(context) else LocalDbProvenance.Info.NONE
+            mobileBuildSource = if (isFrance) LocalDbProvenance.readMobileBuildSource(context) else LocalDbProvenance.BuildSourceInfo.NONE
         }
         refreshState?.reportRefreshed(DatabaseRefreshIds.LOCAL_BUILD, sectionRefreshKey)
     }
@@ -212,14 +220,18 @@ fun LocalDbBuildCard(
                 )
                 Spacer(modifier = Modifier.width(sizing.spacing(12.dp)))
                 Text(
-                    text = "${stringResource(R.string.appstrings_local_build_title)} (France)",
+                    text = "${stringResource(R.string.appstrings_local_build_title)} (${buildingCountry.displayName})",
                     fontWeight = FontWeight.Bold,
                     style = sizing.textStyle(MaterialTheme.typography.titleMedium),
                 )
             }
 
             Text(
-                text = stringResource(R.string.appstrings_local_build_desc),
+                text = if (buildingCountry == DatabaseCountry.CA) {
+                    stringResource(R.string.appstrings_local_build_desc_ca)
+                } else {
+                    stringResource(R.string.appstrings_local_build_desc)
+                },
                 style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -246,9 +258,13 @@ fun LocalDbBuildCard(
                     Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
                     val phaseOrdinal = currentBuild.progress.getInt(LocalDbBuildWorker.KEY_PHASE, -1)
                     val currentPhase = BuildPhase.values().getOrNull(phaseOrdinal)
-                    val phaseText = currentPhase
-                        ?.let { stringResource(it.labelRes()) }
-                        ?: stringResource(R.string.appstrings_local_build_running)
+                    val phaseText = if (buildingCountry == DatabaseCountry.CA && currentPhase != null) {
+                        stringResource(canadaPhaseLabelRes(currentPhase))
+                    } else {
+                        currentPhase
+                            ?.let { stringResource(it.labelRes()) }
+                            ?: stringResource(R.string.appstrings_local_build_running)
+                    }
                     Text(
                         text = stringResource(R.string.appstrings_local_build_current_step, phaseText),
                         fontWeight = FontWeight.SemiBold,
@@ -520,11 +536,78 @@ fun LocalDbBuildCard(
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
-                                // Duree de la derniere generation locale reussie.
-                                DbOperationTimingText(
-                                    timingKey = DbOperationTimings.LOCAL_BUILD,
-                                    running = false,
-                                    downloaded = false,
+                                // Durees des dernieres generations locales reussies (par pays et Radio separes).
+                                val countryMobileKey = DbOperationTimings.localBuildMobileKey(selectedCountry)
+                                val hasCountryMobileTiming =
+                                    DbOperationTimings.readDurationMs(context, countryMobileKey) != null
+                                val mobileTimingKey = when {
+                                    hasCountryMobileTiming -> countryMobileKey
+                                    selectedCountry == DatabaseCountry.FR -> DbOperationTimings.LOCAL_BUILD
+                                    else -> null
+                                }
+                                if (generatedMobile != null && mobileTimingKey != null) {
+                                    DbOperationTimingText(
+                                        timingKey = mobileTimingKey,
+                                        running = false,
+                                        downloaded = false,
+                                    )
+                                }
+                                if (generatedRadio != null && DbOperationTimings.readDurationMs(context, DbOperationTimings.LOCAL_BUILD_RADIO) != null) {
+                                    DbOperationTimingText(
+                                        timingKey = DbOperationTimings.LOCAL_BUILD_RADIO,
+                                        running = false,
+                                        downloaded = false,
+                                    )
+                                } else if (generatedMobile == null && generatedRadio != null) {
+                                    DbOperationTimingText(
+                                        timingKey = DbOperationTimings.LOCAL_BUILD,
+                                        running = false,
+                                        downloaded = false,
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = sizing.spacing(12.dp)),
+                        horizontalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp)),
+                    ) {
+                        DatabaseCountry.entries.forEach { countryOption ->
+                            val selected = selectedCountry == countryOption
+                            Surface(
+                                shape = RoundedCornerShape(sizing.component(10.dp)),
+                                border = BorderStroke(
+                                    1.dp,
+                                    if (selected) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
+                                ),
+                                color = if (selected) {
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                                } else {
+                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(sizing.component(10.dp)))
+                                    .clickable { selectedCountry = countryOption },
+                            ) {
+                                Text(
+                                    text = "${countryOption.flagEmoji} ${countryOption.displayName}",
+                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                    style = sizing.textStyle(MaterialTheme.typography.labelLarge),
+                                    color = if (selected) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    },
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.padding(
+                                        horizontal = sizing.spacing(8.dp),
+                                        vertical = sizing.spacing(10.dp),
+                                    ),
                                 )
                             }
                         }
@@ -543,24 +626,27 @@ fun LocalDbBuildCard(
                         label = stringResource(R.string.appstrings_local_build_pack_mobile),
                         subtitle = stringResource(R.string.appstrings_local_build_pack_mobile_desc),
                     ) { packMobile = !packMobile }
-                    PackOption(
-                        checked = packRadio,
-                        icon = Icons.Default.Radio,
-                        label = stringResource(R.string.appstrings_local_build_pack_radio),
-                        subtitle = stringResource(R.string.appstrings_local_build_pack_radio_desc),
-                    ) { packRadio = !packRadio }
-                    Text(
-                        text = stringResource(R.string.appstrings_local_build_packs_hint),
-                        style = sizing.textStyle(MaterialTheme.typography.bodySmall),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = sizing.spacing(8.dp)),
-                    )
+                    if (isFrance) {
+                        PackOption(
+                            checked = packRadio,
+                            icon = Icons.Default.Radio,
+                            label = stringResource(R.string.appstrings_local_build_pack_radio),
+                            subtitle = stringResource(R.string.appstrings_local_build_pack_radio_desc),
+                        ) { packRadio = !packRadio }
+                        Text(
+                            text = stringResource(R.string.appstrings_local_build_packs_hint),
+                            style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = sizing.spacing(8.dp)),
+                        )
+                    }
 
                     var sourceConfig by remember { mutableStateOf(LocalBuildSourceStore.load(context)) }
                     var sourcesExpanded by remember { mutableStateOf(false) }
 
                     Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
 
+                    if (isFrance) {
                     Surface(
                         shape = RoundedCornerShape(sizing.component(12.dp)),
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)),
@@ -725,10 +811,11 @@ fun LocalDbBuildCard(
                             }
                         }
                     }
+                    }
                     // Un pack coche dont la base est deja installee (telechargee OU generee) sera ecrase :
                     // le bouton previent alors du remplacement.
-                    val willReplace = (packMobile && mobileInfo.installed) ||
-                        (packRadio && radioInfo.installed)
+                    val willReplace = (effectivePackMobile && mobileInfo.installed) ||
+                        (effectivePackRadio && radioInfo.installed)
 
                     Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
                     if (eligibility.eligible) {
@@ -789,61 +876,6 @@ fun LocalDbBuildCard(
                         }
                     }
 
-                    if (rustAvailable) {
-                        Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
-                        Text(
-                            text = "Moteur de génération",
-                            fontWeight = FontWeight.Bold,
-                            style = sizing.textStyle(MaterialTheme.typography.titleSmall),
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.padding(bottom = sizing.spacing(6.dp)),
-                        )
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp)),
-                        ) {
-                            listOf(
-                                LocalBuildEngine.KOTLIN to "Kotlin (standard)",
-                                LocalBuildEngine.RUST to "Rust (expérimental)",
-                            ).forEach { (engineOption, label) ->
-                                val selected = selectedEngine == engineOption
-                                Surface(
-                                    shape = RoundedCornerShape(sizing.component(10.dp)),
-                                    border = BorderStroke(
-                                        1.dp,
-                                        if (selected) MaterialTheme.colorScheme.primary
-                                        else MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
-                                    ),
-                                    color = if (selected) {
-                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
-                                    } else {
-                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
-                                    },
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clip(RoundedCornerShape(sizing.component(10.dp)))
-                                        .clickable { selectedEngine = engineOption },
-                                ) {
-                                    Text(
-                                        text = label,
-                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                                        style = sizing.textStyle(MaterialTheme.typography.labelLarge),
-                                        color = if (selected) {
-                                            MaterialTheme.colorScheme.primary
-                                        } else {
-                                            MaterialTheme.colorScheme.onSurfaceVariant
-                                        },
-                                        textAlign = TextAlign.Center,
-                                        modifier = Modifier.padding(
-                                            horizontal = sizing.spacing(8.dp),
-                                            vertical = sizing.spacing(10.dp),
-                                        ),
-                                    )
-                                }
-                            }
-                        }
-                    }
-
                     Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
                     Button(
                         onClick = {
@@ -852,16 +884,16 @@ fun LocalDbBuildCard(
                                 pauseStateVersion++
                                 LocalDbBuildWorker.enqueue(
                                     workManager,
-                                    mobile = packMobile,
-                                    radio = packRadio,
+                                    mobile = effectivePackMobile,
+                                    radio = effectivePackRadio,
                                     force = forceBuild,
-                                    engine = selectedEngine,
+                                    country = selectedCountry,
                                 )
                             }
                         },
                         enabled = !isDownloading &&
                             RemoteFeatureFlags.isLocalDbBuildAllowed() &&
-                            (packMobile || packRadio) &&
+                            (effectivePackMobile || effectivePackRadio) &&
                             (eligibility.eligible || forceBuild),
                         modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = sizing.component(56.dp)),
                         shape = RoundedCornerShape(sizing.component(12.dp)),
@@ -990,7 +1022,32 @@ private data class LocalBuildStepSpec(
     @get:StringRes val labelRes: Int,
 )
 
+@StringRes
+private fun canadaPhaseLabelRes(phase: BuildPhase): Int = when (phase) {
+    BuildPhase.RESOLVING -> R.string.appstrings_local_build_phase_resolving
+    BuildPhase.DOWNLOADING -> R.string.appstrings_local_build_phase_downloading_ca
+    BuildPhase.READING_STATIONS -> R.string.appstrings_local_build_phase_reading_ca
+    BuildPhase.INSERTING -> R.string.appstrings_local_build_phase_inserting
+    BuildPhase.BUILDING_DETAILS -> R.string.appstrings_local_build_phase_details_ca
+    BuildPhase.COMPUTING_STATS -> R.string.appstrings_local_build_phase_stats
+    BuildPhase.FINALIZING -> R.string.appstrings_local_build_phase_finalizing
+    BuildPhase.INSTALLING, BuildPhase.DONE -> R.string.appstrings_local_build_phase_installing
+    else -> R.string.appstrings_local_build_running
+}
+
 private fun localBuildSteps(tags: Set<String>): List<LocalBuildStepSpec> {
+    if (LocalDbBuildWorker.TAG_COUNTRY_CA in tags) {
+        return listOf(
+            LocalBuildStepSpec(BuildPhase.RESOLVING, canadaPhaseLabelRes(BuildPhase.RESOLVING)),
+            LocalBuildStepSpec(BuildPhase.DOWNLOADING, canadaPhaseLabelRes(BuildPhase.DOWNLOADING)),
+            LocalBuildStepSpec(BuildPhase.READING_STATIONS, canadaPhaseLabelRes(BuildPhase.READING_STATIONS)),
+            LocalBuildStepSpec(BuildPhase.INSERTING, canadaPhaseLabelRes(BuildPhase.INSERTING)),
+            LocalBuildStepSpec(BuildPhase.BUILDING_DETAILS, canadaPhaseLabelRes(BuildPhase.BUILDING_DETAILS)),
+            LocalBuildStepSpec(BuildPhase.COMPUTING_STATS, canadaPhaseLabelRes(BuildPhase.COMPUTING_STATS)),
+            LocalBuildStepSpec(BuildPhase.FINALIZING, canadaPhaseLabelRes(BuildPhase.FINALIZING)),
+            LocalBuildStepSpec(BuildPhase.INSTALLING, canadaPhaseLabelRes(BuildPhase.INSTALLING)),
+        )
+    }
     // WorkInfo tags identify the selected packs before the first progress update. Le repli mobile
     // conserve un affichage utile pour les anciens travaux créés avant l'ajout de ces tags.
     val hasKnownPackTag = tags.any {

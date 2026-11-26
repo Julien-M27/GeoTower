@@ -419,7 +419,7 @@ fun HomeStatusBanners(
         DatabaseBulkUpdate.Target.ENB to "${stringResource(R.string.notification_history_type_db_enb)} (France)"
     )
     val displayedDatabaseNames = buildList {
-        if (effectiveDbMissing) {
+        if (effectiveDbMissing && !isGeneratingDb) {
             add(mobileBaseName)
         }
         if (isFrInvalid || isFrUpdateAvailable) {
@@ -429,7 +429,9 @@ fun HomeStatusBanners(
             add("$mobileBaseName (Canada)")
         }
         if (isGeneratingDb) {
-            if (localBuild.mobileRunning) add(databaseNamesByTarget.getValue(DatabaseBulkUpdate.Target.MOBILE))
+            if (localBuild.mobileRunning) {
+                add(if (localBuild.countryCode == "CA") "$mobileBaseName (Canada)" else "$mobileBaseName (France)")
+            }
             if (localBuild.radioRunning) add(databaseNamesByTarget.getValue(DatabaseBulkUpdate.Target.RADIO))
         }
         availableDatabaseUpdates.forEach { action ->
@@ -724,13 +726,13 @@ fun DatabaseWarningBanner(
         .joinToString(separator = " • ")
     val databaseCount = normalizedDatabaseNames.size
     val databaseSummary = when {
-        !isDownloading && isUpdateAvailable && databaseCount > 0 ->
+        !isDownloading && !isGenerating && isUpdateAvailable && databaseCount > 0 ->
             pluralStringResource(
                 R.plurals.appstrings_update_db_banner_summary,
                 databaseCount,
                 databaseCount
             )
-        !isDownloading && (isMissing || isInvalid) && databaseCount > 0 ->
+        !isDownloading && !isGenerating && (isMissing || isInvalid) && databaseCount > 0 ->
             pluralStringResource(
                 R.plurals.appstrings_download_db_banner_summary,
                 databaseCount,

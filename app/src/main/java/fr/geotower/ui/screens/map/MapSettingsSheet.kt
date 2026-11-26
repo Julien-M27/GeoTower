@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -19,12 +20,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
@@ -49,6 +52,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.geotower.R
+import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.components.ModalSheetSystemBars
 import fr.geotower.ui.components.settingsPopupFadingEdge
 import fr.geotower.data.config.RemoteFeatureFlags
@@ -97,6 +101,46 @@ fun MapSettingsSheet(
         MapFiltersControls(
             modifier = Modifier
                 .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = sizing.spacing(24.dp))
+                .settingsPopupFadingEdge(scrollState)
+                .verticalScroll(scrollState)
+                .padding(bottom = sizing.spacing(64.dp)),
+            onOpenFhMap = onOpenFhMap
+        )
+    }
+}
+
+/**
+ * Version volet latéral du panneau de filtres de la carte pour les grands écrans
+ * (tablettes et appareils pliables dépliés), affichée à droite de la carte.
+ */
+@Composable
+fun MapFiltersSidePane(
+    onDismiss: () -> Unit,
+    onOpenFhMap: (() -> Unit)? = null,
+    modifier: Modifier = Modifier
+) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    val scrollState = rememberScrollState()
+    Column(modifier = modifier.fillMaxSize()) {
+        GeoTowerBackTopBar(
+            title = stringResource(R.string.appstrings_filter),
+            onBack = onDismiss,
+            showBackButton = false,
+            actions = {
+                IconButton(onClick = onDismiss) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = stringResource(R.string.appstrings_close)
+                    )
+                }
+            }
+        )
+        MapFiltersControls(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
                 .navigationBarsPadding()
                 .padding(horizontal = sizing.spacing(24.dp))
                 .settingsPopupFadingEdge(scrollState)

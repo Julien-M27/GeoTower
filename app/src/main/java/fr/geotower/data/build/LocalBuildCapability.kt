@@ -34,8 +34,8 @@ object LocalBuildCapability {
     /** Ce qu'une generation reclame a l'appareil, marges comprises. */
     data class Budget(val heapBytes: Long, val storageBytes: Long)
 
-    /** Pic de tas mesure, commun a tous les packs. */
-    private const val HEAP_PEAK_BYTES = 112L * MIB
+    /** Pic de tas Java mesure avec le moteur Rust (~61 Mo), commun a tous les packs. */
+    private const val HEAP_PEAK_BYTES = 64L * MIB
 
     private const val STORAGE_PEAK_MOBILE_BYTES = 828L * MIB
     private const val STORAGE_PEAK_ALL_BYTES = 1157L * MIB

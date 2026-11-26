@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -69,8 +70,18 @@ fun MapSupportWrapperScreen(
     var selectedSupportOperatorKey by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedSiteId by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedSidePane by remember { mutableStateOf<SiteDetailSidePane?>(null) }
+    var showFiltersPane by rememberSaveable { mutableStateOf(false) }
+    var lastSplitWasFilters by remember { mutableStateOf(false) }
 
-    val isSplitActive = splitDisplay && selectedSupportId != null
+    LaunchedEffect(showFiltersPane, selectedSupportId) {
+        if (showFiltersPane) {
+            lastSplitWasFilters = true
+        } else if (selectedSupportId != null) {
+            lastSplitWasFilters = false
+        }
+    }
+
+    val isSplitActive = splitDisplay && (selectedSupportId != null || showFiltersPane)
     val leftWidthFraction by animateFloatAsState(
         targetValue = if (isSplitActive) 0.5f else 1f,
         animationSpec = tween(durationMillis = 400, easing = FastOutSlowInEasing),
@@ -87,6 +98,7 @@ fun MapSupportWrapperScreen(
     // Gestion du bouton retour quand le volet latéral est ouvert
     BackHandler(enabled = isSplitActive) {
         when {
+            showFiltersPane -> showFiltersPane = false
             selectedSidePane != null -> selectedSidePane = null
             selectedSiteId != null -> selectedSiteId = null
             else -> closeSupportSelection()
@@ -113,10 +125,19 @@ fun MapSupportWrapperScreen(
                     if (!compareSlot.isNullOrBlank()) {
                         false
                     } else if (splitDisplay) {
+                        showFiltersPane = false
                         selectedSupportId = supportId
                         selectedSupportOperatorKey = operatorKey
                         selectedSiteId = null
                         selectedSidePane = null
+                        true
+                    } else {
+                        false
+                    }
+                },
+                onFilterClick = {
+                    if (splitDisplay && selectedSupportId == null) {
+                        showFiltersPane = !showFiltersPane
                         true
                     } else {
                         false
@@ -126,10 +147,29 @@ fun MapSupportWrapperScreen(
         }
 
         AnimatedSplitPane(visible = isSplitActive) {
-            val supportId = selectedSupportId ?: return@AnimatedSplitPane
-            val siteId = selectedSiteId
             val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
             val alignedTopPadding = (statusBarTop - 8.dp).coerceAtLeast(44.dp)
+            if (showFiltersPane || (selectedSupportId == null && lastSplitWasFilters)) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.surface)
+                        .padding(top = alignedTopPadding)
+                ) {
+                    MapFiltersSidePane(
+                        onDismiss = { showFiltersPane = false },
+                        onOpenFhMap = {
+                            showFiltersPane = false
+                            navController.navigate(fr.geotower.ui.screens.fh.FH_MAP_ROUTE) {
+                                launchSingleTop = true
+                            }
+                        }
+                    )
+                }
+                return@AnimatedSplitPane
+            }
+            val supportId = selectedSupportId ?: return@AnimatedSplitPane
+            val siteId = selectedSiteId
             Box(
                 modifier = Modifier
                     .fillMaxSize()

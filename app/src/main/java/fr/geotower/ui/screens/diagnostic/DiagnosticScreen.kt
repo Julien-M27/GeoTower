@@ -113,9 +113,11 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
@@ -754,29 +756,44 @@ private fun DiagnosticStatusGrid(
     items: List<DiagnosticItem>,
     onItemClick: (DiagnosticItem) -> Unit
 ) {
+    if (items.isEmpty()) return
     val uiStyle = LocalGeoTowerUiStyle.current
     val sizing = uiStyle.sizing
 
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
         val columns = if (maxWidth >= 620.dp) 3 else 2
-        val rows = remember(items, columns) { items.chunked(columns) }
 
-        Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))) {
-            rows.forEach { rowItems ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))
-                ) {
-                    rowItems.forEach { item ->
+        Layout(
+            modifier = Modifier.fillMaxWidth(),
+            content = {
+                items.forEach { item ->
+                    key(item.id) {
                         DiagnosticStatusTile(
                             item = item,
-                            modifier = Modifier.weight(1f),
                             onClick = { onItemClick(item) }
                         )
                     }
-                    repeat(columns - rowItems.size) {
-                        Spacer(modifier = Modifier.weight(1f))
-                    }
+                }
+            }
+        ) { measurables, constraints ->
+            val spacingPx = sizing.spacing(8.dp).roundToPx()
+            val totalWidth = constraints.maxWidth
+            val tileWidth = ((totalWidth - spacingPx * (columns - 1)) / columns).coerceAtLeast(0)
+            val maxTileHeight = measurables.maxOfOrNull { it.maxIntrinsicHeight(tileWidth) } ?: 0
+            val tileConstraints = Constraints.fixed(width = tileWidth, height = maxTileHeight)
+            val placeables = measurables.map { it.measure(tileConstraints) }
+            val rowCount = (placeables.size + columns - 1) / columns
+            val totalHeight = (rowCount * maxTileHeight + (rowCount - 1).coerceAtLeast(0) * spacingPx)
+                .coerceAtLeast(0)
+
+            layout(totalWidth, totalHeight) {
+                placeables.forEachIndexed { index, placeable ->
+                    val row = index / columns
+                    val col = index % columns
+                    placeable.placeRelative(
+                        x = col * (tileWidth + spacingPx),
+                        y = row * (maxTileHeight + spacingPx)
+                    )
                 }
             }
         }
@@ -936,6 +953,14 @@ private fun DiagnosticItemCard(
                 ) {
                     if (action != null && label != null) {
                         TextButton(onClick = { onAction(action) }) {
+                            if (action is DiagnosticAction.CopyText) {
+                                Icon(
+                                    imageVector = Icons.Default.ContentCopy,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(sizing.component(18.dp))
+                                )
+                                Spacer(modifier = Modifier.width(sizing.spacing(6.dp)))
+                            }
                             Text(label)
                         }
                     }
@@ -1715,14 +1740,30 @@ private fun buildLocalBuildMetricsItem(context: Context): DiagnosticItem? {
     val measuredAt = LocalBuildReportStore.readTimestamp(context)
         ?.let { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(it)) }
         ?: context.getString(R.string.appstrings_diagnostic_value_unknown)
+    val title = context.getString(R.string.appstrings_diagnostic_section_local_build)
+    val summary = context.getString(R.string.appstrings_diagnostic_summary_local_build, measuredAt)
+    val reportText = formatLocalBuildReport(title = title, summary = summary, details = details)
     return DiagnosticItem(
         id = "local_build_metrics",
-        title = context.getString(R.string.appstrings_diagnostic_section_local_build),
-        summary = context.getString(R.string.appstrings_diagnostic_summary_local_build, measuredAt),
+        title = title,
+        summary = summary,
         severity = DiagnosticSeverity.Info,
-        details = details
+        details = details,
+        actionLabel = context.getString(R.string.appstrings_diagnostic_copy_report),
+        action = DiagnosticAction.CopyText(
+            label = title,
+            text = reportText,
+            toastMessageRes = R.string.appstrings_diagnostic_local_build_report_copied
+        )
     )
 }
+
+internal fun formatLocalBuildReport(title: String, summary: String, details: List<String>): String =
+    buildString {
+        appendLine(title)
+        appendLine(summary)
+        details.forEach { appendLine(it) }
+    }.trim()
 
 private fun buildReport(
     context: Context,
@@ -1788,6 +1829,12 @@ private fun handleDiagnosticAction(
         DiagnosticAction.OpenNotificationSettings -> openNotificationSettings(context)
         DiagnosticAction.ChooseApiServer -> onChooseApiServer()
         DiagnosticAction.PingApiServer -> onPingApiServer()
+        is DiagnosticAction.CopyText -> copyDiagnosticText(
+            context = context,
+            label = action.label,
+            text = action.text,
+            toastMessageRes = action.toastMessageRes
+        )
     }
 }
 
@@ -1815,20 +1862,29 @@ private fun openNotificationSettings(context: Context) {
 }
 
 private fun copyDiagnosticReport(context: Context, report: String) {
-    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-    clipboard.setPrimaryClip(
-        ClipData.newPlainText(
-            context.getString(R.string.appstrings_diagnostic_title),
-            report
-        )
+    copyDiagnosticText(
+        context = context,
+        label = context.getString(R.string.appstrings_diagnostic_title),
+        text = report,
+        toastMessageRes = R.string.appstrings_diagnostic_report_copied
     )
+}
+
+private fun copyDiagnosticText(
+    context: Context,
+    label: String,
+    text: String,
+    @androidx.annotation.StringRes toastMessageRes: Int
+) {
+    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    clipboard.setPrimaryClip(ClipData.newPlainText(label, text))
     ShareHistoryStore.record(
         context = context,
         kind = ShareHistoryStore.KIND_DIAGNOSTIC,
         destination = ShareHistoryStore.DEST_CLIPBOARD,
         contents = ShareHistoryStore.FIELD_REPORT
     )
-    Toast.makeText(context, R.string.appstrings_diagnostic_report_copied, Toast.LENGTH_SHORT).show()
+    Toast.makeText(context, toastMessageRes, Toast.LENGTH_SHORT).show()
 }
 
 private fun shareDebugLog(context: Context) {

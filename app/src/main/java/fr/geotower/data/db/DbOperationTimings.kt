@@ -27,8 +27,18 @@ object DbOperationTimings {
     /** Base des identifiants eNB/gNB ([fr.geotower.data.workers.EnbDatabaseDownloadWorker]). */
     const val ENB_DOWNLOAD = "db_enb_download"
 
-    /** Generation locale ([fr.geotower.data.workers.LocalDbBuildWorker]), mobile et/ou radio en une passe. */
+    /** Generation locale ([fr.geotower.data.workers.LocalDbBuildWorker]), chrono live en cours. */
     const val LOCAL_BUILD = "db_local_build"
+
+    /** Derniere duree de generation locale incluant la base mobile. */
+    const val LOCAL_BUILD_MOBILE = "db_local_build_mobile"
+
+    /** Derniere duree de generation locale radio seule. */
+    const val LOCAL_BUILD_RADIO = "db_local_build_radio"
+
+    /** Cle de chronometrage de la generation locale mobile pour un pays donne. */
+    fun localBuildMobileKey(country: DatabaseCountry): String =
+        if (country == DatabaseCountry.FR) LOCAL_BUILD_MOBILE else "${LOCAL_BUILD_MOBILE}_${country.code.lowercase()}"
 
     /** Cle de chronometrage d'une carte hors-ligne (une par fichier de carte). */
     fun mapKey(mapFilename: String): String = "map_dl_$mapFilename"
@@ -62,6 +72,11 @@ object DbOperationTimings {
     /** Horodatage de debut de l'operation en cours (chrono live), ou null si aucune n'est en cours. */
     fun readStartTime(context: Context, key: String): Long? =
         prefs(context).getLong(startKey(key), -1L).takeIf { it > 0L }
+
+    /** Enregistre explicitement une duree mesuree pour une cle donnee. */
+    fun recordDurationMs(context: Context, key: String, durationMs: Long) {
+        prefs(context).edit().putLong(durationKey(key), durationMs.coerceAtLeast(0L)).apply()
+    }
 
     /** Duree de la derniere operation reussie (ms), ou null si jamais mesuree. */
     fun readDurationMs(context: Context, key: String): Long? =

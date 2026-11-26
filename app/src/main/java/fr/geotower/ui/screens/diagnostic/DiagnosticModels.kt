@@ -18,6 +18,13 @@ sealed class DiagnosticAction {
 
     /** Lance un test de latence vers l'un des deux serveurs GeoTower. */
     object PingApiServer : DiagnosticAction()
+
+    /** Copie un texte (ex. rapport de génération locale) dans le presse-papiers. */
+    data class CopyText(
+        val label: String,
+        val text: String,
+        @androidx.annotation.StringRes val toastMessageRes: Int
+    ) : DiagnosticAction()
 }
 
 data class DiagnosticItem(

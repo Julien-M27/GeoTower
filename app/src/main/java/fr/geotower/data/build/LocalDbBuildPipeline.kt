@@ -5,6 +5,7 @@ import android.database.sqlite.SQLiteDatabase
 import fr.geotower.R
 import fr.geotower.data.api.DatabaseDownloader
 import fr.geotower.data.api.RadioDatabaseDownloader
+import fr.geotower.data.db.DatabaseCountry
 import fr.geotower.data.db.GeoTowerDatabaseValidator
 import fr.geotower.data.db.DatabaseStorageCleanup
 import fr.geotower.data.db.LocalDbProvenance
@@ -110,15 +111,16 @@ class LocalDbBuildPipeline(
         packs: Packs,
         force: Boolean = false,
         sourceConfig: LocalBuildSourceConfig = LocalBuildSourceStore.load(context),
-        engine: LocalBuildEngine = LocalBuildEngine.KOTLIN,
+        engine: LocalBuildEngine = LocalBuildEngine.RUST,
+        country: DatabaseCountry = DatabaseCountry.FR,
         onProgress: (BuildProgressUpdate) -> Unit,
         onPause: () -> Unit = {},
     ): Result {
         val metrics = LocalBuildMetrics()
         val device = BuildDeviceProfiles.read(context)
-        val result = runMeasured(context, packs, force, sourceConfig, engine, metrics, onProgress, onPause)
+        val result = runMeasured(context, packs, force, sourceConfig, engine, country, metrics, onProgress, onPause)
         runCatching {
-            LocalBuildReportStore.save(context, metrics.report(device, packs.label, result.success, result.reason, engine = engine))
+            LocalBuildReportStore.save(context, metrics.report(device, "${country.code}:${packs.label}", result.success, result.reason, engine = engine))
         }.onFailure { AppLogger.w("GeoTowerDb", "Rapport de mesures non enregistre", it) }
         return result
     }
@@ -129,6 +131,7 @@ class LocalDbBuildPipeline(
         force: Boolean,
         sourceConfig: LocalBuildSourceConfig,
         engine: LocalBuildEngine,
+        country: DatabaseCountry,
         metrics: LocalBuildMetrics,
         onProgress: (BuildProgressUpdate) -> Unit,
         onPause: () -> Unit,
@@ -191,7 +194,7 @@ class LocalDbBuildPipeline(
         // connexion, et mobile et radio en ont chacune une.
         val stagingFile = File(workDir, "staging_mobile.db")
         val radioStagingFile = File(workDir, "staging_radio.db")
-        val builtFile = context.getDatabasePath("${GeoTowerDatabaseValidator.DB_NAME}.localbuild")
+        val builtFile = context.getDatabasePath("${country.dbFileName}.localbuild")
         val builtRadioFile = context.getDatabasePath("${RadioDatabaseValidator.DB_NAME}.localbuild")
         var radioDb: AndroidSqlDatabase? = null
         // Enrichissement ARCEP trimestriel (arcep_nidt/is_zb, cf. localisation). Optionnel : telecharge
@@ -203,6 +206,92 @@ class LocalDbBuildPipeline(
             .also { it.start() }
 
         try {
+            if (country == DatabaseCountry.CA) {
+                emit(BuildPhase.RESOLVING, 0, null)
+                val caZip = File(workDir, "Site_Data_Extract_FX.zip")
+                emit(BuildPhase.DOWNLOADING, 5, null)
+                var caPct = -1
+                downloader.downloadToFile(
+                    url = OfficialSources.URL_CANADA_ISED_ZIP,
+                    dest = caZip,
+                    maxBytes = 1024L * 1024L * 1024L,
+                    onProgress = { copied, total ->
+                        val mb = copied / (1024 * 1024)
+                        val pct = if (total > 0) (5 + copied * 35 / total).toInt().coerceIn(5, 40) else 20
+                        if (pct != caPct) {
+                            caPct = pct
+                            emit(
+                                phase = BuildPhase.DOWNLOADING,
+                                percent = pct,
+                                detail = "$mb Mo",
+                                importType = BuildImportType.MONTHLY,
+                                fileName = "Site_Data_Extract_FX.zip",
+                                sourceUrl = OfficialSources.URL_CANADA_ISED_ZIP,
+                                sourceLink = BuildSourceLink.STANDARD,
+                                downloadedBytes = copied,
+                                totalBytes = total,
+                            )
+                        }
+                    },
+                    beforeRead = onPause,
+                )
+                metrics.noteFile("Site_Data_Extract_FX.zip", caZip.length())
+
+                val caVersion = buildVersion()
+                val rustError = RustDbBuilder.build(
+                    RustDbBuilder.Config(
+                        countryCode = "CA",
+                        packMobile = true,
+                        packRadio = false,
+                        allowedServiceMask = 0,
+                        dataZip = caZip,
+                        refZip = null,
+                        observatoireCsv = null,
+                        arcepFiles = emptyList(),
+                        builtMobileFile = builtFile,
+                        stagingMobileFile = stagingFile,
+                        builtRadioFile = builtRadioFile,
+                        stagingRadioFile = radioStagingFile,
+                        version = caVersion,
+                        zipVersion = "Site_Data_Extract_FX.zip",
+                        quarterlyVersion = null,
+                        totalRamBytes = eligibility.totalRamBytes,
+                        communes = emptyMap(),
+                        departments = emptyMap(),
+                    ),
+                    object : RustDbBuilder.ProgressCallback {
+                        override fun onProgress(phaseOrdinal: Int, percent: Int, detail: String?, processed: Long) {
+                            val phase = BuildPhase.values().getOrNull(phaseOrdinal) ?: BuildPhase.READING_STATIONS
+                            emit(phase, percent, detail, processed)
+                        }
+
+                        override fun checkControl(): Int {
+                            return try {
+                                onPause()
+                                0
+                            } catch (_: CancellationException) {
+                                1
+                            }
+                        }
+                    },
+                )
+                if (rustError == "CANCELLED") throw CancellationException("Build cancelled")
+                if (rustError != null) return@withContext Result(false, rustError)
+
+                emit(BuildPhase.INSTALLING, 95, null)
+                metrics.noteFile("${DatabaseCountry.CA.dbFileName} (produite)", builtFile.length())
+                val validation = GeoTowerDatabaseValidator.validateDatabaseFile(builtFile, expectedCountryCode = "CA")
+                if (!validation.isValid) {
+                    return@withContext Result(false, "Validation CA : ${validation.reason ?: "base invalide"}")
+                }
+                if (!DatabaseDownloader.installBuiltDatabase(context, builtFile, DatabaseCountry.CA)) {
+                    return@withContext Result(false, "Installation impossible (échange du fichier de base CA)")
+                }
+                AppConfig.alignLocalModeLevelAfterLocalBuild(context)
+                emit(BuildPhase.DONE, 100, null)
+                return@withContext Result(true)
+            }
+
             emit(BuildPhase.RESOLVING, 0, null)
             val monthlyUrl = sourceConfig.effectiveMonthlyUrl()
             val isMonthlyCustom = sourceConfig.isMonthlyCustom
@@ -608,16 +697,6 @@ class LocalDbBuildPipeline(
                 if (rustError != null) return@withContext Result(false, rustError)
 
                 if (packs.mobile) {
-                    emit(BuildPhase.COMPUTING_STATS, 92, null)
-                    runBuildCatching {
-                        val deptDb = AndroidSqlDatabase(SQLiteDatabase.openOrCreateDatabase(builtFile, null))
-                        try {
-                            DepartmentStatsBuilder.populateDepartmentStats(deptDb, departments)
-                        } finally {
-                            deptDb.close()
-                        }
-                    }.onFailure { AppLogger.w("GeoTowerDb", "Department stats failed (non-fatal)", it) }
-
                     emit(BuildPhase.INSTALLING, 94, null)
                     metrics.noteFile("${GeoTowerDatabaseValidator.DB_NAME} (produite)", builtFile.length())
                     val validation = GeoTowerDatabaseValidator.validateDatabaseFile(builtFile)
@@ -845,7 +924,7 @@ class LocalDbBuildPipeline(
             runCatching { radioDb?.close() }
             DatabaseStorageCleanup.clearLocalBuildWorkspace(workDir)
             if (packs.mobile) {
-                DatabaseStorageCleanup.clearTransientArtifacts(context, GeoTowerDatabaseValidator.DB_NAME)
+                DatabaseStorageCleanup.clearTransientArtifacts(context, country.dbFileName)
             }
             if (packs.anyRadio) {
                 DatabaseStorageCleanup.clearTransientArtifacts(context, RadioDatabaseValidator.DB_NAME)

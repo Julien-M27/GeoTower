@@ -1958,6 +1958,7 @@
     <string name="appstrings_diagnostic_refresh">Refresh</string>
     <string name="appstrings_diagnostic_copy_report">Copy report</string>
     <string name="appstrings_diagnostic_report_copied">Diagnostic report copied</string>
+    <string name="appstrings_diagnostic_local_build_report_copied">Local build report copied</string>
     <string name="appstrings_diagnostic_log_size">Debug log: %1$s</string>
     <string name="appstrings_diagnostic_view_log">View log</string>
     <string name="appstrings_diagnostic_share_log">Share log</string>
@@ -3023,6 +3024,7 @@
     <string name="appstrings_release_v2142_summary_speedtests_ocr_max_priority_and_raw_text">Prioritized main speed values over chart MAX peaks in OCR and added raw OCR text viewer in speedtest details</string>
     <string name="appstrings_release_v2143_summary_speedtests_ocr_dual_pass_and_decimals">Dual-scale OCR pass for large display digits and spaced decimal normalization in speedtests</string>
     <string name="appstrings_release_v2144_summary_speedtests_map_thumbnails_and_translations">Clickable speedtest thumbnails on the map, speedtest image sharing and OCR copy, and complete UI translations</string>
+    <string name="appstrings_release_v2150_summary_rust_canada_and_local_build">Native Rust local database generation for Canada, improved build progress and diagnostics</string>
     <string name="appstrings_release_v2149_summary_rust_jni_release_fix">Improved stability of the native Rust database builder in Release builds</string>
     <string name="appstrings_release_v2148_summary_rust_db_builder_and_update_scheduler">Experimental native Rust engine for local database generation and update scheduler improvements</string>
     <string name="appstrings_release_v2147_summary_spatial_ocr_permissions_and_i18n">Spatial speedtest OCR parsing, unified permission dialogs, Garmin refinements and full translations</string>
@@ -3497,4 +3499,9 @@
     <string name="garmin_status_sdk_stopped">SDK stopped</string>
     <string name="garmin_last_payload_none">No message received</string>
     <string name="preference_profile_clipboard_label">GeoTower Profile</string>
+    <string name="appstrings_local_build_desc_ca">Rebuilds the Canada database on the device from official ISED open data (Site_Data_Extract_FX.zip). Advanced — capable devices only. Uses mobile data, time and battery; Wi-Fi recommended.</string>
+    <string name="appstrings_local_build_phase_downloading_ca">Downloading ISED data</string>
+    <string name="appstrings_local_build_phase_reading_ca">Reading ISED ZIP (mobile filtering)</string>
+    <string name="appstrings_local_build_phase_details_ca">Assembling ISED sector details</string>
+    <string name="appstrings_local_build_retry">Retrying (%1$d/%2$d)…</string>
 </resources>

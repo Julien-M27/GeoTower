@@ -24,6 +24,7 @@ object RustDbBuilder {
     }
 
     data class Config(
+        val countryCode: String = "FR",
         val packMobile: Boolean,
         val packRadio: Boolean,
         val allowedServiceMask: Int,
@@ -46,6 +47,7 @@ object RustDbBuilder {
     fun build(config: Config, callback: ProgressCallback): String? {
         if (!loaded) return "Bibliothèque native Rust (geotower_builder) indisponible"
         val json = JSONObject().apply {
+            put("countryCode", config.countryCode)
             put("packMobile", config.packMobile)
             put("packRadio", config.packRadio)
             put("allowedServiceMask", config.allowedServiceMask)

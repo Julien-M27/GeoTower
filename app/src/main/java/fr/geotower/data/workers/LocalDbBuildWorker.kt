@@ -169,60 +169,115 @@ class LocalDbBuildWorker(
             nonMobileTech = inputData.getBoolean(KEY_PACK_NONMOBILE, true),
         )
         val force = inputData.getBoolean(KEY_FORCE, false)
-        val engine = fr.geotower.data.build.LocalBuildEngine.fromId(inputData.getString(KEY_ENGINE))
+        val engine = inputData.getString(KEY_ENGINE)
+            ?.let { fr.geotower.data.build.LocalBuildEngine.fromId(it) }
+            ?: fr.geotower.data.build.LocalBuildEngine.RUST
+        val country = fr.geotower.data.db.DatabaseCountry.fromCode(inputData.getString(KEY_COUNTRY_CODE))
 
         try {
-            val result = LocalDbBuildPipeline().run(
-                context = context,
-                packs = packs,
-                force = force,
-                sourceConfig = fr.geotower.data.build.LocalBuildSourceStore.load(context),
-                engine = engine,
-                onProgress = { update: BuildProgressUpdate ->
-                    if (update.importType == BuildImportType.WEEKLY &&
-                        update.sourceUrl != null && update.sourceLink != null
-                    ) {
-                        observatoireSourceSnapshot.set(
-                            ObservatoireSourceSnapshot(
-                                url = update.sourceUrl,
-                                sourceLinkOrdinal = update.sourceLink.ordinal,
-                                switchReason = update.sourceSwitchReason.orEmpty(),
-                            ),
-                        )
-                    }
-                    val previous = progressSnapshot.get()
-                    val snapshot = ProgressSnapshot(
-                        percent = maxOf(previous.percent, update.percent.coerceIn(0, 100)),
-                        phaseOrdinal = update.phase.ordinal,
-                        detail = update.detail.orEmpty(),
-                        importOrdinal = update.importType?.ordinal ?: -1,
-                        fileName = update.fileName.orEmpty(),
-                        sourceUrl = update.sourceUrl.orEmpty(),
-                        sourceLinkOrdinal = update.sourceLink?.ordinal ?: -1,
-                        sourceSwitchReason = update.sourceSwitchReason.orEmpty(),
-                        downloadedBytes = update.downloadedBytes,
-                        totalBytes = update.totalBytes,
+            var lastFailureReason: String? = null
+            var result = fr.geotower.data.build.LocalDbBuildPipeline.Result(false, null)
+
+            for (attempt in 1..MAX_ATTEMPTS) {
+                if (attempt > 1) {
+                    val retryMsg = context.getString(R.string.appstrings_local_build_retry, attempt, MAX_ATTEMPTS)
+                    AppLogger.w(TAG, "Local DB build attempt ${attempt - 1}/$MAX_ATTEMPTS failed ($lastFailureReason), retrying...")
+                    observatoireSourceSnapshot.set(null)
+                    progressSnapshot.set(
+                        ProgressSnapshot(
+                            percent = 0,
+                            phaseOrdinal = BuildPhase.RESOLVING.ordinal,
+                            detail = retryMsg,
+                            importOrdinal = -1,
+                            fileName = "",
+                            sourceUrl = "",
+                            sourceLinkOrdinal = -1,
+                            sourceSwitchReason = "",
+                            downloadedBytes = 0L,
+                            totalBytes = -1L,
+                        ),
                     )
-                    progressSnapshot.set(snapshot)
                     notifyLive(
-                        update.phase,
-                        snapshot.percent,
-                        update.detail,
+                        BuildPhase.RESOLVING,
+                        0,
+                        retryMsg,
                         OperationPauseStore.isPaused(context, OperationPauseStore.LOCAL_DB_BUILD),
                     )
-                },
-                onPause = {
-                    OperationPauseStore.blockIfPaused(context, OperationPauseStore.LOCAL_DB_BUILD)
-                },
-            )
+                }
+
+                result = try {
+                    LocalDbBuildPipeline().run(
+                        context = context,
+                        packs = packs,
+                        force = force,
+                        sourceConfig = fr.geotower.data.build.LocalBuildSourceStore.load(context),
+                        engine = engine,
+                        country = country,
+                        onProgress = { update: BuildProgressUpdate ->
+                            if (update.importType == BuildImportType.WEEKLY &&
+                                update.sourceUrl != null && update.sourceLink != null
+                            ) {
+                                observatoireSourceSnapshot.set(
+                                    ObservatoireSourceSnapshot(
+                                        url = update.sourceUrl,
+                                        sourceLinkOrdinal = update.sourceLink.ordinal,
+                                        switchReason = update.sourceSwitchReason.orEmpty(),
+                                    ),
+                                )
+                            }
+                            val previous = progressSnapshot.get()
+                            val snapshot = ProgressSnapshot(
+                                percent = maxOf(previous.percent, update.percent.coerceIn(0, 100)),
+                                phaseOrdinal = update.phase.ordinal,
+                                detail = update.detail.orEmpty(),
+                                importOrdinal = update.importType?.ordinal ?: -1,
+                                fileName = update.fileName.orEmpty(),
+                                sourceUrl = update.sourceUrl.orEmpty(),
+                                sourceLinkOrdinal = update.sourceLink?.ordinal ?: -1,
+                                sourceSwitchReason = update.sourceSwitchReason.orEmpty(),
+                                downloadedBytes = update.downloadedBytes,
+                                totalBytes = update.totalBytes,
+                            )
+                            progressSnapshot.set(snapshot)
+                            notifyLive(
+                                update.phase,
+                                snapshot.percent,
+                                update.detail,
+                                OperationPauseStore.isPaused(context, OperationPauseStore.LOCAL_DB_BUILD),
+                            )
+                        },
+                        onPause = {
+                            OperationPauseStore.blockIfPaused(context, OperationPauseStore.LOCAL_DB_BUILD)
+                        },
+                    )
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    AppLogger.w(TAG, "Local DB build attempt $attempt/$MAX_ATTEMPTS threw exception", e)
+                    fr.geotower.data.build.LocalDbBuildPipeline.Result(
+                        success = false,
+                        reason = e.message ?: e.javaClass.simpleName,
+                    )
+                }
+
+                if (result.success) break
+                lastFailureReason = result.reason
+            }
 
             ticker.cancel()
             ticker.join()
             cancelSafely(PROGRESS_NOTIFICATION_ID)
-            val databasesLabel = formatDatabasesLabel(context, packs)
+            val databasesLabel = formattedDatabaseWithCountry(packs)
             if (result.success) {
                 OperationPauseStore.clear(context, OperationPauseStore.LOCAL_DB_BUILD)
-                DbOperationTimings.finish(context, DbOperationTimings.LOCAL_BUILD)
+                val durationMs = DbOperationTimings.finish(context, DbOperationTimings.LOCAL_BUILD)
+                if (durationMs != null) {
+                    if (packs.mobile) {
+                        DbOperationTimings.recordDurationMs(context, DbOperationTimings.localBuildMobileKey(currentCountry()), durationMs)
+                    } else if (packs.anyRadio) {
+                        DbOperationTimings.recordDurationMs(context, DbOperationTimings.LOCAL_BUILD_RADIO, durationMs)
+                    }
+                }
                 setProgress(workDataOf(KEY_PROGRESS to 100, KEY_PHASE to BuildPhase.DONE.ordinal))
                 showResult(success = true, packs = packs, reason = null)
                 val source = observatoireSourceSnapshot.get()
@@ -248,7 +303,7 @@ class LocalDbBuildWorker(
             } else {
                 OperationPauseStore.clear(context, OperationPauseStore.LOCAL_DB_BUILD)
                 DbOperationTimings.clearStart(context, DbOperationTimings.LOCAL_BUILD)
-                AppLogger.w(TAG, "Local DB build failed: ${result.reason}")
+                AppLogger.w(TAG, "Local DB build failed after $MAX_ATTEMPTS attempts: ${result.reason}")
                 showResult(success = false, packs = packs, reason = result.reason)
                 Result.failure(workDataOf(KEY_ERROR to (result.reason ?: "Cause inconnue")))
             }
@@ -303,13 +358,25 @@ class LocalDbBuildWorker(
         }
     }
 
+    private fun currentPacks(): LocalDbBuildPipeline.Packs = LocalDbBuildPipeline.Packs(
+        mobile = inputData.getBoolean(KEY_PACK_MOBILE, true),
+        radioBroadcast = inputData.getBoolean(KEY_PACK_RADIO_BROADCAST, true),
+        nonMobileTech = inputData.getBoolean(KEY_PACK_NONMOBILE, true),
+    )
+
+    private fun currentCountry(): fr.geotower.data.db.DatabaseCountry =
+        fr.geotower.data.db.DatabaseCountry.fromCode(inputData.getString(KEY_COUNTRY_CODE))
+
+    private fun formattedDatabaseWithCountry(packs: LocalDbBuildPipeline.Packs = currentPacks()): String =
+        "${formatDatabasesLabel(context, packs)} (${currentCountry().displayName})"
+
     private fun buildProgressNotification(
         phase: BuildPhase,
         percent: Int,
         detail: String?,
         paused: Boolean,
     ): android.app.Notification {
-        val title = context.getString(R.string.appstrings_local_build_notif_title)
+        val title = "${context.getString(R.string.appstrings_local_build_notif_title)} — ${formattedDatabaseWithCountry()}"
         val label = context.getString(phase.labelRes())
         val labelWithDetail = if (detail.isNullOrBlank()) label else "$label ($detail)"
         val content = if (paused) {
@@ -369,7 +436,7 @@ class LocalDbBuildWorker(
     }
 
     private fun showResult(success: Boolean, packs: LocalDbBuildPipeline.Packs, reason: String?) {
-        val databasesLabel = formatDatabasesLabel(context, packs)
+        val databasesLabel = formattedDatabaseWithCountry(packs)
         // Consigné même quand la notification ne part pas : voir [NotificationHistoryStore].
         NotificationHistoryStore.record(
             context = context,
@@ -442,6 +509,7 @@ class LocalDbBuildWorker(
         // l'annoncer « manquante ») des l'etat ENQUEUED, avant la premiere progression.
         const val TAG_PACK_MOBILE = "local_build_pack_mobile"
         const val TAG_PACK_RADIO = "local_build_pack_radio"
+        const val TAG_COUNTRY_CA = "local_build_country_ca"
 
         const val KEY_PROGRESS = "progress"
         const val KEY_PHASE = "phase"
@@ -462,8 +530,10 @@ class LocalDbBuildWorker(
         /** L'utilisateur a demande a generer malgre un appareil sous les budgets mesures. */
         const val KEY_FORCE = "force"
         const val KEY_ENGINE = "build_engine"
+        const val KEY_COUNTRY_CODE = "country_code"
 
         private const val TAG = "GeoTowerDb"
+        private const val MAX_ATTEMPTS = 2
         fun formatDatabasesLabel(
             packs: LocalDbBuildPipeline.Packs,
             mobileLabel: String,
@@ -504,23 +574,26 @@ class LocalDbBuildWorker(
             mobile: Boolean,
             radio: Boolean,
             force: Boolean = false,
-            engine: fr.geotower.data.build.LocalBuildEngine = fr.geotower.data.build.LocalBuildEngine.KOTLIN,
-        ) = buildRequest(mobile, radioBroadcast = radio, nonMobileTech = radio, force = force, engine = engine)
+            engine: fr.geotower.data.build.LocalBuildEngine = fr.geotower.data.build.LocalBuildEngine.RUST,
+            country: fr.geotower.data.db.DatabaseCountry = fr.geotower.data.db.DatabaseCountry.FR,
+        ) = buildRequest(mobile, radioBroadcast = radio, nonMobileTech = radio, force = force, engine = engine, country = country)
 
         fun enqueue(
             workManager: WorkManager,
             mobile: Boolean = true,
             radio: Boolean = true,
             force: Boolean = false,
-            engine: fr.geotower.data.build.LocalBuildEngine = fr.geotower.data.build.LocalBuildEngine.KOTLIN,
-        ) = enqueue(workManager, mobile, radioBroadcast = radio, nonMobileTech = radio, force = force, engine = engine)
+            engine: fr.geotower.data.build.LocalBuildEngine = fr.geotower.data.build.LocalBuildEngine.RUST,
+            country: fr.geotower.data.db.DatabaseCountry = fr.geotower.data.db.DatabaseCountry.FR,
+        ) = enqueue(workManager, mobile, radioBroadcast = radio, nonMobileTech = radio, force = force, engine = engine, country = country)
 
         fun buildRequest(
             mobile: Boolean,
             radioBroadcast: Boolean,
             nonMobileTech: Boolean,
             force: Boolean = false,
-            engine: fr.geotower.data.build.LocalBuildEngine = fr.geotower.data.build.LocalBuildEngine.KOTLIN,
+            engine: fr.geotower.data.build.LocalBuildEngine = fr.geotower.data.build.LocalBuildEngine.RUST,
+            country: fr.geotower.data.db.DatabaseCountry = fr.geotower.data.db.DatabaseCountry.FR,
         ) =
             OneTimeWorkRequestBuilder<LocalDbBuildWorker>()
                 .setInputData(
@@ -530,6 +603,7 @@ class LocalDbBuildWorker(
                         KEY_PACK_NONMOBILE to nonMobileTech,
                         KEY_FORCE to force,
                         KEY_ENGINE to engine.id,
+                        KEY_COUNTRY_CODE to country.code,
                     ),
                 )
                 // Le réseau est vérifié au démarrage, puis le traitement peut continuer hors ligne.
@@ -539,6 +613,7 @@ class LocalDbBuildWorker(
                     if (mobile) addTag(TAG_PACK_MOBILE)
                     // Les deux packs non-mobiles alimentent la meme base radio.
                     if (radioBroadcast || nonMobileTech) addTag(TAG_PACK_RADIO)
+                    if (country == fr.geotower.data.db.DatabaseCountry.CA) addTag(TAG_COUNTRY_CA)
                 }
                 .build()
 
@@ -548,12 +623,13 @@ class LocalDbBuildWorker(
             radioBroadcast: Boolean = true,
             nonMobileTech: Boolean = true,
             force: Boolean = false,
-            engine: fr.geotower.data.build.LocalBuildEngine = fr.geotower.data.build.LocalBuildEngine.KOTLIN,
+            engine: fr.geotower.data.build.LocalBuildEngine = fr.geotower.data.build.LocalBuildEngine.RUST,
+            country: fr.geotower.data.db.DatabaseCountry = fr.geotower.data.db.DatabaseCountry.FR,
         ) {
             workManager.enqueueUniqueWork(
                 UNIQUE_WORK_NAME,
                 ExistingWorkPolicy.KEEP,
-                buildRequest(mobile, radioBroadcast, nonMobileTech, force, engine),
+                buildRequest(mobile, radioBroadcast, nonMobileTech, force, engine, country),
             )
         }
     }

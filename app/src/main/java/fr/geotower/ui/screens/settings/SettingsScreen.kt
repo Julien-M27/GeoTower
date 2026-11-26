@@ -4938,20 +4938,22 @@ fun SectionDatabase(
             Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
         }
 
-        Box(modifier = cardAnchor(ANCHOR_DB_MOBILE_CA).fillMaxWidth()) {
-            fr.geotower.ui.components.DatabaseDownloadCard(
-                useOneUi = useOneUi,
-                shape = shape,
-                border = border,
-                bubbleColor = bubbleColor,
-                title = "${stringResource(R.string.settings_database_online_title)} (Canada — ISDE)",
-                refreshState = refreshState,
-                disableDownloadAction = disableIndividualDownloads,
-                country = fr.geotower.data.db.DatabaseCountry.CA
-            )
-        }
+        if (showMobileCard) {
+            Box(modifier = cardAnchor(ANCHOR_DB_MOBILE_CA).fillMaxWidth()) {
+                fr.geotower.ui.components.DatabaseDownloadCard(
+                    useOneUi = useOneUi,
+                    shape = shape,
+                    border = border,
+                    bubbleColor = bubbleColor,
+                    title = "${stringResource(R.string.settings_database_online_title)} (Canada — ISDE)",
+                    refreshState = refreshState,
+                    disableDownloadAction = disableIndividualDownloads,
+                    country = fr.geotower.data.db.DatabaseCountry.CA
+                )
+            }
 
-        Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+            Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+        }
 
         if (showRadioCard) {
             Box(modifier = cardAnchor(ANCHOR_DB_RADIO).fillMaxWidth()) {

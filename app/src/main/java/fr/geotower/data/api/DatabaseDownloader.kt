@@ -271,18 +271,26 @@ object DatabaseDownloader {
      * `.backup`/rename, reconstruction des index, etat VALID. `builtFile` doit etre sur le meme
      * volume que la base installee (idealement `context.getDatabasePath("$DB_NAME.localbuild")`).
      */
-    internal suspend fun installBuiltDatabase(context: Context, builtFile: File): Boolean =
+    internal suspend fun installBuiltDatabase(
+        context: Context,
+        builtFile: File,
+        country: DatabaseCountry = DatabaseCountry.FR,
+    ): Boolean =
         withContext(Dispatchers.IO) {
-            val validation = GeoTowerDatabaseValidator.validateDatabaseFile(builtFile)
+            val validation = GeoTowerDatabaseValidator.validateDatabaseFile(
+                builtFile,
+                expectedCountryCode = country.code,
+            )
             if (!validation.isValid) {
-                AppLogger.w(TAG, "Locally built database validation failed: ${validation.reason}")
+                AppLogger.w(TAG, "Locally built database validation failed (${country.code}): ${validation.reason}")
                 if (builtFile.exists()) builtFile.delete()
                 return@withContext false
             }
 
-            val dbFile = context.getDatabasePath(DB_NAME)
+            val targetName = country.dbFileName
+            val dbFile = context.getDatabasePath(targetName)
             dbFile.parentFile?.mkdirs()
-            val backupFile = context.getDatabasePath("$DB_NAME.backup")
+            val backupFile = context.getDatabasePath("$targetName.backup")
 
             AppDatabase.closeDatabase()
             DatabaseStorageCleanup.clearSqliteSidecars(dbFile)
@@ -293,12 +301,12 @@ object DatabaseDownloader {
             }
 
             GeoTowerDatabaseIndexes.applyToFile(dbFile)
-            GeoTowerDatabaseValidator.clearInstalledDatabaseInvalid(context, DatabaseCountry.FR)
-            if (DatabaseCountryStore.getActive(context) == DatabaseCountry.FR) {
+            GeoTowerDatabaseValidator.clearInstalledDatabaseInvalid(context, country)
+            if (DatabaseCountryStore.getActive(context) == country) {
                 updateCachedDatabaseState(GeoTowerDatabaseValidator.LocalDatabaseState.VALID)
             }
-            InstalledDatabaseArtifactIdentity.clearMobile(context, DatabaseCountry.FR)
-            DatabaseStorageCleanup.clearTransientArtifacts(context, DB_NAME)
+            InstalledDatabaseArtifactIdentity.clearMobile(context, country)
+            DatabaseStorageCleanup.clearTransientArtifacts(context, targetName)
             true
         }
 

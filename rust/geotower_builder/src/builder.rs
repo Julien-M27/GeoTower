@@ -16,7 +16,7 @@ use crate::schema::{
     mobile_staging_statements, CREATE_FH_LINK_INDEX, INSERT_ROOM_IDENTITY, MOBILE_COUNTRY_CODE,
     MOBILE_COUNTRY_NAME, MOBILE_CREATE_TABLES, MOBILE_SCHEMA_VERSION, MOBILE_SOURCE,
 };
-use crate::{BResult, BuildRequest, ProgressSink};
+use crate::{BResult, BuildRequest, DepartmentRef, ProgressSink};
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
 use flate2::read::ZlibDecoder;
@@ -934,16 +934,28 @@ pub fn run_build(req: &BuildRequest, sink: &mut dyn ProgressSink) -> BResult<()>
             .map_err(|e| format!("{e}"))?;
         }
         tx.execute(
-            "INSERT OR REPLACE INTO source_versions (source_key, source_value) VALUES ('provenance', 'local_build_rust')",
+            "INSERT OR REPLACE INTO source_versions (source_key, source_value) VALUES ('provenance', 'local_build')",
             [],
         )
         .map_err(|e| format!("{e}"))?;
         tx.commit().map_err(|e| format!("{e}"))?;
     }
 
-    // 13/ radio_stat_current
+    // Free large staging tables before stats computation to reduce peak disk usage
+    for tbl in &[
+        "stg_support",
+        "stg_antenne",
+        "stg_station_final",
+        "stg_arcep",
+        "stg_details",
+    ] {
+        let _ = conn.execute(&format!("DROP TABLE IF EXISTS stg.{tbl}"), []);
+    }
+
+    // 13/ radio_stat_current + dept_stat_current + dept_stat_operator_tech
     sink.emit(PHASE_COMPUTING_STATS, 90, Some("tables finales -> statistiques"), 0);
     populate_current_stats(&conn)?;
+    populate_department_stats(&conn, &req.departments)?;
 
     // 14/ Finalize mobile DB
     sink.emit(PHASE_FINALIZING, 93, Some("staging SQLite -> base finale"), 0);
@@ -952,13 +964,8 @@ pub fn run_build(req: &BuildRequest, sink: &mut dyn ProgressSink) -> BResult<()>
         "stg_emr_freqs",
         "stg_emetteur",
         "stg_fh_aer",
-        "stg_antenne",
         "stg_antenne_sta",
-        "stg_support",
         "stg_sysstatus",
-        "stg_station_final",
-        "stg_arcep",
-        "stg_details",
         "stg_details_extra",
     ] {
         let _ = conn.execute(&format!("DROP TABLE IF EXISTS stg.{tbl}"), []);
@@ -2003,5 +2010,346 @@ fn populate_current_stats(conn: &Connection) -> BResult<()> {
         }
     }
     tx.commit().map_err(|e| format!("{e}"))?;
+    Ok(())
+}
+
+fn dept_from_insee(code_insee: Option<&str>) -> Option<String> {
+    let raw = code_insee?.trim().to_ascii_uppercase();
+    if raw.is_empty() {
+        return None;
+    }
+    let code = if raw.len() == 4 && raw.bytes().all(|b| b.is_ascii_digit()) {
+        format!("0{raw}")
+    } else {
+        raw
+    };
+    if code.len() != 5 {
+        return None;
+    }
+    let prefix = &code[..2];
+    if prefix == "2A" || prefix == "2B" {
+        return Some(prefix.to_string());
+    }
+    if !code.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    if prefix == "97" || prefix == "98" {
+        Some(code[..3].to_string())
+    } else {
+        Some(prefix.to_string())
+    }
+}
+
+fn extract_aer_id(line: &str) -> Option<&str> {
+    let tag = "[AER_ID:";
+    let pos = line.find(tag)?;
+    let rest = &line[pos + tag.len()..];
+    let end = rest.find(']')?;
+    let val = rest[..end].trim();
+    if val.is_empty() { None } else { Some(val) }
+}
+
+fn ratio_opt(num: f64, den: Option<f64>) -> Option<f64> {
+    let d = den?;
+    if d == 0.0 {
+        return None;
+    }
+    Some((num / d * 1_000_000.0).round() / 1_000_000.0)
+}
+
+fn populate_department_stats(
+    conn: &Connection,
+    reference: &HashMap<String, DepartmentRef>,
+) -> BResult<()> {
+    const TECHS: &[(&str, i32)] = &[
+        ("2G", TECH_2G),
+        ("3G", TECH_3G),
+        ("4G", TECH_4G),
+        ("5G", TECH_5G),
+    ];
+
+    conn.execute_batch(
+        "DROP TABLE IF EXISTS stg.stg_dept_station;
+         CREATE TABLE IF NOT EXISTS stg.stg_dept_station (
+             id_anfr TEXT NOT NULL,
+             dept TEXT NOT NULL,
+             operator TEXT NOT NULL,
+             tech TEXT NOT NULL,
+             is_active INTEGER NOT NULL,
+             antennas INTEGER NOT NULL,
+             antennas_active INTEGER NOT NULL,
+             antennas_fh INTEGER NOT NULL,
+             PRIMARY KEY (id_anfr, tech)
+         );
+         DELETE FROM dept_stat_current;
+         DELETE FROM dept_stat_operator_tech;",
+    )?;
+
+    {
+        let tx = conn.unchecked_transaction()?;
+        let mut ins = tx.prepare_cached(
+            "INSERT OR REPLACE INTO stg_dept_station (id_anfr, dept, operator, tech, is_active, antennas, antennas_active, antennas_fh)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        )?;
+        let mut q = conn.prepare(
+            "SELECT l.id_anfr, l.code_insee, COALESCE(l.tech_mask, 0), UPPER(TRIM(COALESCE(o.libelle, ''))), COALESCE(t.has_active, 0), COALESCE(st.libelle, ''), t.details_frequences
+             FROM localisation l
+             LEFT JOIN ref_operateur o ON l.operateur_id = o.id
+             LEFT JOIN technique t ON t.id_anfr = l.id_anfr
+             LEFT JOIN ref_statut st ON t.statut_id = st.id",
+        )?;
+        let mut rows = q.query([])?;
+        while let Some(row) = rows.next()? {
+            let id_anfr: String = row.get::<_, Option<String>>(0)?.unwrap_or_default().trim().to_string();
+            let code_insee: Option<String> = row.get(1)?;
+            let Some(dept) = dept_from_insee(code_insee.as_deref()) else { continue };
+            if id_anfr.is_empty() {
+                continue;
+            }
+            let op_raw: String = row.get::<_, Option<String>>(3)?.unwrap_or_default().trim().to_string();
+            let operator = if op_raw.is_empty() { "INCONNU".to_string() } else { op_raw };
+            let tech_mask: i32 = row.get(2)?;
+            let has_active: i32 = row.get(4)?;
+            let statut: String = row.get::<_, Option<String>>(5)?.unwrap_or_default();
+            let details_raw: Option<String> = row.get(6)?;
+
+            let mut by_tech: HashMap<&'static str, HashSet<String>> = HashMap::new();
+            let mut active_by_tech: HashMap<&'static str, HashSet<String>> = HashMap::new();
+            let mut techs_det: HashSet<&'static str> = HashSet::new();
+            let mut active_techs_det: HashSet<&'static str> = HashSet::new();
+            let mut fh_aers: HashSet<String> = HashSet::new();
+
+            let dec = decode_details(details_raw.as_deref());
+            for line in dec.split('\n') {
+                let l = line.trim();
+                if l.is_empty() {
+                    continue;
+                }
+                let mut parts = l.split('|');
+                let sys = parts.next().unwrap_or("").trim();
+                let st_part = parts.next().unwrap_or("").trim();
+                let st_up = st_part.to_ascii_uppercase();
+                let active = st_up.contains("EN SERVICE") || st_up.contains("TECHNIQUEMENT OP");
+                let aer = extract_aer_id(l);
+
+                let sys_up = sys.to_ascii_uppercase();
+                if sys_up.contains("FH") {
+                    if let Some(a) = aer {
+                        fh_aers.insert(a.to_string());
+                    }
+                    continue;
+                }
+                let gen = if sys_up.contains("5G") || sys_up.contains("NR") {
+                    Some("5G")
+                } else if sys_up.contains("4G") || sys_up.contains("LTE") {
+                    Some("4G")
+                } else if sys_up.contains("3G") || sys_up.contains("UMTS") {
+                    Some("3G")
+                } else if sys_up.contains("2G") || sys_up.contains("GSM") {
+                    Some("2G")
+                } else {
+                    None
+                };
+                let Some(g) = gen else { continue };
+                techs_det.insert(g);
+                if active {
+                    active_techs_det.insert(g);
+                }
+                if let Some(a) = aer {
+                    by_tech.entry(g).or_default().insert(a.to_string());
+                    if active {
+                        active_by_tech.entry(g).or_default().insert(a.to_string());
+                    }
+                }
+            }
+
+            let mut declared_techs: HashSet<&'static str> = techs_det;
+            for &(tk, bit) in TECHS {
+                if (tech_mask & bit) != 0 {
+                    declared_techs.insert(tk);
+                }
+            }
+            let st_up = statut.to_ascii_uppercase();
+            let station_active = !active_techs_det.is_empty()
+                || has_active == 1
+                || st_up.contains("EN SERVICE")
+                || st_up.contains("TECHNIQUEMENT OP");
+            let active_techs: HashSet<&'static str> = if !active_techs_det.is_empty() {
+                active_techs_det
+            } else if station_active {
+                TECHS.iter().filter(|&&(_, b)| (tech_mask & b) != 0).map(|&(t, _)| t).collect()
+            } else {
+                HashSet::new()
+            };
+
+            let mut distinct_all: HashSet<&str> = HashSet::new();
+            for s in by_tech.values() {
+                for a in s {
+                    distinct_all.insert(a.as_str());
+                }
+            }
+            let mut distinct_act: HashSet<&str> = HashSet::new();
+            for s in active_by_tech.values() {
+                for a in s {
+                    distinct_act.insert(a.as_str());
+                }
+            }
+
+            let _ = ins.execute(params![
+                &id_anfr,
+                &dept,
+                &operator,
+                "ALL",
+                if station_active { 1 } else { 0 },
+                distinct_all.len() as i32,
+                distinct_act.len() as i32,
+                fh_aers.len() as i32,
+            ]);
+
+            for tech in declared_techs {
+                let ant_cnt = by_tech.get(tech).map_or(0, |s| s.len() as i32);
+                let act_cnt = active_by_tech.get(tech).map_or(0, |s| s.len() as i32);
+                let _ = ins.execute(params![
+                    &id_anfr,
+                    &dept,
+                    &operator,
+                    tech,
+                    if active_techs.contains(tech) { 1 } else { 0 },
+                    ant_cnt,
+                    act_cnt,
+                    0,
+                ]);
+            }
+        }
+        drop(rows);
+        drop(q);
+        drop(ins);
+        tx.commit()?;
+    }
+
+    conn.execute_batch(
+        "INSERT INTO dept_stat_operator_tech (
+             dept_code, operator_name, tech,
+             supports, supports_active, stations, stations_active, antennas, antennas_active
+         )
+         SELECT c.dept, c.operator, c.tech, COALESCE(s.supports, 0), COALESCE(s.supports_active, 0),
+                c.stations, c.stations_active, c.antennas, c.antennas_active
+         FROM (
+             SELECT dept, operator, tech, COUNT(*) AS stations, SUM(is_active) AS stations_active,
+                    SUM(antennas) AS antennas, SUM(antennas_active) AS antennas_active
+             FROM stg_dept_station
+             GROUP BY dept, operator, tech
+         ) c
+         LEFT JOIN (
+             SELECT d.dept, d.operator, d.tech,
+                    COUNT(DISTINCT sup.id_support) AS supports,
+                    COUNT(DISTINCT CASE WHEN d.is_active = 1 THEN sup.id_support END) AS supports_active
+             FROM stg_dept_station d
+             INNER JOIN support sup ON sup.id_anfr = d.id_anfr
+             GROUP BY d.dept, d.operator, d.tech
+         ) s ON s.dept = c.dept AND s.operator = c.operator AND s.tech = c.tech;
+
+         INSERT INTO dept_stat_operator_tech (
+             dept_code, operator_name, tech,
+             supports, supports_active, stations, stations_active, antennas, antennas_active
+         )
+         SELECT c.dept, 'ALL', c.tech, COALESCE(s.supports, 0), COALESCE(s.supports_active, 0),
+                c.stations, c.stations_active, c.antennas, c.antennas_active
+         FROM (
+             SELECT dept, tech, COUNT(*) AS stations, SUM(is_active) AS stations_active,
+                    SUM(antennas) AS antennas, SUM(antennas_active) AS antennas_active
+             FROM stg_dept_station
+             GROUP BY dept, tech
+         ) c
+         LEFT JOIN (
+             SELECT d.dept, d.tech,
+                    COUNT(DISTINCT sup.id_support) AS supports,
+                    COUNT(DISTINCT CASE WHEN d.is_active = 1 THEN sup.id_support END) AS supports_active
+             FROM stg_dept_station d
+             INNER JOIN support sup ON sup.id_anfr = d.id_anfr
+             GROUP BY d.dept, d.tech
+         ) s ON s.dept = c.dept AND s.tech = c.tech;",
+    )?;
+
+    {
+        let tx = conn.unchecked_transaction()?;
+        let mut ins = tx.prepare(
+            "INSERT INTO dept_stat_current (
+                 dept_code, dept_name, region_code, area_km2, population, population_year,
+                 supports, supports_active, stations, stations_active,
+                 antennas, antennas_active, antennas_fh,
+                 stations_per_support, antennas_per_station,
+                 supports_per_km2, stations_per_km2, antennas_per_km2,
+                 supports_per_1k_hab, stations_per_1k_hab, antennas_per_1k_hab,
+                 hab_per_support, hab_per_station, hab_per_antenna
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24)",
+        )?;
+        let mut q = conn.prepare(
+            "SELECT m.dept_code, m.supports, m.supports_active, m.stations, m.stations_active,
+                    m.antennas, m.antennas_active, COALESCE(fh.antennas_fh, 0)
+             FROM dept_stat_operator_tech m
+             LEFT JOIN (
+                 SELECT dept, SUM(antennas_fh) AS antennas_fh
+                 FROM stg_dept_station
+                 WHERE tech = 'ALL'
+                 GROUP BY dept
+             ) fh ON fh.dept = m.dept_code
+             WHERE m.operator_name = 'ALL' AND m.tech = 'ALL'
+             ORDER BY m.dept_code",
+        )?;
+        let mut rows = q.query([])?;
+        while let Some(row) = rows.next()? {
+            let dept_code: String = row.get::<_, Option<String>>(0)?.unwrap_or_default();
+            if dept_code.is_empty() {
+                continue;
+            }
+            let supports: i32 = row.get(1)?;
+            let supports_active: i32 = row.get(2)?;
+            let stations: i32 = row.get(3)?;
+            let stations_active: i32 = row.get(4)?;
+            let antennas: i32 = row.get(5)?;
+            let antennas_active: i32 = row.get(6)?;
+            let antennas_fh: i32 = row.get(7)?;
+
+            let info = reference.get(&dept_code);
+            let area = info.and_then(|i| i.area_km2);
+            let pop = info.and_then(|i| i.population);
+            let pop_f = pop.map(|p| p as f64);
+            let pop_1k = pop.filter(|&p| p > 0).map(|p| p as f64 / 1000.0);
+
+            ins.execute(params![
+                &dept_code,
+                info.map(|i| i.name.as_str()),
+                info.map(|i| i.region_code.as_str()),
+                area,
+                pop,
+                info.and_then(|i| i.population_year.as_deref()),
+                supports,
+                supports_active,
+                stations,
+                stations_active,
+                antennas,
+                antennas_active,
+                antennas_fh,
+                ratio_opt(stations as f64, Some(supports as f64)),
+                ratio_opt(antennas as f64, Some(stations as f64)),
+                ratio_opt(supports as f64, area),
+                ratio_opt(stations as f64, area),
+                ratio_opt(antennas as f64, area),
+                ratio_opt(supports as f64, pop_1k),
+                ratio_opt(stations as f64, pop_1k),
+                ratio_opt(antennas as f64, pop_1k),
+                pop_f.and_then(|p| ratio_opt(p, Some(supports as f64))),
+                pop_f.and_then(|p| ratio_opt(p, Some(stations as f64))),
+                pop_f.and_then(|p| ratio_opt(p, Some(antennas as f64))),
+            ])?;
+        }
+        drop(rows);
+        drop(q);
+        drop(ins);
+        tx.commit()?;
+    }
+
+    let _ = conn.execute("DROP TABLE IF EXISTS stg.stg_dept_station", []);
     Ok(())
 }

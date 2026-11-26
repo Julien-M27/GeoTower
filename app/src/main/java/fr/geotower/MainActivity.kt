@@ -10,13 +10,19 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -2274,6 +2280,44 @@ class MainActivity : ComponentActivity() {
                         val shouldShowDbSuccessPopup = pendingDbSuccessPopup != null ||
                             AppGlobalState.showDbSuccessPopup.value
                         if (shouldShowDbSuccessPopup && currentRoute != "splash" && currentRoute != "first_start") {
+                            val popupContext = androidx.compose.ui.platform.LocalContext.current
+                            val lastBuildDurationMs = remember(shouldShowDbSuccessPopup, dbSuccessPopupName, isGeneration) {
+                                if (isGeneration) {
+                                    val name = dbSuccessPopupName.orEmpty()
+                                    val timingKey = when {
+                                        name.contains("Canada", ignoreCase = true) ->
+                                            fr.geotower.data.db.DbOperationTimings.localBuildMobileKey(
+                                                fr.geotower.data.db.DatabaseCountry.CA
+                                            )
+                                        name.contains("radio", ignoreCase = true) && !name.contains("mobile", ignoreCase = true) ->
+                                            fr.geotower.data.db.DbOperationTimings.LOCAL_BUILD_RADIO
+                                        else ->
+                                            fr.geotower.data.db.DbOperationTimings.localBuildMobileKey(
+                                                fr.geotower.data.db.DatabaseCountry.FR
+                                            )
+                                    }
+                                    fr.geotower.data.db.DbOperationTimings.readDurationMs(popupContext, timingKey)
+                                        ?: fr.geotower.data.db.DbOperationTimings.readDurationMs(
+                                            popupContext,
+                                            fr.geotower.data.db.DbOperationTimings.LOCAL_BUILD
+                                        )
+                                } else null
+                            }
+                            val dbFileSizeText = remember(shouldShowDbSuccessPopup, dbSuccessPopupName, isGeneration) {
+                                if (!isGeneration) return@remember null
+                                val name = dbSuccessPopupName.orEmpty()
+                                val targetFile = when {
+                                    name.contains("Canada", ignoreCase = true) ->
+                                        popupContext.getDatabasePath(fr.geotower.data.db.DatabaseCountry.CA.dbFileName)
+                                    name.contains("radio", ignoreCase = true) && !name.contains("mobile", ignoreCase = true) ->
+                                        popupContext.getDatabasePath(fr.geotower.data.db.RadioDatabaseValidator.DB_NAME)
+                                    else ->
+                                        popupContext.getDatabasePath(fr.geotower.data.db.DatabaseCountry.FR.dbFileName)
+                                }
+                                if (targetFile.isFile && targetFile.length() > 0L) {
+                                    android.text.format.Formatter.formatShortFileSize(popupContext, targetFile.length())
+                                } else null
+                            }
                             AlertDialog(
                                 onDismissRequest = {
                                     pendingDbSuccessPopup?.let {
@@ -2282,6 +2326,14 @@ class MainActivity : ComponentActivity() {
                                     AppGlobalState.showDbSuccessPopup.value = false
                                     AppGlobalState.dbSuccessPopupName.value = null
                                     AppGlobalState.dbSuccessPopupIsGeneration.value = false
+                                },
+                                icon = {
+                                    Icon(
+                                        imageVector = Icons.Default.CheckCircle,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(36.dp)
+                                    )
                                 },
                                 title = {
                                     Text(
@@ -2293,22 +2345,54 @@ class MainActivity : ComponentActivity() {
                                     )
                                 },
                                 text = {
-                                    Text(
-                                        text = if (isGeneration) {
-                                            if (dbSuccessPopupName != null) {
-                                                stringResource(R.string.database_build_success_desc_named, dbSuccessPopupName)
+                                    Column(
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Text(
+                                            text = if (isGeneration) {
+                                                if (dbSuccessPopupName != null) {
+                                                    stringResource(R.string.database_build_success_desc_named, dbSuccessPopupName)
+                                                } else {
+                                                    stringResource(R.string.database_build_success_desc)
+                                                }
                                             } else {
-                                                stringResource(R.string.database_build_success_desc)
+                                                if (dbSuccessPopupName != null) {
+                                                    stringResource(R.string.database_download_success_desc_named, dbSuccessPopupName)
+                                                } else {
+                                                    stringResource(R.string.database_download_success_desc)
+                                                }
                                             }
-                                        } else {
-                                            if (dbSuccessPopupName != null) {
-                                                stringResource(R.string.database_download_success_desc_named, dbSuccessPopupName)
-                                            } else {
-                                                stringResource(R.string.database_download_success_desc)
-                                            }
+                                        )
+                                        val summaryParts = listOfNotNull(
+                                            lastBuildDurationMs?.let { fr.geotower.data.db.DbOperationTimings.formatDuration(it) },
+                                            dbFileSizeText
+                                        )
+                                        if (summaryParts.isNotEmpty()) {
+                                            Text(
+                                                text = summaryParts.joinToString(" · "),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
                                         }
-                                    )
+                                    }
                                 },
+                                dismissButton = if (isGeneration) {
+                                    {
+                                        TextButton(onClick = {
+                                            pendingDbSuccessPopup?.let {
+                                                AppGlobalState.dismissDbSuccessPopup(it.workId)
+                                            }
+                                            AppGlobalState.showDbSuccessPopup.value = false
+                                            AppGlobalState.dbSuccessPopupName.value = null
+                                            AppGlobalState.dbSuccessPopupIsGeneration.value = false
+                                            navController.navigate("diagnostic") {
+                                                launchSingleTop = true
+                                            }
+                                        }) {
+                                            Text(stringResource(R.string.share_history_kind_diagnostic))
+                                        }
+                                    }
+                                } else null,
                                 confirmButton = {
                                     Button(onClick = {
                                         pendingDbSuccessPopup?.let {

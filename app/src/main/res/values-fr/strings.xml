@@ -1948,6 +1948,7 @@
     <string name="appstrings_diagnostic_refresh">Actualiser</string>
     <string name="appstrings_diagnostic_copy_report">Copier le rapport</string>
     <string name="appstrings_diagnostic_report_copied">Rapport diagnostic copié</string>
+    <string name="appstrings_diagnostic_local_build_report_copied">Rapport de génération locale copié</string>
     <string name="appstrings_diagnostic_log_size">Journal de débogage : %1$s</string>
     <string name="appstrings_diagnostic_view_log">Visualiser les logs</string>
     <string name="appstrings_diagnostic_share_log">Partager le journal</string>
@@ -3012,6 +3013,7 @@
     <string name="appstrings_release_v2142_summary_speedtests_ocr_max_priority_and_raw_text">Priorité aux débits principaux sur les valeurs MAX en OCR et affichage du texte OCR détecté dans les détails</string>
     <string name="appstrings_release_v2143_summary_speedtests_ocr_dual_pass_and_decimals">Double passe OCR à échelle réduite pour les grands chiffres et normalisation des décimales espacées dans les speedtests</string>
     <string name="appstrings_release_v2144_summary_speedtests_map_thumbnails_and_translations">Miniatures des speedtests géolocalisés sur la carte, partage et copie OCR, et traductions complètes de l\'interface</string>
+    <string name="appstrings_release_v2150_summary_rust_canada_and_local_build">Génération locale Rust pour le Canada, améliorations du suivi de génération et des diagnostics</string>
     <string name="appstrings_release_v2149_summary_rust_jni_release_fix">Fiabilisation du moteur natif Rust pour la génération locale des bases en version Release</string>
     <string name="appstrings_release_v2148_summary_rust_db_builder_and_update_scheduler">Moteur expérimental Rust pour la génération locale des bases et fiabilisation des vérifications de mise à jour</string>
     <string name="appstrings_release_v2147_summary_spatial_ocr_permissions_and_i18n">OCR spatial des speedtests, dialogues de permissions unifiés, ajustements Garmin et traductions complètes</string>
@@ -3486,4 +3488,9 @@
     <string name="garmin_status_sdk_stopped">SDK arrêté</string>
     <string name="garmin_last_payload_none">Aucun message reçu</string>
     <string name="preference_profile_clipboard_label">Profil GeoTower</string>
+    <string name="appstrings_local_build_desc_ca">Reconstruit la base Canada depuis les données ouvertes officielles ISDE (Site_Data_Extract_FX.zip), sur l\'appareil. Avancé — téléphones performants uniquement. Consomme des données mobiles, du temps et de la batterie ; Wi-Fi conseillé.</string>
+    <string name="appstrings_local_build_phase_downloading_ca">Téléchargement des données ISDE</string>
+    <string name="appstrings_local_build_phase_reading_ca">Lecture du ZIP ISDE (filtrage mobile)</string>
+    <string name="appstrings_local_build_phase_details_ca">Assemblage des fiches secteurs ISDE</string>
+    <string name="appstrings_local_build_retry">Nouvelle tentative (%1$d/%2$d)…</string>
 </resources>

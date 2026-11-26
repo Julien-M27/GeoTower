@@ -30,6 +30,16 @@ pub const BAND_5G_26000: i32 = 1 << 13;
 pub const BAND_FH: i32 = 1 << 14;
 pub const BAND_5G_1400: i32 = 1 << 21;
 pub const BAND_5G_4200: i32 = 1 << 22;
+pub const BAND_3G_1900: i32 = 1 << 15;
+pub const BAND_4G_600: i32 = 1 << 16;
+pub const BAND_4G_2300: i32 = 1 << 17;
+pub const BAND_4G_3500: i32 = 1 << 18;
+pub const BAND_5G_600: i32 = 1 << 19;
+pub const BAND_5G_850: i32 = 1 << 20;
+pub const BAND_5G_1900: i32 = 1 << 23;
+pub const BAND_5G_2000: i32 = 1 << 24;
+pub const BAND_5G_2600: i32 = 1 << 25;
+pub const BAND_5G_3800: i32 = 1 << 26;
 
 #[inline]
 pub fn clean_text(s: Option<&str>) -> &str {

@@ -5,6 +5,7 @@ use serde::Deserialize;
 use std::collections::HashMap;
 
 mod builder;
+mod canada;
 mod parsing;
 mod radio;
 mod schema;
@@ -26,6 +27,8 @@ pub type BResult<T> = Result<T, BuildErr>;
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BuildRequest {
+    #[serde(default = "default_country_code")]
+    pub country_code: String,
     pub pack_mobile: bool,
     pub pack_radio: bool,
     pub allowed_service_mask: i32,
@@ -54,6 +57,10 @@ pub struct DepartmentRef {
     pub area_km2: Option<f64>,
     pub population: Option<i64>,
     pub population_year: Option<String>,
+}
+
+fn default_country_code() -> String {
+    "FR".to_string()
 }
 
 pub trait ProgressSink {
@@ -142,7 +149,11 @@ pub extern "system" fn Java_fr_geotower_data_build_RustDbBuilder_nativeBuildData
         callback: &callback,
     };
 
-    let result = builder::run_build(&req, &mut sink);
+    let result = if req.country_code.eq_ignore_ascii_case("CA") {
+        canada::run_build_canada(&req, &mut sink)
+    } else {
+        builder::run_build(&req, &mut sink)
+    };
     match result {
         Ok(()) => env
             .new_string("")

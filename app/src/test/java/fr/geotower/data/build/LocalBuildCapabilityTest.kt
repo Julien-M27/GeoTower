@@ -40,7 +40,7 @@ class LocalBuildCapabilityTest {
 
     @Test
     fun rejectsADeviceWhoseHeapCeilingIsTooLow() {
-        val result = evaluate(heapLimitMib = 128, freeStorageMib = 2048)
+        val result = evaluate(heapLimitMib = 64, freeStorageMib = 2048)
 
         assertFalse(result.eligible)
         assertTrue(result.reason ?: "", result.reason!!.contains("mémoire d'application"))
@@ -82,7 +82,7 @@ class LocalBuildCapabilityTest {
     /** Les deux causes se cumulent dans le motif, pour que le diagnostic soit complet. */
     @Test
     fun reportsEveryBlockingReasonAtOnce() {
-        val result = evaluate(heapLimitMib = 96, freeStorageMib = 100)
+        val result = evaluate(heapLimitMib = 64, freeStorageMib = 100)
 
         assertFalse(result.eligible)
         assertTrue(result.reason ?: "", result.reason!!.contains("mémoire d'application"))
@@ -94,8 +94,8 @@ class LocalBuildCapabilityTest {
     fun keepsMarginsAboveMeasuredPeaksWithoutInflatingThem() {
         val budget = LocalBuildCapability.budgetFor(mobile = true, radio = true)
 
-        assertTrue(budget.heapBytes > 112L * mib)
-        assertTrue(budget.heapBytes < 2L * 112L * mib)
+        assertTrue(budget.heapBytes > 64L * mib)
+        assertTrue(budget.heapBytes < 2L * 64L * mib)
         assertTrue(budget.storageBytes > 1157L * mib)
         assertTrue(budget.storageBytes < 2L * 1157L * mib)
     }

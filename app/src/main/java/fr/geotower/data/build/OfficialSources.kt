@@ -34,7 +34,13 @@ object OfficialSources {
         "www.sfr.fr",
         "www.bouyguestelecom.fr",
         "couverture-mobile.orange.fr",
+        // Canada (ISDE / ISED)
+        "www.ic.gc.ca",
+        "ic.gc.ca",
+        "ised-isde.canada.ca",
     )
+
+    const val URL_CANADA_ISED_ZIP = "https://www.ic.gc.ca/engineering/SMS_TAFL_Files/Site_Data_Extract_FX.zip"
 
     /** Presets identiques a l'interface d'administration serveur (docs/server/admin_ui.py). */
     const val WEEKLY_PRESET_DATAGOUV_ZIP = "datagouv_zip"

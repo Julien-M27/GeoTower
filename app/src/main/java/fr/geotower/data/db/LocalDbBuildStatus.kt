@@ -22,6 +22,7 @@ data class LocalDbBuildStatus(
     val mobile: Boolean,
     val radio: Boolean,
     val progress: Int,
+    val countryCode: String = "FR",
 ) {
     /** Une generation en cours produira la base mobile (`geotower_fr.db`). */
     val mobileRunning: Boolean get() = running && mobile
@@ -41,11 +42,13 @@ data class LocalDbBuildStatus(
             // Build lance par une version anterieure (sans tag de pack) : on ignore ce qu'il produit,
             // on couvre donc les deux bases plutot que d'en annoncer une « manquante » a tort.
             val untagged = !mobileTagged && !radioTagged
+            val isCanada = info.tags.contains(LocalDbBuildWorker.TAG_COUNTRY_CA)
             return LocalDbBuildStatus(
                 running = true,
                 mobile = mobileTagged || untagged,
                 radio = radioTagged || untagged,
                 progress = info.progress.getInt(LocalDbBuildWorker.KEY_PROGRESS, 0),
+                countryCode = if (isCanada) "CA" else "FR",
             )
         }
 
