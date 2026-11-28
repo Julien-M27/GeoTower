@@ -46,6 +46,7 @@ object AppConfig {
     const val PREF_MAP_FOLLOW_ORIENTATION = "map_follow_orientation"
     const val DEFAULT_MAP_ROTATION_ENABLED = false
     const val DEFAULT_MAP_FOLLOW_ORIENTATION = false
+    const val PREF_USE_MAPLIBRE_2D = "use_maplibre_2d"
     const val PREF_SHOW_AZIMUTH_LINES = "show_azimuths"
     const val PREF_SHOW_AZIMUTH_CONES = "show_azimuths_cone"
     const val PREF_KEEP_AZIMUTHS_WHEN_ZOOMED_OUT = "keep_azimuths_when_zoomed_out"
@@ -599,6 +600,7 @@ object AppConfig {
     // --- Capteurs matériels ---
     var hasCompass = mutableStateOf(true) // Vrai par défaut, vérifié au lancement
     var supports3DMap = mutableStateOf(true) // Déterminé au démarrage selon le support OpenGL ES 3.0
+    var useMapLibre2D = mutableStateOf(false) // Mode intermédiaire : moteur MapLibre en 2D (osmdroid reste actif par défaut et pour le hors-ligne .map)
 
     // --- AFFICHAGE DES SPEEDTESTS
     var siteShowSpeedtest = mutableStateOf(true)
@@ -625,6 +627,7 @@ object AppConfig {
         smoothMapLocation.value = MapDisplayPrefs.smoothLocation.read(prefs)
         mapRotationEnabled.value = MapDisplayPrefs.mapRotationEnabled.read(prefs)
         mapFollowOrientation.value = MapDisplayPrefs.mapFollowOrientation.read(prefs)
+        useMapLibre2D.value = prefs.getBoolean(PREF_USE_MAPLIBRE_2D, false)
         mapLocationZoom.intValue = MapDisplayPrefs.locationZoom.read(prefs)
             .coerceIn(MIN_MAP_LOCATION_ZOOM, MAX_MAP_LOCATION_ZOOM)
         mapClusterStrength.intValue = MapDisplayPrefs.mapClusterStrength.read(prefs)

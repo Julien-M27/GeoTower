@@ -593,7 +593,7 @@
     <string name="appstrings_delete_all_maps_warning_title">Eliminar todos os mapas?</string>
     <string name="appstrings_delete_traces">Eliminar traços</string>
     <string name="appstrings_details">Detalhes</string>
-    <string name="appstrings_dev_credit">Desenvolvido por Julien e colaboradores do GitHub 😉</string>
+    <string name="appstrings_dev_credit">Desenvolvido por Julien, Johan e colaboradores do GitHub 😉</string>
     <string name="appstrings_distance_hidden">Distância oculta (Modo confidencial)</string>
     <string name="appstrings_distance_label">Distância :\u0020</string>
     <string name="appstrings_do_not_show_again">Não mostrar esta mensagem novamente</string>
@@ -3011,6 +3011,7 @@
     <string name="appstrings_release_v2142_summary_speedtests_ocr_max_priority_and_raw_text">Prioridade às velocidades principais sobre os picos MAX em OCR e visualização do texto OCR detetado nos detalhes</string>
     <string name="appstrings_release_v2143_summary_speedtests_ocr_dual_pass_and_decimals">Dupla passagem OCR em escala reduzida para dígitos grandes e normalização de decimais espaçados nos speedtests</string>
     <string name="appstrings_release_v2144_summary_speedtests_map_thumbnails_and_translations">Miniaturas clicáveis de speedtests no mapa, partilha e cópia OCR, e traduções completas da interface</string>
+    <string name="appstrings_release_v2151_summary_map_3d_clustering_and_perf">Otimizações de desempenho em mapas 2D/3D, clustering, consultas e acompanhamento em tempo real</string>
     <string name="appstrings_release_v2150_summary_rust_canada_and_local_build">Geração local em Rust para o Canadá e melhorias no progresso da criação e diagnósticos</string>
     <string name="appstrings_release_v2149_summary_rust_jni_release_fix">Maior estabilidade do motor nativo Rust para geração local das bases em versões Release</string>
     <string name="appstrings_release_v2148_summary_rust_db_builder_and_update_scheduler">Motor experimental em Rust para geração local das bases de dados e melhorias no agendador de atualizações</string>

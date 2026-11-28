@@ -593,7 +593,7 @@
     <string name="appstrings_delete_all_maps_warning_title">¿Eliminar todos los mapas?</string>
     <string name="appstrings_delete_traces">Eliminar trazados</string>
     <string name="appstrings_details">Detalles</string>
-    <string name="appstrings_dev_credit">Desarrollado por Julien y colaboradores de GitHub 😉</string>
+    <string name="appstrings_dev_credit">Desarrollado por Julien, Johan y colaboradores de GitHub 😉</string>
     <string name="appstrings_distance_hidden">Distancia oculta (modo confidencial)</string>
     <string name="appstrings_distance_label">Distancia:\u0020</string>
     <string name="appstrings_do_not_show_again">No volver a mostrar este mensaje</string>
@@ -3011,6 +3011,7 @@
     <string name="appstrings_release_v2142_summary_speedtests_ocr_max_priority_and_raw_text">Prioridad a las velocidades principales frente a los picos MAX en OCR y visualización del texto OCR detectado en los detalles</string>
     <string name="appstrings_release_v2143_summary_speedtests_ocr_dual_pass_and_decimals">Doble pasada OCR a escala reducida para cifras grandes y normalización de decimales espaciados en speedtests</string>
     <string name="appstrings_release_v2144_summary_speedtests_map_thumbnails_and_translations">Miniaturas interactivas de speedtests en el mapa, compartir imagen y copiar OCR, y traducciones completas de la interfaz</string>
+    <string name="appstrings_release_v2151_summary_map_3d_clustering_and_perf">Optimizaciones de rendimiento en mapas 2D/3D, clustering, consultas y seguimiento en directo</string>
     <string name="appstrings_release_v2150_summary_rust_canada_and_local_build">Generación local con Rust para Canadá y mejoras en el progreso de creación y diagnósticos</string>
     <string name="appstrings_release_v2149_summary_rust_jni_release_fix">Mayor estabilidad del motor nativo Rust para la generación local de bases en versiones Release</string>
     <string name="appstrings_release_v2148_summary_rust_db_builder_and_update_scheduler">Motor experimental en Rust para la generación local de bases de datos y mejoras en el programador de actualizaciones</string>

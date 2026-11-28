@@ -45,6 +45,12 @@ import fr.geotower.utils.AppConfig
 import fr.geotower.utils.PreferenceStores
 import kotlin.math.roundToInt
 
+private const val CLUSTER_STRENGTH_STEP = 10
+private const val CLUSTER_STRENGTH_STEPS_COUNT = (100 / CLUSTER_STRENGTH_STEP) - 1 // 9 pas discrets entre 0 et 100
+
+private fun snapClusterStrength(value: Float): Int =
+    ((value / CLUSTER_STRENGTH_STEP.toFloat()).roundToInt() * CLUSTER_STRENGTH_STEP).coerceIn(0, 100)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MapClusterStrengthSlider(
@@ -58,18 +64,20 @@ fun MapClusterStrengthSlider(
         context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
     }
     val currentStrength = AppConfig.mapClusterStrength.intValue.coerceIn(0, 100)
-    var sliderValue by remember(currentStrength) {
-        mutableFloatStateOf(currentStrength.toFloat())
+    val snappedInitial = snapClusterStrength(currentStrength.toFloat())
+    var sliderValue by remember(snappedInitial) {
+        mutableFloatStateOf(snappedInitial.toFloat())
     }
     val displayedStrength = sliderValue.roundToInt().coerceIn(0, 100)
 
     fun updateStrength(value: Float) {
-        sliderValue = value
-        AppConfig.mapClusterStrength.intValue = value.roundToInt().coerceIn(0, 100)
+        val snapped = snapClusterStrength(value)
+        sliderValue = snapped.toFloat()
+        AppConfig.mapClusterStrength.intValue = snapped
     }
 
     fun persistStrength() {
-        val savedStrength = sliderValue.roundToInt().coerceIn(0, 100)
+        val savedStrength = snapClusterStrength(sliderValue)
         AppConfig.mapClusterStrength.intValue = savedStrength
         prefs.edit()
             .putInt(AppConfig.PREF_MAP_CLUSTER_STRENGTH, savedStrength)
@@ -133,7 +141,7 @@ fun MapClusterStrengthSlider(
                 onValueChange = ::updateStrength,
                 onValueChangeFinished = ::persistStrength,
                 valueRange = 0f..100f,
-                steps = 0,
+                steps = CLUSTER_STRENGTH_STEPS_COUNT,
                 modifier = Modifier.fillMaxWidth(),
                 thumb = {
                     Box(
@@ -176,7 +184,7 @@ fun MapClusterStrengthSlider(
                 onValueChange = ::updateStrength,
                 onValueChangeFinished = ::persistStrength,
                 valueRange = 0f..100f,
-                steps = 0,
+                steps = CLUSTER_STRENGTH_STEPS_COUNT,
                 modifier = Modifier.fillMaxWidth()
             )
         }

@@ -149,7 +149,22 @@ class AntennaWidgetWorker(
                 maxLon = lon + offsetLon
             )
             val antennas = HiddenSitesStore.filter(context, antennasInBox.ifEmpty {
-                dao.getNearest100(lat, lon)
+                var found = emptyList<fr.geotower.data.models.LocalisationEntity>()
+                for (radius in listOf(0.15, 0.45, 1.5)) {
+                    val candidates = dao.getNearestWithinRadius(
+                        lat = lat,
+                        lon = lon,
+                        minLat = lat - radius,
+                        maxLat = lat + radius,
+                        minLon = lon - radius,
+                        maxLon = lon + radius,
+                        maxDistanceSquared = radius * radius,
+                        limit = 100
+                    )
+                    if (candidates.size > found.size) found = candidates
+                    if (candidates.size >= 100) break
+                }
+                found.ifEmpty { dao.getNearest100(lat, lon) }
             })
 
             if (antennas.isEmpty()) {

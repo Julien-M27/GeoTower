@@ -499,23 +499,72 @@ class LiveTrackingService : Service() {
         }
 
         return HiddenSitesStore.filter(applicationContext, if (isNearestMode) {
-            dao.getNearestActiveLocalisations(
-                lat = location.latitude,
-                lon = location.longitude,
-                limit = GLOBAL_OPERATOR_FALLBACK_LIMIT
-            )
-        } else {
-            operatorQueryNames
-                .flatMap { operatorQueryName ->
-                    dao.getNearestActiveLocalisationsByOperator(
-                        operatorName = operatorQueryName,
+            queryNearestActiveWithProgressiveRadii(
+                limit = GLOBAL_OPERATOR_FALLBACK_LIMIT,
+                byRadius = { r ->
+                    dao.getNearestActiveLocalisationsWithinRadius(
+                        lat = location.latitude,
+                        lon = location.longitude,
+                        minLat = location.latitude - r,
+                        maxLat = location.latitude + r,
+                        minLon = location.longitude - r,
+                        maxLon = location.longitude + r,
+                        maxDistanceSquared = r * r,
+                        limit = GLOBAL_OPERATOR_FALLBACK_LIMIT
+                    )
+                },
+                fallback = {
+                    dao.getNearestActiveLocalisations(
                         lat = location.latitude,
                         lon = location.longitude,
                         limit = GLOBAL_OPERATOR_FALLBACK_LIMIT
                     )
                 }
+            )
+        } else {
+            operatorQueryNames
+                .flatMap { operatorQueryName ->
+                    queryNearestActiveWithProgressiveRadii(
+                        limit = GLOBAL_OPERATOR_FALLBACK_LIMIT,
+                        byRadius = { r ->
+                            dao.getNearestActiveLocalisationsByOperatorWithinRadius(
+                                operatorName = operatorQueryName,
+                                lat = location.latitude,
+                                lon = location.longitude,
+                                minLat = location.latitude - r,
+                                maxLat = location.latitude + r,
+                                minLon = location.longitude - r,
+                                maxLon = location.longitude + r,
+                                maxDistanceSquared = r * r,
+                                limit = GLOBAL_OPERATOR_FALLBACK_LIMIT
+                            )
+                        },
+                        fallback = {
+                            dao.getNearestActiveLocalisationsByOperator(
+                                operatorName = operatorQueryName,
+                                lat = location.latitude,
+                                lon = location.longitude,
+                                limit = GLOBAL_OPERATOR_FALLBACK_LIMIT
+                            )
+                        }
+                    )
+                }
                 .distinctBy { it.idAnfr }
         })
+    }
+
+    private suspend inline fun queryNearestActiveWithProgressiveRadii(
+        limit: Int,
+        crossinline byRadius: suspend (Double) -> List<LocalisationEntity>,
+        crossinline fallback: suspend () -> List<LocalisationEntity>
+    ): List<LocalisationEntity> {
+        var best = emptyList<LocalisationEntity>()
+        for (radius in listOf(0.15, 0.45, 1.5, 4.0)) {
+            val candidates = byRadius(radius)
+            if (candidates.size > best.size) best = candidates
+            if (candidates.size >= limit) return candidates
+        }
+        return fallback().ifEmpty { best }
     }
 
     private fun requestLiveOutageRefreshIfNeeded(force: Boolean = false) {

@@ -593,7 +593,7 @@
     <string name="appstrings_delete_all_maps_warning_title">Alle Karten löschen?</string>
     <string name="appstrings_delete_traces">Spuren löschen</string>
     <string name="appstrings_details">Details</string>
-    <string name="appstrings_dev_credit">Entwickelt von Julien und GitHub-Mitwirkenden 😉</string>
+    <string name="appstrings_dev_credit">Entwickelt von Julien, Johan und GitHub-Mitwirkenden 😉</string>
     <string name="appstrings_distance_hidden">Entfernung ausgeblendet (vertraulicher Modus)</string>
     <string name="appstrings_distance_label">Entfernung:\u0020</string>
     <string name="appstrings_do_not_show_again">Diese Meldung nicht mehr anzeigen</string>
@@ -3011,6 +3011,7 @@
     <string name="appstrings_release_v2142_summary_speedtests_ocr_max_priority_and_raw_text">Priorisierung der Hauptgeschwindigkeiten vor MAX-Spitzen in der OCR und Anzeige des erkannten OCR-Textes in den Details</string>
     <string name="appstrings_release_v2143_summary_speedtests_ocr_dual_pass_and_decimals">Zweiter OCR-Durchlauf mit reduzierter Skalierung für große Ziffern und Normalisierung getrennter Dezimalstellen bei Speedtests</string>
     <string name="appstrings_release_v2144_summary_speedtests_map_thumbnails_and_translations">Klickbare Speedtest-Vorschaubilder auf der Karte, Teilen/Kopieren von OCR-Text und vollständige Oberflächenübersetzungen</string>
+    <string name="appstrings_release_v2151_summary_map_3d_clustering_and_perf">Leistungsoptimierungen für 2D/3D-Karten, Clustering, Abfragen und Live-Tracking</string>
     <string name="appstrings_release_v2150_summary_rust_canada_and_local_build">Native Rust-Datenbankerstellung für Kanada sowie verbesserte Fortschritts- und Diagnoseansichten</string>
     <string name="appstrings_release_v2149_summary_rust_jni_release_fix">Verbesserte Stabilität der nativen Rust-Datenbank-Engine in Release-Builds</string>
     <string name="appstrings_release_v2148_summary_rust_db_builder_and_update_scheduler">Experimentelle native Rust-Engine für die lokale Datenbankerstellung und Verbesserungen am Update-Planer</string>

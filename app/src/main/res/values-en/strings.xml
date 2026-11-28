@@ -593,7 +593,7 @@
     <string name="appstrings_delete_all_maps_warning_title">Delete all maps?</string>
     <string name="appstrings_delete_traces">Delete traces</string>
     <string name="appstrings_details">Details</string>
-    <string name="appstrings_dev_credit">Developed by Julien and GitHub contributors 😉</string>
+    <string name="appstrings_dev_credit">Developed by Julien, Johan and GitHub contributors 😉</string>
     <string name="appstrings_distance_hidden">Distance hidden (Confidential mode)</string>
     <string name="appstrings_distance_label">Distance :\u0020</string>
     <string name="appstrings_do_not_show_again">Do not show this message again</string>
@@ -3011,6 +3011,7 @@
     <string name="appstrings_release_v2142_summary_speedtests_ocr_max_priority_and_raw_text">Prioritized main speed values over chart MAX peaks in OCR and added raw OCR text viewer in speedtest details</string>
     <string name="appstrings_release_v2143_summary_speedtests_ocr_dual_pass_and_decimals">Dual-scale OCR pass for large display digits and spaced decimal normalization in speedtests</string>
     <string name="appstrings_release_v2144_summary_speedtests_map_thumbnails_and_translations">Clickable speedtest thumbnails on the map, speedtest image sharing and OCR copy, and complete UI translations</string>
+    <string name="appstrings_release_v2151_summary_map_3d_clustering_and_perf">Performance optimizations for 2D/3D map rendering, clustering, queries, and live tracking</string>
     <string name="appstrings_release_v2150_summary_rust_canada_and_local_build">Native Rust local database generation for Canada, improved build progress and diagnostics</string>
     <string name="appstrings_release_v2149_summary_rust_jni_release_fix">Improved stability of the native Rust database builder in Release builds</string>
     <string name="appstrings_release_v2148_summary_rust_db_builder_and_update_scheduler">Experimental native Rust engine for local database generation and update scheduler improvements</string>

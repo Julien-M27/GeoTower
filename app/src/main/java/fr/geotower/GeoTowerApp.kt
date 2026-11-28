@@ -79,19 +79,20 @@ class GeoTowerApp : Application() {
         fr.geotower.utils.AppConfig.localModeLevel.intValue =
             ecoPrefs.getInt(fr.geotower.utils.AppConfig.PREF_LOCAL_MODE_LEVEL, fr.geotower.utils.AppConfig.LOCAL_MODE_SERVER)
                 .coerceIn(fr.geotower.utils.AppConfig.LOCAL_MODE_SERVER, fr.geotower.utils.AppConfig.LOCAL_MODE_MAX)
-        fr.geotower.utils.AppConfig.localBuildEligible.value =
-            fr.geotower.data.build.LocalBuildCapability.evaluate(applicationContext).eligible
         // Dernier cran (« autonomie maximale ») : bloque les endpoints communautaires/MAJ/live du client partagé.
         RetrofitClient.communityEndpointBlocker = { fr.geotower.utils.AppConfig.blockCommunityAndUpdates() }
         appScope.launch {
             RemoteFeatureFlags.refreshIfNeeded(applicationContext, force = true)
         }
         appScope.launch(Dispatchers.IO) {
+            // Évaluation stockage/RAM et nettoyage des fichiers obsolètes hors thread UI
+            fr.geotower.utils.AppConfig.localBuildEligible.value =
+                fr.geotower.data.build.LocalBuildCapability.evaluate(applicationContext).eligible
+            SignalQuestUploadQueue.cleanupStaleFiles(applicationContext)
             // Pré-ouvre la base hors thread UI : crée au besoin les index de perf
             // (cf. GeoTowerDatabaseIndexes) et accélère la première requête carte.
             runCatching { AppDatabase.getDatabase(applicationContext) }
         }
-        SignalQuestUploadQueue.cleanupStaleFiles(applicationContext)
         // Pont BLE pour montres connectées Garmin (Connect IQ)
         fr.geotower.services.garmin.GarminCompanionManager.init(this, repository)
     }

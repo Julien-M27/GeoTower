@@ -975,35 +975,52 @@ class AnfrRepository(
         }
     }
 
+    private class ClusterAccumulator {
+        var sumLat = 0.0
+        var sumLon = 0.0
+        var totalSites = 0
+        val distinctIds = LinkedHashSet<String>()
+        val operators = LinkedHashSet<String>()
+    }
+
     private fun buildLiveClusters(sites: List<LocalisationEntity>, zoom: Double): List<DbCluster> {
         if (sites.isEmpty()) return emptyList()
 
         val bucket = clusterBucketForZoom(zoom)
-        val clusters = sites
-            .groupBy { site ->
-                Math.round(site.latitude / bucket.latDegrees) to
-                    Math.round(site.longitude / bucket.lonDegrees)
+        val buckets = LinkedHashMap<Long, ClusterAccumulator>(sites.size.coerceAtMost(256))
+        for (site in sites) {
+            val latCell = Math.round(site.latitude / bucket.latDegrees).toInt()
+            val lonCell = Math.round(site.longitude / bucket.lonDegrees).toInt()
+            val key = ((latCell.toLong() and 0xFFFF_FFFFL) shl 32) or (lonCell.toLong() and 0xFFFF_FFFFL)
+            val acc = buckets.getOrPut(key) { ClusterAccumulator() }
+            acc.sumLat += site.latitude
+            acc.sumLon += site.longitude
+            acc.totalSites++
+            val idAnfr = site.idAnfr
+            if (idAnfr.isNotBlank()) {
+                acc.distinctIds.add(idAnfr)
             }
-            .map { (_, group) ->
-                val distinctIds = group
-                    .map { it.idAnfr }
-                    .filter { it.isNotBlank() }
-                    .distinct()
-                val count = distinctIds.size.takeIf { it > 0 } ?: group.size
-                val operators = group
-                    .mapNotNull { it.operateur?.trim()?.takeIf(String::isNotBlank) }
-                    .distinct()
-                    .joinToString(", ")
-                    .takeIf { it.isNotBlank() }
+            val operator = site.operateur?.trim()
+            if (!operator.isNullOrEmpty()) {
+                acc.operators.add(operator)
+            }
+        }
 
+        val clusters = ArrayList<DbCluster>(buckets.size)
+        for (acc in buckets.values) {
+            val distinctCount = acc.distinctIds.size
+            val count = if (distinctCount > 0) distinctCount else acc.totalSites
+            val operators = if (acc.operators.isEmpty()) null else acc.operators.joinToString(", ")
+            clusters.add(
                 DbCluster(
-                    centerLat = group.sumOf { it.latitude } / group.size,
-                    centerLon = group.sumOf { it.longitude } / group.size,
+                    centerLat = acc.sumLat / acc.totalSites,
+                    centerLon = acc.sumLon / acc.totalSites,
                     count = count,
                     operators = operators,
-                    singleIdAnfr = distinctIds.singleOrNull()?.takeIf { count == 1 }
+                    singleIdAnfr = if (count == 1 && distinctCount == 1) acc.distinctIds.first() else null
                 )
-            }
+            )
+        }
 
         return MacroClusterGrouper.mergeTargetedTerritories(clusters, zoom)
     }
@@ -1388,6 +1405,21 @@ class AnfrRepository(
         return getNearest(lat, lon, 100)
     }
 
+    private suspend inline fun queryNearestWithProgressiveRadii(
+        candidateLimit: Int,
+        radii: List<Double> = DEFAULT_NEAREST_RADII,
+        crossinline queryWithinRadius: suspend (Double) -> List<LocalisationEntity>,
+        crossinline fallbackFullScan: suspend () -> List<LocalisationEntity>
+    ): List<LocalisationEntity> {
+        var bestResult = emptyList<LocalisationEntity>()
+        for (radius in radii) {
+            val nearest = queryWithinRadius(radius)
+            if (nearest.size > bestResult.size) bestResult = nearest
+            if (nearest.size >= candidateLimit) return nearest
+        }
+        return fallbackFullScan().ifEmpty { bestResult }
+    }
+
     suspend fun getNearestZb(
         lat: Double,
         lon: Double,
@@ -1404,7 +1436,23 @@ class AnfrRepository(
         }
 
         val localisations = queryLocalDatabaseForCountry(targetCountry, emptyList()) {
-            this.getNearestZb(lat, lon, candidateLimit)
+            queryNearestWithProgressiveRadii(
+                candidateLimit = candidateLimit,
+                radii = SPARSE_NEAREST_RADII,
+                queryWithinRadius = { radius ->
+                    getNearestZbWithinRadius(
+                        lat = lat,
+                        lon = lon,
+                        minLat = lat - radius,
+                        maxLat = lat + radius,
+                        minLon = lon - radius,
+                        maxLon = lon + radius,
+                        maxDistanceSquared = radius * radius,
+                        limit = candidateLimit
+                    )
+                },
+                fallbackFullScan = { getNearestZb(lat, lon, candidateLimit) }
+            )
         }
         return hideHiddenSites(enrichRadioBandMasksFromDetails(localisations, detailBackedBandMask))
             .take(safeLimit)
@@ -1433,11 +1481,29 @@ class AnfrRepository(
         val localisations = queryLocalDatabaseForCountry(targetCountry, emptyList()) {
             val operatorIds = resolveMatchingOperatorIds(selectedKeys)
             if (operatorIds.isEmpty()) return@queryLocalDatabaseForCountry emptyList()
-            getNearestForOperators(
-                lat = lat,
-                lon = lon,
-                operatorIds = operatorIds,
-                limit = candidateLimit
+            queryNearestWithProgressiveRadii(
+                candidateLimit = candidateLimit,
+                queryWithinRadius = { radius ->
+                    getNearestForOperatorsWithinRadius(
+                        lat = lat,
+                        lon = lon,
+                        minLat = lat - radius,
+                        maxLat = lat + radius,
+                        minLon = lon - radius,
+                        maxLon = lon + radius,
+                        maxDistanceSquared = radius * radius,
+                        operatorIds = operatorIds,
+                        limit = candidateLimit
+                    )
+                },
+                fallbackFullScan = {
+                    getNearestForOperators(
+                        lat = lat,
+                        lon = lon,
+                        operatorIds = operatorIds,
+                        limit = candidateLimit
+                    )
+                }
             )
         }
         return hideHiddenSites(enrichRadioBandMasksFromDetails(localisations, detailBackedBandMask))
@@ -1460,26 +1526,22 @@ class AnfrRepository(
         }
 
         val localisations = queryLocalDatabaseForCountry(targetCountry, emptyList()) {
-            val radii = listOf(0.03, 0.08, 0.18, 0.45, 1.0, 2.5, 5.0)
-            var bestResult = emptyList<LocalisationEntity>()
-
-            for (radius in radii) {
-                val nearest = getNearestWithinRadius(
-                    lat = lat,
-                    lon = lon,
-                    minLat = lat - radius,
-                    maxLat = lat + radius,
-                    minLon = lon - radius,
-                    maxLon = lon + radius,
-                    maxDistanceSquared = radius * radius,
-                    limit = candidateLimit
-                )
-
-                if (nearest.size > bestResult.size) bestResult = nearest
-                if (nearest.size >= candidateLimit) return@queryLocalDatabaseForCountry nearest
-            }
-
-            this.getNearest(lat, lon, candidateLimit).ifEmpty { bestResult }
+            queryNearestWithProgressiveRadii(
+                candidateLimit = candidateLimit,
+                queryWithinRadius = { radius ->
+                    getNearestWithinRadius(
+                        lat = lat,
+                        lon = lon,
+                        minLat = lat - radius,
+                        maxLat = lat + radius,
+                        minLon = lon - radius,
+                        maxLon = lon + radius,
+                        maxDistanceSquared = radius * radius,
+                        limit = candidateLimit
+                    )
+                },
+                fallbackFullScan = { this.getNearest(lat, lon, candidateLimit) }
+            )
         }
         return hideHiddenSites(enrichRadioBandMasksFromDetails(localisations, detailBackedBandMask))
             .take(safeLimit)
@@ -2870,6 +2932,8 @@ class AnfrRepository(
         const val MIN_LONGITUDE_SCALE = 0.1
 
         const val SQLITE_IN_CLAUSE_BATCH_SIZE = 900
+        private val DEFAULT_NEAREST_RADII = listOf(0.03, 0.08, 0.18, 0.45, 1.0, 2.5, 5.0)
+        private val SPARSE_NEAREST_RADII = listOf(0.15, 0.45, 1.2, 3.0, 6.0)
         const val LIVE_DETAIL_LOOKUP_LIMIT = 120
         const val LIVE_BBOX_TILE_REQUEST_LIMIT = 96
         const val LIVE_BBOX_MAX_PARALLEL_REQUESTS = 8

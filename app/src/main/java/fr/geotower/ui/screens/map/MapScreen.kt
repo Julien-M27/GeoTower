@@ -1808,6 +1808,7 @@ fun MapScreen(
     val canUseMapLocation = featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.MAP_LOCATION)
     val is3DSupported = AppConfig.supports3DMap.value
     var is3DMode by rememberSaveable { mutableStateOf(false) }
+    val useMapLibre2D by AppConfig.useMapLibre2D
     if (!is3DSupported && is3DMode) {
         is3DMode = false
     }
@@ -1854,12 +1855,30 @@ fun MapScreen(
     }
 
     val initialDefaultCountry = remember { fr.geotower.data.db.DatabaseCountryStore.getDefault(context) }
-    var currentZoom by rememberSaveable { mutableStateOf(15.0) }
-    var currentLat by rememberSaveable { mutableStateOf(initialDefaultCountry.defaultMapLat) }
-    var map3dLat by rememberSaveable { mutableDoubleStateOf(initialDefaultCountry.defaultMapLat) }
-    var map3dLon by rememberSaveable { mutableDoubleStateOf(initialDefaultCountry.defaultMapLon) }
-    var map3dZoom by rememberSaveable { mutableDoubleStateOf(15.0) }
-    var map3dBearing by rememberSaveable { mutableFloatStateOf(0f) }
+    val mapLibreZoomOffset = remember(context) {
+        1.0 + kotlin.math.log2(context.resources.displayMetrics.density.toDouble().coerceAtLeast(1.0))
+    }
+    val initialMapLat = remember {
+        focusLat ?: prefs.getFloat("last_map_lat", initialDefaultCountry.defaultMapLat.toFloat()).toDouble()
+    }
+    val initialMapLon = remember {
+        focusLon ?: prefs.getFloat("last_map_lon", initialDefaultCountry.defaultMapLon.toFloat()).toDouble()
+    }
+    val initialMapOsmZoom = remember {
+        if (focusLat != null && focusLon != null) {
+            17.0
+        } else {
+            prefs.getFloat("last_map_zoom", initialDefaultCountry.defaultMapZoom.toFloat()).toDouble()
+        }
+    }
+    var currentZoom by rememberSaveable { mutableStateOf(initialMapOsmZoom) }
+    var currentLat by rememberSaveable { mutableStateOf(initialMapLat) }
+    var map3dLat by rememberSaveable { mutableDoubleStateOf(initialMapLat) }
+    var map3dLon by rememberSaveable { mutableDoubleStateOf(initialMapLon) }
+    var map3dZoom by rememberSaveable { mutableDoubleStateOf((initialMapOsmZoom - mapLibreZoomOffset).coerceIn(2.0, 20.0)) }
+    var map3dBearing by rememberSaveable {
+        mutableFloatStateOf(-normalizeMapOrientation(prefs.getFloat(PREF_LAST_MAP_ORIENTATION, 0f)))
+    }
     var map3dRecenterTrigger by remember { mutableLongStateOf(0L) }
     var isMeasuringMode by rememberSaveable { mutableStateOf(false) }
     var trackNearestAll by rememberSaveable { mutableStateOf(false) }
@@ -2473,12 +2492,17 @@ fun MapScreen(
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     TextButton(
                         onClick = {
-                            if (is3DMode) {
+                            if (is3DMode || (is3DSupported && useMapLibre2D && mapViewRef?.tileProvider !is MapsForgeTileProvider)) {
                                 map3dLat = link.latA
                                 map3dLon = link.lonA
                                 map3dRecenterTrigger++
                             } else {
-                                mapViewRef?.controller?.animateTo(GeoPoint(link.latA, link.lonA))
+                                mapViewRef?.let { map ->
+                                    map.controller.setCenter(GeoPoint(link.latA, link.lonA))
+                                    if (map.zoomLevelDouble < 13.0) {
+                                        map.controller.setZoom(13.0)
+                                    }
+                                }
                             }
                             selectedFhLink = null
                         }
@@ -2487,7 +2511,7 @@ fun MapScreen(
                     }
                     TextButton(
                         onClick = {
-                            if (is3DMode) {
+                            if (is3DMode || (is3DSupported && useMapLibre2D && mapViewRef?.tileProvider !is MapsForgeTileProvider)) {
                                 map3dLat = link.latB
                                 map3dLon = link.lonB
                                 map3dRecenterTrigger++
@@ -2680,7 +2704,7 @@ fun MapScreen(
     // le capteur reprendrait la main dans la foulée.
     val resetMapOrientation: () -> Unit = {
         if (AppConfig.mapFollowOrientation.value) setFollowOrientation(false)
-        if (is3DMode) {
+        if (is3DMode || (is3DSupported && useMapLibre2D && mapViewRef?.tileProvider !is MapsForgeTileProvider)) {
             map3dBearing = 0f
             map3dRecenterTrigger++
         } else {
@@ -3093,6 +3117,26 @@ fun MapScreen(
     val shouldInvertColors = ((mapProvider == 0 || mapProvider == 1) && ignStyle == 1)
     // Sur orthophoto seulement, les marqueurs sont cernés d'un liseré de contraste (cf. MapUtils).
     val satelliteMarkerContrast = MapUtils.isSatelliteBasemap(effectiveProvider, ignStyle)
+    val isMapLibre2DActive = is3DSupported && useMapLibre2D && effectiveProvider != 4
+    val isMapLibreShown = is3DMode || isMapLibre2DActive
+    val effectiveMapLibreStyleUri = if (is3DMode) {
+        current3dStyleUri
+    } else {
+        when {
+            effectiveProvider == 0 && ignStyle == 2 ->
+                "raster:https://data.geopf.fr/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetTile&LAYER=ORTHOIMAGERY.ORTHOPHOTOS&STYLE=normal&FORMAT=image/jpeg&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}"
+            effectiveProvider == 0 ->
+                "raster:https://data.geopf.fr/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetTile&LAYER=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&STYLE=normal&FORMAT=image/png&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}"
+            effectiveProvider == 1 && ignStyle == 2 ->
+                "raster:https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+            effectiveProvider == 1 && ignStyle == 1 ->
+                "https://tiles.openfreemap.org/styles/dark"
+            effectiveProvider == 3 ->
+                "raster:https://tile.opentopomap.org/{z}/{x}/{y}.png"
+            else ->
+                "raster:https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+        }
+    }
     val latestSatelliteMarkerContrast = androidx.compose.runtime.rememberUpdatedState(satelliteMarkerContrast)
 
     val clusterStrength = AppConfig.mapClusterStrength.intValue
@@ -3262,25 +3306,31 @@ fun MapScreen(
 
     val toggle3DMode: () -> Unit = {
         if (is3DSupported) {
-            if (!is3DMode) {
+            if (isMapLibre2DActive) {
+                is3DMode = !is3DMode
+            } else if (!is3DMode) {
             val center = mapViewRef?.mapCenter ?: GeoPoint(currentLat, map3dLon)
             map3dLat = center.latitude
             map3dLon = center.longitude
-            map3dZoom = (mapViewRef?.zoomLevelDouble ?: currentZoom).coerceIn(2.0, 20.0)
+            map3dZoom = ((mapViewRef?.zoomLevelDouble ?: currentZoom) - mapLibreZoomOffset).coerceIn(2.0, 20.0)
             map3dBearing = -(mapViewRef?.mapOrientation ?: 0f)
             isTrackingActive = false
             navCameraLocked = false
             mapViewRef?.onPause()
+            if (showLocationMarker) {
+                locationOverlayRef?.enableMyLocation()
+            }
             is3DMode = true
         } else {
             is3DMode = false
             mapViewRef?.let { map ->
                 map.onResume()
                 map.controller.setCenter(GeoPoint(map3dLat, map3dLon))
-                map.controller.setZoom(map3dZoom)
+                val osmZoom = (map3dZoom + mapLibreZoomOffset).coerceIn(2.0, 21.0)
+                map.controller.setZoom(osmZoom)
                 map.mapOrientation = -map3dBearing
                 currentLat = map3dLat
-                currentZoom = map3dZoom
+                currentZoom = osmZoom
                 mapOrientationState.floatValue = map3dBearing
                 map.invalidate()
                 map.loadVisibleAntennas(viewModel)
@@ -4312,23 +4362,46 @@ fun MapScreen(
         measuredSites.values.forEach { antenna ->
             if (myLoc == null) return@forEach
             val antLoc = GeoPoint(antenna.latitude, antenna.longitude)
-
-            val line = Polyline(map).apply {
-                setPoints(listOf(myLoc, antLoc))
-                outlinePaint.color = android.graphics.Color.parseColor("#3B5998")
-                outlinePaint.strokeWidth = 10f
-                // Même finition que les traits de la chaîne, pour que les deux se ressemblent.
-                outlinePaint.strokeJoin = android.graphics.Paint.Join.ROUND
-                outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
+            val siteSeg = MeasureSegment(
+                startVertex = MeasureVertex.CurrentLocation,
+                endVertex = MeasureVertex.Fixed(antLoc),
+                start = myLoc,
+                end = antLoc,
+                toIndex = -2
+            )
+            val siteRoute = routeProfile?.let { profile ->
+                measureRoutes[measureRouteCacheKey(siteSeg, profile, routeOptimization)]
+                    ?.let { it as? MeasureRoute.Ready }
+                    ?.let { ready -> measureRouteAlignedOnSegment(siteSeg, ready) }
             }
-            line.setOnClickListener { _, _, _ ->
-                measuredSites.remove(antenna.idAnfr)
-                refreshMeasureLayers(map)
-                true
+            val sitePath = if (siteRoute != null && siteRoute.points.size >= 2) {
+                buildList {
+                    add(myLoc)
+                    addAll(siteRoute.points)
+                    add(antLoc)
+                }
+            } else {
+                listOf(myLoc, antLoc)
             }
-            measureOverlay.add(line)
 
-            val dist = myLoc.distanceToAsDouble(antLoc)
+            measurePathChunks(sitePath).forEach { chunk ->
+                val line = Polyline(map).apply {
+                    setPoints(chunk)
+                    outlinePaint.color = android.graphics.Color.parseColor("#3B5998")
+                    outlinePaint.strokeWidth = 10f
+                    // Même finition que les traits de la chaîne, pour que les deux se ressemblent.
+                    outlinePaint.strokeJoin = android.graphics.Paint.Join.ROUND
+                    outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
+                }
+                line.setOnClickListener { _, _, _ ->
+                    measuredSites.remove(antenna.idAnfr)
+                    refreshMeasureLayers(map)
+                    true
+                }
+                measureOverlay.add(line)
+            }
+
+            val dist = siteRoute?.distanceMeters ?: myLoc.distanceToAsDouble(antLoc)
 
             // ✅ LECTURE DES PARAMÈTRES (0 = km, 1 = miles)
             val isMi = AppConfig.distanceUnit.intValue == 1
@@ -5274,9 +5347,29 @@ fun MapScreen(
     // eux-mêmes : la clé arrondit « ma position » (cf. measureRouteRequestKey), donc marcher quelques
     // mètres ne repart pas de zéro et n'interrompt pas un calcul en cours.
     val measureRouteSignature = measureRouteProfileValue?.let { profile ->
-        currentMeasureSegments.joinToString("|") {
+        val chainSig = currentMeasureSegments.joinToString("|") {
             measureRouteRequestKey(it, profile, measureRouteOptimizationValue)
         }
+        val myLoc = myCurrentLoc
+        val sitesSig = if (myLoc != null && measuredSites.isNotEmpty()) {
+            measuredSites.values.joinToString("|") { ant ->
+                val antLoc = GeoPoint(ant.latitude, ant.longitude)
+                measureRouteRequestKey(
+                    MeasureSegment(
+                        startVertex = MeasureVertex.CurrentLocation,
+                        endVertex = MeasureVertex.Fixed(antLoc),
+                        start = myLoc,
+                        end = antLoc,
+                        toIndex = -2
+                    ),
+                    profile,
+                    measureRouteOptimizationValue
+                )
+            }
+        } else {
+            ""
+        }
+        "$chainSig#$sitesSig"
     }
     // Un seul avertissement par activation : un itinéraire qui échoue échoue souvent pour tous les
     // traits (hors de France, réseau coupé), et autant de toasts serait insupportable.
@@ -5305,7 +5398,25 @@ fun MapScreen(
         val profile = measureRouteProfileValue ?: return@LaunchedEffect
         if (!isMeasuringMode) return@LaunchedEffect
         val optimization = measureRouteOptimizationValue
-        currentMeasureSegments.forEach { segment ->
+        val myLoc = myCurrentLoc
+        val allSegmentsToRoute = buildList {
+            addAll(currentMeasureSegments)
+            if (myLoc != null && measuredSites.isNotEmpty()) {
+                measuredSites.values.forEachIndexed { idx, ant ->
+                    val antLoc = GeoPoint(ant.latitude, ant.longitude)
+                    add(
+                        MeasureSegment(
+                            startVertex = MeasureVertex.CurrentLocation,
+                            endVertex = MeasureVertex.Fixed(antLoc),
+                            start = myLoc,
+                            end = antLoc,
+                            toIndex = -2 - idx
+                        )
+                    )
+                }
+            }
+        }
+        allSegmentsToRoute.forEach { segment ->
             val requestKey = measureRouteRequestKey(segment, profile, optimization)
             if (!measureRouteRequests.add(requestKey)) return@forEach
             val cacheKey = measureRouteCacheKey(segment, profile, optimization)
@@ -5574,7 +5685,7 @@ fun MapScreen(
         AndroidView(
             modifier = Modifier
                 .fillMaxSize()
-                .then(if (is3DMode) Modifier.alpha(0f) else Modifier)
+                .then(if (isMapLibreShown) Modifier.alpha(0f) else Modifier)
                 // Origine de la MapView dans la composition : l'ancre du repère de suivi est
                 // mesurée sur les boutons de zoom, en coordonnées racine. Sans ce décalage, on
                 // diviserait une hauteur mesurée depuis le haut de l'écran par la hauteur de la
@@ -5738,6 +5849,12 @@ fun MapScreen(
                                         .putFloat("last_map_lon", initialLoc.longitude.toFloat())
                                         .putFloat("last_map_zoom", initialZoom.toFloat())
                                         .apply()
+                                    if (isMapLibreShown) {
+                                        map3dLat = initialLoc.latitude
+                                        map3dLon = initialLoc.longitude
+                                        map3dZoom = (initialZoom - mapLibreZoomOffset).coerceIn(2.0, 20.0)
+                                        map3dRecenterTrigger++
+                                    }
                                 }
                             }
                         }
@@ -5966,8 +6083,8 @@ fun MapScreen(
             }
         )
 
-        // --- Vue carte 3D alternative (MapLibre) ---
-        if (is3DMode) {
+        // --- Vue carte MapLibre (3D ou 2D hybride) ---
+        if (isMapLibreShown) {
             val userLoc = myCurrentLoc ?: locationOverlayRef?.myLocation
             Map3DView(
                 centerLat = map3dLat,
@@ -5985,46 +6102,94 @@ fun MapScreen(
                 radioMarkers = radioMarkers,
                 fhLinks = fhLinks,
                 recenterTrigger = map3dRecenterTrigger,
-                styleUri = current3dStyleUri,
+                styleUri = effectiveMapLibreStyleUri,
                 tripPlan = plannerPlan,
                 tripApproachPoints = plannerApproachPoints,
                 tripApproachRouted = plannerApproachRouted,
                 tripProgress = tripProgress,
                 tripMode = tripMode,
                 navCameraLocked = navCameraLocked,
-                measureSegments = if (isMeasuringMode && measuredVertices.size >= 2) {
+                isFlat2D = !is3DMode,
+                isMeasuringMode = isMeasuringMode,
+                measureSegments = if (isMeasuringMode && (measuredVertices.size >= 2 || measuredSites.isNotEmpty())) {
                     val myLoc = myCurrentLoc ?: locationOverlayRef?.myLocation
                     val profile = measureRouteProfile()
                     val routeOpt = AppConfig.routeOptimization()
-                    measureSegments(measuredVertices, measuredLinkedToPrev, measuredLoopClosed, myLoc).map { seg ->
-                        val route = measureRouteAlignedOnSegment(
-                            seg,
-                            profile
-                                ?.let { p -> measureRoutes[measureRouteCacheKey(seg, p, routeOpt)] }
-                                ?.let { it as? MeasureRoute.Ready }
-                        )
-                        val pts: List<GeoPoint>
-                        val distMeters: Double
-                        if (route != null && route.points.size >= 2) {
-                            pts = buildList {
-                                add(seg.start)
-                                addAll(route.points)
-                                add(seg.end)
+                    val chainSegments = if (measuredVertices.size >= 2) {
+                        measureSegments(measuredVertices, measuredLinkedToPrev, measuredLoopClosed, myLoc).map { seg ->
+                            val route = measureRouteAlignedOnSegment(
+                                seg,
+                                profile
+                                    ?.let { p -> measureRoutes[measureRouteCacheKey(seg, p, routeOpt)] }
+                                    ?.let { it as? MeasureRoute.Ready }
+                            )
+                            val pts: List<GeoPoint>
+                            val distMeters: Double
+                            if (route != null && route.points.size >= 2) {
+                                pts = buildList {
+                                    add(seg.start)
+                                    addAll(route.points)
+                                    add(seg.end)
+                                }
+                                distMeters = route.distanceMeters
+                            } else {
+                                pts = listOf(seg.start, seg.end)
+                                distMeters = seg.start.distanceToAsDouble(seg.end)
                             }
-                            distMeters = route.distanceMeters
-                        } else {
-                            pts = listOf(seg.start, seg.end)
-                            distMeters = seg.start.distanceToAsDouble(seg.end)
+                            val mid = pts[pts.size / 2]
+                            Measure3DSegment(
+                                toIndex = seg.toIndex,
+                                points = pts.map { it.latitude to it.longitude },
+                                label = formatMeasureDistance(distMeters),
+                                labelLat = mid.latitude,
+                                labelLon = mid.longitude
+                            )
                         }
-                        val mid = pts[pts.size / 2]
-                        Measure3DSegment(
-                            toIndex = seg.toIndex,
-                            points = pts.map { it.latitude to it.longitude },
-                            label = formatMeasureDistance(distMeters),
-                            labelLat = mid.latitude,
-                            labelLon = mid.longitude
-                        )
+                    } else {
+                        emptyList()
                     }
+                    val siteSegments = if (myLoc != null && measuredSites.isNotEmpty()) {
+                        measuredSites.values.mapIndexed { idx, antenna ->
+                            val antLoc = GeoPoint(antenna.latitude, antenna.longitude)
+                            val seg = MeasureSegment(
+                                startVertex = MeasureVertex.CurrentLocation,
+                                endVertex = MeasureVertex.Fixed(antLoc),
+                                start = myLoc,
+                                end = antLoc,
+                                toIndex = -2 - idx
+                            )
+                            val route = measureRouteAlignedOnSegment(
+                                seg,
+                                profile
+                                    ?.let { p -> measureRoutes[measureRouteCacheKey(seg, p, routeOpt)] }
+                                    ?.let { it as? MeasureRoute.Ready }
+                            )
+                            val pts: List<GeoPoint>
+                            val distMeters: Double
+                            if (route != null && route.points.size >= 2) {
+                                pts = buildList {
+                                    add(myLoc)
+                                    addAll(route.points)
+                                    add(antLoc)
+                                }
+                                distMeters = route.distanceMeters
+                            } else {
+                                pts = listOf(myLoc, antLoc)
+                                distMeters = myLoc.distanceToAsDouble(antLoc)
+                            }
+                            val mid = pts[pts.size / 2]
+                            Measure3DSegment(
+                                toIndex = -2 - idx,
+                                points = pts.map { it.latitude to it.longitude },
+                                label = formatMeasureDistance(distMeters),
+                                labelLat = mid.latitude,
+                                labelLon = mid.longitude
+                            )
+                        }
+                    } else {
+                        emptyList()
+                    }
+                    chainSegments + siteSegments
                 } else {
                     emptyList()
                 },
@@ -6055,7 +6220,11 @@ fun MapScreen(
                     mapViewRef?.let { refreshMeasureLayers(it) }
                 },
                 onMeasureSegmentClick = { toIndex ->
-                    if (toIndex >= 0) deleteMeasureSegment(toIndex) else measuredLoopClosed = false
+                    when {
+                        toIndex >= 0 -> deleteMeasureSegment(toIndex)
+                        toIndex == -1 -> measuredLoopClosed = false
+                        else -> measuredSites.keys.elementAtOrNull(-2 - toIndex)?.let { measuredSites.remove(it) }
+                    }
                     mapViewRef?.let { refreshMeasureLayers(it) }
                 },
                 onStepClick = { stepIndex ->
@@ -6092,9 +6261,15 @@ fun MapScreen(
                     map3dLon = lon
                     map3dZoom = zoom
                     map3dBearing = bearing
+                    val osmZoom = zoom + mapLibreZoomOffset
                     currentLat = lat
-                    currentZoom = zoom
+                    currentZoom = osmZoom
                     mapOrientationState.floatValue = bearing
+                    prefs.edit()
+                        .putFloat("last_map_lat", lat.toFloat())
+                        .putFloat("last_map_lon", lon.toFloat())
+                        .putFloat("last_map_zoom", osmZoom.toFloat())
+                        .apply()
                 },
                 onViewportChanged = { zoom, latNorth, lonEast, latSouth, lonWest ->
                     viewModel.loadAntennasInBox(
@@ -6195,7 +6370,7 @@ fun MapScreen(
             val flowPoint = remember { GeoPoint(0.0, 0.0) }
 
             ComposeCanvas(modifier = Modifier.fillMaxSize()) {
-                if (is3DMode) return@ComposeCanvas
+                if (isMapLibreShown) return@ComposeCanvas
                 val map = mapViewRef ?: return@ComposeCanvas
                 // La MapView n'est pas observable : sans cette lecture, un déplacement de la carte
                 // laisserait la lueur collée à ses anciens pixels.
@@ -6254,7 +6429,7 @@ fun MapScreen(
         // Le repère est peint ICI, au-dessus de la MapView, et non dans un calque osmdroid : un
         // calque imposerait de réinvalider toute la carte — donc de redessiner les milliers de
         // marqueurs d'antennes — à chaque image, alors que cette couche ne repeint qu'un rond.
-        if (smoothLocationEnabled && !is3DMode) {
+        if (smoothLocationEnabled && !isMapLibreShown) {
             val markerPainter = locationMarkerPainter
             val drawPixel = remember { android.graphics.Point() }
             val drawPoint = remember { GeoPoint(0.0, 0.0) }
@@ -8284,7 +8459,7 @@ fun MapScreen(
                             ),
                             onClick = {
                                 releaseNavCameraForManualZoom()
-                                if (is3DMode) {
+                                if (isMapLibreShown) {
                                     map3dZoom = (map3dZoom + 1.0).coerceAtMost(20.0)
                                     map3dRecenterTrigger++
                                 } else {
@@ -8306,7 +8481,7 @@ fun MapScreen(
                             ),
                             onClick = {
                                 releaseNavCameraForManualZoom()
-                                if (is3DMode) {
+                                if (isMapLibreShown) {
                                     map3dZoom = (map3dZoom - 1.0).coerceAtLeast(2.0)
                                     map3dRecenterTrigger++
                                 } else {
@@ -8330,12 +8505,12 @@ fun MapScreen(
                                     return@safeClick
                                 }
 
-                                if (is3DMode) {
+                                if (isMapLibreShown) {
                                     val known = myCurrentLoc ?: locationOverlayRef?.myLocation
                                     if (known != null) {
                                         map3dLat = known.latitude
                                         map3dLon = known.longitude
-                                        map3dZoom = preferredLocationZoom()
+                                        map3dZoom = (preferredLocationZoom() - mapLibreZoomOffset).coerceIn(2.0, 20.0)
                                         map3dRecenterTrigger++
                                     }
                                     return@safeClick
@@ -9040,6 +9215,65 @@ fun MapScreen(
                                     }
                                 }
                             }
+                        }
+                    }
+
+                    if (!is3DMode && is3DSupported && isOnline && effectiveProvider != 4) {
+                        Spacer(Modifier.height(sizing.spacing(16.dp)))
+                        HorizontalDivider()
+                        Spacer(Modifier.height(sizing.spacing(12.dp)))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    val next = !useMapLibre2D
+                                    if (next) {
+                                        val center = mapViewRef?.mapCenter ?: GeoPoint(currentLat, map3dLon)
+                                        map3dLat = center.latitude
+                                        map3dLon = center.longitude
+                                        map3dZoom = ((mapViewRef?.zoomLevelDouble ?: currentZoom) - mapLibreZoomOffset).coerceIn(2.0, 20.0)
+                                        map3dBearing = -(mapViewRef?.mapOrientation ?: 0f)
+                                        mapViewRef?.onPause()
+                                        if (showLocationMarker) {
+                                            locationOverlayRef?.enableMyLocation()
+                                        }
+                                    } else {
+                                        mapViewRef?.let { map ->
+                                            map.onResume()
+                                            map.controller.setCenter(GeoPoint(map3dLat, map3dLon))
+                                            val osmZoom = (map3dZoom + mapLibreZoomOffset).coerceIn(2.0, 21.0)
+                                            map.controller.setZoom(osmZoom)
+                                            map.mapOrientation = -map3dBearing
+                                            currentLat = map3dLat
+                                            currentZoom = osmZoom
+                                            mapOrientationState.floatValue = map3dBearing
+                                            map.invalidate()
+                                            map.loadVisibleAntennas(viewModel)
+                                        }
+                                    }
+                                    AppConfig.useMapLibre2D.value = next
+                                    prefs.edit().putBoolean(AppConfig.PREF_USE_MAPLIBRE_2D, next).apply()
+                                },
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f).padding(end = sizing.spacing(12.dp))) {
+                                Text(
+                                    text = "Moteur MapLibre 2D (bêta)",
+                                    style = sizing.textStyle(MaterialTheme.typography.titleSmall),
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "Rendu GPU fluide pour les cartes en ligne. Osmdroid reste actif pour les cartes hors-ligne (.map).",
+                                    style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            androidx.compose.material3.Switch(
+                                checked = useMapLibre2D,
+                                onCheckedChange = null
+                            )
                         }
                     }
                 }

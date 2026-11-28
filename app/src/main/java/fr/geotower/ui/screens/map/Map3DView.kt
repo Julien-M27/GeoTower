@@ -240,7 +240,8 @@ private fun drawAzimuthLine(
     colorInt: Int,
     density: Float,
     isDashed: Boolean = false,
-    satelliteContrast: Boolean = false
+    satelliteContrast: Boolean = false,
+    isFlat2D: Boolean = false
 ) {
     val rad = Math.toRadians((visualAngleDeg - 90.0))
     val dirX = Math.cos(rad).toFloat()
@@ -251,15 +252,21 @@ private fun drawAzimuthLine(
     val endX = cx + endDist * dirX
     val endY = cy + endDist * dirY
 
+    val lineWidth = if (isFlat2D) {
+        if (isDashed) 3.0f * density else 3.5f * density
+    } else {
+        2.0f * density
+    }
+
     if (satelliteContrast) {
         val shadowPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
             style = android.graphics.Paint.Style.STROKE
-            color = android.graphics.Color.parseColor("#1A202C")
-            strokeWidth = 3.6f * density
+            color = MapUtils.contrastOutlineColor(colorInt)
+            strokeWidth = lineWidth + (if (isFlat2D) 2.4f else 1.6f) * density
             strokeCap = android.graphics.Paint.Cap.ROUND
         }
         if (isDashed) {
-            shadowPaint.pathEffect = android.graphics.DashPathEffect(floatArrayOf(4f * density, 3f * density), 0f)
+            shadowPaint.pathEffect = android.graphics.DashPathEffect(floatArrayOf(5f * density, 5f * density), 0f)
         }
         canvas.drawLine(startX, startY, endX, endY, shadowPaint)
     }
@@ -267,11 +274,11 @@ private fun drawAzimuthLine(
     val linePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
         style = android.graphics.Paint.Style.STROKE
         color = colorInt
-        strokeWidth = 2.0f * density
+        strokeWidth = lineWidth
         strokeCap = android.graphics.Paint.Cap.ROUND
     }
     if (isDashed) {
-        linePaint.pathEffect = android.graphics.DashPathEffect(floatArrayOf(4f * density, 3f * density), 0f)
+        linePaint.pathEffect = android.graphics.DashPathEffect(floatArrayOf(5f * density, 5f * density), 0f)
     }
     canvas.drawLine(startX, startY, endX, endY, linePaint)
 }
@@ -289,7 +296,8 @@ private fun drawAzimuthDots(
     operatorKeys: List<String>,
     density: Float,
     isFh: Boolean = false,
-    satelliteContrast: Boolean = false
+    satelliteContrast: Boolean = false,
+    isFlat2D: Boolean = false
 ) {
     val rad = Math.toRadians((visualAngleDeg - 90.0))
     val dirX = Math.cos(rad).toFloat()
@@ -304,13 +312,15 @@ private fun drawAzimuthDots(
         val dotX = cx + dist * dirX
         val dotY = cy + dist * dirY
 
-        // Liseré de contraste pour détacher la pastille sur le ciel / décor 3D
-        val outlinePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-            style = android.graphics.Paint.Style.STROKE
-            color = if (satelliteContrast) MapUtils.contrastOutlineColor(opColor) else android.graphics.Color.parseColor("#1A202C")
-            strokeWidth = 1.2f * density
+        if (satelliteContrast || !isFlat2D) {
+            // Liseré de contraste (toujours en 3D sur le ciel, uniquement sur satellite en 2D comme Osmdroid)
+            val outlinePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                style = android.graphics.Paint.Style.STROKE
+                color = if (satelliteContrast) MapUtils.contrastOutlineColor(opColor) else android.graphics.Color.parseColor("#1A202C")
+                strokeWidth = 1.2f * density
+            }
+            canvas.drawCircle(dotX, dotY, dotRadius, outlinePaint)
         }
-        canvas.drawCircle(dotX, dotY, dotRadius, outlinePaint)
 
         // Pastille pleine de l'opérateur
         val fillPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
@@ -736,10 +746,11 @@ private fun createPylonAntennaMarkerBitmap(
     cameraBearing: Float,
     supportHeightMeters: Double,
     visualType: SupportVisualType = SupportVisualType.LATTICE,
-    satelliteContrast: Boolean = false
+    satelliteContrast: Boolean = false,
+    isFlat2D: Boolean = false
 ): Bitmap {
     val rCircle = circleBitmap.width / 2f
-    val beamLength = 22f * density
+    val beamLength = if (isFlat2D) 42f * density else 22f * density
     val pointRadius = 3.4f * density
     val gapMobile = pointRadius * 2.1f
 
@@ -765,31 +776,37 @@ private fun createPylonAntennaMarkerBitmap(
         SupportVisualType.WATER_TOWER -> 10f * density
         else -> 8f * density
     }
-    val maxRadius = maxOf(rCircle + rayExtension + 4f * density, minSupportMargin)
+    val maxRadius = if (isFlat2D) {
+        rCircle + rayExtension + 4f * density
+    } else {
+        maxOf(rCircle + rayExtension + 4f * density, minSupportMargin)
+    }
 
     val cx = maxRadius
     val cy = maxRadius
 
     val pylonBottom = cy + rCircle + pylonHeight
-    val totalHeight = (pylonBottom + 3f * density).toInt()
+    val totalHeight = if (isFlat2D) (maxRadius * 2f).toInt() else (pylonBottom + 3f * density).toInt()
     val totalWidth = (maxRadius * 2f).toInt()
 
     val bitmap = Bitmap.createBitmap(totalWidth, totalHeight, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
 
-    // 1. Structure du mât / support selon sa nature ANFR
-    val towerTop = cy + rCircle - 3f * density
-    val towerBottom = pylonBottom
-    drawSupportStructure(
-        canvas = canvas,
-        cx = cx,
-        towerTop = towerTop,
-        towerBottom = towerBottom,
-        pylonHeight = pylonHeight,
-        clampedHeightM = clampedHeightM,
-        visualType = visualType,
-        density = density
-    )
+    // 1. Structure du mât / support selon sa nature ANFR (uniquement en 3D)
+    if (!isFlat2D) {
+        val towerTop = cy + rCircle - 3f * density
+        val towerBottom = pylonBottom
+        drawSupportStructure(
+            canvas = canvas,
+            cx = cx,
+            towerTop = towerTop,
+            towerBottom = towerBottom,
+            pylonHeight = pylonHeight,
+            clampedHeightM = clampedHeightM,
+            visualType = visualType,
+            density = density
+        )
+    }
 
     // 2. Cônes d'azimut en arrière-plan (si activés)
     if (showCones) {
@@ -819,7 +836,8 @@ private fun createPylonAntennaMarkerBitmap(
                 colorInt = opColor,
                 density = density,
                 isDashed = false,
-                satelliteContrast = satelliteContrast
+                satelliteContrast = satelliteContrast,
+                isFlat2D = isFlat2D
             )
             drawAzimuthDots(
                 canvas = canvas,
@@ -830,7 +848,8 @@ private fun createPylonAntennaMarkerBitmap(
                 operatorKeys = sortedOps,
                 density = density,
                 isFh = false,
-                satelliteContrast = satelliteContrast
+                satelliteContrast = satelliteContrast,
+                isFlat2D = isFlat2D
             )
         }
     }
@@ -852,7 +871,8 @@ private fun createPylonAntennaMarkerBitmap(
                 colorInt = opColor,
                 density = density,
                 isDashed = true,
-                satelliteContrast = satelliteContrast
+                satelliteContrast = satelliteContrast,
+                isFlat2D = isFlat2D
             )
             drawAzimuthDots(
                 canvas = canvas,
@@ -863,7 +883,8 @@ private fun createPylonAntennaMarkerBitmap(
                 operatorKeys = sortedOps,
                 density = density,
                 isFh = true,
-                satelliteContrast = satelliteContrast
+                satelliteContrast = satelliteContrast,
+                isFlat2D = isFlat2D
             )
         }
     }
@@ -925,6 +946,8 @@ fun Map3DView(
     tripProgress: TripRouteProgress? = null,
     tripMode: String = TRIP_MODE_VIEW,
     navCameraLocked: Boolean = false,
+    isFlat2D: Boolean = false,
+    isMeasuringMode: Boolean = false,
     onStepClick: ((Int) -> Unit)? = null,
     onFhLinkClick: ((FhLinkItem) -> Unit)? = null,
     onMeasurePointClick: ((Int) -> Unit)? = null,
@@ -1132,33 +1155,37 @@ fun Map3DView(
         val antennasSource = GeoJsonSource(ANTENNAS_SOURCE_ID)
         style.addSource(antennasSource)
 
-        // Pylônes d'antennes individuelles (ancrés au sol par le bas pour s'élever à l'échelle)
+        // Pylônes d'antennes individuelles (ancrés au sol en 3D, centrés et taille 1:1 en 2D)
         val antennasLayer = SymbolLayer(ANTENNAS_LAYER_ID, ANTENNAS_SOURCE_ID).apply {
             setFilter(Expression.eq(Expression.get("isCluster"), Expression.literal(false)))
             setProperties(
                 PropertyFactory.iconImage(Expression.get("icon")),
-                PropertyFactory.iconAnchor(Property.ICON_ANCHOR_BOTTOM),
+                PropertyFactory.iconAnchor(if (isFlat2D) Property.ICON_ANCHOR_CENTER else Property.ICON_ANCHOR_BOTTOM),
                 PropertyFactory.iconAllowOverlap(true),
                 PropertyFactory.iconIgnorePlacement(true),
-                PropertyFactory.iconPitchAlignment(Property.ICON_PITCH_ALIGNMENT_VIEWPORT),
-                PropertyFactory.iconRotationAlignment(Property.ICON_ROTATION_ALIGNMENT_VIEWPORT),
-                // Échelle proportionnée aux immeubles et rues selon le zoom
+                PropertyFactory.iconPitchAlignment(if (isFlat2D) Property.ICON_PITCH_ALIGNMENT_MAP else Property.ICON_PITCH_ALIGNMENT_VIEWPORT),
+                PropertyFactory.iconRotationAlignment(if (isFlat2D) Property.ICON_ROTATION_ALIGNMENT_MAP else Property.ICON_ROTATION_ALIGNMENT_VIEWPORT),
+                // Échelle 1:1 en 2D (identique à Osmdroid), proportionnée aux immeubles en 3D
                 PropertyFactory.iconSize(
-                    Expression.interpolate(
-                        Expression.linear(),
-                        Expression.zoom(),
-                        Expression.stop(10f, 0.40f),
-                        Expression.stop(13f, 0.55f),
-                        Expression.stop(15f, 0.72f),
-                        Expression.stop(17f, 0.88f),
-                        Expression.stop(18f, 1.0f)
-                    )
+                    if (isFlat2D) {
+                        Expression.literal(1.0f)
+                    } else {
+                        Expression.interpolate(
+                            Expression.linear(),
+                            Expression.zoom(),
+                            Expression.stop(10f, 0.40f),
+                            Expression.stop(13f, 0.55f),
+                            Expression.stop(15f, 0.72f),
+                            Expression.stop(17f, 0.88f),
+                            Expression.stop(18f, 1.0f)
+                        )
+                    }
                 )
             )
         }
         style.addLayer(antennasLayer)
 
-        // Clusters macro (ancrés au centre)
+        // Clusters macro (ancrés au centre, taille 1:1 en 2D)
         val clustersLayer = SymbolLayer(CLUSTERS_LAYER_ID, ANTENNAS_SOURCE_ID).apply {
             setFilter(Expression.eq(Expression.get("isCluster"), Expression.literal(true)))
             setProperties(
@@ -1169,13 +1196,17 @@ fun Map3DView(
                 PropertyFactory.iconPitchAlignment(Property.ICON_PITCH_ALIGNMENT_VIEWPORT),
                 PropertyFactory.iconRotationAlignment(Property.ICON_ROTATION_ALIGNMENT_VIEWPORT),
                 PropertyFactory.iconSize(
-                    Expression.interpolate(
-                        Expression.linear(),
-                        Expression.zoom(),
-                        Expression.stop(8f, 0.6f),
-                        Expression.stop(12f, 0.8f),
-                        Expression.stop(15f, 1.0f)
-                    )
+                    if (isFlat2D) {
+                        Expression.literal(1.0f)
+                    } else {
+                        Expression.interpolate(
+                            Expression.linear(),
+                            Expression.zoom(),
+                            Expression.stop(8f, 0.6f),
+                            Expression.stop(12f, 0.8f),
+                            Expression.stop(15f, 1.0f)
+                        )
+                    }
                 )
             )
         }
@@ -1227,7 +1258,37 @@ fun Map3DView(
         isStyleLoaded = false
         currentLoadedStyleUri = styleUri
         val isDark = styleUri.contains("dark")
-        map.setStyle(Style.Builder().fromUri(styleUri)) { style ->
+        val styleBuilder = if (styleUri.startsWith("raster:")) {
+            val tileUrl = styleUri.removePrefix("raster:")
+            val escapedUrl = org.json.JSONObject.quote(tileUrl)
+            val rasterJson = """
+                {
+                  "version": 8,
+                  "name": "GeoTower Raster",
+                  "sources": {
+                    "geotower-raster": {
+                      "type": "raster",
+                      "tiles": [$escapedUrl],
+                      "tileSize": 256,
+                      "maxzoom": 19
+                    }
+                  },
+                  "layers": [
+                    {
+                      "id": "geotower-raster-layer",
+                      "type": "raster",
+                      "source": "geotower-raster",
+                      "minzoom": 0,
+                      "maxzoom": 22
+                    }
+                  ]
+                }
+            """.trimIndent()
+            Style.Builder().fromJson(rasterJson)
+        } else {
+            Style.Builder().fromUri(styleUri)
+        }
+        map.setStyle(styleBuilder) { style ->
             setup3DStyle(style, isDark)
         }
     }
@@ -1256,6 +1317,63 @@ fun Map3DView(
         }
     }
 
+    val targetTilt = if (isFlat2D) 0.0 else 55.0
+
+    // Bascule fluide entre MapLibre 2D (0°) et 3D (55°)
+    LaunchedEffect(isFlat2D, isStyleLoaded, mapLibreMapInstance) {
+        val map = mapLibreMapInstance ?: return@LaunchedEffect
+        map.uiSettings.isTiltGesturesEnabled = !isFlat2D
+        if (isStyleLoaded) {
+            val style = map.style
+            (style?.getLayer(ANTENNAS_LAYER_ID) as? SymbolLayer)?.setProperties(
+                PropertyFactory.iconAnchor(if (isFlat2D) Property.ICON_ANCHOR_CENTER else Property.ICON_ANCHOR_BOTTOM),
+                PropertyFactory.iconPitchAlignment(if (isFlat2D) Property.ICON_PITCH_ALIGNMENT_MAP else Property.ICON_PITCH_ALIGNMENT_VIEWPORT),
+                PropertyFactory.iconRotationAlignment(if (isFlat2D) Property.ICON_ROTATION_ALIGNMENT_MAP else Property.ICON_ROTATION_ALIGNMENT_VIEWPORT),
+                PropertyFactory.iconSize(
+                    if (isFlat2D) {
+                        Expression.literal(1.0f)
+                    } else {
+                        Expression.interpolate(
+                            Expression.linear(),
+                            Expression.zoom(),
+                            Expression.stop(10f, 0.40f),
+                            Expression.stop(13f, 0.55f),
+                            Expression.stop(15f, 0.72f),
+                            Expression.stop(17f, 0.88f),
+                            Expression.stop(18f, 1.0f)
+                        )
+                    }
+                )
+            )
+            (style?.getLayer(CLUSTERS_LAYER_ID) as? SymbolLayer)?.setProperties(
+                PropertyFactory.iconSize(
+                    if (isFlat2D) {
+                        Expression.literal(1.0f)
+                    } else {
+                        Expression.interpolate(
+                            Expression.linear(),
+                            Expression.zoom(),
+                            Expression.stop(8f, 0.6f),
+                            Expression.stop(12f, 0.8f),
+                            Expression.stop(15f, 1.0f)
+                        )
+                    }
+                )
+            )
+        }
+        val cam = map.cameraPosition
+        if (kotlin.math.abs(cam.tilt - targetTilt) > 0.5) {
+            map.animateCamera(
+                CameraUpdateFactory.newCameraPosition(
+                    CameraPosition.Builder(cam)
+                        .tilt(targetTilt)
+                        .build()
+                ),
+                450
+            )
+        }
+    }
+
     // Recentrage caméra
     LaunchedEffect(recenterTrigger) {
         val map = mapLibreMapInstance ?: return@LaunchedEffect
@@ -1265,7 +1383,7 @@ fun Map3DView(
                     CameraPosition.Builder()
                         .target(LatLng(centerLat, centerLon))
                         .zoom(zoom.coerceIn(2.0, 20.0))
-                        .tilt(55.0)
+                        .tilt(targetTilt)
                         .bearing(bearing.toDouble())
                         .build()
                 )
@@ -1323,7 +1441,7 @@ fun Map3DView(
                     .target(LatLng(userLatitude, userLongitude))
                     .zoom(targetZoom)
                     .bearing(userHeading.toDouble())
-                    .tilt(55.0)
+                    .tilt(targetTilt)
                     .build()
             ),
             800
@@ -1462,12 +1580,14 @@ fun Map3DView(
         AppConfig.showAzimuths.value,
         AppConfig.showAzimuthsCone.value,
         AppConfig.showTechnoFH.value,
+        isFlat2D,
         isStyleLoaded,
         mapLibreMapInstance
     ) {
         val map = mapLibreMapInstance ?: return@LaunchedEffect
         val style = map.style ?: return@LaunchedEffect
         if (!isStyleLoaded) return@LaunchedEffect
+        val currentMapZoom = map.cameraPosition.zoom
 
         val (collection, imagesToAdd, newSitesMap) = withContext(Dispatchers.Default) {
             val selectedOperators = AppConfig.selectedOperatorKeys.value
@@ -1545,9 +1665,85 @@ fun Map3DView(
                 features.add(feat)
             }
 
-            // 2. Antennes physiques directes avec pylône et azimuts au sommet
-            val groupedSites = directAntennas.groupBy { it.physicalSiteKey() }.values.take(PowerProfile.mapMarkerCap)
-            groupedSites.forEach { siteAntennas ->
+            // 1.1 Regroupement micro à l'écran en MapLibre 2D (identique à RadiusMarkerClusterer d'Osmdroid)
+            val zoomOffset = 1.0 + kotlin.math.log2(density.toDouble().coerceAtLeast(1.0))
+            val equivalentOsmZoom = currentMapZoom + zoomOffset
+            val microClusterRadiusPx = Math.round(
+                MapClusterStrengthProfile.nearbyRadiusPx(equivalentOsmZoom, clusterStrength) * 0.5f
+            )
+            val groupedDirectSites = directAntennas.groupBy { it.physicalSiteKey() }.values.take(PowerProfile.mapMarkerCap)
+            val sitesToRenderIndividually = mutableListOf<List<LocalisationEntity>>()
+            if (isFlat2D && clusterAntennas.isEmpty() && microClusterRadiusPx > 0 && groupedDirectSites.size > 1) {
+                val radiusDp = microClusterRadiusPx / density.coerceAtLeast(1f)
+                val degPerDp = 360.0 / (512.0 * Math.pow(2.0, currentMapZoom))
+                val lonThresh = radiusDp * degPerDp
+                val visited = BooleanArray(groupedDirectSites.size)
+                val siteList = groupedDirectSites.toList()
+                for (i in siteList.indices) {
+                    if (visited[i]) continue
+                    visited[i] = true
+                    val seedSite = siteList[i]
+                    val seed = seedSite.first()
+                    val latThresh = lonThresh * kotlin.math.cos(Math.toRadians(seed.latitude)).coerceAtLeast(0.1)
+                    val members = mutableListOf(seedSite)
+                    for (j in i + 1 until siteList.size) {
+                        if (visited[j]) continue
+                        val other = siteList[j].first()
+                        val dLat = (other.latitude - seed.latitude) / latThresh
+                        val dLon = (other.longitude - seed.longitude) / lonThresh
+                        if (dLat * dLat + dLon * dLon <= 1.0) {
+                            visited[j] = true
+                            members.add(siteList[j])
+                        }
+                    }
+                    if (members.size == 1) {
+                        sitesToRenderIndividually.add(seedSite)
+                    } else {
+                        var sumLat = 0.0
+                        var sumLon = 0.0
+                        val clusterOps = LinkedHashSet<String>()
+                        members.forEach { site ->
+                            val main = site.first()
+                            sumLat += main.latitude
+                            sumLon += main.longitude
+                            site.forEach { ant ->
+                                visibleOperatorKeysForAntenna(
+                                    antenna = ant,
+                                    hsOperatorMap = hsOperatorMap,
+                                    showSitesInService = showSitesInService,
+                                    showSitesOutOfService = showSitesOutOfService,
+                                    showProjectSites = showProjectSites,
+                                    selectedOperatorKeys = selectedOperators
+                                ).forEach { clusterOps.add(it) }
+                            }
+                        }
+                        val activeOps = clusterOps.toList()
+                        val count = members.size
+                        val iconKey = "cluster_${activeOps.sorted().joinToString("_")}_${count}_${defaultOp}_${satelliteMarkerContrast}_$clusterStrength"
+                        if (!images.containsKey(iconKey)) {
+                            val clusterDrawable = MapUtils.createClusterIcon(
+                                context,
+                                activeOps,
+                                count,
+                                defaultOp,
+                                satelliteMarkerContrast,
+                                clusterStrength = clusterStrength
+                            )
+                            images[iconKey] = clusterDrawable.bitmap
+                        }
+                        val feat = Feature.fromGeometry(Point.fromLngLat(sumLon / count, sumLat / count))
+                        feat.addStringProperty("icon", iconKey)
+                        feat.addNumberProperty("clusterCount", count)
+                        feat.addBooleanProperty("isCluster", true)
+                        features.add(feat)
+                    }
+                }
+            } else {
+                sitesToRenderIndividually.addAll(groupedDirectSites)
+            }
+
+            // 2. Antennes physiques directes
+            sitesToRenderIndividually.forEach { siteAntennas ->
                 val filteredSiteAntennas = siteAntennas.mapNotNull { antenna ->
                     val activeOps = visibleOperatorKeysForAntenna(
                         antenna = antenna,
@@ -1607,7 +1803,7 @@ fun Map3DView(
                 val heightBucket = ((siteHeight / 2.0).roundToInt() * 2).coerceIn(8, 76)
                 val coneSig = if (showAzimuthCones) "1" else "0"
 
-                val iconKey = "pylon_ant_${visualType.name}_${isHs}_${satelliteMarkerContrast}_${clusterStrength}_${defaultOp}_${opsOnSite.joinToString("_")}_h${heightBucket}_b${bearingStep}_az[$azSig]_fh[$fhSig]_c$coneSig"
+                val iconKey = "${if (isFlat2D) "flat2d" else "pylon"}_ant_${visualType.name}_${isHs}_${satelliteMarkerContrast}_${clusterStrength}_${defaultOp}_${opsOnSite.joinToString("_")}_h${heightBucket}_b${bearingStep}_az[$azSig]_fh[$fhSig]_c$coneSig"
                 if (!images.containsKey(iconKey)) {
                     val cached = pylonMarkerCache.get(iconKey)
                     if (cached != null) {
@@ -1627,7 +1823,7 @@ fun Map3DView(
                             baseIcon
                         }
                         val cropped = cropToMarkerCircle(iconDrawable.bitmap, clusterStrength)
-                        val pylonBitmap = createPylonAntennaMarkerBitmap(
+                        val finalBitmap = createPylonAntennaMarkerBitmap(
                             circleBitmap = cropped,
                             density = density,
                             azimuths = mobileAzimuths,
@@ -1636,13 +1832,14 @@ fun Map3DView(
                             showLines = showAzimuthLines,
                             showCones = showAzimuthCones,
                             showFh = showFh,
-                            cameraBearing = bearingStep.toFloat(),
+                            cameraBearing = if (isFlat2D) 0f else bearingStep.toFloat(),
                             supportHeightMeters = siteHeight,
                             visualType = visualType,
-                            satelliteContrast = satelliteMarkerContrast
+                            satelliteContrast = satelliteMarkerContrast,
+                            isFlat2D = isFlat2D
                         )
-                        pylonMarkerCache.put(iconKey, pylonBitmap)
-                        images[iconKey] = pylonBitmap
+                        pylonMarkerCache.put(iconKey, finalBitmap)
+                        images[iconKey] = finalBitmap
                     }
                 }
 
@@ -1723,6 +1920,7 @@ fun Map3DView(
     val currentOnSiteClick by rememberUpdatedState(onSiteClick)
     val currentOnMeasurePointClick by rememberUpdatedState(onMeasurePointClick)
     val currentOnMeasureSegmentClick by rememberUpdatedState(onMeasureSegmentClick)
+    val currentIsMeasuringMode by rememberUpdatedState(isMeasuringMode)
 
     LaunchedEffect(isStyleLoaded, measureSegments, measurePoints) {
         val map = mapLibreMapInstance ?: return@LaunchedEffect
@@ -1770,11 +1968,12 @@ fun Map3DView(
                         map.uiSettings.isLogoEnabled = false
                         map.uiSettings.isAttributionEnabled = false
                         map.uiSettings.isCompassEnabled = false
+                        map.uiSettings.isTiltGesturesEnabled = !isFlat2D
 
                         val initialPosition = CameraPosition.Builder()
                             .target(LatLng(centerLat, centerLon))
                             .zoom(zoom.coerceIn(2.0, 20.0))
-                            .tilt(55.0)
+                            .tilt(targetTilt)
                             .bearing(bearing.toDouble())
                             .build()
                         map.cameraPosition = initialPosition
@@ -1808,13 +2007,15 @@ fun Map3DView(
                                 }
                             }
 
-                            // 1. Clic sur une étape de trajet
-                            val renderedSteps = map.queryRenderedFeatures(rect, TRIP_STEPS_LAYER_ID)
-                            if (renderedSteps.isNotEmpty()) {
-                                val stepIndex = renderedSteps[0].getNumberProperty("stepIndex")?.toInt()
-                                if (stepIndex != null && onStepClick != null) {
-                                    onStepClick(stepIndex)
-                                    return@addOnMapClickListener true
+                            // 1. Clic sur une étape de trajet (hors mode mesure)
+                            if (!currentIsMeasuringMode) {
+                                val renderedSteps = map.queryRenderedFeatures(rect, TRIP_STEPS_LAYER_ID)
+                                if (renderedSteps.isNotEmpty()) {
+                                    val stepIndex = renderedSteps[0].getNumberProperty("stepIndex")?.toInt()
+                                    if (stepIndex != null && onStepClick != null) {
+                                        onStepClick(stepIndex)
+                                        return@addOnMapClickListener true
+                                    }
                                 }
                             }
 
@@ -1824,39 +2025,54 @@ fun Map3DView(
                                 val feat = rendered[0]
                                 val isCluster = feat.getBooleanProperty("isCluster") ?: false
                                 if (isCluster) {
-                                    val geom = feat.geometry() as? Point
-                                    if (geom != null) {
-                                        val cam = map.cameraPosition
-                                        map.animateCamera(
-                                            CameraUpdateFactory.newCameraPosition(
-                                                CameraPosition.Builder()
-                                                    .target(LatLng(geom.latitude(), geom.longitude()))
-                                                    .zoom(cam.zoom + 1.5)
-                                                    .tilt(cam.tilt)
-                                                    .bearing(cam.bearing)
-                                                    .build()
+                                    if (!currentIsMeasuringMode) {
+                                        val geom = feat.geometry() as? Point
+                                        if (geom != null) {
+                                            val cam = map.cameraPosition
+                                            map.animateCamera(
+                                                CameraUpdateFactory.newCameraPosition(
+                                                    CameraPosition.Builder()
+                                                        .target(LatLng(geom.latitude(), geom.longitude()))
+                                                        .zoom(cam.zoom + 1.5)
+                                                        .tilt(cam.tilt)
+                                                        .bearing(cam.bearing)
+                                                        .build()
+                                                )
                                             )
-                                        )
-                                        return@addOnMapClickListener true
+                                            return@addOnMapClickListener true
+                                        }
                                     }
                                 } else {
                                     val idAnfr = feat.getStringProperty("idAnfr")
                                     val match = sitesMap[idAnfr] ?: antennas.find { it.idAnfr == idAnfr }
                                     if (match != null) {
-                                        currentOnSiteClick(match)
-                                        return@addOnMapClickListener true
+                                        val shouldSnap = if (currentIsMeasuringMode) {
+                                            val pt = map.projection.toScreenLocation(LatLng(match.latitude, match.longitude))
+                                            val dx = pt.x - screenPoint.x
+                                            val dy = pt.y - screenPoint.y
+                                            val maxSnapPx = 22f * context.resources.displayMetrics.density
+                                            (dx * dx + dy * dy) <= (maxSnapPx * maxSnapPx)
+                                        } else {
+                                            true
+                                        }
+                                        if (shouldSnap) {
+                                            currentOnSiteClick(match)
+                                            return@addOnMapClickListener true
+                                        }
                                     }
                                 }
                             }
 
-                            // 2b. Clic sur une liaison FH
-                            val renderedFhLinks = map.queryRenderedFeatures(rect, FH_LINKS_LAYER_ID)
-                            if (renderedFhLinks.isNotEmpty()) {
-                                val linkIndex = renderedFhLinks[0].getNumberProperty("linkIndex")?.toInt()
-                                val clickedLink = linkIndex?.let { currentFhLinks.getOrNull(it) }
-                                if (clickedLink != null && currentOnFhLinkClick != null) {
-                                    currentOnFhLinkClick?.invoke(clickedLink)
-                                    return@addOnMapClickListener true
+                            // 2b. Clic sur une liaison FH (hors mode mesure)
+                            if (!currentIsMeasuringMode) {
+                                val renderedFhLinks = map.queryRenderedFeatures(rect, FH_LINKS_LAYER_ID)
+                                if (renderedFhLinks.isNotEmpty()) {
+                                    val linkIndex = renderedFhLinks[0].getNumberProperty("linkIndex")?.toInt()
+                                    val clickedLink = linkIndex?.let { currentFhLinks.getOrNull(it) }
+                                    if (clickedLink != null && currentOnFhLinkClick != null) {
+                                        currentOnFhLinkClick?.invoke(clickedLink)
+                                        return@addOnMapClickListener true
+                                    }
                                 }
                             }
 
@@ -1889,8 +2105,11 @@ fun Map3DView(
                                 )
                                 val visibleRegion = map.projection.visibleRegion
                                 val bounds = visibleRegion.latLngBounds
+                                val densityZoomOffset = 1.0 + kotlin.math.log2(
+                                    context.resources.displayMetrics.density.toDouble().coerceAtLeast(1.0)
+                                )
                                 onViewportChanged(
-                                    cam.zoom,
+                                    cam.zoom + densityZoomOffset,
                                     bounds.latitudeNorth,
                                     bounds.longitudeEast,
                                     bounds.latitudeSouth,

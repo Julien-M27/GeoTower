@@ -593,7 +593,7 @@
     <string name="appstrings_delete_all_maps_warning_title">Eliminare tutte le mappe?</string>
     <string name="appstrings_delete_traces">Elimina tracciati</string>
     <string name="appstrings_details">Dettagli</string>
-    <string name="appstrings_dev_credit">Sviluppato da Julien e dai contributori GitHub 😉</string>
+    <string name="appstrings_dev_credit">Sviluppato da Julien, Johan e dai contributori GitHub 😉</string>
     <string name="appstrings_distance_hidden">Distanza nascosta (modalità riservata)</string>
     <string name="appstrings_distance_label">Distanza:\u0020</string>
     <string name="appstrings_do_not_show_again">Non mostrare più questo messaggio</string>
@@ -3011,6 +3011,7 @@
     <string name="appstrings_release_v2142_summary_speedtests_ocr_max_priority_and_raw_text">Priorità alle velocità principali rispetto ai picchi MAX in OCR e visualizzazione del testo OCR rilevato nei dettagli</string>
     <string name="appstrings_release_v2143_summary_speedtests_ocr_dual_pass_and_decimals">Doppia passata OCR in scala ridotta per le cifre grandi e normalizzazione dei decimali spaziati negli speedtest</string>
     <string name="appstrings_release_v2144_summary_speedtests_map_thumbnails_and_translations">Miniature cliccabili degli speedtest sulla mappa, condivisione e copia OCR, e traduzioni complete dell\'interfaccia</string>
+    <string name="appstrings_release_v2151_summary_map_3d_clustering_and_perf">Ottimizzazioni delle prestazioni per mappe 2D/3D, clustering, query e tracciamento in tempo reale</string>
     <string name="appstrings_release_v2150_summary_rust_canada_and_local_build">Generazione locale Rust per il Canada e miglioramenti a avanzamento e diagnostica</string>
     <string name="appstrings_release_v2149_summary_rust_jni_release_fix">Maggiore stabilità del motore nativo Rust per la generazione locale dei database nelle build Release</string>
     <string name="appstrings_release_v2148_summary_rust_db_builder_and_update_scheduler">Motore sperimentale Rust per la generazione locale dei database e miglioramenti alla pianificazione degli aggiornamenti</string>

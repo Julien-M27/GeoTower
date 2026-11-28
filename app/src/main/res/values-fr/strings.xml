@@ -627,7 +627,7 @@
     <string name="appstrings_delete_all_maps_warning_title">Supprimer toutes les cartes ?</string>
     <string name="appstrings_delete_traces">Supprimer les tracés</string>
     <string name="appstrings_details">Détails</string>
-    <string name="appstrings_dev_credit">Développé par Julien et les contributeurs de GitHub 😉</string>
+    <string name="appstrings_dev_credit">Développé par Julien, Johan et les contributeurs de GitHub 😉</string>
     <string name="appstrings_distance_hidden">Distance masquée (Mode confidentiel)</string>
     <string name="appstrings_distance_label">Distance :\u0020</string>
     <string name="appstrings_do_not_show_again">Ne plus afficher ce message</string>
@@ -3013,6 +3013,7 @@
     <string name="appstrings_release_v2142_summary_speedtests_ocr_max_priority_and_raw_text">Priorité aux débits principaux sur les valeurs MAX en OCR et affichage du texte OCR détecté dans les détails</string>
     <string name="appstrings_release_v2143_summary_speedtests_ocr_dual_pass_and_decimals">Double passe OCR à échelle réduite pour les grands chiffres et normalisation des décimales espacées dans les speedtests</string>
     <string name="appstrings_release_v2144_summary_speedtests_map_thumbnails_and_translations">Miniatures des speedtests géolocalisés sur la carte, partage et copie OCR, et traductions complètes de l\'interface</string>
+    <string name="appstrings_release_v2151_summary_map_3d_clustering_and_perf">Optimisation des performances (carte 2D/3D, clustering, requêtes et suivi en direct)</string>
     <string name="appstrings_release_v2150_summary_rust_canada_and_local_build">Génération locale Rust pour le Canada, améliorations du suivi de génération et des diagnostics</string>
     <string name="appstrings_release_v2149_summary_rust_jni_release_fix">Fiabilisation du moteur natif Rust pour la génération locale des bases en version Release</string>
     <string name="appstrings_release_v2148_summary_rust_db_builder_and_update_scheduler">Moteur expérimental Rust pour la génération locale des bases et fiabilisation des vérifications de mise à jour</string>
